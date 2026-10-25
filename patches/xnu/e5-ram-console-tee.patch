@@ -41,7 +41,7 @@ index 7187c15..cc4f62c 100644
  	if (debug_boot_arg) {
  		patch_low_glo();
 diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
-index 715c545..9d556fe 100644
+index 715c545..3809492 100644
 --- a/osfmk/console/serial_console.c
 +++ b/osfmk/console/serial_console.c
 @@ -249,9 +249,95 @@ get_cons_ops_index(void)
@@ -56,7 +56,7 @@ index 715c545..9d556fe 100644
 + */
 +#define E5_PRZ_PA        0xFFF80000UL
 +#define E5_PRZ_DATA_OFF  27UL
-+#define E5_PRZ_WIN_OFF   0xB000UL
++#define E5_PRZ_WIN_OFF   0x4F00UL
 +#define E5_PRZ_WIN_SIZE  0x3000UL
 +
 +extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
