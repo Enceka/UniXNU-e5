@@ -33,10 +33,10 @@ index 7187c15..569fb40 100644
  	if (debug_boot_arg) {
  		patch_low_glo();
 diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
-index 715c545..ac32f82 100644
+index 715c545..01a330c 100644
 --- a/osfmk/console/serial_console.c
 +++ b/osfmk/console/serial_console.c
-@@ -249,9 +249,80 @@ get_cons_ops_index(void)
+@@ -249,9 +249,78 @@ get_cons_ops_index(void)
   * @param poll Whether or not this call should poll instead of going to sleep
   *             waiting for an interrupt when the hardware device isn't ready
   */
@@ -48,7 +48,7 @@ index 715c545..ac32f82 100644
 + */
 +#define E5_PRZ_PA        0xFFF80000UL
 +#define E5_PRZ_DATA_OFF  27UL
-+#define E5_PRZ_WIN_OFF   0x6F00UL   // E5: dmesg prz area (Android rewrites the console prz)
++#define E5_PRZ_WIN_OFF   0xB000UL
 +#define E5_PRZ_WIN_SIZE  0x3000UL
 +
 +extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
@@ -63,8 +63,6 @@ index 715c545..ac32f82 100644
 +e5_prz_phase = 0;
 +e5_prz_win = NULL;
 +e5_prz_pos = 0;
-+/* E5: MMU is already on at arm_init entry; NEVER write via the raw PA here.
-+ * Output starts only after e5_trace_map() creates a Device mapping. */
 +}
 +
 +void
@@ -90,6 +88,7 @@ index 715c545..ac32f82 100644
 +if (c == '\n') {
 +e5_kputc('\r');
 +}
++if (e5_prz_phase == 1 && e5_prz_win != NULL) {
 +p = (volatile char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
 +*p = c;
 +if (++e5_prz_pos >= E5_PRZ_WIN_SIZE) {
