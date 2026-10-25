@@ -1,5 +1,5 @@
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
-index bca4c7c..f7c744c 100644
+index bca4c7c..6f87ef9 100644
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
 @@ -464,6 +464,17 @@ start_cpu:
@@ -7,12 +7,12 @@ index bca4c7c..f7c744c 100644
  LEXT(start_first_cpu)
  
 +.macro E5MARK, paLo, tagHi, tagLo
-+movzx16, #0xFFF8, lsl #16
-+movkx16, #\paLo
-+movzx17, #\tagHi, lsl #16
-+movkx17, #\tagLo
-+strx17, [x16]
-+dccvac, x16
++	movz	x16, #0xFFF8, lsl #16
++	movk	x16, #\paLo
++	movz	x17, #\tagHi, lsl #16
++	movk	x17, #\tagLo
++	str	x17, [x16]
++	dc	cvac, x16
 +.endmacro
 +
 +E5MARK 0xC01B, 0x3153, 0x3545   // E5S1 reached start_first_cpu
