@@ -1,5 +1,5 @@
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
-index bca4c7c..c4a33f8 100644
+index bca4c7c..100b83f 100644
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
 @@ -464,6 +464,17 @@ start_cpu:
@@ -98,7 +98,7 @@ index bca4c7c..c4a33f8 100644
  
  #ifndef __ARM_IC_NOALIAS_ICACHE__
  	/* Invalidate the TLB and icache on systems that do not guarantee that the
-@@ -761,6 +775,7 @@ common_start:
+@@ -761,15 +775,17 @@ common_start:
  	PAC_INIT_KEY_STATE tmp=x0, tmp2=x1
  #endif /* HAS_APPLE_PAC */
  
@@ -106,3 +106,16 @@ index bca4c7c..c4a33f8 100644
  	// Enable caches, MMU, ROP and JOP
  	MOV64   x0, SCTLR_EL1_DEFAULT
  	MSR_SCTLR_EL1_X0
+ 	isb		sy
++	E5MARK 0x7F8B, 0x7853, 0x3545	// E5Sx MMU on
+ 
+ #if !VMAPPLE
+-	MOV64   x1, SCTLR_EL1_DEFAULT
+-	cmp		x0, x1
+-	bne		.
++	// E5: A53 readback of RES0 bits (bit20/UCI/SED...) differs from the
++	// written Apple-oriented value; skip the spin check.
++	nop
+ #endif /* !VMAPPLE */
+ 
+ #if (!CONFIG_KERNEL_INTEGRITY || (CONFIG_KERNEL_INTEGRITY && !defined(KERNEL_INTEGRITY_WT)))
