@@ -33,10 +33,10 @@ index 7187c15..569fb40 100644
  	if (debug_boot_arg) {
  		patch_low_glo();
 diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
-index 715c545..01a330c 100644
+index 715c545..a38701e 100644
 --- a/osfmk/console/serial_console.c
 +++ b/osfmk/console/serial_console.c
-@@ -249,9 +249,78 @@ get_cons_ops_index(void)
+@@ -249,9 +249,80 @@ get_cons_ops_index(void)
   * @param poll Whether or not this call should poll instead of going to sleep
   *             waiting for an interrupt when the hardware device isn't ready
   */
@@ -52,6 +52,8 @@ index 715c545..01a330c 100644
 +#define E5_PRZ_WIN_SIZE  0x3000UL
 +
 +extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
++
++void e5_trace_mark(void);
 +
 +static char * volatile e5_prz_win;
 +static unsigned long e5_prz_pos;
