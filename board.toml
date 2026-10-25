@@ -19,13 +19,12 @@
   "build-software-aes-bindings.py",
   "build-mockfs-fixture.py",
   "build-libpthread-kernel.py",
-  "component:RamBlock",
 ]
 "config_fragments" = ["arch:configs/common.config", "soc:configs/ums9621.config", "os:configs/ipados.config"]
 "patch_series" = ["arch:patches/xnu/series", "soc:patches/xnu/series", "os:patches/xnu/series", "device:patches/xnu/series"]
 
 ["components"]
-"include" = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "RamBlock"]
+"include" = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink"]
 
 ["device_tree"]
 "source" = "device:dts/e5.dts"
