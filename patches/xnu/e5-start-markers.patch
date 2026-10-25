@@ -1,5 +1,5 @@
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
-index bca4c7c..9429725 100644
+index bca4c7c..ab75b81 100644
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
 @@ -464,6 +464,17 @@ start_cpu:
@@ -37,15 +37,23 @@ index bca4c7c..9429725 100644
  
  	// Set up interrupt stack pointer
  	adrp	x0, EXT(intstack_top)@page			// Load top of irq stack
-@@ -616,6 +630,7 @@ Lkernelcache_base_found:
- 	/* Setup the KVA bootstrap mapping */
+@@ -617,6 +631,15 @@ Lkernelcache_base_found:
  	lsr		x5,  x24, #(ARM_TT_L2_SHIFT)
  	create_bootstrap_mapping x14, x15, x5, x3, x2, x9, x10, x11, x12, x13
-+	E5MARK 0x7F33, 0x3453, 0x3545   // E5S4 bootstrap page tables built
  
++	/* E5: identity-map the persistent ram console (0xFFE00000, 32MB block)
++	 * into the V=P table so PA==VA writes (ram console at 0xFFF80000) work
++	 * from MMU enable until arm_vm_init() installs the real kernel map. */
++	mov		x0, #(0xFFE00000)
++	mov		x4, #(0xFFE00000)
++	mov		x5, #(1)
++	create_bootstrap_mapping x0, x4, x5, x1, x2, x6, x10, x11, x12, x13
++	E5MARK 0x7F33, 0x3453, 0x3545   // E5S4 bootstrap page tables built
++
  	b Lbootstrap_tables_ready
  Lbootstrap_tables_exhausted:
-@@ -658,6 +673,7 @@ common_start:
+ 	// MMU is still off. Stop with the offending cursor/end preserved for
+@@ -658,6 +681,7 @@ common_start:
  	add		x0, x0, EXT(sysreg_restore)@pageoff
  	ldr		x1, [x0, SR_RESTORE_TCR_EL1]
  	MSR_TCR_EL1_X1
@@ -53,7 +61,7 @@ index bca4c7c..9429725 100644
  
  	/* Set up translation table base registers.
  	 *	TTBR0 - V=P table @ top of kernel
-@@ -672,9 +688,11 @@ common_start:
+@@ -672,9 +696,11 @@ common_start:
  	mov		x19, lr
  	bl		EXT(set_mmu_ttb)
  	mov		lr, x19
@@ -65,7 +73,7 @@ index bca4c7c..9429725 100644
  
  	// Set up MAIR attr0 for normal memory, attr1 for device memory
  	mov		x0, xzr
-@@ -702,23 +720,19 @@ common_start:
+@@ -702,23 +728,19 @@ common_start:
  	orr		x0, x0, x1
  #endif /* HAS_FEAT_XS */
  	msr		MAIR_EL1, x0
@@ -98,7 +106,7 @@ index bca4c7c..9429725 100644
  
  #ifndef __ARM_IC_NOALIAS_ICACHE__
  	/* Invalidate the TLB and icache on systems that do not guarantee that the
-@@ -761,15 +775,17 @@ common_start:
+@@ -761,15 +783,17 @@ common_start:
  	PAC_INIT_KEY_STATE tmp=x0, tmp2=x1
  #endif /* HAS_APPLE_PAC */
  
@@ -119,7 +127,7 @@ index bca4c7c..9429725 100644
  #endif /* !VMAPPLE */
  
  #if (!CONFIG_KERNEL_INTEGRITY || (CONFIG_KERNEL_INTEGRITY && !defined(KERNEL_INTEGRITY_WT)))
-@@ -782,10 +798,12 @@ common_start:
+@@ -782,10 +806,12 @@ common_start:
  	// Enable NEON
  	mov		x0, #(CPACR_FPEN_ENABLE)
  	msr		CPACR_EL1, x0
@@ -132,7 +140,7 @@ index bca4c7c..9429725 100644
  
  
  #if defined(APPLE_ARM64_ARCH_FAMILY)
-@@ -816,6 +834,7 @@ common_start:
+@@ -816,6 +842,7 @@ common_start:
  	// Set KVA of boot args as first arg
  	add		x0, x20, x22
  	sub		x0, x0, x23
