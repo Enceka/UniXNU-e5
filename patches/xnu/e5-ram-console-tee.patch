@@ -63,6 +63,8 @@ index 715c545..ac32f82 100644
 +e5_prz_phase = 0;
 +e5_prz_win = NULL;
 +e5_prz_pos = 0;
++/* E5: MMU is already on at arm_init entry; NEVER write via the raw PA here.
++ * Output starts only after e5_trace_map() creates a Device mapping. */
 +}
 +
 +void
@@ -72,6 +74,7 @@ index 715c545..ac32f82 100644
 +e5_prz_win = (char *)ml_io_map(E5_PRZ_PA, 0x10000);
 +if (e5_prz_win != NULL) {
 +e5_prz_phase = 1;
++e5_trace_mark();
 +}
 +}
 +}
@@ -81,18 +84,14 @@ index 715c545..ac32f82 100644
 +{
 +volatile char *p;
 +
++if (e5_prz_phase != 1 || e5_prz_win == NULL) {
++return;
++}
 +if (c == '\n') {
 +e5_kputc('\r');
 +}
-+if (e5_prz_phase == 1 && e5_prz_win != NULL) {
 +p = (volatile char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
-+} else {
-+p = (volatile char *)(E5_PRZ_PA + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
-+}
 +*p = c;
-+if (e5_prz_phase == 0) {
-+__asm__ volatile ("dc cvac, %0" :: "r"((void *)p) : "memory");
-+}
 +if (++e5_prz_pos >= E5_PRZ_WIN_SIZE) {
 +e5_prz_pos = 0;
 +}
