@@ -1,0 +1,71 @@
+diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+index bca4c7c..f7c744c 100644
+--- a/osfmk/arm64/start.s
++++ b/osfmk/arm64/start.s
+@@ -464,6 +464,17 @@ start_cpu:
+ 	.globl EXT(start_first_cpu)
+ LEXT(start_first_cpu)
+ 
++.macro E5MARK, paLo, tagHi, tagLo
++movzx16, #0xFFF8, lsl #16
++movkx16, #\paLo
++movzx17, #\tagHi, lsl #16
++movkx17, #\tagLo
++strx17, [x16]
++dccvac, x16
++.endmacro
++
++E5MARK 0xC01B, 0x3153, 0x3545   // E5S1 reached start_first_cpu
++
+ 	// Unlock the core for debugging
+ 	msr		OSLAR_EL1, xzr
+ 	msr		DAIFSet, #(DAIFSC_ALL)				// Disable all interrupts
+@@ -484,6 +495,8 @@ LEXT(start_first_cpu)
+ 	adrp	x25, EXT(bootstrap_pagetables)@page	// Get the start of the page tables
+ 	ldr		x26, [x20, BA_BOOT_FLAGS]			// Get the kernel boot flags
+ 
++	E5MARK 0xC023, 0x3253, 0x3545   // E5S2 args loaded
++
+ 	// Clear the registers that will be used to store the userspace thread pointer and CPU number.
+ 	// We may not actually be booting from ordinal CPU 0, so this register will be updated
+ 	// in ml_parse_cpu_topology(), which happens later in bootstrap.
+@@ -504,6 +517,7 @@ LEXT(start_first_cpu)
+ #endif
+ 
+ 	mov		sp, x0
++	E5MARK 0xC02B, 0x3353, 0x3545   // E5S3 stacks set
+ 
+ 	// Set up interrupt stack pointer
+ 	adrp	x0, EXT(intstack_top)@page			// Load top of irq stack
+@@ -616,6 +630,7 @@ Lkernelcache_base_found:
+ 	/* Setup the KVA bootstrap mapping */
+ 	lsr		x5,  x24, #(ARM_TT_L2_SHIFT)
+ 	create_bootstrap_mapping x14, x15, x5, x3, x2, x9, x10, x11, x12, x13
++	E5MARK 0xC033, 0x3453, 0x3545   // E5S4 bootstrap page tables built
+ 
+ 	b Lbootstrap_tables_ready
+ Lbootstrap_tables_exhausted:
+@@ -658,6 +673,7 @@ common_start:
+ 	add		x0, x0, EXT(sysreg_restore)@pageoff
+ 	ldr		x1, [x0, SR_RESTORE_TCR_EL1]
+ 	MSR_TCR_EL1_X1
++	E5MARK 0xC03B, 0x3553, 0x3545   // E5S5 TCR set
+ 
+ 	/* Set up translation table base registers.
+ 	 *	TTBR0 - V=P table @ top of kernel
+@@ -719,6 +735,7 @@ common_start:
+ 	str		w1, [x0]
+ 	isb		sy
+ #endif
++	E5MARK 0xC043, 0x3653, 0x3545   // E5S6 BCM2837 timer routing done
+ 
+ #ifndef __ARM_IC_NOALIAS_ICACHE__
+ 	/* Invalidate the TLB and icache on systems that do not guarantee that the
+@@ -761,6 +778,7 @@ common_start:
+ 	PAC_INIT_KEY_STATE tmp=x0, tmp2=x1
+ #endif /* HAS_APPLE_PAC */
+ 
++	E5MARK 0xC04B, 0x3753, 0x3545   // E5S7 before MMU on
+ 	// Enable caches, MMU, ROP and JOP
+ 	MOV64   x0, SCTLR_EL1_DEFAULT
+ 	MSR_SCTLR_EL1_X0

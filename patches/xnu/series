@@ -1,1 +1,2 @@
 e5-ram-console-tee.patch
+patches/xnu/e5-start-markers.patch
