@@ -1,5 +1,5 @@
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
-index 7187c15..569fb40 100644
+index 7187c15..c8b2e6d 100644
 --- a/osfmk/arm/arm_init.c
 +++ b/osfmk/arm/arm_init.c
 @@ -347,6 +347,13 @@ void
@@ -8,9 +8,9 @@ index 7187c15..569fb40 100644
  {
 +	{
 +		extern void e5_trace_init(void);
-+		extern void e5_trace_mark(void);
++		extern void e5_trace_tag(const char *tag);
 +		e5_trace_init();
-+		e5_trace_mark();
++		e5_trace_tag("E5M1\n");
 +	}
 +
  	unsigned int    maxmem;
@@ -20,7 +20,7 @@ index 7187c15..569fb40 100644
  
  	PE_init_platform(FALSE, args); /* Get platform expert set up */
  	boot_progress_init();
-+e5_trace_mark();
++	e5_trace_tag("E5M2\n");
  
  #if __arm64__
  	configure_timer_apple_regs();
@@ -28,15 +28,15 @@ index 7187c15..569fb40 100644
  	boot_progress_stage("arm_vm_init enter");
  	arm_vm_init(xmaxmem, args);
  	boot_progress_stage("arm_vm_init returned");
-+	{ extern void e5_trace_map(void); e5_trace_map(); e5_trace_mark(); }
++	{ extern void e5_trace_map(void); extern void e5_trace_tag(const char *tag); e5_trace_map(); e5_trace_tag("E5M3\n"); }
  
  	if (debug_boot_arg) {
  		patch_low_glo();
 diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
-index 715c545..d20b532 100644
+index 715c545..2fec143 100644
 --- a/osfmk/console/serial_console.c
 +++ b/osfmk/console/serial_console.c
-@@ -249,9 +249,79 @@ get_cons_ops_index(void)
+@@ -249,9 +249,92 @@ get_cons_ops_index(void)
   * @param poll Whether or not this call should poll instead of going to sleep
   *             waiting for an interrupt when the hardware device isn't ready
   */
@@ -84,13 +84,18 @@ index 715c545..d20b532 100644
 +{
 +volatile char *p;
 +
-+if (e5_prz_phase != 1 || e5_prz_win == NULL) {
-+return;
-+}
 +if (c == '\n') {
 +e5_kputc('\r');
 +}
++if ((e5_prz_phase == 1) && (e5_prz_win != NULL)) {
 +p = (volatile char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
++} else {
++/*
++ * Bootstrap V=P identity mapping (VA == PA) installed by start.s
++ * covers the persistent zone until arm_vm_init() replaces the tables.
++ */
++p = (volatile char *)(E5_PRZ_PA + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
++}
 +*p = c;
 +if (++e5_prz_pos >= E5_PRZ_WIN_SIZE) {
 +e5_prz_pos = 0;
@@ -107,6 +112,14 @@ index 715c545..d20b532 100644
 +e5_kputc(mark[i]);
 +}
 +e5_kputc('\n');
++}
++
++void
++e5_trace_tag(const char *tag)
++{
++while (*tag != '\0') {
++e5_kputc(*tag++);
++}
 +}
 +
  static inline void
