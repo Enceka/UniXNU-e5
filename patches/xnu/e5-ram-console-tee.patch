@@ -1,19 +1,30 @@
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
-index 7187c15..45d3f21 100644
+index 7187c15..569fb40 100644
 --- a/osfmk/arm/arm_init.c
 +++ b/osfmk/arm/arm_init.c
-@@ -369,6 +369,10 @@ arm_init(
- 	BootCpuData.jop_key = ml_default_jop_pid();
- #endif /* defined(HAS_APPLE_PAC) */
+@@ -347,6 +347,13 @@ void
+ arm_init(
+ 	boot_args       *args)
+ {
++	{
++		extern void e5_trace_init(void);
++		extern void e5_trace_mark(void);
++		e5_trace_init();
++		e5_trace_mark();
++	}
++
+ 	unsigned int    maxmem;
+ 	uint32_t        memsize;
+ 	uint64_t        xmaxmem;
+@@ -371,6 +378,7 @@ arm_init(
  
-+	extern void e5_trace_init(void);
-+	extern void e5_trace_mark(void);
-+	e5_trace_init();
-+	e5_trace_mark();
  	PE_init_platform(FALSE, args); /* Get platform expert set up */
  	boot_progress_init();
++e5_trace_mark();
  
-@@ -534,6 +538,7 @@ arm_init(
+ #if __arm64__
+ 	configure_timer_apple_regs();
+@@ -534,6 +542,7 @@ arm_init(
  	boot_progress_stage("arm_vm_init enter");
  	arm_vm_init(xmaxmem, args);
  	boot_progress_stage("arm_vm_init returned");
