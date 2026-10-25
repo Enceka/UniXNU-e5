@@ -1,5 +1,5 @@
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
-index bca4c7c..d2c27c9 100644
+index bca4c7c..c7d65a8 100644
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
 @@ -464,6 +464,17 @@ start_cpu:
@@ -53,15 +53,28 @@ index bca4c7c..d2c27c9 100644
  
  	/* Set up translation table base registers.
  	 *	TTBR0 - V=P table @ top of kernel
-@@ -719,6 +735,7 @@ common_start:
- 	str		w1, [x0]
- 	isb		sy
- #endif
+@@ -707,18 +723,8 @@ common_start:
+ 	dsb		ish
+ 
+ 
+-#if defined(BCM2837) && (!defined(XNU_NATIVE_ARCH_TIMER) || !XNU_NATIVE_ARCH_TIMER)
+-	// Setup timer interrupt routing; must be done before MMU is enabled
+-	mrs		x15, MPIDR_EL1						// Load MPIDR to get CPU number
+-	and		x15, x15, #0xFF						// CPU number is in MPIDR Affinity Level 0
+-	mov		x0, #0x4000
+-	lsl		x0, x0, #16
+-	add		x0, x0, #0x0040						// x0: 0x4000004X Core Timers interrupt control
+-	add		x0, x0, x15, lsl #2
+-	mov		w1, #0xF0 						// x1: 0xF0 	  Route to Core FIQs
+-	str		w1, [x0]
+-	isb		sy
+-#endif
++#if 0 // E5: BCM2837 core-timer routing write faults on UMS9621
 +	E5MARK 0x7F43, 0x3653, 0x3545   // E5S6 BCM2837 timer routing done
  
  #ifndef __ARM_IC_NOALIAS_ICACHE__
  	/* Invalidate the TLB and icache on systems that do not guarantee that the
-@@ -761,6 +778,7 @@ common_start:
+@@ -761,6 +767,7 @@ common_start:
  	PAC_INIT_KEY_STATE tmp=x0, tmp2=x1
  #endif /* HAS_APPLE_PAC */
  
