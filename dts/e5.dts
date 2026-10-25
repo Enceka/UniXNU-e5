@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/dts-v1/;
+/include/ "ums9621.dtsi"
+
+/ {
+    model = "Rongyue E5";
+    compatible = "rongyue,e5", "sprd,ums9621";
+
+    memory@80000000 {
+        device_type = "memory";
+        reg = <0 0x80000000 0 0x80000000>;
+    };
+};

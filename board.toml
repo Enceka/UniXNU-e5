@@ -1,0 +1,37 @@
+"schema_version" = 2
+
+["board"]
+"name" = "e5"
+"soc" = "UMS9621"
+"description" = "Rongyue E5 e-reader"
+"kit" = "e5"
+"soc_source" = "ums9621"
+"os_profile" = "ipados-17.7.11-21H461"
+
+["kernel"]
+"defconfig" = "e5_defconfig"
+"archives" = [
+  "build-corecrypto-14.py",
+  "build-corecrypto-14.py --namespace",
+  "component:ArmDTPlatform",
+  "component:ArmCpu",
+  "component:SoftwareAES",
+  "build-software-aes-bindings.py",
+  "build-mockfs-fixture.py",
+  "build-libpthread-kernel.py",
+  "component:RamBlock",
+]
+"config_fragments" = ["arch:configs/common.config", "soc:configs/ums9621.config", "os:configs/ipados.config"]
+"patch_series" = ["arch:patches/xnu/series", "soc:patches/xnu/series", "os:patches/xnu/series", "device:patches/xnu/series"]
+
+["components"]
+"include" = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink", "RamBlock"]
+
+["device_tree"]
+"source" = "device:dts/e5.dts"
+"include_dirs" = ["soc:dts"]
+
+["payload"]
+"title" = "Boot E5"
+"dram_size" = "0x80000000"
+"kernel_args" = ["-v", "serial=3"]

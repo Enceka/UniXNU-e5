@@ -1,0 +1,5 @@
+[[source]]
+kind = "soc"
+name = "ums9621"
+git = "https://github.com/Enceka/unixnu-ums9621.git"
+commit = "d2ea612ed4ed8099096ddc33026368def3a748ac"
