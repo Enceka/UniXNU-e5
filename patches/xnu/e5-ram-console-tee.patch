@@ -22,13 +22,13 @@ index 7187c15..45d3f21 100644
  	if (debug_boot_arg) {
  		patch_low_glo();
 diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
-index 715c545..ad33e0d 100644
+index 715c545..ac32f82 100644
 --- a/osfmk/console/serial_console.c
 +++ b/osfmk/console/serial_console.c
-@@ -250,8 +250,79 @@ get_cons_ops_index(void)
+@@ -249,9 +249,80 @@ get_cons_ops_index(void)
+  * @param poll Whether or not this call should poll instead of going to sleep
   *             waiting for an interrupt when the hardware device isn't ready
   */
- static inline void
 +
 +/* E5 ram console tee: mirror every console character into the persistent
 + * dmesg ramoops zone so the trace survives the reset back to Android.
@@ -99,6 +99,7 @@ index 715c545..ad33e0d 100644
 +e5_kputc('\n');
 +}
 +
+ static inline void
  _cnputc(char c, bool poll)
  {
 +	e5_kputc(c);
