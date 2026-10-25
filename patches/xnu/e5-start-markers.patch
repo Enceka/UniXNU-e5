@@ -1,5 +1,5 @@
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
-index bca4c7c..100b83f 100644
+index bca4c7c..4736daf 100644
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
 @@ -464,6 +464,17 @@ start_cpu:
@@ -119,3 +119,11 @@ index bca4c7c..100b83f 100644
  #endif /* !VMAPPLE */
  
  #if (!CONFIG_KERNEL_INTEGRITY || (CONFIG_KERNEL_INTEGRITY && !defined(KERNEL_INTEGRITY_WT)))
+@@ -786,6 +802,7 @@ common_start:
+ 
+ 	// Clear thread pointer
+ 	msr		TPIDR_EL1, xzr						// Set thread register
++	E5MARK 0x7F9B, 0x326D, 0x3545	// E5m2 TPIDR done (tag E5m2)
+ 
+ 
+ #if defined(APPLE_ARM64_ARCH_FAMILY)
