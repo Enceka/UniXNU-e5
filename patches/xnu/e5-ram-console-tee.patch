@@ -1,11 +1,19 @@
 diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
-index 7187c15..c8b2e6d 100644
+index 7187c15..cc4f62c 100644
 --- a/osfmk/arm/arm_init.c
 +++ b/osfmk/arm/arm_init.c
-@@ -347,6 +347,13 @@ void
+@@ -347,6 +347,21 @@ void
  arm_init(
  	boot_args       *args)
  {
++	__asm__ volatile (
++		"movz x16, #0xFFF8, lsl #16\n\t"
++		"movk x16, #0xFAB\n\t"
++		"movz x17, #0x304D, lsl #16\n\t"
++		"movk x17, #0x3545\n\t"
++		"str x17, [x16]\n\t"
++		"dc cvac, x16"
++		: : : "memory", "x16", "x17");
 +	{
 +		extern void e5_trace_init(void);
 +		extern void e5_trace_tag(const char *tag);
@@ -16,7 +24,7 @@ index 7187c15..c8b2e6d 100644
  	unsigned int    maxmem;
  	uint32_t        memsize;
  	uint64_t        xmaxmem;
-@@ -371,6 +378,7 @@ arm_init(
+@@ -371,6 +386,7 @@ arm_init(
  
  	PE_init_platform(FALSE, args); /* Get platform expert set up */
  	boot_progress_init();
@@ -24,7 +32,7 @@ index 7187c15..c8b2e6d 100644
  
  #if __arm64__
  	configure_timer_apple_regs();
-@@ -534,6 +542,7 @@ arm_init(
+@@ -534,6 +550,7 @@ arm_init(
  	boot_progress_stage("arm_vm_init enter");
  	arm_vm_init(xmaxmem, args);
  	boot_progress_stage("arm_vm_init returned");
