@@ -33,10 +33,10 @@ index 7187c15..569fb40 100644
  	if (debug_boot_arg) {
  		patch_low_glo();
 diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
-index 715c545..a38701e 100644
+index 715c545..d20b532 100644
 --- a/osfmk/console/serial_console.c
 +++ b/osfmk/console/serial_console.c
-@@ -249,9 +249,80 @@ get_cons_ops_index(void)
+@@ -249,9 +249,79 @@ get_cons_ops_index(void)
   * @param poll Whether or not this call should poll instead of going to sleep
   *             waiting for an interrupt when the hardware device isn't ready
   */
@@ -90,7 +90,6 @@ index 715c545..a38701e 100644
 +if (c == '\n') {
 +e5_kputc('\r');
 +}
-+if (e5_prz_phase == 1 && e5_prz_win != NULL) {
 +p = (volatile char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
 +*p = c;
 +if (++e5_prz_pos >= E5_PRZ_WIN_SIZE) {
