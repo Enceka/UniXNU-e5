@@ -1,5 +1,5 @@
 diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
-index bca4c7c..4736daf 100644
+index bca4c7c..9429725 100644
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
 @@ -464,6 +464,17 @@ start_cpu:
@@ -119,7 +119,12 @@ index bca4c7c..4736daf 100644
  #endif /* !VMAPPLE */
  
  #if (!CONFIG_KERNEL_INTEGRITY || (CONFIG_KERNEL_INTEGRITY && !defined(KERNEL_INTEGRITY_WT)))
-@@ -786,6 +802,7 @@ common_start:
+@@ -782,10 +798,12 @@ common_start:
+ 	// Enable NEON
+ 	mov		x0, #(CPACR_FPEN_ENABLE)
+ 	msr		CPACR_EL1, x0
++	E5MARK 0x7F93, 0x316D, 0x3545	// E5m1 CPACR done (tag E5m1)
+ #endif
  
  	// Clear thread pointer
  	msr		TPIDR_EL1, xzr						// Set thread register
@@ -127,3 +132,11 @@ index bca4c7c..4736daf 100644
  
  
  #if defined(APPLE_ARM64_ARCH_FAMILY)
+@@ -816,6 +834,7 @@ common_start:
+ 	// Set KVA of boot args as first arg
+ 	add		x0, x20, x22
+ 	sub		x0, x0, x23
++	E5MARK 0x7FA3, 0x336D, 0x3545	// E5m3 args KVA done (tag E5m3)
+ 
+ #if KASAN
+ 	mov	x20, x0
