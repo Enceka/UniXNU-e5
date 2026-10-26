@@ -10,16 +10,3 @@ index e9daeed..f9bf3d9 100644
  	/* Shift debug buf start location and size by the length of the panic header */
  	debug_buf_base = (char *)gPanicBase + sizeof(struct embedded_panic_header);
  	debug_buf_ptr = debug_buf_base;
-@@ -1023,6 +1024,12 @@ panic(const char *str, ...)
- 	va_list panic_str_args;
- 
- 	va_start(panic_str_args, str);
-+	{
-+		extern void e5_panic_print(const char *);
-+		extern void e5_panic_vprint(const char *, va_list);
-+		e5_panic_print("E5PANIC: ");
-+		e5_panic_vprint(str, panic_str_args);
-+	}
- 	panic_trap_to_debugger(str, &panic_str_args, 0, NULL, 0, NULL, (unsigned long)(char *)__builtin_return_address(0));
- 	va_end(panic_str_args);
- }
