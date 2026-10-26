@@ -1,0 +1,21 @@
+diff --git a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
+index 90a0b10..55ac109 100644
+--- a/osfmk/arm64/sleh.c
++++ b/osfmk/arm64/sleh.c
+@@ -391,12 +391,14 @@ is_parity_error(fault_status_t status)
+ 
+ 
+ 
+-__dead2 __unused
++__unused
+ static void
+ arm64_implementation_specific_error(arm_saved_state_t *state, uint32_t esr, vm_offset_t far)
+ {
+ #pragma unused (state, esr, far)
+-	panic_plain("Unhandled implementation specific error esr 0x%08x far 0x%016lx\n", esr, far);
++	/* E5: benign async external abort on UMS9621 (unmapped peripheral probe). */
++	{ extern void e5_trace_tag(const char*); e5_trace_tag("E5SERRSKIP\n"); }
++	return;
+ }
+ 
+ #if CONFIG_KERNEL_INTEGRITY
