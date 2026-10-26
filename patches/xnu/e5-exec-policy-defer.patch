@@ -1,0 +1,21 @@
+diff --git a/bsd/kern/kern_exec.c b/bsd/kern/kern_exec.c
+index 8bba078..55305d4 100644
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -7631,6 +7631,16 @@ process_signature(proc_t p, struct image_params *imgp)
+ 	 * which is unexpected but security framework does not
+ 	 * approve of exec, kill and return immediately.
+ 	 */
++	if (imgp->ip_mac_return != 0) {
++		/* E5: developer seed boots carry a trust-cached but non-Apple launchd
++		 * stub; AMFI's exec policy still rejects it. Defer that policy verdict
++		 * behind an explicit boot-arg so only opted-in boots skip it. */
++		if (PE_parse_boot_argn("e5-exec-policy-off", NULL, 0)) {
++			printf("E5: exec security policy return %d deferred (e5-exec-policy-off)\n",
++			    imgp->ip_mac_return);
++			imgp->ip_mac_return = 0;
++		}
++	}
+ 	if (imgp->ip_mac_return != 0) {
+ 		KERNEL_DEBUG_CONSTANT(BSDDBG_CODE(DBG_BSD_PROC, BSD_PROC_EXITREASON_CREATE) | DBG_FUNC_NONE,
+ 		    proc_getpid(p), OS_REASON_EXEC, EXEC_EXIT_REASON_SECURITY_POLICY, 0, 0);
