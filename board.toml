@@ -16,6 +16,8 @@
   "component:ArmDTPlatform",
   "component:ArmCpu",
   "component:SoftwareAES",
+  "component:RamBlock",
+  "build-virtio-mmio-bindings.py --component RamBlock --directory build/ram-block",
   "build-software-aes-bindings.py",
   "build-mockfs-fixture.py",
   "build-libpthread-kernel.py",
@@ -24,7 +26,7 @@
 "patch_series" = ["arch:patches/xnu/series", "soc:patches/xnu/series", "os:patches/xnu/series", "device:patches/xnu/series"]
 
 ["components"]
-"include" = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "XnuPrelink"]
+"include" = ["ArmDTPlatform", "ArmCpu", "SoftwareAES", "RamBlock", "XnuPrelink"]
 
 ["device_tree"]
 "source" = "device:dts/e5.dts"
