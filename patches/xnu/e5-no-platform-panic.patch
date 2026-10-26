@@ -1,5 +1,327 @@
+diff --git a/osfmk/arm/arm_init.c b/osfmk/arm/arm_init.c
+index 7187c15..cc4f62c 100644
+--- a/osfmk/arm/arm_init.c
++++ b/osfmk/arm/arm_init.c
+@@ -347,6 +347,21 @@ void
+ arm_init(
+ 	boot_args       *args)
+ {
++	__asm__ volatile (
++		"movz x16, #0xFFF8, lsl #16\n\t"
++		"movk x16, #0xFAB\n\t"
++		"movz x17, #0x304D, lsl #16\n\t"
++		"movk x17, #0x3545\n\t"
++		"str x17, [x16]\n\t"
++		"dc cvac, x16"
++		: : : "memory", "x16", "x17");
++	{
++		extern void e5_trace_init(void);
++		extern void e5_trace_tag(const char *tag);
++		e5_trace_init();
++		e5_trace_tag("E5M1\n");
++	}
++
+ 	unsigned int    maxmem;
+ 	uint32_t        memsize;
+ 	uint64_t        xmaxmem;
+@@ -371,6 +386,7 @@ arm_init(
+ 
+ 	PE_init_platform(FALSE, args); /* Get platform expert set up */
+ 	boot_progress_init();
++	e5_trace_tag("E5M2\n");
+ 
+ #if __arm64__
+ 	configure_timer_apple_regs();
+@@ -534,6 +550,7 @@ arm_init(
+ 	boot_progress_stage("arm_vm_init enter");
+ 	arm_vm_init(xmaxmem, args);
+ 	boot_progress_stage("arm_vm_init returned");
++	{ extern void e5_trace_map(void); extern void e5_trace_tag(const char *tag); e5_trace_map(); e5_trace_tag("E5M3\n"); }
+ 
+ 	if (debug_boot_arg) {
+ 		patch_low_glo();
+diff --git a/osfmk/arm64/sleh.c b/osfmk/arm64/sleh.c
+index ae94c7e..90a0b10 100644
+--- a/osfmk/arm64/sleh.c
++++ b/osfmk/arm64/sleh.c
+@@ -396,7 +396,7 @@ static void
+ arm64_implementation_specific_error(arm_saved_state_t *state, uint32_t esr, vm_offset_t far)
+ {
+ #pragma unused (state, esr, far)
+-	panic_plain("Unhandled implementation specific error\n");
++	panic_plain("Unhandled implementation specific error esr 0x%08x far 0x%016lx\n", esr, far);
+ }
+ 
+ #if CONFIG_KERNEL_INTEGRITY
+diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+index bca4c7c..e46367d 100644
+--- a/osfmk/arm64/start.s
++++ b/osfmk/arm64/start.s
+@@ -464,6 +464,17 @@ start_cpu:
+ 	.globl EXT(start_first_cpu)
+ LEXT(start_first_cpu)
+ 
++.macro E5MARK, paLo, tagHi, tagLo
++	movz	x16, #0xFFF8, lsl #16
++	movk	x16, #\paLo
++	movz	x17, #\tagHi, lsl #16
++	movk	x17, #\tagLo
++	str	x17, [x16]
++	dc	cvac, x16
++.endmacro
++
++E5MARK 0x7F1B, 0x3153, 0x3545   // E5S1 reached start_first_cpu
++
+ 	// Unlock the core for debugging
+ 	msr		OSLAR_EL1, xzr
+ 	msr		DAIFSet, #(DAIFSC_ALL)				// Disable all interrupts
+@@ -484,6 +495,8 @@ LEXT(start_first_cpu)
+ 	adrp	x25, EXT(bootstrap_pagetables)@page	// Get the start of the page tables
+ 	ldr		x26, [x20, BA_BOOT_FLAGS]			// Get the kernel boot flags
+ 
++	E5MARK 0x7F23, 0x3253, 0x3545   // E5S2 args loaded
++
+ 	// Clear the registers that will be used to store the userspace thread pointer and CPU number.
+ 	// We may not actually be booting from ordinal CPU 0, so this register will be updated
+ 	// in ml_parse_cpu_topology(), which happens later in bootstrap.
+@@ -504,6 +517,7 @@ LEXT(start_first_cpu)
+ #endif
+ 
+ 	mov		sp, x0
++	E5MARK 0x7F2B, 0x3353, 0x3545   // E5S3 stacks set
+ 
+ 	// Set up interrupt stack pointer
+ 	adrp	x0, EXT(intstack_top)@page			// Load top of irq stack
+@@ -617,6 +631,15 @@ Lkernelcache_base_found:
+ 	lsr		x5,  x24, #(ARM_TT_L2_SHIFT)
+ 	create_bootstrap_mapping x14, x15, x5, x3, x2, x9, x10, x11, x12, x13
+ 
++	/* E5: identity-map the persistent ram console (0xFFE00000, 32MB block)
++	 * into the V=P table so PA==VA writes (ram console at 0xFFF80000) work
++	 * from MMU enable until arm_vm_init() installs the real kernel map. */
++	mov		x0, #(0xFFE00000)
++	mov		x4, #(0xFFE00000)
++	mov		x5, #(1)
++	create_bootstrap_mapping x0, x4, x5, x1, x2, x6, x10, x11, x12, x13
++	E5MARK 0x7F33, 0x3453, 0x3545   // E5S4 bootstrap page tables built
++
+ 	b Lbootstrap_tables_ready
+ Lbootstrap_tables_exhausted:
+ 	// MMU is still off. Stop with the offending cursor/end preserved for
+@@ -658,6 +681,7 @@ common_start:
+ 	add		x0, x0, EXT(sysreg_restore)@pageoff
+ 	ldr		x1, [x0, SR_RESTORE_TCR_EL1]
+ 	MSR_TCR_EL1_X1
++	E5MARK 0x7F3B, 0x3553, 0x3545   // E5S5 TCR set
+ 
+ 	/* Set up translation table base registers.
+ 	 *	TTBR0 - V=P table @ top of kernel
+@@ -672,9 +696,11 @@ common_start:
+ 	mov		x19, lr
+ 	bl		EXT(set_mmu_ttb)
+ 	mov		lr, x19
++	E5MARK 0x7F53, 0x3535, 0x3545   // E5Sa set_mmu_ttb returned
+ 	add		x0, x25, PGBYTES
+ 	and		x0, x0, #(TTBR_BADDR_MASK)
+ 	MSR_TTBR1_EL1_X0
++	E5MARK 0x7F5B, 0x3635, 0x3545   // E5Sb TTBR1 done
+ 
+ 	// Set up MAIR attr0 for normal memory, attr1 for device memory
+ 	mov		x0, xzr
+@@ -702,23 +728,19 @@ common_start:
+ 	orr		x0, x0, x1
+ #endif /* HAS_FEAT_XS */
+ 	msr		MAIR_EL1, x0
++	E5MARK 0x7F63, 0x3735, 0x3545   // E5Sc MAIR done
+ 	isb
+-	tlbi	vmalle1
++	E5MARK 0x7F73, 0x3935, 0x3545   // E5Se after isb
++	nop		// E5: tlbi vmalle1 broadcast never completes on UMS9621 (parked
++			// secondaries never ACK inner-shareable TLB maintenance); skip it.
++	E5MARK 0x7F7B, 0x3036, 0x3545   // E5Sf after tlbi (tag E560)
+ 	dsb		ish
++	E5MARK 0x7F83, 0x3136, 0x3545   // E5Sg after dsb (tag E561)
+ 
+ 
+-#if defined(BCM2837) && (!defined(XNU_NATIVE_ARCH_TIMER) || !XNU_NATIVE_ARCH_TIMER)
+-	// Setup timer interrupt routing; must be done before MMU is enabled
+-	mrs		x15, MPIDR_EL1						// Load MPIDR to get CPU number
+-	and		x15, x15, #0xFF						// CPU number is in MPIDR Affinity Level 0
+-	mov		x0, #0x4000
+-	lsl		x0, x0, #16
+-	add		x0, x0, #0x0040						// x0: 0x4000004X Core Timers interrupt control
+-	add		x0, x0, x15, lsl #2
+-	mov		w1, #0xF0 						// x1: 0xF0 	  Route to Core FIQs
+-	str		w1, [x0]
+-	isb		sy
+-#endif
++#if 0 // E5: BCM2837 core-timer routing write (unmapped 0x4000004X) faults on UMS9621
++	#endif
++	E5MARK 0x7F43, 0x3653, 0x3545   // E5S6 BCM2837 timer routing done
+ 
+ #ifndef __ARM_IC_NOALIAS_ICACHE__
+ 	/* Invalidate the TLB and icache on systems that do not guarantee that the
+@@ -761,15 +783,19 @@ common_start:
+ 	PAC_INIT_KEY_STATE tmp=x0, tmp2=x1
+ #endif /* HAS_APPLE_PAC */
+ 
++	E5MARK 0x7F4B, 0x3753, 0x3545   // E5S7 before MMU on
+ 	// Enable caches, MMU, ROP and JOP
+ 	MOV64   x0, SCTLR_EL1_DEFAULT
++	E5MARK 0x7FC3, 0x3241, 0x3545	// E5A2 pre-msr-sctlr
+ 	MSR_SCTLR_EL1_X0
++	E5MARK 0x7FCB, 0x3242, 0x3545	// E5B2 post-msr pre-isb
+ 	isb		sy
++	E5MARK 0x7F8B, 0x7853, 0x3545	// E5Sx MMU on
+ 
+ #if !VMAPPLE
+-	MOV64   x1, SCTLR_EL1_DEFAULT
+-	cmp		x0, x1
+-	bne		.
++	// E5: A53 readback of RES0 bits (bit20/UCI/SED...) differs from the
++	// written Apple-oriented value; skip the spin check.
++	nop
+ #endif /* !VMAPPLE */
+ 
+ #if (!CONFIG_KERNEL_INTEGRITY || (CONFIG_KERNEL_INTEGRITY && !defined(KERNEL_INTEGRITY_WT)))
+@@ -782,10 +808,12 @@ common_start:
+ 	// Enable NEON
+ 	mov		x0, #(CPACR_FPEN_ENABLE)
+ 	msr		CPACR_EL1, x0
++	E5MARK 0x7F93, 0x316D, 0x3545	// E5m1 CPACR done (tag E5m1)
+ #endif
+ 
+ 	// Clear thread pointer
+ 	msr		TPIDR_EL1, xzr						// Set thread register
++	E5MARK 0x7F9B, 0x326D, 0x3545	// E5m2 TPIDR done (tag E5m2)
+ 
+ 
+ #if defined(APPLE_ARM64_ARCH_FAMILY)
+@@ -816,6 +844,7 @@ common_start:
+ 	// Set KVA of boot args as first arg
+ 	add		x0, x20, x22
+ 	sub		x0, x0, x23
++	E5MARK 0x7FA3, 0x336D, 0x3545	// E5m3 args KVA done (tag E5m3)
+ 
+ #if KASAN
+ 	mov	x20, x0
+diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
+index 715c545..3809492 100644
+--- a/osfmk/console/serial_console.c
++++ b/osfmk/console/serial_console.c
+@@ -249,9 +249,95 @@ get_cons_ops_index(void)
+  * @param poll Whether or not this call should poll instead of going to sleep
+  *             waiting for an interrupt when the hardware device isn't ready
+  */
++
++/* E5 ram console tee: mirror every console character into the persistent
++ * dmesg ramoops zone so the trace survives the reset back to Android.
++ * Phase 0 runs before arm_vm_init() with the MMU off (physical addressing),
++ * phase 1 uses an uncached device mapping created by e5_trace_map().
++ */
++#define E5_PRZ_PA        0xFFF80000UL
++#define E5_PRZ_DATA_OFF  27UL
++#define E5_PRZ_WIN_OFF   0x4F00UL
++#define E5_PRZ_WIN_SIZE  0x3000UL
++
++extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
++
++void e5_trace_mark(void);
++
++static char * volatile e5_prz_win;
++static unsigned long e5_prz_pos;
++static int e5_prz_phase;
++
++void
++e5_trace_init(void)
++{
++e5_prz_phase = 0;
++e5_prz_win = NULL;
++e5_prz_pos = 0;
++}
++
++void
++e5_trace_map(void)
++{
++if (e5_prz_phase == 0) {
++e5_prz_win = (char *)ml_io_map(E5_PRZ_PA, 0x10000);
++if (e5_prz_win != NULL) {
++e5_prz_phase = 1;
++e5_trace_mark();
++}
++}
++}
++
++void
++e5_kputc(char c)
++{
++volatile char *p;
++
++if (c == '\n') {
++e5_kputc('\r');
++}
++if ((e5_prz_phase == 1) && (e5_prz_win != NULL)) {
++p = (volatile char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
++} else {
++/*
++ * Bootstrap V=P identity mapping (VA == PA) installed by start.s
++ * covers the persistent zone until arm_vm_init() replaces the tables.
++ */
++p = (volatile char *)(E5_PRZ_PA + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
++}
++*p = c;
++if (e5_prz_phase == 0) {
++__asm__ volatile ("dc cvac, %0" :: "r" ((void *) p) : "memory");
++}
++if (++e5_prz_pos >= E5_PRZ_WIN_SIZE) {
++e5_prz_pos = 0;
++}
++}
++
++void
++e5_trace_mark(void)
++{
++static const char mark[] = " E5XNU1 ";
++unsigned long i;
++
++for (i = 0; i < sizeof(mark) - 1; i++) {
++e5_kputc(mark[i]);
++}
++e5_kputc('\n');
++}
++
++void
++e5_trace_tag(const char *tag)
++{
++while (*tag != '\0') {
++e5_kputc(*tag++);
++}
++}
++
+ static inline void
+ _cnputc(char c, bool poll)
+ {
++	e5_kputc(c);
+ 	if (boot_progress_active()) { boot_progress_putc(c); return; }
+ 	bool in_debugger = (kernel_debugger_entry_count > 0);
+ 	const uint32_t idx = get_cons_ops_index();
+diff --git a/pexpert/arm/pe_identify_machine.c b/pexpert/arm/pe_identify_machine.c
+index 937ce42..99946c7 100644
+--- a/pexpert/arm/pe_identify_machine.c
++++ b/pexpert/arm/pe_identify_machine.c
+@@ -42,10 +42,6 @@ pe_identify_machine(boot_args * bootArgs)
+ 
+ 	(void)bootArgs;
+ 
+-	if (pe_arm_get_soc_base_phys() == 0) {
+-		return;
+-	}
+-
+ 	/* Clear the gPEClockFrequencyInfo struct */
+ 	bzero((void *)&gPEClockFrequencyInfo, sizeof(clock_frequency_info_t));
+ 
 diff --git a/pexpert/arm/pe_init.c b/pexpert/arm/pe_init.c
-index f3532cc..1ceffc1 100644
+index f3532cc..a032dbe 100644
 --- a/pexpert/arm/pe_init.c
 +++ b/pexpert/arm/pe_init.c
 @@ -102,7 +102,7 @@ void PE_slide_devicetree(vm_offset_t);
@@ -11,3 +333,32 @@ index f3532cc..1ceffc1 100644
  	gPanicBase = ml_io_map_wcomb(PLATFORM_PANIC_LOG_PADDR, PLATFORM_PANIC_LOG_SIZE);
  	panic_text_len = PLATFORM_PANIC_LOG_SIZE - sizeof(struct embedded_panic_header);
  	gPanicSize = PLATFORM_PANIC_LOG_SIZE;
+@@ -128,8 +128,11 @@ check_for_panic_log(void)
+ 	 * reg[1] is the size of iBoot's kMemoryRegion_Panic (not used)
+ 	 * embedded-panic-log-size is the maximum amount of data to store in the buffer
+ 	 */
+-	if (kSuccess != SecureDTLookupEntry(0, "pram", &entry)) {
+-		return;
++	if (kSuccess != SecureDTLookupEntry(0, "pram", &entry)) { /* E5 lookup */
++	gPanicBase = ml_io_map_wcomb(0x9F000000ULL, 0x10000ULL); /* E5: DRAM pram outside 256MB window */
++	panic_text_len = 0x10000ULL - sizeof(struct embedded_panic_header);
++	gPanicSize = 0x10000ULL;
++	return;
+ 	}
+ 
+ 	if (kSuccess != SecureDTGetProperty(entry, "reg", (void const **)&reg_prop, &size) ||
+diff --git a/pexpert/arm/pe_kprintf.c b/pexpert/arm/pe_kprintf.c
+index 3c440ec..e98d3d8 100644
+--- a/pexpert/arm/pe_kprintf.c
++++ b/pexpert/arm/pe_kprintf.c
+@@ -60,6 +60,10 @@ static void
+ PE_init_kprintf(void)
+ {
+ 	if (boot_progress_active()) { PE_kputc = boot_progress_putc; return; }
++	{
++		extern void e5_kputc(char c);
++		PE_kputc = e5_kputc;
++	}
+ 	if (serial_init()) {
+ 		PE_kputc = serial_putc_crlf;
+ 	} else {
