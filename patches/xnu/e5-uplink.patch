@@ -1,8 +1,8 @@
 diff --git a/bsd/kern/sys_generic.c b/bsd/kern/sys_generic.c
-index f229fc1..63eaf03 100644
+index f229fc1..deef3cf 100644
 --- a/bsd/kern/sys_generic.c
 +++ b/bsd/kern/sys_generic.c
-@@ -352,6 +352,28 @@ read_internal(struct proc *p, int fd, user_addr_t buf, user_size_t nbyte,
+@@ -680,6 +680,28 @@ write_internal(struct proc *p, int fd, user_addr_t buf, user_size_t nbyte,
  	uio_t uio;
  	int spacetype = IS_64BIT_PROCESS(p) ? UIO_USERSPACE64 : UIO_USERSPACE32;
  
