@@ -1,0 +1,25 @@
+diff --git a/osfmk/kern/debug.c b/osfmk/kern/debug.c
+index e9daeed..f9bf3d9 100644
+--- a/osfmk/kern/debug.c
++++ b/osfmk/kern/debug.c
+@@ -492,6 +492,7 @@ debug_log_init(void)
+ 		printf("debug_log_init: Error!! gPanicBase is still not initialized\n");
+ 		return;
+ 	}
++	panic_info = (struct macos_panic_header *)gPanicBase; /* E5: arm64 never assigns it; SavePanicInfo/paniclog_flush deref NULL */
+ 	/* Shift debug buf start location and size by the length of the panic header */
+ 	debug_buf_base = (char *)gPanicBase + sizeof(struct embedded_panic_header);
+ 	debug_buf_ptr = debug_buf_base;
+@@ -1023,6 +1024,12 @@ panic(const char *str, ...)
+ 	va_list panic_str_args;
+ 
+ 	va_start(panic_str_args, str);
++	{
++		extern void e5_panic_print(const char *);
++		extern void e5_panic_vprint(const char *, va_list);
++		e5_panic_print("E5PANIC: ");
++		e5_panic_vprint(str, panic_str_args);
++	}
+ 	panic_trap_to_debugger(str, &panic_str_args, 0, NULL, 0, NULL, (unsigned long)(char *)__builtin_return_address(0));
+ 	va_end(panic_str_args);
+ }
