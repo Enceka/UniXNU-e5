@@ -12,3 +12,4 @@ e5-pmgr-nub.patch
 e5-rootauth-defer.patch
 e5-exec-policy-defer.patch
 e5-uplink.patch
+e5-emmc-personality.patch

@@ -1,0 +1,16 @@
+diff --git a/iokit/KernelConfigTables.cpp b/iokit/KernelConfigTables.cpp
+index 2f374b7..adf327c 100644
+--- a/iokit/KernelConfigTables.cpp
++++ b/iokit/KernelConfigTables.cpp
+@@ -105,4 +105,11 @@ const char * gIOKernelConfigTables =
+     "     'IOProbeScore'    = 500:32;"
+     "   }"
+ #endif
++    "   ,{"
++    "     'IOClass'         = NativeEmmc;"
++    "     'IOMatchCategory' = NativeEmmc;"
++    "     'IOProviderClass' = IOResources;"
++    "     'IOResourceMatch' = IOBSD;"
++    "     'IOProbeScore'    = 1000:32;"
++    "   }"
+     ")";
