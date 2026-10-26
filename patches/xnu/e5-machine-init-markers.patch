@@ -1,0 +1,21 @@
+diff --git a/osfmk/arm/machine_routines_common.c b/osfmk/arm/machine_routines_common.c
+index 5c9c64a..a54d1f2 100644
+--- a/osfmk/arm/machine_routines_common.c
++++ b/osfmk/arm/machine_routines_common.c
+@@ -1427,11 +1427,16 @@ machine_conf(void)
+ void
+ machine_init(void)
+ {
++	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5MI1\n"); }
+ 	debug_log_init();
++	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5MI2\n"); }
+ 	clock_config();
++	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5MI3\n"); }
+ 	is_clock_configured = TRUE;
+ 	if (debug_enabled) {
+ 		pmap_map_globals();
+ 	}
++	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5MI4\n"); }
+ 	ml_lockdown_init();
++	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5MI5\n"); }
+ }
