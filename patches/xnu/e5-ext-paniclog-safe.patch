@@ -1,0 +1,12 @@
+diff --git a/osfmk/kern/ext_paniclog.c b/osfmk/kern/ext_paniclog.c
+index c27243a..4025f23 100644
+--- a/osfmk/kern/ext_paniclog.c
++++ b/osfmk/kern/ext_paniclog.c
+@@ -316,6 +316,7 @@ ext_paniclog_get_size_required(void)
+ bool
+ is_debug_ptr_in_ext_paniclog(void)
+ {
++	return false; /* E5: panic_info never initialized on this platform; see debug_log_init */
+ 	bool ext_paniclog_exceeds = ((panic_info->eph_ext_paniclog_offset != 0) ?
+ 	    ((uint32_t)(debug_buf_ptr - gPanicBase) >= panic_info->eph_ext_paniclog_offset) :
+ 	    false);
