@@ -41,10 +41,10 @@ index 7187c15..cc4f62c 100644
  	if (debug_boot_arg) {
  		patch_low_glo();
 diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
-index 715c545..147e20b 100644
+index 715c545..aba4a0a 100644
 --- a/osfmk/console/serial_console.c
 +++ b/osfmk/console/serial_console.c
-@@ -249,9 +249,104 @@ get_cons_ops_index(void)
+@@ -249,9 +249,120 @@ get_cons_ops_index(void)
   * @param poll Whether or not this call should poll instead of going to sleep
   *             waiting for an interrupt when the hardware device isn't ready
   */
@@ -113,6 +113,22 @@ index 715c545..147e20b 100644
 +}
 +}
 +
++static void
++e5_doprnt_putc(char c)
++{
++e5_kputc(c);
++}
++
++void
++e5_panic_vprint(const char *fmt, va_list ap)
++{
++va_list copy;
++
++__builtin_va_copy(copy, ap);
++_doprnt(fmt, &copy, e5_doprnt_putc, 16);
++e5_kputc('\n');
++}
++
 +void
 +e5_panic_print(const char *s)
 +{
@@ -150,21 +166,22 @@ index 715c545..147e20b 100644
  	bool in_debugger = (kernel_debugger_entry_count > 0);
  	const uint32_t idx = get_cons_ops_index();
 diff --git a/osfmk/kern/debug.c b/osfmk/kern/debug.c
-index e9daeed..fffecc2 100644
+index e9daeed..2cfd86d 100644
 --- a/osfmk/kern/debug.c
 +++ b/osfmk/kern/debug.c
-@@ -1022,6 +1022,11 @@ panic(const char *str, ...)
- {
+@@ -1023,6 +1023,12 @@ panic(const char *str, ...)
  	va_list panic_str_args;
  
+ 	va_start(panic_str_args, str);
 +	{
 +		extern void e5_panic_print(const char *);
++		extern void e5_panic_vprint(const char *, va_list);
 +		e5_panic_print("E5PANIC: ");
-+		e5_panic_print(str);
++		e5_panic_vprint(str, panic_str_args);
 +	}
- 	va_start(panic_str_args, str);
  	panic_trap_to_debugger(str, &panic_str_args, 0, NULL, 0, NULL, (unsigned long)(char *)__builtin_return_address(0));
  	va_end(panic_str_args);
+ }
 diff --git a/osfmk/kern/printf.c b/osfmk/kern/printf.c
 index aeac9d3..36d1498 100644
 --- a/osfmk/kern/printf.c
