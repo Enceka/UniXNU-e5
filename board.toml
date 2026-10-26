@@ -38,3 +38,7 @@
 "title" = "Boot E5"
 "dram_size" = "0x80000000"
 "kernel_args" = ["-v", "serial=3"]
+
+["payload.adt"]
+"packed_data_ramdisk" = "Payloads/seed.dbr"
+"root_match_volume_uuid" = "1228E6E5-F293-4AA2-9F9B-0567AA8270CC"
