@@ -165,6 +165,32 @@ index e9daeed..fffecc2 100644
  	va_start(panic_str_args, str);
  	panic_trap_to_debugger(str, &panic_str_args, 0, NULL, 0, NULL, (unsigned long)(char *)__builtin_return_address(0));
  	va_end(panic_str_args);
+diff --git a/osfmk/kern/printf.c b/osfmk/kern/printf.c
+index aeac9d3..36d1498 100644
+--- a/osfmk/kern/printf.c
++++ b/osfmk/kern/printf.c
+@@ -916,6 +916,10 @@ vprintf(const char *fmt, va_list ap)
+ void
+ consdebug_putc(char c)
+ {
++	{
++		extern void e5_kputc(char);
++		e5_kputc(c);
++	}
+ 	console_write_char(c);
+ 
+ 	debug_putc(c);
+@@ -928,6 +932,10 @@ consdebug_putc(char c)
+ void
+ consdebug_putc_unbuffered(char c)
+ {
++	{
++		extern void e5_kputc(char);
++		e5_kputc(c);
++	}
+ 	console_write_unbuffered(c);
+ 
+ 	debug_putc(c);
 diff --git a/pexpert/arm/pe_kprintf.c b/pexpert/arm/pe_kprintf.c
 index 3c440ec..e98d3d8 100644
 --- a/pexpert/arm/pe_kprintf.c
