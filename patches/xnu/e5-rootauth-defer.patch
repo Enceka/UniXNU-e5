@@ -1,0 +1,19 @@
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+index bb558ee..73bacc4 100644
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -939,6 +939,14 @@ bsd_init(void)
+ 		require_rootauth = TRUE;
+ #endif // XNU_TARGET_OS_OSX && defined(__arm64__)
+ 
++		if (require_rootauth) {
++			/* E5: developer ramdisk boots carry an unsealed seed volume; defer the
++			 * seal check behind an explicit boot-arg so only opted-in boots skip it. */
++			if (PE_parse_boot_argn("e5-rootauth-off", NULL, 0)) {
++				printf("E5: rootvp authentication deferred (e5-rootauth-off)\n");
++				require_rootauth = FALSE;
++			}
++		}
+ 		if (require_rootauth) {
+ 			/* enforce sealedness */
+ 			int autherr = VNOP_IOCTL(rootvnode, FSIOC_KERNEL_ROOTAUTH, NULL, 0, vfs_context_kernel());

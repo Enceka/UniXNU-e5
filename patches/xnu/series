@@ -9,3 +9,4 @@ e5-serror-triangulate-debug.patch
 e5-serror-triangulate-scc.patch
 e5-serr-skip.patch
 e5-pmgr-nub.patch
+e5-rootauth-defer.patch
