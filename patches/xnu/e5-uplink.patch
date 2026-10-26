@@ -1,23 +1,27 @@
 diff --git a/bsd/kern/sys_generic.c b/bsd/kern/sys_generic.c
-index f229fc1..9628c56 100644
+index f229fc1..63eaf03 100644
 --- a/bsd/kern/sys_generic.c
 +++ b/bsd/kern/sys_generic.c
-@@ -680,6 +680,24 @@ write_internal(struct proc *p, int fd, user_addr_t buf, user_size_t nbyte,
+@@ -352,6 +352,28 @@ read_internal(struct proc *p, int fd, user_addr_t buf, user_size_t nbyte,
  	uio_t uio;
  	int spacetype = IS_64BIT_PROCESS(p) ? UIO_USERSPACE64 : UIO_USERSPACE32;
  
 +	/*
 +	 * E5 uplink: write(fd == 229, buf, n <= 256) mirrors the buffer into the
-+	 * kernel console (ram tee) so userspace probes are visible in pstore.
++	 * persistent ram console tee so userspace probes are visible in pstore.
++	 * Uses e5_panic_print directly: plain printf() output is buffered and
++	 * never drains without timer interrupts on this platform.
 +	 */
 +	if (__improbable(fd == 229 && nbyte > 0 && nbyte <= 256)) {
 +		extern boolean_t PE_parse_boot_argn(const char *arg_string,
 +		    void *arg_ptr, int max_arg);
++		extern void e5_panic_print(const char *s);
 +		if (PE_parse_boot_argn("e5-uplink", NULL, 0)) {
-+			char e5ul[257];
-+			if (copyin(buf, e5ul, nbyte) == 0) {
-+				e5ul[nbyte] = '\0';
-+				printf("E5UL|%s", e5ul);
++			char e5ul[262];
++			if (copyin(buf, e5ul + 5, nbyte) == 0) {
++				memcpy(e5ul, "E5UL|", 5);
++				e5ul[5 + nbyte] = '\0';
++				e5_panic_print(e5ul);
 +				*retval = nbyte;
 +				return 0;
 +			}
