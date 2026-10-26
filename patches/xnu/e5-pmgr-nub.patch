@@ -1,0 +1,38 @@
+diff --git a/bsd/kern/bsd_init.c b/bsd/kern/bsd_init.c
+index f394e74..a15003f 100644
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -782,6 +782,12 @@ bsd_init(void)
+ 	boot_progress_stage("original PMGR nub returned");
+ #endif
+ 
++	/* E5: register a bare ApplePMGRNub for AMFI (IOPMGR.cpp e5_pmgr_run). */
++	{
++		extern void e5_pmgr_run(void);
++		e5_pmgr_run();
++	}
++
+ 	/*
+ 	 * Initialize the calendar.
+ 	 */
+diff --git a/iokit/Kernel/IOPMGR.cpp b/iokit/Kernel/IOPMGR.cpp
+index 48c09e3..af8e6a8 100644
+--- a/iokit/Kernel/IOPMGR.cpp
++++ b/iokit/Kernel/IOPMGR.cpp
+@@ -44,3 +44,16 @@ IOPMGR::enableCPUCore(unsigned int cpu_id)
+ {
+ 	panic("enableCPUCore is unimplemented");
+ }
++// E5: register a bare ApplePMGRNub so AMFI finds a PMGR (null-provider no-op).
++#include <IOKit/IORegistryEntry.h>
++#include <libkern/c++/OSMetaClass.h>
++extern "C" void
++e5_pmgr_run(void)
++{
++    IOService *nub = OSDynamicCast(IOService, OSMetaClass::allocClassWithName("ApplePMGRNub"));
++    if (nub == NULL) { kprintf("E5-PMGR: metaclass not found%c", 10); return; }
++    if (nub->init() == 0) { kprintf("E5-PMGR: init failed%c", 10); return; }
++    if (nub->attachToParent(IORegistryEntry::getRegistryRoot(), gIOServicePlane) == 0) { kprintf("E5-PMGR: attach failed%c", 10); return; }
++    nub->registerService();
++    kprintf("E5-PMGR: ApplePMGRNub registered%c", 10);
++}
