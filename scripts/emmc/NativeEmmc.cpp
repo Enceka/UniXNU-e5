@@ -76,13 +76,22 @@ class NativeEmmc : public IOBlockStorageDevice {
     return false;
   }
 
+  // SDHCI_SOFTWARE_RESET (0x2F) is not 4-byte aligned; poll it bytewise.
+  bool waitBits8(uint32_t off, uint8_t mask, uint8_t want, uint32_t loops, uint32_t stepUs) {
+    for (uint32_t i = 0; i < loops; i++) {
+      if ((r8(off) & mask) == want) return true;
+      IODelay(stepUs);
+    }
+    return false;
+  }
+
   // Wait for a normal-interrupt bit, W1C it.  Returns false on error/timeout.
   bool waitInt(uint32_t bits, uint32_t loops, uint32_t stepUs) {
     for (uint32_t i = 0; i < loops; i++) {
       uint32_t st = r32(SDHCI_INT_STATUS);
       if (st & INT_ERROR) {
         w32(SDHCI_INT_STATUS, st);
-        IOLog("NativeEmmc: int error 0x%x after cmd\n", st);
+        kprintf("NativeEmmc: int error 0x%x after cmd\n", st);
         return false;
       }
       if (st & bits) {
@@ -91,14 +100,14 @@ class NativeEmmc : public IOBlockStorageDevice {
       }
       IODelay(stepUs);
     }
-    IOLog("NativeEmmc: int timeout waiting 0x%x, status 0x%x\n", bits, r32(SDHCI_INT_STATUS));
+    kprintf("NativeEmmc: int timeout waiting 0x%x, status 0x%x\n", bits, r32(SDHCI_INT_STATUS));
     return false;
   }
 
   // Issue a command without data phases.
   bool cmd(uint16_t index, uint32_t arg, uint16_t flags, uint32_t *resp = nullptr) {
     if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT, 0, 5000, 10)) {
-      IOLog("NativeEmmc: CMD%u: cmd line stuck (pstate 0x%x)\n", index, r32(SDHCI_PRESENT_STATE));
+      kprintf("NativeEmmc: CMD%u: cmd line stuck (pstate 0x%x)\n", index, r32(SDHCI_PRESENT_STATE));
       return false;
     }
     w32(SDHCI_ARGUMENT, arg);
@@ -114,7 +123,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     // R1b: wait for the busy (DAT) lines to release.
     if ((flags & CMD_RESP_SHORT) && (flags & CMD_CRC_ENABLE)) {
       if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_DAT_INHIBIT, 0, 50000, 10))
-        IOLog("NativeEmmc: CMD%u: DAT still busy\n", index);
+        kprintf("NativeEmmc: CMD%u: DAT still busy\n", index);
     }
     return true;
   }
@@ -122,8 +131,8 @@ class NativeEmmc : public IOBlockStorageDevice {
   bool hostInit() {
     // Full soft reset of the host (sprd: bit3 must stay set; write only bit0).
     w8(SDHCI_SOFTWARE_RESET, 0x01);
-    if (!waitBits(SDHCI_SOFTWARE_RESET, 0x01, 0, 100000, 10)) {
-      IOLog("NativeEmmc: host soft reset did not clear (0x%x)\n", r8(SDHCI_SOFTWARE_RESET));
+    if (!waitBits8(SDHCI_SOFTWARE_RESET, 0x01, 0, 100000, 10)) {
+      kprintf("NativeEmmc: host soft reset did not clear (0x%x)\n", r8(SDHCI_SOFTWARE_RESET));
       return false;
     }
     // 400 kHz from the 26 MHz sprd base: SDHCI v3 divider base/(div*10):
@@ -135,14 +144,14 @@ class NativeEmmc : public IOBlockStorageDevice {
       IODelay(1);
     }
     if (!(r16(SDHCI_CLOCK_CONTROL) & 0x0002)) {
-      IOLog("NativeEmmc: internal clock never stabilised\n");
+      kprintf("NativeEmmc: internal clock never stabilised\n");
       return false;
     }
     w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004); // SD clock on
     w8(0x2E, 0x0E); // timeout control: max
     w32(SDHCI_INT_ENABLE, 0);
     w32(SDHCI_INT_STATUS, 0xFFFF);
-    IOLog("NativeEmmc: host up, caps 0x%x/0x%x clkctl 0x%x\n",
+    kprintf("NativeEmmc: host up, caps 0x%x/0x%x clkctl 0x%x\n",
           r32(SDHCI_CAPABILITIES), r32(SDHCI_CAPABILITIES2), r16(SDHCI_CLOCK_CONTROL));
     return true;
   }
@@ -157,7 +166,7 @@ class NativeEmmc : public IOBlockStorageDevice {
       IODelay(1000);
     }
     if (!(ocr & 0x80000000)) {
-      IOLog("NativeEmmc: card never powered up, OCR 0x%x\n", ocr);
+      kprintf("NativeEmmc: card never powered up, OCR 0x%x\n", ocr);
       return false;
     }
     if (!cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid)) return false; // ALL_SEND_CID
@@ -216,22 +225,22 @@ bool NativeEmmc::start(IOService *provider)
 {
   if (!IOBlockStorageDevice::start(provider)) return false;
   IOMemoryDescriptor *md = IOMemoryDescriptor::withAddressRange(E5_EMMC_BASE, E5_EMMC_LEN, kIODirectionNone, nullptr);
-  if (!md) { IOLog("NativeEmmc: no memory descriptor\n"); return false; }
+  if (!md) { kprintf("NativeEmmc: no memory descriptor\n"); return false; }
   IOMemoryMap *map = md->map();
-  if (!map) { md->release(); IOLog("NativeEmmc: map failed\n"); return false; }
+  if (!map) { md->release(); kprintf("NativeEmmc: map failed\n"); return false; }
   regs = (volatile uint32_t *)map->getVirtualAddress();
-  IOLog("NativeEmmc: regs mapped at %p\n", (void *)regs);
-  if (!hostInit()) { IOLog("NativeEmmc: host init failed\n"); return false; }
-  if (!cardInit()) { IOLog("NativeEmmc: card init failed\n"); return false; }
-  IOLog("NativeEmmc: OCR 0x%x RCA 0x%x\n", ocr, rca);
-  IOLog("NativeEmmc: CID %08x %08x %08x %08x\n", cid[0], cid[1], cid[2], cid[3]);
-  IOLog("NativeEmmc: CSD %08x %08x %08x %08x\n", csd[0], csd[1], csd[2], csd[3]);
+  kprintf("NativeEmmc: regs mapped at %p\n", (void *)regs);
+  if (!hostInit()) { kprintf("NativeEmmc: host init failed\n"); return false; }
+  if (!cardInit()) { kprintf("NativeEmmc: card init failed\n"); return false; }
+  kprintf("NativeEmmc: OCR 0x%x RCA 0x%x\n", ocr, rca);
+  kprintf("NativeEmmc: CID %08x %08x %08x %08x\n", cid[0], cid[1], cid[2], cid[3]);
+  kprintf("NativeEmmc: CSD %08x %08x %08x %08x\n", csd[0], csd[1], csd[2], csd[3]);
   if (readExtCsd()) {
     cardUp = true;
-    IOLog("NativeEmmc: EXT_CSD rev %u, HS_TIMING %u, SEC_COUNT %llu (%.1f GiB)\n",
+    kprintf("NativeEmmc: EXT_CSD rev %u, HS_TIMING %u, SEC_COUNT %llu (%.1f GiB)\n",
           extCsd[192], extCsd[185], sectors, (double)(sectors * 512) / (1024.0 * 1024.0 * 1024.0));
   } else {
-    IOLog("NativeEmmc: EXT_CSD read failed\n");
+    kprintf("NativeEmmc: EXT_CSD read failed\n");
   }
   // v1 stops here: identity proven, no block service yet.
   return true;
