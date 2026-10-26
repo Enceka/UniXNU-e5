@@ -1,5 +1,5 @@
 diff --git a/bsd/kern/sys_generic.c b/bsd/kern/sys_generic.c
-index f229fc1..42796f2 100644
+index f229fc1..9628c56 100644
 --- a/bsd/kern/sys_generic.c
 +++ b/bsd/kern/sys_generic.c
 @@ -680,6 +680,24 @@ write_internal(struct proc *p, int fd, user_addr_t buf, user_size_t nbyte,
@@ -12,7 +12,7 @@ index f229fc1..42796f2 100644
 +	 */
 +	if (__improbable(fd == 229 && nbyte > 0 && nbyte <= 256)) {
 +		extern boolean_t PE_parse_boot_argn(const char *arg_string,
-+		    void *buffer_ptr, u_int buffer_len);
++		    void *arg_ptr, int max_arg);
 +		if (PE_parse_boot_argn("e5-uplink", NULL, 0)) {
 +			char e5ul[257];
 +			if (copyin(buf, e5ul, nbyte) == 0) {
