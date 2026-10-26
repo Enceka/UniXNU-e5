@@ -76,7 +76,6 @@ class RF(io.RawIOBase):
 
 def der_octet_string(d):
     # IM4P container is DER: SEQ(IA5 'IM4P', IA5 'krnl', IA5 desc, OCTET STRING payload)
-    require(d[0] == 0x30, 'kernelcache member is not an IM4P DER sequence')
 
     def rd_tl(p):
         tag = d[p]
@@ -88,7 +87,8 @@ def der_octet_string(d):
             p += n
         return tag, l, p
 
-    p = 2
+    tag, l, p = rd_tl(0)
+    require(tag == 0x30, 'kernelcache member is not an IM4P DER sequence')
     for _ in range(3):
         tag, l, p = rd_tl(p)
         require(tag == 0x16, 'expected IA5String in IM4P header')
@@ -103,10 +103,11 @@ def fat_arm64_slice(data):
         return data
     cnt = struct.unpack('>I', data[4:8])[0]
     for i in range(cnt):
-        c = data[8 + i * 20:]
-        cpu = struct.unpack('>I', c[4:8])[0]
+        c = data[8 + i * 20:8 + (i + 1) * 20]
+        cpu = struct.unpack('>I', c[0:4])[0]
         if cpu == 0x0100000c:
-            off, ln = struct.unpack('>QQ', c[8:24])
+            off = struct.unpack('>I', c[8:12])[0]
+            ln = struct.unpack('>I', c[12:16])[0]
             return data[off:off + ln]
     die('no arm64 slice in fat kernelcache')
 
