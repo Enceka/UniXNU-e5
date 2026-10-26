@@ -19,6 +19,7 @@
   "component:RamBlock",
   "e5_derive_audit.py .",
   "build-virtio-mmio-bindings.py --component RamBlock --directory build/ram-block",
+  "e5_ufs_stub.py .",
   "build-software-aes-bindings.py",
   "build-mockfs-fixture.py",
   "build-libpthread-kernel.py",
