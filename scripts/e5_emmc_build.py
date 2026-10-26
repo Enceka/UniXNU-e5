@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-root = Path(__file__).resolve().parents[2]  # <tree>/scripts/emmc -> tree
+root = Path(__file__).resolve().parents[1]  # <tree>/scripts -> tree
 tree = root
 recipe = tree / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json'
 source = Path(__file__).resolve().parent / 'emmc' / 'NativeEmmc.cpp'
