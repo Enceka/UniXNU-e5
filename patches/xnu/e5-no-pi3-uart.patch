@@ -1,0 +1,13 @@
+diff --git a/pexpert/pexpert/arm64/BCM2837.h b/pexpert/pexpert/arm64/BCM2837.h
+index 61afb61..2247621 100644
+--- a/pexpert/pexpert/arm64/BCM2837.h
++++ b/pexpert/pexpert/arm64/BCM2837.h
+@@ -26,7 +26,7 @@
+ 
+ #ifndef ASSEMBLER
+ 
+-#define PI3_UART
++/* E5: PI3 mini-UART MMIO (0x3F215000-ish) unmapped on UMS9621 -> root SError 0xbe000011 + nested data aborts in panic putc. */
+ 
+ #define PI3_BREAK                               asm volatile("brk #0");
+ 

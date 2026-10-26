@@ -1,3 +1,4 @@
 e5-ram-console-tee.patch
 e5-start-markers.patch
 e5-no-platform-panic.patch
+e5-no-pi3-uart.patch
