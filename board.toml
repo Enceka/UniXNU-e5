@@ -17,7 +17,7 @@
   "component:ArmCpu",
   "component:SoftwareAES",
   "component:RamBlock",
-  "../device/scripts/e5_derive_audit.py .",
+  "e5_derive_audit.py .",
   "build-virtio-mmio-bindings.py --component RamBlock --directory build/ram-block",
   "build-software-aes-bindings.py",
   "build-mockfs-fixture.py",
