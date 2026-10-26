@@ -5,3 +5,5 @@ e5-no-pi3-uart.patch
 e5-ext-paniclog-safe.patch
 e5-panic-info-init.patch
 e5-machine-init-markers.patch
+e5-serror-triangulate-debug.patch
+e5-serror-triangulate-scc.patch
