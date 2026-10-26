@@ -4,3 +4,4 @@ e5-no-platform-panic.patch
 e5-no-pi3-uart.patch
 e5-ext-paniclog-safe.patch
 e5-panic-info-init.patch
+e5-machine-init-markers.patch
