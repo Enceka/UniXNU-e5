@@ -326,6 +326,7 @@ def derive_module(kc):
 
 
 def ref_compile(root):
+    root = root.resolve()
     source = root / 'refer' / 'IOStorageFamily'
     out = root / 'build' / 'storage-abi'
     record = json.loads((root / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json')
