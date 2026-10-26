@@ -1,27 +1,34 @@
 diff --git a/osfmk/kern/clock.c b/osfmk/kern/clock.c
-index b58ad2e..0327ab6 100644
+index b58ad2e..425b59e 100644
 --- a/osfmk/kern/clock.c
 +++ b/osfmk/kern/clock.c
-@@ -359,6 +359,8 @@ clock_config(void)
+@@ -358,7 +358,11 @@ clock_config(void)
+ {
  	lck_ticket_init(&clock_lock, &clock_lock_grp);
  
++	{ extern void e5_trace_tag(const char*); e5_trace_tag("E5CC1\n"); }
  	clock_oldconfig();
++	{ extern void e5_trace_tag(const char*); e5_trace_tag("E5CC2\n"); }
 +	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5CC1\n"); }
 +	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5CC2\n"); }
  
  	ntp_init();
  
 diff --git a/osfmk/kern/startup.c b/osfmk/kern/startup.c
-index 8a82186..94c7511 100644
+index 8a82186..31a4fe2 100644
 --- a/osfmk/kern/startup.c
 +++ b/osfmk/kern/startup.c
-@@ -508,7 +508,9 @@ kernel_bootstrap(void)
+@@ -507,9 +507,13 @@ kernel_bootstrap(void)
+ 
  	kernel_bootstrap_log("machine_init");
  	machine_init();
++	{ extern void e5_trace_tag(const char*); e5_trace_tag("E5SB1\n"); }
  
 +	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5SB1\n"); }
  	kernel_bootstrap_log("thread_machine_init_template");
 +	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5SB2\n"); }
  	thread_machine_init_template();
++	{ extern void e5_trace_tag(const char*); e5_trace_tag("E5SB2\n"); }
  
  	kernel_bootstrap_log("clock_init");
+ 	clock_init();

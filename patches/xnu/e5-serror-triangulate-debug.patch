@@ -1,39 +1,20 @@
 diff --git a/osfmk/kern/debug.c b/osfmk/kern/debug.c
-index e9daeed..a57cbc5 100644
+index f9bf3d9..697ef4b 100644
 --- a/osfmk/kern/debug.c
 +++ b/osfmk/kern/debug.c
-@@ -487,11 +487,13 @@ extended_debug_log_init(void)
+@@ -487,6 +487,7 @@ extended_debug_log_init(void)
  void
  debug_log_init(void)
  {
-+	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5DL1\n"); }
++	{ extern void e5_trace_tag(const char*); e5_trace_tag("E5DL1\n"); }
  #if defined(__arm64__)
  	if (!gPanicBase) {
  		printf("debug_log_init: Error!! gPanicBase is still not initialized\n");
- 		return;
- 	}
-+	panic_info = (struct macos_panic_header *)gPanicBase; /* E5: arm64 never assigns it; SavePanicInfo/paniclog_flush deref NULL */
- 	/* Shift debug buf start location and size by the length of the panic header */
- 	debug_buf_base = (char *)gPanicBase + sizeof(struct embedded_panic_header);
- 	debug_buf_ptr = debug_buf_base;
-@@ -499,6 +501,7 @@ debug_log_init(void)
+@@ -499,6 +500,7 @@ debug_log_init(void)
+ 	debug_buf_size = gPanicSize - sizeof(struct embedded_panic_header);
  
  #if CONFIG_EXT_PANICLOG
++	{ extern void e5_trace_tag(const char*); e5_trace_tag("E5DL2\n"); }
  	ext_paniclog_init();
-+	{ extern void e5_trace_tag(const char *); e5_trace_tag("E5DL2\n"); }
  #endif
  #else
- 	kern_return_t kr = KERN_SUCCESS;
-@@ -1023,6 +1026,12 @@ panic(const char *str, ...)
- 	va_list panic_str_args;
- 
- 	va_start(panic_str_args, str);
-+	{
-+		extern void e5_panic_print(const char *);
-+		extern void e5_panic_vprint(const char *, va_list);
-+		e5_panic_print("E5PANIC: ");
-+		e5_panic_vprint(str, panic_str_args);
-+	}
- 	panic_trap_to_debugger(str, &panic_str_args, 0, NULL, 0, NULL, (unsigned long)(char *)__builtin_return_address(0));
- 	va_end(panic_str_args);
- }
