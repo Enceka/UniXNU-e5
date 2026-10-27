@@ -385,6 +385,8 @@ class NativeEmmc : public IOBlockStorageDevice {
           dt[0] = 0x02000023u;                       // cmd=0x23 len=512
           dt[1] = (uint32_t)(dva + 0x100u);
           __asm__ volatile ("dmb sy" ::: "memory");
+          // HOST_CONTROL[4:3] DMA select: 0x10=ADMA2 (00=SDMA, default!)
+          w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);
           w16(0x04, 512); w16(0x06, 1);
           w32(0x3C, 0); w32(0x00, (uint32_t)dva);    // ADMA address (hi always 0)
           w16(SDHCI_TRANSFER_MODE, 0x13);           // DMA|BCNT|read
@@ -404,6 +406,7 @@ class NativeEmmc : public IOBlockStorageDevice {
           dt[2] = (uint32_t)(dva + 0x100u);
           dt[3] = 0;
           __asm__ volatile ("dmb sy" ::: "memory");
+          w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);   // ADMA2 select
           w16(0x04, 512); w16(0x06, 1);
           w32(0x3C, 0); w32(0x00, (uint32_t)dva);
           w16(SDHCI_TRANSFER_MODE, 0x13);
@@ -414,6 +417,18 @@ class NativeEmmc : public IOBlockStorageDevice {
             if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
           }
           elog("e5-emmc: adma64 st %08x err %08x d0 %08x d1 %08x\n", stx, r32(0x54), d[0], d[1]);
+          // SDMA variant: DMA select 00 + SYS_ADDR = buffer PA + 32-bit block write
+          w8(0x28, r8(0x28) & ~0x18u);             // SDMA select
+          w32(0x04, (1u << 16) | 512u);            // 32-bit: size | count<<16
+          w32(0x3C, 0); w32(0x00, (uint32_t)(dva + 0x100u));
+          w16(SDHCI_TRANSFER_MODE, 0x13);
+          w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
+          stx = 0;
+          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+            stx = r32(SDHCI_INT_STATUS);
+            if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
+          }
+          elog("e5-emmc: sdma32 st %08x err %08x d0 %08x\n", stx, r32(0x54), d[0]);
         } else {
           elog("e5-emmc: adma2 alloc fail\n");
         }
