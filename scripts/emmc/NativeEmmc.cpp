@@ -129,6 +129,11 @@ class NativeEmmc : public IOBlockStorageDevice {
     w32(SDHCI_INT_STATUS, 0xFFFF); // W1C all
     w16(SDHCI_COMMAND, (uint16_t)(index << 8) | flags);
     if (!waitInt(INT_CMD_COMPLETE, 20000, 10)) return false;
+    uint32_t ist = r32(SDHCI_INT_STATUS);
+    if (ist & 0xFFFF0000u) {           // error interrupts are in the high half
+      elog("NativeEmmc: CMD%u int error 0x%x\n", index, ist);
+      w32(SDHCI_INT_STATUS, ist);      // W1C
+    }
     if (resp) {
       resp[0] = r32(SDHCI_RESPONSE + 0x0);
       resp[1] = r32(SDHCI_RESPONSE + 0x4);
@@ -194,8 +199,10 @@ class NativeEmmc : public IOBlockStorageDevice {
       return false;
     }
     if (!cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid)) return false; // ALL_SEND_CID
+    elog("NativeEmmc: cmd2 raw %08x %08x %08x %08x\n", cid[0], cid[1], cid[2], cid[3]);
     rca = (uint16_t)(cid[0] >> 0); // placeholder; replaced by CMD3 below
     if (!cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE, resp)) return false;
+    elog("NativeEmmc: cmd3 raw %08x\n", resp[0]);
     rca = (uint16_t)(resp[0] >> 16);
     if (!cmd(9, (uint32_t)rca << 16, CMD_RESP_LONG | CMD_CRC_ENABLE, csd)) return false;
     if (!cmd(7, (uint32_t)rca << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE)) return false; // SELECT
