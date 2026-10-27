@@ -399,6 +399,24 @@ class NativeEmmc : public IOBlockStorageDevice {
           }
           uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100);
           elog("e5-emmc: adma32 st %08x err %08x d0 %08x\n", stx, r32(0x54), d[0]);
+          // sprd debug window: ADMA process ptr / block-count latches / adma buf ptr AFTER failed xfer
+          elog("e5-emmc: dbg abuf %08x %08x blkc %08x %08x proc %08x %08x sys %08x\n",
+               r32(0x220), r32(0x224), r32(0x228), r32(0x22c), r32(0x240), r32(0x244), r32(0x00));
+          // variant A2: ARGUMENT2(0x3C)=block count (ACMD23/v4 dual role)
+          for (uint32_t i = 0; i < 16; i = i + 1) dt[i] = 0;
+          dt[0] = 0x02000023u; dt[1] = (uint32_t)(dva + 0x100u);
+          __asm__ volatile ("dmb sy" ::: "memory");
+          w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);
+          w16(0x04, 512); w16(0x06, 0);
+          w32(0x3C, 1); w32(0x00, (uint32_t)dva);
+          w16(SDHCI_TRANSFER_MODE, 0x13);
+          w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
+          stx = 0;
+          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+            stx = r32(SDHCI_INT_STATUS);
+            if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
+          }
+          elog("e5-emmc: adma-arg2 st %08x d0 %08x\n", stx, d[0]);
           w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
           for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
           // variant B: 64-bit descriptors (16B): Trans+End entry with addr pair
