@@ -225,6 +225,25 @@ class NativeEmmc : public IOBlockStorageDevice {
     cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid);
     elog("bt: cmd2 %08x %08x %08x %08x pstate %08x\n",
           cid[0], cid[1], cid[2], cid[3], r32(SDHCI_PRESENT_STATE));
+    // ---- k98: full command scan (which indexes move the latch) ----
+    for (uint16_t ci = 2; ci <= 63; ci++) {
+      uint16_t fl = (ci == 2 || ci == 9 || ci == 10) ? (CMD_RESP_LONG | CMD_CRC_ENABLE)
+                                                      : CMD_RESP_SHORT | CMD_CRC_ENABLE;
+      uint32_t r4[4] = {0, 0, 0, 0};
+      if (!cmd(ci, 0x00000000, fl, r4)) { elog("scan: CMD%u timeout/err\n", ci); continue; }
+      if (r4[0] != 0xc01f8000u || r4[1] != 0 || r4[2] != 0) {
+        elog("scan: CMD%u ANSWERS %08x %08x %08x %08x\n", ci, r4[0], r4[1], r4[2], r4[3]);
+      }
+    }
+    elog("scan done (stale = c01f8000)\n");
+    // ---- k98: RCA sweep via CMD13 SEND_STATUS ----
+    static const uint32_t rcas[] = { 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0010, 0x1000, 0x10000, 0x20000, 0x4564, 0xffff };
+    for (uint32_t ri = 0; ri < 11; ri++) {
+      uint32_t r4[4] = {0,0,0,0};
+      if (!cmd(13, rcas[ri] << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4)) { elog("rca %04x: err\n", rcas[ri]); continue; }
+      if (r4[0] != 0xc01f8000u) elog("rca %04x ANSWERS %08x\n", rcas[ri], r4[0]);
+    }
+    elog("rca sweep done\n");
     // ---- end battery ----
     if (!cmd(0, 0, CMD_RESP_NONE)) return false;          // GO_IDLE_STATE
     for (uint32_t i = 0; i < 200; i++) {                    // SEND_OP_COND until power-up
