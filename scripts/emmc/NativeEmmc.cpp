@@ -425,10 +425,13 @@ class NativeEmmc : public IOBlockStorageDevice {
           uint32_t dlyLK0 = r32(0x204);
           elog("e5-emmc: dlyLK initial %08x dly_off %08x\n", dlyLK0, r32(0x208));
           for (uint32_t vi = 0; vi < 4; vi = vi + 1) {
-            uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1)); (void)d;
+            uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
             for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u + vi;
-            if (dvars[vi].dly != 0xFFFFFFFFu) w32(0x204, dvars[vi].dly);
-            __asm__ volatile ("dmb sy" ::: "memory");
+            // k163: flush dirty marker lines to RAM so DMA can overwrite and ivac works
+            for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+              __asm__ volatile ("dc cvac, %0" :: "r"(la));
+            __asm__ volatile ("dsb sy" ::: "memory");
+            (void)d;
             w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
             for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
             // k154: unstick card — CMD12 STOP (R1b) + wait busy + CMD7 re-select
