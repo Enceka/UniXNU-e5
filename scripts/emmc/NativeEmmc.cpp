@@ -150,6 +150,13 @@ class NativeEmmc : public IOBlockStorageDevice {
 
   bool hostInit() {
     // Hardware reset of the card: sprd bit3 is active low, pulse it
+
+    // Full controller reset + legacy mode (Android/LK left HS400ES strobe + V4 mode: dead at 400kHz)
+    w8(0x2F, 0x03);                                  // reset CMD+DAT state machines
+    if (!waitBits8(0x2F, 0x03, 0)) { kprintf("NativeEmmc: soft reset stuck %02x\n", r8(0x2F)); }
+    w16(0x3E, 0x0000);                               // HOST_CONTROL2: SDR12/legacy, V4 off, strobe off
+    w8(0x28, 0x00);                                  // HOST_CONTROL: 1-bit bus, no DMA/ADMA
+    kprintf("NativeEmmc: mode cleared hc2=%04x hc1=%02x\n", r16(0x3E), r8(0x28));
     // (mirrors sdhci_sprd_hw_reset in e5-linux).
     w8(SDHCI_SOFTWARE_RESET, r8(SDHCI_SOFTWARE_RESET) & (uint8_t)~0x08);
     IODelay(15);
