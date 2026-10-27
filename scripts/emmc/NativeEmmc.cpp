@@ -351,7 +351,6 @@ class NativeEmmc : public IOBlockStorageDevice {
       }
       elog("e5-emmc: dll cfg %08x sts %08x %s\n", r32(0x200), lk, (lk & 0x40000u) ? "LOCKED" : "unlocked");
     {
-      uint32_t pw = r8(0x29), hc = r8(0x28);
       // 16-bit block-reg writes read back zero; try a combined 32-bit write and
       // dump the low register file to see where values actually land.
       w32(0x04, (1u << 16) | 512u);
