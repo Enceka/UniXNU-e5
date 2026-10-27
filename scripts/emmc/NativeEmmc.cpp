@@ -202,6 +202,11 @@ class NativeEmmc : public IOBlockStorageDevice {
       if (ocr & 0x80000000) break;
       IODelay(1000);
     }
+    // Re-send CMD1 with the card's own OCR (host accepts window) then wait:
+    // some cards refuse CID identification until the negotiation closes.
+    cmd(1, ocr & 0xFFFFFFFCu, CMD_RESP_SHORT, resp);
+    elog("NativeEmmc: negotiated cmd1 -> %08x\n", resp[0]);
+    IODelay(100000);   // 100 ms settle before CMD2
     if (!(ocr & 0x80000000)) {
       elog("NativeEmmc: card never powered up, OCR 0x%x\n", ocr);
       return false;
@@ -269,6 +274,22 @@ bool NativeEmmc::start(IOService *provider)
   if (!map) { md->release(); elog("NativeEmmc: map failed\n"); return false; }
   regs = (volatile uint32_t *)map->getVirtualAddress();
   elog("NativeEmmc: regs mapped at %p\n", (void *)regs);
+  // Dump + quiesce the CQHCI engine at 0x22030000 (LK may leave it live; its
+  // completion path could shadow standard command issue).
+  {
+    IOMemoryDescriptor *cmd = IOMemoryDescriptor::withAddressRange(0x22030000ull, 0x400, kIODirectionNone, nullptr);
+    if (cmd) {
+      IOMemoryMap *cm = cmd->map();
+      if (cm) {
+        volatile uint32_t *cq = (volatile uint32_t *)cm->getVirtualAddress();
+        elog("NativeEmmc: cq cfg %08x %08x %08x %08x\n", cq[0], cq[1], cq[2], cq[3]);
+        elog("NativeEmmc: cq 0x10 %08x %08x %08x %08x\n", cq[4], cq[5], cq[6], cq[7]);
+        cq[4] = 0;  // CQ_CTL: engine off if implemented
+        cm->release();
+      }
+      cmd->release();
+    }
+  }
   bool hostOk = false;
   for (uint32_t a = 0; a < 4 && !hostOk; a++) {
     hostOk = hostInit();
