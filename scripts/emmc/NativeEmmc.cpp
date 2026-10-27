@@ -356,23 +356,29 @@ class NativeEmmc : public IOBlockStorageDevice {
            r8(0x04), r8(0x05), r8(0x06), r8(0x07), r32(0x04));
       // spec ADMA2 path: descriptor table + SYS_ADDR, single 512 read
       {
-        uint64_t dva = sdmaPhys;             // reuse the 4K buffer: descr at start, data after 0x100
-        uint32_t *dt = sdmaVirt;
-        dt[0] = (0x21u << 24) | 512u;        // Valid|Act1(Trans), len 512
-        dt[1] = (uint32_t)(dva + 0x100u);
-        dt[2] = (0x23u << 24) | 0u;          // Valid|Act1|Act2(End), len 0
-        dt[3] = 0u;
-        __asm__ volatile ("dmb sy" ::: "memory");
-        w16(0x04, 512); w16(0x06, 1);
-        w32(0x00, (uint32_t)dva);            // SYS_ADDR = descriptor PA
-        w16(SDHCI_TRANSFER_MODE, 0x13);     // DMA|read-direction
-        w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
-        uint32_t stx = 0;
-        for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-          stx = r32(SDHCI_INT_STATUS);
-          if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
+        IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, kIODirectionIn, 4096, 0xFFFFF000ull);
+        if (bmd) {
+          uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
+          uint64_t dva = bmd->getPhysicalAddress();
+          dt[0] = (0x21u << 24) | 512u;        // Valid|Act1(Trans), len 512
+          dt[1] = (uint32_t)(dva + 0x100u);    // data at +0x100
+          dt[2] = (0x23u << 24) | 0u;          // Valid|Act1|Act2(End)
+          dt[3] = 0u;
+          __asm__ volatile ("dmb sy" ::: "memory");
+          w16(0x04, 512); w16(0x06, 1);
+          w32(0x00, (uint32_t)dva);            // SYS_ADDR = descriptor PA
+          w16(SDHCI_TRANSFER_MODE, 0x13);     // DMA|read-direction
+          w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
+          uint32_t stx = 0;
+          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+            stx = r32(SDHCI_INT_STATUS);
+            if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
+          }
+          uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100);
+          elog("e5-emmc: adma2 st %08x d0 %08x d1 %08x\n", stx, d[0], d[1]);
+        } else {
+          elog("e5-emmc: adma2 alloc fail\n");
         }
-        elog("e5-emmc: adma2 st %08x d0 %08x d1 %08x\n", stx, sdmaVirt[0x100 / 4], sdmaVirt[0x104 / 4]);
       }
     }
     }
