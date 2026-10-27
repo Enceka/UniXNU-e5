@@ -410,14 +410,18 @@ class NativeEmmc : public IOBlockStorageDevice {
         if (bmd) {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
-          static const struct { const char *tag; uint32_t tm; uint32_t boundary; uint32_t rsp; uint32_t comb; } vars[3] = {
-            { "IETRUE ", 0x3u, 0x7000u, 0x1Au, 1u },  // k156: int-enable trio + U-Boot exact
-            { "IE19   ", 0x3u, 0x7000u, 0x19u, 1u },  // int trio + 0x19 (engine-engaging)
-            { "IETM13 ", 0x13u, 0x7000u, 0x1Au, 1u }, // int trio + read bit control
+          static const struct { const char *tag; uint32_t tm; uint32_t dly; } dvars[4] = {
+            { "dlyLK  ", 0x3u, 0xFFFFFFFFu },  // keep LK residue (don't write)
+            { "dly0   ", 0x3u, 0x00000000u },  // zero delays
+            { "dly3f3f", 0x3u, 0x003f003fu },  // cmd/dat 0x3f, read/write 0
+            { "dlyHS  ", 0x3u, 0x3f3f403fu },  // FDT HS pack
           };
-          for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
+          uint32_t dlyLK0 = r32(0x204);
+          elog("e5-emmc: dlyLK initial %08x dly_off %08x\n", dlyLK0, r32(0x208));
+          for (uint32_t vi = 0; vi < 4; vi = vi + 1) {
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
             for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u + vi;
+            if (dvars[vi].dly != 0xFFFFFFFFu) w32(0x204, dvars[vi].dly);
             __asm__ volatile ("dmb sy" ::: "memory");
             w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
             for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
@@ -444,15 +448,10 @@ class NativeEmmc : public IOBlockStorageDevice {
             w16(0x3E, (uint16_t)(r16(0x3E) | 0x0001u));      // HC2 |= 64BIT_ADDR (k149 state)
             uint64_t bdva = dva + 0x100u * (vi + 1);
             w32(0x58, (uint32_t)bdva); w32(0x5C, (uint32_t)(bdva >> 32));
-            w16(0x04, (uint16_t)(512u | vars[vi].boundary));
+            w16(0x04, (uint16_t)(512u | 0x7000u));
             w32(0x00, 1);                                     // 32-bit block count
             w32(SDHCI_ARGUMENT, 0);                          // LBA 0
-            if (vars[vi].comb) {
-              w32(0x0C, (((17u << 8) | vars[vi].rsp | 0x20u) << 16) | vars[vi].tm);
-            } else {
-              w16(SDHCI_TRANSFER_MODE, vars[vi].tm);
-              w16(SDHCI_COMMAND, (17u << 8) | vars[vi].rsp | 0x20u);
-            }
+            w32(0x0C, (((17u << 8) | 0x1Au | 0x20u) << 16) | dvars[vi].tm);  // 0x3A + TM
             uint32_t stx = 0;
             for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
               stx = r32(SDHCI_INT_STATUS);
@@ -466,11 +465,11 @@ class NativeEmmc : public IOBlockStorageDevice {
             }
             __asm__ volatile ("dmb sy" ::: "memory");
             elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x\n",
-                 vars[vi].tag, stx, stc, r32(SDHCI_RESPONSE), d[0], d[1]);
-            elog("e5-emmc: %s rsp %08x %08x %08x %08x\n", vars[vi].tag,
+                 dvars[vi].tag, stx, stc, r32(SDHCI_RESPONSE), d[0], d[1]);
+            elog("e5-emmc: %s rsp %08x %08x %08x %08x\n", dvars[vi].tag,
                  r32(0x10), r32(0x14), r32(0x18), r32(0x1C));
             elog("e5-emmc: %s abuf %08x blkc %08x/%08x proc %08x pstate %08x\n",
-                 vars[vi].tag, r32(0x220), r32(0x228), r32(0x22c), r32(0x240), r32(SDHCI_PRESENT_STATE));
+                 dvars[vi].tag, r32(0x220), r32(0x228), r32(0x22c), r32(0x240), r32(SDHCI_PRESENT_STATE));
           }
           elog("e5-emmc: k150 dva %08x\n", (uint32_t)dva);
         } else {
