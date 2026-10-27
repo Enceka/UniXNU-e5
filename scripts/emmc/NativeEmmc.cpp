@@ -272,122 +272,50 @@ class NativeEmmc : public IOBlockStorageDevice {
   }
 
   bool cardInit() {
+    // ---- pure JEDEC eMMC enumeration: NO extra commands between states ----
     uint32_t resp[4];
-    // ---- discriminator battery ----
-    // (a) CMD1 with degenerate args: a real card changes its answer.
-    cmd(0, 0, CMD_RESP_NONE);
-    IODelay(5000);
-    if (!cmd(1, 0x00000000, CMD_RESP_SHORT, resp)) return false;
-    elog("bt: cmd1 arg0 -> %08x\n", resp[0]);
-    if (!cmd(1, 0xC0FF8000, CMD_RESP_SHORT, resp)) return false;
-    elog("bt: cmd1 argC0FF8000 -> %08x\n", resp[0]);
-    // (b) loop with iteration telemetry
-    uint32_t iter = 0;
-    for (uint32_t i = 0; i < 200; i = i + 1) {
-      iter++;
-      if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT, resp)) return false;
+
+    // CMD0 GO_IDLE_STATE
+    if (!cmd(0, 0x00000000, CMD_RESP_NONE, resp)) { elog("e5-emmc: cmd0 fail\n"); return false; }
+    elog("e5-emmc: cmd0 ok\n");
+
+    // CMD1 SEND_OP_COND loop until busy set (card ready)
+    uint32_t ocr = 0;
+    for (uint32_t k = 0; k < 2000; k = k + 1) {
+      if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT, resp)) break;
       ocr = resp[0];
-      if (ocr & 0x80000000) break;
-      IODelay(1000);
+      if (ocr & 0x80000000u) break;
     }
-    elog("bt: cmd1 loop %u iters, last %08x\n", iter, resp[0]);
-    // (c) illegal commands: SDIO CMD52 / SD CMD55 must draw no response.
-    cmd(52, 0x00000000, CMD_RESP_SHORT, resp);
-    elog("bt: cmd52 resp %08x (absent=>ff?)\n", resp[0]);
-    cmd(55, 0x00000000, CMD_RESP_SHORT, resp);
-    elog("bt: cmd55 resp %08x\n", resp[0]);
-    // (d) CMD2 right here, pstate before/after.
-    elog("bt: pstate pre-cmd2 %08x\n", r32(SDHCI_PRESENT_STATE));
-    cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid);
-    elog("bt: cmd2 %08x %08x %08x %08x pstate %08x\n",
-          cid[0], cid[1], cid[2], cid[3], r32(SDHCI_PRESENT_STATE));
-    // ---- k99: clock-off fabrication test ----
-    {
-      uint16_t save = r16(SDHCI_CLOCK_CONTROL);
-      w16(SDHCI_CLOCK_CONTROL, save & ~0x0004);          // SD clock OFF
-      for (volatile uint32_t i = 0; i < 20000; i = i + 1) {}
-      uint32_t r4[4] = {0,0,0,0};
-      bool got = cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
-      elog("clkoff cmd1 -> %s %08x (fabricated if it answers)\n", got ? "complete" : "timeout", r4[0]);
-      w16(SDHCI_CLOCK_CONTROL, save | 0x0004);           // clock back on
-      for (volatile uint32_t i = 0; i < 20000; i = i + 1) {}
-      got = cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
-      elog("clkon  cmd1 -> %s %08x\n", got ? "complete" : "timeout", r4[0]);
-      // garbage-arg CMD1: real card returns window+busy0 regardless
-      got = cmd(1, 0x12345678, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
-      elog("oddarg cmd1 -> %s %08x\n", got ? "complete" : "timeout", r4[0]);
-    }
-    // ---- k99: real hw reset then fresh enumeration ----
-    {
-      uint8_t sr = r8(SDHCI_SOFTWARE_RESET);
-      w8(SDHCI_SOFTWARE_RESET, sr & ~0x08);              // RST_n low
-      for (volatile uint32_t i = 0; i < 600000; i = i + 1) {}  // ~10ms at slow poll
-      w8(SDHCI_SOFTWARE_RESET, sr | 0x08);               // release
-      for (volatile uint32_t i = 0; i < 60000; i = i + 1) {}   // ~1ms
-      elog("hwreset done, pstate %08x\n", r32(0x24));
-      // fresh 74+ clocks + full enum
-      cmd(0, 0, CMD_RESP_NONE, 0);
-      for (volatile uint32_t i = 0; i < 400000; i = i + 1) {}  // ~10ms idle clocks
-      uint32_t r4[4] = {0,0,0,0};
-      if (cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4)) elog("postreset cmd1 %08x\n", r4[0]);
-      if (cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, r4)) elog("postreset cmd2 %08x %08x %08x %08x\n", r4[0], r4[1], r4[2], r4[3]);
-      if (cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4)) elog("postreset cmd3 %08x\n", r4[0]);
-    }
-    // ---- end k99 ----
-    // ---- k98: full command scan (which indexes move the latch) ----
-    for (uint16_t ci = 2; ci <= 63; ci = ci + 1) {
-      uint16_t fl = (ci == 2 || ci == 9 || ci == 10) ? (CMD_RESP_LONG | CMD_CRC_ENABLE)
-                                                      : CMD_RESP_SHORT | CMD_CRC_ENABLE;
-      uint32_t r4[4] = {0, 0, 0, 0};
-      if (!cmd(ci, 0x00000000, fl, r4)) { elog("scan: CMD%u timeout/err\n", ci); continue; }
-      if (r4[0] != 0xc01f8000u || r4[1] != 0 || r4[2] != 0) {
-        elog("scan: CMD%u ANSWERS %08x %08x %08x %08x\n", ci, r4[0], r4[1], r4[2], r4[3]);
-      }
-    }
-    elog("scan done (stale = c01f8000)\n");
-    // ---- k98: RCA sweep via CMD13 SEND_STATUS ----
-    static const uint32_t rcas[] = { 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0010, 0x1000, 0x10000, 0x20000, 0x4564, 0xffff };
-    for (uint32_t ri = 0; ri < 11; ri = ri + 1) {
-      uint32_t r4[4] = {0,0,0,0};
-      if (!cmd(13, rcas[ri] << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4)) { elog("rca %04x: err\n", rcas[ri]); continue; }
-      if (r4[0] != 0xc01f8000u) elog("rca %04x ANSWERS %08x\n", rcas[ri], r4[0]);
-    }
-    elog("rca sweep done\n");
-    // ---- end battery ----
-    if (!cmd(0, 0, CMD_RESP_NONE)) return false;          // GO_IDLE_STATE
-    for (uint32_t i = 0; i < 200; i = i + 1) {                    // SEND_OP_COND until power-up
-      if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT, resp)) return false;
-      ocr = resp[0];
-      if (ocr & 0x80000000) break;
-      IODelay(1000);
-    }
-    // Re-send CMD1 with the card's own OCR (host accepts window) then wait:
-    // some cards refuse CID identification until the negotiation closes.
-    cmd(1, ocr & 0xFFFFFFFCu, CMD_RESP_SHORT, resp);
-    elog("NativeEmmc: negotiated cmd1 -> %08x\n", resp[0]);
-    IODelay(100000);   // 100 ms settle before CMD2
-    if (!(ocr & 0x80000000)) {
-      elog("NativeEmmc: card never powered up, OCR 0x%x\n", ocr);
-      return false;
-    }
-    for (uint32_t tryn = 0; tryn < 20; tryn++) {             // ALL_SEND_CID
-      if (!cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid)) return false;
-      if (cid[0] != 0xFFFFFFFFu || cid[1] != 0xFFFFFFFFu ||
-          cid[2] != 0xFFFFFFFFu || cid[3] != 0xFFFFFFFFu) {
-        elog("NativeEmmc: cmd2 try%u raw %08x %08x %08x %08x\n",
-             tryn, cid[0], cid[1], cid[2], cid[3]);
-        if (cid[3] == 0x00FFFFFFu) continue;                 // still the idle-high ghost
-        break;                                               // structurally new response
-      }
-      IODelay(1000);
-    }
-    rca = (uint16_t)(cid[0] >> 0); // placeholder; replaced by CMD3 below
-    if (!cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE, resp)) return false;
-    elog("NativeEmmc: cmd3 raw %08x\n", resp[0]);
-    rca = (uint16_t)(resp[0] >> 16);
-    if (!cmd(9, (uint32_t)rca << 16, CMD_RESP_LONG | CMD_CRC_ENABLE, csd)) return false;
-    if (!cmd(7, (uint32_t)rca << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE)) return false; // SELECT
-    if (!cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE)) return false; // BLOCKLEN
+    this->ocr = ocr;
+    if (!(ocr & 0x80000000u)) { elog("e5-emmc: cmd1 never ready ocr %08x\n", ocr); }
+    elog("e5-emmc: cmd1 ocr %08x\n", ocr);
+
+    // CMD2 ALL_SEND_CID (once) -> IDENT
+    if (!cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd2 fail\n"); return false; }
+    for (int q = 0; q < 4; q = q + 1) this->cid[q] = resp[q];
+    elog("e5-emmc: cid %08x %08x %08x %08x\n", resp[0], resp[1], resp[2], resp[3]);
+
+    // CMD3 SEND_RELATIVE_ADDR (once) -> RCA, card -> STBY
+    if (!cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd3 fail\n"); return false; }
+    this->rca = (uint16_t)(resp[0] >> 16);
+    elog("e5-emmc: rca %04x status %08x\n", this->rca, resp[0] & 0xFFFFu);
+
+    // CMD9 SEND_CSD (R2, arg = rca<<16)
+    if (!cmd(9, ((uint32_t)this->rca) << 16, CMD_RESP_LONG | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd9 fail\n"); return false; }
+    for (int q = 0; q < 4; q = q + 1) this->csd[q] = resp[q];
+    elog("e5-emmc: csd %08x %08x %08x %08x\n", resp[0], resp[1], resp[2], resp[3]);
+
+    // CMD7 SELECT_CARD (arg = rca<<16) -> TRAN
+    if (!cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd7 fail\n"); return false; }
+    elog("e5-emmc: cmd7 status %08x\n", resp[0]);
+
+    // CMD16 SET_BLOCKLEN 512
+    if (!cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd16 fail\n"); return false; }
+    elog("e5-emmc: cmd16 status %08x\n", resp[0]);
+
+    // CMD8 READ_EXT_CSD
+    if (!readExtCsd()) { elog("e5-emmc: ext_csd fail\n"); }
+    elog("e5-emmc: card up: ocr %08x rca %04x\n", this->ocr, this->rca);
     return true;
   }
 
