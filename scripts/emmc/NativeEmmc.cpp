@@ -472,23 +472,23 @@ bool NativeEmmc::start(IOService *provider)
   {
     uint32_t rb[4];
     cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
-    kprintf("b1 cid %08x %08x %08x %08x\n", rb[0], rb[1], rb[2], rb[3]);
+    elog("b1 cid %08x %08x %08x %08x\n", rb[0], rb[1], rb[2], rb[3]);
     cmd(3, 0x00010000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
-    kprintf("b2 cmd3 arg0001 %08x\n", rb[0]);
+    elog("b2 cmd3 arg0001 %08x\n", rb[0]);
     cmd(3, 0x55550000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
-    kprintf("b3 cmd3 arg5555 %08x\n", rb[0]);
+    elog("b3 cmd3 arg5555 %08x\n", rb[0]);
     cmd(3, 0x00400000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
-    kprintf("b4 cmd3 arg0040 %08x\n", rb[0]);
+    elog("b4 cmd3 arg0040 %08x\n", rb[0]);
     cmd(9, 0x00010000, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
-    kprintf("b5 cmd9 rca0001 %08x %08x\n", rb[0], rb[1]);
+    elog("b5 cmd9 rca0001 %08x %08x\n", rb[0], rb[1]);
     cmd(9, 0x00400000, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
-    kprintf("b6 cmd9 rca0040 %08x %08x\n", rb[0], rb[1]);
+    elog("b6 cmd9 rca0040 %08x %08x\n", rb[0], rb[1]);
     cmd(7, 0x00400000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
-    kprintf("b7 cmd7 %08x\n", rb[0]);
+    elog("b7 cmd7 %08x\n", rb[0]);
     cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
-    kprintf("b8 cmd16 %08x\n", rb[0]);
+    elog("b8 cmd16 %08x\n", rb[0]);
     cmd(8, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
-    kprintf("b9 cmd8 %08x\n", rb[0]);
+    elog("b9 cmd8 %08x\n", rb[0]);
   }
 
   // Divisor sweep: re-init from scratch at slower clocks, vendor DEBOUNCE
