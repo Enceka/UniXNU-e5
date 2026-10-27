@@ -197,6 +197,35 @@ class NativeEmmc : public IOBlockStorageDevice {
 
   bool cardInit() {
     uint32_t resp[4];
+    // ---- discriminator battery ----
+    // (a) CMD1 with degenerate args: a real card changes its answer.
+    cmd(0, 0, CMD_RESP_NONE);
+    IODelay(5000);
+    if (!cmd(1, 0x00000000, CMD_RESP_SHORT, resp)) return false;
+    elog("bt: cmd1 arg0 -> %08x\n", resp[0]);
+    if (!cmd(1, 0xC0FF8000, CMD_RESP_SHORT, resp)) return false;
+    elog("bt: cmd1 argC0FF8000 -> %08x\n", resp[0]);
+    // (b) loop with iteration telemetry
+    uint32_t iter = 0;
+    for (uint32_t i = 0; i < 200; i++) {
+      iter++;
+      if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT, resp)) return false;
+      ocr = resp[0];
+      if (ocr & 0x80000000) break;
+      IODelay(1000);
+    }
+    elog("bt: cmd1 loop %u iters, last %08x\n", iter, resp[0]);
+    // (c) illegal commands: SDIO CMD52 / SD CMD55 must draw no response.
+    cmd(52, 0x00000000, CMD_RESP_SHORT, resp);
+    elog("bt: cmd52 resp %08x (absent=>ff?)\n", resp[0]);
+    cmd(55, 0x00000000, CMD_RESP_SHORT, resp);
+    elog("bt: cmd55 resp %08x\n", resp[0]);
+    // (d) CMD2 right here, pstate before/after.
+    elog("bt: pstate pre-cmd2 %08x\n", r32(SDHCI_PRESENT_STATE));
+    cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid);
+    elog("bt: cmd2 %08x %08x %08x %08x pstate %08x\n",
+          cid[0], cid[1], cid[2], cid[3], r32(SDHCI_PRESENT_STATE));
+    // ---- end battery ----
     if (!cmd(0, 0, CMD_RESP_NONE)) return false;          // GO_IDLE_STATE
     for (uint32_t i = 0; i < 200; i++) {                    // SEND_OP_COND until power-up
       if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT, resp)) return false;
@@ -285,6 +314,9 @@ bool NativeEmmc::start(IOService *provider)
   if (!map) { md->release(); elog("NativeEmmc: map failed\n"); return false; }
   regs = (volatile uint32_t *)map->getVirtualAddress();
   elog("NativeEmmc: regs mapped at %p\n", (void *)regs);
+  // LK leftovers in the response file, before any of our resets:
+  elog("NativeEmmc: resp0 pre %08x %08x %08x %08x\n",
+        r32(SDHCI_RESPONSE), r32(SDHCI_RESPONSE+4), r32(SDHCI_RESPONSE+8), r32(SDHCI_RESPONSE+12));
   bool hostOk = false;
   for (uint32_t a = 0; a < 4 && !hostOk; a++) {
     hostOk = hostInit();
