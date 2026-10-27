@@ -350,12 +350,29 @@ class NativeEmmc : public IOBlockStorageDevice {
       }
       elog("e5-emmc: dll cfg %08x sts %08x %s\n", r32(0x200), lk, (lk & 0x40000u) ? "LOCKED" : "unlocked");
     {
-      // 16-bit block-reg writes read back zero; try a combined 32-bit write and
-      // dump the low register file to see where values actually land.
-      w32(0x04, (1u << 16) | 512u);
-      elog("e5-emmc: blk32 %08x hc2 %04x\n", r32(0x04), r16(0x3E));
-      for (uint32_t q = 0; q < 8; q = q + 1) {
-        elog("e5-emmc: r%02x %08x\n", q * 4, r32(q * 4));
+      // byte-granular probe: where does a distinctive count actually land?
+      w16(0x06, 0xA5A5);
+      elog("e5-emmc: after w06=A5A5: b04=%02x b05=%02x b06=%02x b07=%02x r04=%08x\n",
+           r8(0x04), r8(0x05), r8(0x06), r8(0x07), r32(0x04));
+      // spec ADMA2 path: descriptor table + SYS_ADDR, single 512 read
+      {
+        uint64_t dva = sdmaPhys;             // reuse the 4K buffer: descr at start, data after 0x100
+        uint32_t *dt = sdmaVirt;
+        dt[0] = (0x21u << 24) | 512u;        // Valid|Act1(Trans), len 512
+        dt[1] = (uint32_t)(dva + 0x100u);
+        dt[2] = (0x23u << 24) | 0u;          // Valid|Act1|Act2(End), len 0
+        dt[3] = 0u;
+        __asm__ volatile ("dmb sy" ::: "memory");
+        w16(0x04, 512); w16(0x06, 1);
+        w32(0x00, (uint32_t)dva);            // SYS_ADDR = descriptor PA
+        w16(SDHCI_TRANSFER_MODE, 0x13);     // DMA|read-direction
+        w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
+        uint32_t stx = 0;
+        for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+          stx = r32(SDHCI_INT_STATUS);
+          if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
+        }
+        elog("e5-emmc: adma2 st %08x d0 %08x d1 %08x\n", stx, sdmaVirt[0x100 / 4], sdmaVirt[0x104 / 4]);
       }
     }
     }
