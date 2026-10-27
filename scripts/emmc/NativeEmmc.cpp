@@ -328,6 +328,10 @@ class NativeEmmc : public IOBlockStorageDevice {
     w16(SDHCI_BLOCK_SIZE, 512);
     w16(SDHCI_BLOCK_COUNT, 1);
 
+    // LK leaves the host in 8-bit bus mode; our CMD0 reset the card to 1-bit.
+    // Host width bits [1:0] must match the card or every data phase times out.
+    w8(0x28, r8(0x28) & ~0x03);
+    elog("e5-emmc: hc1 %02x\n", r8(0x28));
     w8(SDHCI_TIMEOUT_CONTROL, 0x0E);   // data timeout counter
     {
       // CMD17 probe: plain single-block read of LBA0 via PIO
