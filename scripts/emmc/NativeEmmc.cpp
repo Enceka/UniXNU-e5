@@ -328,19 +328,10 @@ class NativeEmmc : public IOBlockStorageDevice {
     w16(SDHCI_BLOCK_SIZE, 512);
     w16(SDHCI_BLOCK_COUNT, 1);
 
-    // full controller re-init mimicking the vendor driver's probe path:
-    // SOFT_RESET_ALL (keep sprd HW_RESET_CARD bit3), clock re-program, and the
-    // sprd INT_SIGNAL_MASK for INT_ENABLE (all-FF writes set vendor bits that
-    // break the data engine).
-    w8(0x2F, 0x01 | 0x08);
-    for (uint32_t n = 0; n < 100000; n = n + 1) { if (!(r8(0x2F) & 0x0F)) break; }
-    w16(SDHCI_CLOCK_CONTROL, 0x0001 | (7 << 8));
-    for (uint32_t n = 0; n < 150000; n = n + 1) { if (r16(SDHCI_CLOCK_CONTROL) & 0x0002) break; }
-    w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004);
+    // vendor dll backup mode (the one sprd init step never run in the live path)
+    w32(0x28C, r32(0x28C) | 0x3);
     w8(0x28, r8(0x28) & ~0x03);
-    w32(SDHCI_INT_ENABLE, 0x1B7F410Bu);
-    w32(0x38, 0);  // no signal irq
-    elog("e5-emmc: reinit hc1 %02x clk %04x\n", r8(0x28), r16(SDHCI_CLOCK_CONTROL));
+    elog("e5-emmc: deb %08x dll_sts %08x\n", r32(0x28C), r32(0x210));
     w8(SDHCI_TIMEOUT_CONTROL, 0x0E);   // data timeout counter
     {
       // CMD17 probe: plain single-block read of LBA0 via PIO
@@ -360,6 +351,12 @@ class NativeEmmc : public IOBlockStorageDevice {
       }
       uint32_t w0 = got ? r32(SDHCI_BUFFER_DATA) : 0;
       elog("e5-emmc: cmd17 st %08x buf0 %08x\n", st, w0);
+      if (!got) {
+        for (uint32_t s = 0; s < 8; s = s + 1) {
+          elog("e5-emmc: s%u pstate %08x\n", s, r32(SDHCI_PRESENT_STATE));
+          for (uint32_t w = 0; w < 60000; w = w + 1) { }
+        }
+      }
       w8(SDHCI_SOFTWARE_RESET, 0x06);
       for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
     }
