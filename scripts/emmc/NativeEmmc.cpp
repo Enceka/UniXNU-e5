@@ -348,7 +348,15 @@ class NativeEmmc : public IOBlockStorageDevice {
 
     // ---- variant B: SDMA ----
     IOPhysicalAddress pa = 0;
-    void *dmaBuf = IOMallocContiguous(4096, 4096, &pa);
+    void *dmaBuf __attribute__((unused)) = nullptr;
+    {
+      IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, kIODirectionIn, 4096, 0xFFFFF000ull);
+      if (bmd) {
+        dmaBuf = bmd->getBytesNoCopy();
+        pa = bmd->getPhysicalAddress();
+        elog("e5-emmc: sdma va %p pa %08llx\n", dmaBuf, (unsigned long long)pa);
+      }
+    }
     if (!dmaBuf || !pa) {
       elog("e5-emmc: sdma alloc fail\n");
       return false;
@@ -374,12 +382,10 @@ class NativeEmmc : public IOBlockStorageDevice {
         elog("e5-emmc: ext_csd sdma rev %u hs %u sec lo %02x%02x\n",
              extCsd[192], extCsd[185], extCsd[213], extCsd[212]);
         sectors = (uint64_t)extCsd[212] | ((uint64_t)extCsd[213] << 8) | ((uint64_t)extCsd[214] << 16) | ((uint64_t)extCsd[215] << 24);
-        IOFreeContiguous(dmaBuf, 4096);
         return true;
       }
       elog("e5-emmc: sdma fail st %08x\n", st);
     }
-    IOFreeContiguous(dmaBuf, 4096);
     return false;
   }
 
