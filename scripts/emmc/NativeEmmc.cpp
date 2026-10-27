@@ -451,7 +451,8 @@ class NativeEmmc : public IOBlockStorageDevice {
             w32(0x38, 0x027F803Bu);               // SIGNAL_ENABLE
             w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);              // clear all int status
             w8(0x28, r8(0x28) & ~0x18u);                     // HC: SDMA select
-            uint64_t bdva = dva + 0x100u * (vi + 1);
+            uint64_t bva = (uint64_t)dt + 0x100u * (vi + 1);   // data VA (k162: reads via VA!)
+            uint64_t bdva = dva + 0x100u * (vi + 1);             // data PA for descriptor
             uint64_t tva = (uint64_t)dt + 0x1000u + 0x20u * vi; // desc table VA (k161: VA not PA!)
             uint64_t tdva = dva + 0x1000u + 0x20u * vi;           // desc table PA for 0x58
             // k159: build 16B v4 descriptor (linux values) at table, then NOP_END
@@ -484,9 +485,9 @@ class NativeEmmc : public IOBlockStorageDevice {
               if ((stc & 0xFFFF0000u) && !(stx & 0x01u)) break;     // early err w/o CC
             }
             __asm__ volatile ("dmb sy" ::: "memory");
-            invRange((volatile void *)bdva, 512);            // k159: pull DMA data from RAM
+            invRange((volatile void *)bva, 512);              // k162: invalidate data via VA
             elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x\n",
-                 dvars[vi].tag, stx, stc, r32(SDHCI_RESPONSE), *(volatile uint32_t *)bdva, *(((volatile uint32_t *)bdva) + 1));
+                 dvars[vi].tag, stx, stc, r32(SDHCI_RESPONSE), *(volatile uint32_t *)bva, *(((volatile uint32_t *)bva) + 1));
             elog("e5-emmc: %s rsp %08x %08x %08x %08x\n", dvars[vi].tag,
                  r32(0x10), r32(0x14), r32(0x18), r32(0x1C));
             elog("e5-emmc: %s abuf %08x blkc %08x/%08x proc %08x pstate %08x\n",
