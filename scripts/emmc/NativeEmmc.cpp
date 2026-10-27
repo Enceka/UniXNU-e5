@@ -398,69 +398,51 @@ class NativeEmmc : public IOBlockStorageDevice {
         w16(0x04, 512); w16(0x06, 1);
         elog("e5-emmc: retry blk %04x/%04x\n", r16(0x04), r16(0x06));
       }
-      // spec ADMA2 path — k149: v4 mode uses 16-BYTE descriptors ALWAYS (V4_EN),
-      // and 64-bit systems need HC2 |= 64BIT_ADDR (bit0) per sdhci_config_dma().
-      // Descriptor (struct sdhci_adma2_64_desc): u16 cmd; u16 len; u32 addr_lo; u32 addr_hi.
       {
+        // ---- k150: U-Boot ground truth transcription (uboot_a @0xa8bd8-0xa8c5c) ----
+        // U-Boot sprd_sdhci_send_command SDMA sequence, verbatim:
+        //   w32(0x30,0xFFFFFFFF); w32(0x58,buf_lo); w32(0x5C,buf_hi);
+        //   w16(0x04, blksz|0x7000); w32(0x00, blocks); w32(0x08, arg);
+        //   w32(0x0C, (cmd<<16)|TM)  with TM=0x3 (DMA|BCNT, NO read-direction bit)
+        // Three variants: exact / +read-bit / -boundary to isolate each delta.
         IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, kIODirectionIn, 4096, 0x7FFFF000ull);
         if (bmd) {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
-          // v4 16B table: [Trans|Valid, len, addr_lo, addr_hi] + [NOP|End|Valid, 0,0,0]
-          for (uint32_t i = 0; i < 16; i = i + 1) dt[i] = 0;
-          dt[0] = 0x02000021u; dt[1] = (uint32_t)(dva + 0x100u); dt[2] = 0; dt[3] = 0;
-          dt[4] = 0x00000003u; dt[5] = 0; dt[6] = 0; dt[7] = 0;
-          __asm__ volatile ("dmb sy" ::: "memory");
-          uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100);
-          // variant 1: ADMA2 v4, HC2 = V4_EN|64BIT_ADDR = 0x1001
-          w16(0x3E, (uint16_t)(r16(0x3E) | 0x0001u));
-          w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);  // ADMA2 select
-          w16(0x04, 512); w16(0x06, 0);           // block size, clear legacy count
-          w16(0x00, 1); w32(0x58, (uint32_t)dva); w32(0x5C, 0);  // v4 count + table
-          w16(SDHCI_TRANSFER_MODE, 0x13);
-          w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
-          uint32_t stx = 0;
-          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-            stx = r32(SDHCI_INT_STATUS);
-            if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
+          static const struct { const char *tag; uint32_t tm; uint32_t boundary; } vars[3] = {
+            { "uboot   ", 0x3u, 0x7000u },   // exact transcription
+            { "uboot_rd", 0x13u, 0x7000u },  // + read-direction bit (our old TM)
+            { "uboot_nb", 0x3u, 0x0000u },   // no SDMA boundary bits
+          };
+          for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
+            uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
+            for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u + vi;
+            __asm__ volatile ("dmb sy" ::: "memory");
+            w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
+            for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
+            w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);              // clear all int status
+            w8(0x28, r8(0x28) & ~0x18u);                     // HC: SDMA select
+            w16(0x3E, (uint16_t)(r16(0x3E) | 0x0001u));      // HC2 |= 64BIT_ADDR (k149 state)
+            uint64_t bdva = dva + 0x100u * (vi + 1);
+            w32(0x58, (uint32_t)bdva); w32(0x5C, (uint32_t)(bdva >> 32));
+            w16(0x04, (uint16_t)(512u | vars[vi].boundary));
+            w32(0x00, 1);                                     // 32-bit block count
+            w32(SDHCI_ARGUMENT, 0);                          // LBA 0
+            w32(0x0C, (((17u << 8) | 0x02u | 0x08u | 0x10u | 0x20u) << 16) | vars[vi].tm);
+            uint32_t stx = 0;
+            for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+              stx = r32(SDHCI_INT_STATUS);
+              if (stx & (0x01u | 0x20u | 0xFFFF0000u)) break;
+            }
+            __asm__ volatile ("dmb sy" ::: "memory");
+            elog("e5-emmc: %s st %08x r1 %08x d0 %08x d1 %08x\n",
+                 vars[vi].tag, stx, r32(SDHCI_RESPONSE), d[0], d[1]);
+            elog("e5-emmc: %s abuf %08x blkc %08x/%08x proc %08x pstate %08x\n",
+                 vars[vi].tag, r32(0x220), r32(0x228), r32(0x22c), r32(0x240), r32(SDHCI_PRESENT_STATE));
           }
-          elog("e5-emmc: v4adma st %08x err %08x hc2 %04x d0 %08x\n", stx, r32(0x54), r16(0x3E), d[0]);
-          elog("e5-emmc: dbg abuf %08x blkc %08x/%08x proc %08x sys %08x\n",
-               r32(0x220), r32(0x228), r32(0x22c), r32(0x240), r32(0x00));
-          w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
-          for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
-          // variant 2: SDMA v4 — HC2 64BIT set, buffer via 0x58 (sdhci_set_sdma_addr)
-          w8(0x28, r8(0x28) & ~0x18u);             // SDMA select (00)
-          w16(0x04, 512); w16(0x06, 0);
-          w16(0x00, 1); w32(0x58, (uint32_t)(dva + 0x100u)); w32(0x5C, 0);
-          w16(SDHCI_TRANSFER_MODE, 0x13);
-          w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
-          stx = 0;
-          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-            stx = r32(SDHCI_INT_STATUS);
-            if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
-          }
-          elog("e5-emmc: v4sdma st %08x err %08x d0 %08x\n", stx, r32(0x54), d[0]);
-          w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
-          for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
-          // variant 3 (control): legacy-look — HC2 back to V4_EN only, 8B table
-          w16(0x3E, (uint16_t)(r16(0x3E) & ~0x0001u));
-          for (uint32_t i = 0; i < 16; i = i + 1) dt[i] = 0;
-          dt[0] = 0x02000021u; dt[1] = (uint32_t)(dva + 0x100u); dt[2] = 0x00000003u;
-          __asm__ volatile ("dmb sy" ::: "memory");
-          w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);
-          w16(0x04, 512); w16(0x06, 0);
-          w16(0x00, 1); w32(0x58, (uint32_t)dva); w32(0x5C, 0);
-          w16(SDHCI_TRANSFER_MODE, 0x13);
-          w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
-          stx = 0;
-          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-            stx = r32(SDHCI_INT_STATUS);
-            if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
-          }
-          elog("e5-emmc: v4ad8 st %08x err %08x hc2 %04x d0 %08x\n", stx, r32(0x54), r16(0x3E), d[0]);
+          elog("e5-emmc: k150 dva %08x\n", (uint32_t)dva);
         } else {
-          elog("e5-emmc: adma2 alloc fail\n");
+          elog("e5-emmc: k150 alloc fail\n");
         }
       }
     }
