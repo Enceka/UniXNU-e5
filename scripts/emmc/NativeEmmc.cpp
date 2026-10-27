@@ -124,7 +124,8 @@ class NativeEmmc : public IOBlockStorageDevice {
   // Issue a command without data phases.
   bool cmd(uint16_t index, uint32_t arg, uint16_t flags, uint32_t *resp = nullptr) {
     // sprd r11: CMD-line reset between commands — the engine hangs after 136-bit R2 responses
-    w8(SDHCI_SOFTWARE_RESET, 0x02);
+    // SDHCI_HW_RESET_CARD (bit3) must stay 1 on sprd or the card stops working
+    w8(SDHCI_SOFTWARE_RESET, 0x02 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
     for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x02)) break; }
     w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
     if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT, 0, 5000, 10)) {
@@ -395,7 +396,7 @@ class NativeEmmc : public IOBlockStorageDevice {
           }
           uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100);
           elog("e5-emmc: adma32 st %08x err %08x d0 %08x\n", stx, r32(0x54), d[0]);
-          w8(SDHCI_SOFTWARE_RESET, 0x06);
+          w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
           for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
           // variant B: 64-bit descriptors (16B): Trans+End entry with addr pair
           for (uint32_t i = 0; i < 16; i = i + 1) dt[i] = 0;
@@ -443,7 +444,7 @@ class NativeEmmc : public IOBlockStorageDevice {
           for (uint32_t w = 0; w < 60000; w = w + 1) { }
         }
       }
-      w8(SDHCI_SOFTWARE_RESET, 0x06);
+      w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
       for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
     }
     // ---- variant A: PIO buffer-port read ----
@@ -507,7 +508,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     }
 
     // ---- variant C: ADMA2 ----
-    w8(SDHCI_SOFTWARE_RESET, 0x04);
+    w8(SDHCI_SOFTWARE_RESET, 0x04 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
     for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x04)) break; }
     if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT | PSTATE_DAT_INHIBIT, 0, 5000, 10)) {
       elog("e5-emmc: adma: dat busy\n");
@@ -612,14 +613,14 @@ bool NativeEmmc::start(IOService *provider)
     cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
     elog("b1 cid %08x %08x %08x %08x\n", rb[0], rb[1], rb[2], rb[3]);
     // variant A: CMD|DATA line reset
-    w8(SDHCI_SOFTWARE_RESET, 0x06);
+    w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
     for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
     cmd(3, 0x00010000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
     elog("b2 cmd3-after-0x06 %08x\n", rb[0]);
     // variant B: full reset + clock re-init
     cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
     elog("b3 cid2 %08x\n", rb[0]);
-    w8(SDHCI_SOFTWARE_RESET, 0x07);
+    w8(SDHCI_SOFTWARE_RESET, 0x07 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
     for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x07)) break; }
     w16(SDHCI_CLOCK_CONTROL, 0x0001 | (7 << 8));
     for (uint32_t n = 0; n < 150000; n = n + 1) { if (r16(SDHCI_CLOCK_CONTROL) & 0x0002) break; }
