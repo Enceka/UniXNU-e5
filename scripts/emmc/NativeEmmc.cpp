@@ -325,8 +325,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     // CMD8 SEND_EXT_CSD: 512-byte single-block read. Try PIO then SDMA.
     if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT | PSTATE_DAT_INHIBIT, 0, 5000, 10)) return false;
     w32(SDHCI_INT_ENABLE, 0xFFFFFFFFu);
-    w16(SDHCI_BLOCK_SIZE, 512);
-    w16(SDHCI_BLOCK_COUNT, 1);
+    w32(0x04, 1);   // V4: 0x04 as 32-bit block count
 
     // vendor dll backup mode (the one sprd init step never run in the live path)
     w32(0x28C, r32(0x28C) | 0x3);
@@ -363,8 +362,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     w8(SDHCI_TIMEOUT_CONTROL, 0x0E);   // data timeout counter
     {
       // CMD17 probe: plain single-block read of LBA0 via PIO
-      w16(SDHCI_BLOCK_SIZE, 512);
-      w16(SDHCI_BLOCK_COUNT, 1);
+      w32(0x04, 1);   // V4: 0x04 may be the 32-bit block count
       w32(SDHCI_ARGUMENT, 0);
       w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
       w32(SDHCI_INT_ENABLE, 0xFFFFFFFFu);
