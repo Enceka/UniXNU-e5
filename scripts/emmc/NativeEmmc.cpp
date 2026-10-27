@@ -411,9 +411,9 @@ class NativeEmmc : public IOBlockStorageDevice {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
           static const struct { const char *tag; uint32_t tm; uint32_t dly; } dvars[3] = {
-            { "FLADMA ", 0x13u, 0xFFFFFFFFu },  // k159: ADMA + flushed desc table + ivac data
-            { "FLADMA2", 0x13u, 0xFFFFFFFFu },  // repeat after reselect
-            { "FLSDMA ", 0x3u, 0xFFFFFFFFu },   // control: sdma-style TM
+            { "CLASSIC", 0x3u, 0xFFFFFFFFu },   // k164: V4-off classic SDMA (U-Boot mode)
+            { "CLASSI2", 0x3u, 0xFFFFFFFFu },   // repeat
+            { "CLATM13", 0x13u, 0xFFFFFFFFu },  // classic + read bit control
           };
           // k158: DMA buffer non-coherent — invalidate dcache lines before reading
           auto invRange = [](volatile void *p, uint32_t n) {
@@ -422,6 +422,20 @@ class NativeEmmc : public IOBlockStorageDevice {
             for (; a < e; a += 64) __asm__ volatile ("dc ivac, %0" :: "r"(a));
             __asm__ volatile ("dsb sy" ::: "memory");
           };
+          // k164: soft reset then clear V4 while in reset shadow
+          w8(0x2FC, 0x07u);                       // reset ALL|CMD|DAT
+          for (uint32_t w = 0; w < 100000; w = w + 1) { if (!(r8(0x2FC) & 0x07u)) break; }
+          w16(0x3E, (uint16_t)(r16(0x3E) & ~0x1000u));  // V4 OFF (classic layout)
+          elog("e5-emmc: after reset hc2 %04x\n", r16(0x3E));
+          // re-enumerate card (host reset dropped nothing on card, but re-select for safety)
+          uint32_t rre[4];
+          cmd(0, 0, 0, rre); cmd(1, 0x40FF8080u, 0, rre); rre[0]=0;
+          cmd(2, 0, CMD_RESP_LONG, rre);
+          cmd(3, 0, CMD_RESP_SHORT, rre);
+          uint32_t newrca = (rre[0] >> 16) & 0xFFFFu;
+          cmd(7, newrca << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, rre);
+          cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rre);
+          elog("e5-emmc: re-enum rca %04x st %08x\n", newrca, rre[0]);
           uint32_t dlyLK0 = r32(0x204);
           elog("e5-emmc: dlyLK initial %08x dly_off %08x\n", dlyLK0, r32(0x208));
           for (uint32_t vi = 0; vi < 4; vi = vi + 1) {
@@ -456,25 +470,13 @@ class NativeEmmc : public IOBlockStorageDevice {
             w8(0x28, r8(0x28) & ~0x18u);                     // HC: SDMA select
             uint64_t bva = (uint64_t)dt + 0x100u * (vi + 1);   // data VA (k162: reads via VA!)
             uint64_t bdva = dva + 0x100u * (vi + 1);             // data PA for descriptor
-            uint64_t tva = (uint64_t)dt + 0x1000u + 0x20u * vi; // desc table VA (k161: VA not PA!)
-            uint64_t tdva = dva + 0x1000u + 0x20u * vi;           // desc table PA for 0x58
-            // k159: build 16B v4 descriptor (linux values) at table, then NOP_END
-            volatile uint16_t *dt16 = (volatile uint16_t *)tva;
-            volatile uint32_t *dt32 = (volatile uint32_t *)tva;
-            dt16[0] = 0x0021u; dt16[1] = 512u;                // TRAN_VALID, len
-            dt32[1] = (uint32_t)bdva; dt32[2] = (uint32_t)(bdva >> 32);
-            dt16[8] = 0x0003u; dt16[9] = 0;                   // NOP_END_VALID
-            dt32[5] = 0; dt32[6] = 0;
-            __asm__ volatile ("dc cvac, %0" :: "r"(tva & ~63ull));
-            __asm__ volatile ("dc cvac, %0" :: "r"((tva & ~63ull) + 64));
-            __asm__ volatile ("dsb sy" ::: "memory");
-            w16(0x3E, (uint16_t)(r16(0x3E) | 0x0001u));      // HC2 |= 64BIT_ADDR
-            w16(SDHCI_HOST_CONTROL, (uint16_t)((r16(SDHCI_HOST_CONTROL) & ~0x18u) | 0x10u)); // ADMA2 select
-            w32(0x58, (uint32_t)tdva); w32(0x5C, (uint32_t)(tdva >> 32));  // TABLE pointer
-            w16(0x06, 0);                                     // clear legacy count
-            w16(0x04, 512u);
-            w16(0x00, 1);                                     // v4 16-bit count
-            w32(SDHCI_ARGUMENT, 0);                          // LBA 0
+            (void)0;
+            // k164: classic SDMA (V4 off): 0x00=sysaddr, 0x04=blksz|boundary, 0x06=count
+            w16(SDHCI_HOST_CONTROL, (uint16_t)((r16(SDHCI_HOST_CONTROL) & ~0x18u)));  // SDMA select (00)
+            w32(0x00, (uint32_t)bdva);                        // SDMA system address
+            w16(0x04, (uint16_t)(512u | 0x7000u));            // blksz | 512K boundary
+            w16(0x06, 1);                                      // classic block count
+            w32(SDHCI_ARGUMENT, 0);                            // LBA 0
             w32(0x0C, (((17u << 8) | 0x1Au | 0x20u) << 16) | dvars[vi].tm);  // 0x3A + TM
             uint32_t stx = 0;
             for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
