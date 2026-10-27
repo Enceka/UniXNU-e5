@@ -29,6 +29,7 @@
 #define SDHCI_SOFTWARE_RESET  0x2F
 #define SDHCI_INT_STATUS      0x30
 #define SDHCI_INT_ENABLE      0x34
+#define SDHCI_INT_SIGNAL_ENABLE 0x38
 #define SDHCI_CAPABILITIES    0x40
 #define SDHCI_CAPABILITIES2   0x44
 #define SDHCI_HOST_VERSION    0xFE
@@ -163,7 +164,10 @@ class NativeEmmc : public IOBlockStorageDevice {
     }
     w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004); // SD clock on
     w8(0x2E, 0x0E); // timeout control: max
-    w32(SDHCI_INT_ENABLE, 0);
+    // Keep completion bits enabled in the status-enable register (we poll,
+    // no signal enable needed).  Some sprd cores gate status on this.
+    w32(SDHCI_INT_ENABLE, INT_CMD_COMPLETE | INT_XFER_COMPLETE);
+    w32(SDHCI_INT_SIGNAL_ENABLE, 0);
     w32(SDHCI_INT_STATUS, 0xFFFF);
     elog("NativeEmmc: host up, caps 0x%x/0x%x clkctl 0x%x\n",
           r32(SDHCI_CAPABILITIES), r32(SDHCI_CAPABILITIES2), r16(SDHCI_CLOCK_CONTROL));
