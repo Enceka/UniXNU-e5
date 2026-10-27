@@ -411,9 +411,9 @@ class NativeEmmc : public IOBlockStorageDevice {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
           static const struct { const char *tag; uint32_t tm; uint32_t boundary; uint32_t rsp; uint32_t comb; } vars[3] = {
-            { "TRUE   ", 0x3u, 0x7000u, 0x1Au, 1u },  // k155: EXACT U-Boot (0x3A + TM=0x3) clean bus
-            { "TRUE_x3", 0x3u, 0x7000u, 0x1Au, 1u },  // repeat (state churn check)
-            { "TM13   ", 0x13u, 0x7000u, 0x1Au, 1u }, // control: with read bit
+            { "IETRUE ", 0x3u, 0x7000u, 0x1Au, 1u },  // k156: int-enable trio + U-Boot exact
+            { "IE19   ", 0x3u, 0x7000u, 0x19u, 1u },  // int trio + 0x19 (engine-engaging)
+            { "IETM13 ", 0x13u, 0x7000u, 0x1Au, 1u }, // int trio + read bit control
           };
           for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
@@ -435,6 +435,10 @@ class NativeEmmc : public IOBlockStorageDevice {
               }
               cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, dummy);
             }
+            // k156: U-Boot per-request interrupt trio (uboot_a @0xa7d34)
+            w32(0x3C, r32(0x3C) | 0x20000000u);   // FORCE_EVENT bit29
+            w32(0x34, 0x027F003Bu);               // INT_ENABLE
+            w32(0x38, 0x027F803Bu);               // SIGNAL_ENABLE
             w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);              // clear all int status
             w8(0x28, r8(0x28) & ~0x18u);                     // HC: SDMA select
             w16(0x3E, (uint16_t)(r16(0x3E) | 0x0001u));      // HC2 |= 64BIT_ADDR (k149 state)
