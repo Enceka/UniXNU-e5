@@ -347,15 +347,13 @@ class NativeEmmc : public IOBlockStorageDevice {
     elog("e5-emmc: pio fail st %08x pstate %08x\n", r32(SDHCI_INT_STATUS), r32(SDHCI_PRESENT_STATE));
 
     // ---- variant B: SDMA ----
-    IOMemoryDescriptor *md = nullptr;
-    IOVirtualAddress va = 0;
-    if (!(md = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
-              kernel_task, kIODirectionIn, 4096, 0xFFFFF000ull, true))) {
+    IOPhysicalAddress pa = 0;
+    void *dmaBuf = IOMallocContiguous(4096, 4096, &pa);
+    if (!dmaBuf || !pa) {
       elog("e5-emmc: sdma alloc fail\n");
       return false;
     }
-    va = md->getBytesNoCopy();
-    IOPhysicalAddress pa = md->getPhysicalAddress();
+    uint8_t *va = (uint8_t *)dmaBuf;
     elog("e5-emmc: sdma buf pa %08llx\n", (unsigned long long)pa);
     w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
     w32(0x48, (uint32_t)pa);              // SDMA system address
@@ -376,12 +374,12 @@ class NativeEmmc : public IOBlockStorageDevice {
         elog("e5-emmc: ext_csd sdma rev %u hs %u sec lo %02x%02x\n",
              extCsd[192], extCsd[185], extCsd[213], extCsd[212]);
         sectors = (uint64_t)extCsd[212] | ((uint64_t)extCsd[213] << 8) | ((uint64_t)extCsd[214] << 16) | ((uint64_t)extCsd[215] << 24);
-        md->release();
+        IOFreeContiguous(dmaBuf, 4096);
         return true;
       }
       elog("e5-emmc: sdma fail st %08x\n", st);
     }
-    md->release();
+    IOFreeContiguous(dmaBuf, 4096);
     return false;
   }
 
