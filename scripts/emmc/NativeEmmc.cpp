@@ -362,31 +362,136 @@ class NativeEmmc : public IOBlockStorageDevice {
       IODelay(1000);
     }
     // Re-send CMD1 with the card's own OCR (host accepts window) then wait:
-// RCA battery: verify R6 echo + find the working RCA for CMD9
-    {
-      uint32_t resp[4];
-      cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, resp);
-      kprintf("b1 cid %08x %08x %08x %08x\n", resp[0], resp[1], resp[2], resp[3]);
-      cmd(3, 0x00010000, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp);
-      kprintf("b2 cmd3 arg0001 %08x\n", resp[0]);
-      cmd(3, 0x55550000, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp);
-      kprintf("b3 cmd3 arg5555 %08x\n", resp[0]);
-      cmd(3, 0x00400000, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp);
-      kprintf("b4 cmd3 arg0040 %08x\n", resp[0]);
-      uint32_t r1 = 0x00010000, r2 = 0x00400000;
-      cmd(9, r1, CMD_RESP_LONG | CMD_CRC_ENABLE, resp);
-      kprintf("b5 cmd9 rca0001 %08x %08x\n", resp[0], resp[1]);
-      cmd(9, r2, CMD_RESP_LONG | CMD_CRC_ENABLE, resp);
-      kprintf("b6 cmd9 rca0040 %08x %08x\n", resp[0], resp[1]);
-      cmd(7, r2, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp);
-      kprintf("b7 cmd7 %08x\n", resp[0]);
-      cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp);
-      kprintf("b8 cmd16 %08x\n", resp[0]);
-      cmd(8, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp);
-      kprintf("b9 cmd8 %08x\n", resp[0]);
+    // some cards refuse CID identification until the negotiation closes.
+    cmd(1, ocr & 0xFFFFFFFCu, CMD_RESP_SHORT, resp);
+    elog("NativeEmmc: negotiated cmd1 -> %08x\n", resp[0]);
+    IODelay(100000);   // 100 ms settle before CMD2
+    if (!(ocr & 0x80000000)) {
+      elog("NativeEmmc: card never powered up, OCR 0x%x\n", ocr);
+      return false;
     }
+    for (uint32_t tryn = 0; tryn < 20; tryn++) {             // ALL_SEND_CID
+      if (!cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid)) return false;
+      if (cid[0] != 0xFFFFFFFFu || cid[1] != 0xFFFFFFFFu ||
+          cid[2] != 0xFFFFFFFFu || cid[3] != 0xFFFFFFFFu) {
+        elog("NativeEmmc: cmd2 try%u raw %08x %08x %08x %08x\n",
+             tryn, cid[0], cid[1], cid[2], cid[3]);
+        if (cid[3] == 0x00FFFFFFu) continue;                 // still the idle-high ghost
+        break;                                               // structurally new response
+      }
+      IODelay(1000);
+    }
+    rca = (uint16_t)(cid[0] >> 0); // placeholder; replaced by CMD3 below
+    if (!cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE, resp)) return false;
+    elog("NativeEmmc: cmd3 raw %08x\n", resp[0]);
+    rca = (uint16_t)(resp[0] >> 16);
+    if (!cmd(9, (uint32_t)rca << 16, CMD_RESP_LONG | CMD_CRC_ENABLE, csd)) return false;
+    if (!cmd(7, (uint32_t)rca << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE)) return false; // SELECT
+    if (!cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE)) return false; // BLOCKLEN
+    return true;
+  }
 
-    // // Divisor sweep: re-init from scratch at slower clocks, vendor DEBOUNCE
+  bool readExtCsd() {
+    // CMD8 SEND_EXT_CSD: 512-byte single-block read through the buffer port.
+    if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT | PSTATE_DAT_INHIBIT, 0, 5000, 10)) return false;
+    w16(SDHCI_BLOCK_SIZE, 512);
+    w16(SDHCI_BLOCK_COUNT, 1);
+    w32(SDHCI_ARGUMENT, 0);
+    w32(SDHCI_INT_STATUS, 0xFFFF);
+    w16(SDHCI_TRANSFER_MODE, TM_READ);
+    w16(SDHCI_COMMAND, (8 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
+    uint32_t *out = (uint32_t *)extCsd;
+    for (uint32_t i = 0; i < 512 / 4; i = i + 1) {
+      if (!waitInt(INT_BUF_READ_READY, 100000, 10)) return false;
+      out[i] = r32(SDHCI_BUFFER_DATA);
+    }
+    if (!waitInt(INT_XFER_COMPLETE, 100000, 10)) return false;
+    sectors = (uint64_t)extCsd[212] | ((uint64_t)extCsd[213] << 8) | ((uint64_t)extCsd[214] << 16) | ((uint64_t)extCsd[215] << 24);
+    return true;
+  }
+
+public:
+  bool start(IOService *provider) override;
+  IOReturn doEjectMedia() override { return kIOReturnUnsupported; }
+  IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
+  UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
+  char *getVendorString() override { return const_cast<char *>("Unisoc"); }
+  char *getProductString() override { return const_cast<char *>("eMMC 5.1 (sprd,sdhci-r11)"); }
+  char *getRevisionString() override { return const_cast<char *>("1"); }
+  char *getAdditionalDeviceInfoString() override { return const_cast<char *>("warm-handoff SDHCI"); }
+  IOReturn reportBlockSize(UInt64 *value) override { *value = 512; return kIOReturnSuccess; }
+  IOReturn reportEjectability(bool *value) override { *value = false; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *value) override { *value = sectors ? sectors - 1 : 0; return kIOReturnSuccess; }
+  IOReturn reportMediaState(bool *present, bool *changed) override { *present = cardUp; if (changed) *changed = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *value) override { *value = false; return kIOReturnSuccess; }
+  IOReturn reportWriteProtection(bool *value) override { *value = false; return kIOReturnSuccess; }
+  IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
+  IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
+  IOReturn getWriteCacheState(bool *value) override { *value = false; return kIOReturnSuccess; }
+  IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
+  IOReturn doAsyncReadWrite(IOMemoryDescriptor *, UInt64, UInt64, IOStorageAttributes *, IOStorageCompletion *) override { return kIOReturnUnsupported; }
+};
+OSDefineMetaClassAndStructors(NativeEmmc, IOBlockStorageDevice)
+
+bool NativeEmmc::start(IOService *provider)
+{
+  if (!IOBlockStorageDevice::start(provider)) return false;
+  IOMemoryDescriptor *md = IOMemoryDescriptor::withAddressRange(E5_EMMC_BASE, E5_EMMC_LEN, kIODirectionNone, nullptr);
+  if (!md) { elog("NativeEmmc: no memory descriptor\n"); return false; }
+  IOMemoryMap *map = md->map();
+  if (!map) { md->release(); elog("NativeEmmc: map failed\n"); return false; }
+  regs = (volatile uint32_t *)map->getVirtualAddress();
+  elog("NativeEmmc: regs mapped at %p\n", (void *)regs);
+  // LK leftovers in the response file, before any of our resets:
+  elog("NativeEmmc: resp0 pre %08x %08x %08x %08x\n",
+        r32(SDHCI_RESPONSE), r32(SDHCI_RESPONSE+4), r32(SDHCI_RESPONSE+8), r32(SDHCI_RESPONSE+12));
+  bool hostOk = false;
+  for (uint32_t a = 0; a < 4 && !hostOk; a++) {
+    hostOk = hostInit();
+    if (!hostOk) { elog("NativeEmmc: host init retry %u\n", a); IODelay(20000); }
+  }
+  if (!hostOk) { elog("NativeEmmc: host init failed after retries\n"); return false; }
+  if (!cardInit()) { elog("NativeEmmc: card init failed\n"); return false; }
+  elog("NativeEmmc: OCR 0x%x RCA 0x%x\n", ocr, rca);
+  elog("NativeEmmc: CID %08x %08x %08x %08x\n", cid[0], cid[1], cid[2], cid[3]);
+  elog("NativeEmmc: CSD %08x %08x %08x %08x\n", csd[0], csd[1], csd[2], csd[3]);
+  // sprd r11 probe matrix: do the CRC/INDEX check flags break the latch?
+  {
+    uint32_t r4[4];
+    cmd(3, 0, CMD_RESP_SHORT, r4);                       // no CRC/INDEX check
+    elog("NativeEmmc: probe cmd3 nocrc %08x\n", r4[0]);
+    cmd(3, 0, CMD_RESP_SHORT | CMD_INDEX_ENABLE, r4);    // index only
+    elog("NativeEmmc: probe cmd3 idx %08x\n", r4[0]);
+    cmd(2, 0, CMD_RESP_LONG, r4);                        // long, no crc
+    elog("NativeEmmc: probe cmd2 nocrc %08x %08x %08x %08x\n", r4[0], r4[1], r4[2], r4[3]);
+    cmd(9, (uint32_t)rca << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
+    elog("NativeEmmc: probe cmd9 crc %08x\n", r4[0]);
+    elog("NativeEmmc: pstate %08x clkctl %04x\n", r32(SDHCI_PRESENT_STATE), r16(SDHCI_CLOCK_CONTROL));
+  }
+  // RCA battery: verify R6 echo + find the working RCA for CMD9
+  {
+    uint32_t rb[4];
+    cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
+    kprintf("b1 cid %08x %08x %08x %08x\n", rb[0], rb[1], rb[2], rb[3]);
+    cmd(3, 0x00010000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+    kprintf("b2 cmd3 arg0001 %08x\n", rb[0]);
+    cmd(3, 0x55550000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+    kprintf("b3 cmd3 arg5555 %08x\n", rb[0]);
+    cmd(3, 0x00400000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+    kprintf("b4 cmd3 arg0040 %08x\n", rb[0]);
+    cmd(9, 0x00010000, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
+    kprintf("b5 cmd9 rca0001 %08x %08x\n", rb[0], rb[1]);
+    cmd(9, 0x00400000, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
+    kprintf("b6 cmd9 rca0040 %08x %08x\n", rb[0], rb[1]);
+    cmd(7, 0x00400000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+    kprintf("b7 cmd7 %08x\n", rb[0]);
+    cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+    kprintf("b8 cmd16 %08x\n", rb[0]);
+    cmd(8, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+    kprintf("b9 cmd8 %08x\n", rb[0]);
+  }
+
+  // Divisor sweep: re-init from scratch at slower clocks, vendor DEBOUNCE
   // DLL_BAK|DLL_VAL, 74-clock settle after CMD0, CMD2 re-issued 3x.
   {
     static const uint16_t divs[] = { 7, 15, 31, 63, 127, 255 };
