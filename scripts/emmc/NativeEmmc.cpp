@@ -331,7 +331,26 @@ class NativeEmmc : public IOBlockStorageDevice {
     // vendor dll backup mode (the one sprd init step never run in the live path)
     w32(0x28C, r32(0x28C) | 0x3);
     w8(0x28, r8(0x28) & ~0x03);
-    elog("e5-emmc: deb %08x dll_sts %08x\n", r32(0x28C), r32(0x210));
+    // full sprd PHY DLL init (LTS sdhci_sprd_enable_phy_dll, r11p3 phase=0x2):
+    // our clkctl=0 reprogram killed LK's locked DLL and DAT never sampled.
+    {
+      uint32_t c = r32(0x200);
+      c &= ~(0x00200000u | 0x0F040000u);            // clear DLL_EN | ALL_CPST
+      w32(0x200, c);
+      for (uint32_t w = 0; w < 60000 * 4; w = w + 1) { }
+      c = r32(0x200);
+      c |= 0x0F040000u | 0x00010000u | 0xc00u | 0x2u; // CPST|SEARCH|INIT|phase2
+      w32(0x200, c);
+      for (uint32_t w = 0; w < 60000 * 4; w = w + 1) { }
+      w32(0x200, r32(0x200) | 0x00200000u);          // DLL_EN
+      for (uint32_t w = 0; w < 60000 * 4; w = w + 1) { }
+      uint32_t lk = 0;
+      for (uint32_t w = 0; w < 60000 * 40; w = w + 1) {
+        lk = r32(0x210);
+        if (lk & 0x40000u) break;
+      }
+      elog("e5-emmc: dll cfg %08x sts %08x %s\n", r32(0x200), lk, (lk & 0x40000u) ? "LOCKED" : "unlocked");
+    }
     w8(SDHCI_TIMEOUT_CONTROL, 0x0E);   // data timeout counter
     {
       // CMD17 probe: plain single-block read of LBA0 via PIO
