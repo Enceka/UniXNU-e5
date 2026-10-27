@@ -269,7 +269,12 @@ bool NativeEmmc::start(IOService *provider)
   if (!map) { md->release(); elog("NativeEmmc: map failed\n"); return false; }
   regs = (volatile uint32_t *)map->getVirtualAddress();
   elog("NativeEmmc: regs mapped at %p\n", (void *)regs);
-  if (!hostInit()) { elog("NativeEmmc: host init failed\n"); return false; }
+  bool hostOk = false;
+  for (uint32_t a = 0; a < 4 && !hostOk; a++) {
+    hostOk = hostInit();
+    if (!hostOk) { elog("NativeEmmc: host init retry %u\n", a); IODelay(20000); }
+  }
+  if (!hostOk) { elog("NativeEmmc: host init failed after retries\n"); return false; }
   if (!cardInit()) { elog("NativeEmmc: card init failed\n"); return false; }
   elog("NativeEmmc: OCR 0x%x RCA 0x%x\n", ocr, rca);
   elog("NativeEmmc: CID %08x %08x %08x %08x\n", cid[0], cid[1], cid[2], cid[3]);
