@@ -406,7 +406,7 @@ class NativeEmmc : public IOBlockStorageDevice {
         //   w16(0x04, blksz|0x7000); w32(0x00, blocks); w32(0x08, arg);
         //   w32(0x0C, (cmd<<16)|TM)  with TM=0x3 (DMA|BCNT, NO read-direction bit)
         // Three variants: exact / +read-bit / -boundary to isolate each delta.
-        IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, kIODirectionIn, 4096, 0x7FFFF000ull);
+        IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, kIODirectionIn, 8192, 0x7FFFF000ull);
         if (bmd) {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
@@ -560,7 +560,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     IOPhysicalAddress pa = 0;
     void *dmaBuf __attribute__((unused)) = nullptr;
     {
-      IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, kIODirectionIn, 4096, 0x7FFFF000ull);
+      IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, kIODirectionIn, 8192, 0x7FFFF000ull);
       if (bmd) {
         dmaBuf = bmd->getBytesNoCopy();
         pa = bmd->getPhysicalAddress();
