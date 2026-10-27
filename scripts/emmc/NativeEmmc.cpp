@@ -410,10 +410,10 @@ class NativeEmmc : public IOBlockStorageDevice {
         if (bmd) {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
-          static const struct { const char *tag; uint32_t tm; uint32_t boundary; uint32_t rsp; } vars[3] = {
-            { "uboot_ex", 0x3u, 0x7000u, 0x19u },  // k151 winner: CC+latch at HS; retry at 26M
-            { "uboot_ex", 0x3u, 0x7000u, 0x19u },
-            { "uboot_ex", 0x3u, 0x7000u, 0x19u },
+          static const struct { const char *tag; uint32_t tm; uint32_t boundary; uint32_t rsp; uint32_t comb; } vars[3] = {
+            { "ex_tc  ", 0x3u, 0x7000u, 0x19u, 1u },  // k153: 0x19 + TC poll ALWAYS (ignore resp err)
+            { "ex_sep ", 0x3u, 0x7000u, 0x19u, 0u },  // separate TM/CMD writes
+            { "ex_09  ", 0x3u, 0x7000u, 0x09u, 1u },  // no opcode-check bit
           };
           for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
@@ -429,22 +429,28 @@ class NativeEmmc : public IOBlockStorageDevice {
             w16(0x04, (uint16_t)(512u | vars[vi].boundary));
             w32(0x00, 1);                                     // 32-bit block count
             w32(SDHCI_ARGUMENT, 0);                          // LBA 0
-            w32(0x0C, (((17u << 8) | vars[vi].rsp | 0x20u) << 16) | vars[vi].tm);
+            if (vars[vi].comb) {
+              w32(0x0C, (((17u << 8) | vars[vi].rsp | 0x20u) << 16) | vars[vi].tm);
+            } else {
+              w16(SDHCI_TRANSFER_MODE, vars[vi].tm);
+              w16(SDHCI_COMMAND, (17u << 8) | vars[vi].rsp | 0x20u);
+            }
             uint32_t stx = 0;
             for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
               stx = r32(SDHCI_INT_STATUS);
               if (stx & (0x01u | 0x20u | 0xFFFF0000u)) break;
             }
             uint32_t stc = 0;
-            if ((stx & 0x01u) && !(stx & 0xFFFF0000u)) {          // CC ok -> wait TC
-              for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-                stc = r32(SDHCI_INT_STATUS);
-                if (stc & (0x02u | 0xFFFF0000u)) break;           // TC or error
-              }
+            for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {      // k153: TC poll ALWAYS
+              stc = r32(SDHCI_INT_STATUS);
+              if (stc & (0x02u | 0x00080000u | 0x00100000u)) break; // TC / DMA err / ADMA err
+              if ((stc & 0xFFFF0000u) && !(stx & 0x01u)) break;     // early err w/o CC
             }
             __asm__ volatile ("dmb sy" ::: "memory");
             elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x\n",
                  vars[vi].tag, stx, stc, r32(SDHCI_RESPONSE), d[0], d[1]);
+            elog("e5-emmc: %s rsp %08x %08x %08x %08x\n", vars[vi].tag,
+                 r32(0x10), r32(0x14), r32(0x18), r32(0x1C));
             elog("e5-emmc: %s abuf %08x blkc %08x/%08x proc %08x pstate %08x\n",
                  vars[vi].tag, r32(0x220), r32(0x228), r32(0x22c), r32(0x240), r32(SDHCI_PRESENT_STATE));
           }
