@@ -320,22 +320,68 @@ class NativeEmmc : public IOBlockStorageDevice {
   }
 
   bool readExtCsd() {
-    // CMD8 SEND_EXT_CSD: 512-byte single-block read through the buffer port.
+    // CMD8 SEND_EXT_CSD: 512-byte single-block read. Try PIO then SDMA.
     if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT | PSTATE_DAT_INHIBIT, 0, 5000, 10)) return false;
+    w32(SDHCI_INT_ENABLE, 0xFFFFFFFFu);
     w16(SDHCI_BLOCK_SIZE, 512);
     w16(SDHCI_BLOCK_COUNT, 1);
+
+    // ---- variant A: PIO buffer-port read ----
     w32(SDHCI_ARGUMENT, 0);
-    w32(SDHCI_INT_STATUS, 0xFFFF);
+    w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
     w16(SDHCI_TRANSFER_MODE, TM_READ);
     w16(SDHCI_COMMAND, (8 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
-    uint32_t *out = (uint32_t *)extCsd;
-    for (uint32_t i = 0; i < 512 / 4; i = i + 1) {
-      if (!waitInt(INT_BUF_READ_READY, 100000, 10)) return false;
-      out[i] = r32(SDHCI_BUFFER_DATA);
+    if (waitInt(INT_CMD_COMPLETE, 20000, 10) && waitInt(INT_BUF_READ_READY, 100000, 10)) {
+      uint32_t *out = (uint32_t *)extCsd;
+      for (uint32_t i = 0; i < 512 / 4; i = i + 1) {
+        out[i] = r32(SDHCI_BUFFER_DATA);
+        if (i != 127) { if (!waitInt(INT_BUF_READ_READY, 100000, 10)) break; }
+      }
+      waitInt(INT_XFER_COMPLETE, 100000, 10);
+      elog("e5-emmc: ext_csd pio rev %u hs %u sec lo %02x%02x\n",
+           extCsd[192], extCsd[185], extCsd[213], extCsd[212]);
+      sectors = (uint64_t)extCsd[212] | ((uint64_t)extCsd[213] << 8) | ((uint64_t)extCsd[214] << 16) | ((uint64_t)extCsd[215] << 24);
+      return true;
     }
-    if (!waitInt(INT_XFER_COMPLETE, 100000, 10)) return false;
-    sectors = (uint64_t)extCsd[212] | ((uint64_t)extCsd[213] << 8) | ((uint64_t)extCsd[214] << 16) | ((uint64_t)extCsd[215] << 24);
-    return true;
+    elog("e5-emmc: pio fail st %08x pstate %08x\n", r32(SDHCI_INT_STATUS), r32(SDHCI_PRESENT_STATE));
+
+    // ---- variant B: SDMA ----
+    IOMemoryDescriptor *md = nullptr;
+    IOVirtualAddress va = 0;
+    if (!(md = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+              kernel_task, kIODirectionIn, 4096, 0xFFFFF000ull, true))) {
+      elog("e5-emmc: sdma alloc fail\n");
+      return false;
+    }
+    va = md->getVirtualAddress();
+    IOPhysicalAddress pa = md->getPhysicalAddress();
+    elog("e5-emmc: sdma buf pa %08llx\n", (unsigned long long)pa);
+    w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
+    w32(0x48, (uint32_t)pa);              // SDMA system address
+    w16(SDHCI_TRANSFER_MODE, TM_READ | 0x0001);  // DMA enable + read
+    w16(SDHCI_COMMAND, (8 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
+    if (waitInt(INT_CMD_COMPLETE, 20000, 10)) {
+      uint32_t guard = 0;
+      while (!(r32(SDHCI_INT_STATUS) & (INT_XFER_COMPLETE | 0x80000000u | 0x8000u))) {
+        if (r32(SDHCI_INT_STATUS) & 0x8u) {          // SDMA boundary: rewrite address
+          w32(SDHCI_INT_STATUS, 0x8u);
+          w32(0x48, (uint32_t)pa);
+        }
+        if (++guard > 200000000u) break;
+      }
+      uint32_t st = r32(SDHCI_INT_STATUS);
+      if (st & INT_XFER_COMPLETE) {
+        memcpy(extCsd, (const void *)va, 512);
+        elog("e5-emmc: ext_csd sdma rev %u hs %u sec lo %02x%02x\n",
+             extCsd[192], extCsd[185], extCsd[213], extCsd[212]);
+        sectors = (uint64_t)extCsd[212] | ((uint64_t)extCsd[213] << 8) | ((uint64_t)extCsd[214] << 16) | ((uint64_t)extCsd[215] << 24);
+        md->release();
+        return true;
+      }
+      elog("e5-emmc: sdma fail st %08x\n", st);
+    }
+    md->release();
+    return false;
   }
 
 public:
