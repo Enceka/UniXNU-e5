@@ -225,6 +225,39 @@ class NativeEmmc : public IOBlockStorageDevice {
     cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid);
     elog("bt: cmd2 %08x %08x %08x %08x pstate %08x\n",
           cid[0], cid[1], cid[2], cid[3], r32(SDHCI_PRESENT_STATE));
+    // ---- k99: clock-off fabrication test ----
+    {
+      uint16_t save = r16(SDHCI_CLOCK_CONTROL);
+      w16(SDHCI_CLOCK_CONTROL, save & ~0x0004);          // SD clock OFF
+      for (volatile uint32_t i = 0; i < 20000; i++) {}
+      uint32_t r4[4] = {0,0,0,0};
+      bool got = cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
+      elog("clkoff cmd1 -> %s %08x (fabricated if it answers)\n", got ? "complete" : "timeout", r4[0]);
+      w16(SDHCI_CLOCK_CONTROL, save | 0x0004);           // clock back on
+      for (volatile uint32_t i = 0; i < 20000; i++) {}
+      got = cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
+      elog("clkon  cmd1 -> %s %08x\n", got ? "complete" : "timeout", r4[0]);
+      // garbage-arg CMD1: real card returns window+busy0 regardless
+      got = cmd(1, 0x12345678, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
+      elog("oddarg cmd1 -> %s %08x\n", got ? "complete" : "timeout", r4[0]);
+    }
+    // ---- k99: real hw reset then fresh enumeration ----
+    {
+      uint8_t sr = r8(SDHCI_SOFTWARE_RESET);
+      w8(SDHCI_SOFTWARE_RESET, sr & ~0x08);              // RST_n low
+      for (volatile uint32_t i = 0; i < 600000; i++) {}  // ~10ms at slow poll
+      w8(SDHCI_SOFTWARE_RESET, sr | 0x08);               // release
+      for (volatile uint32_t i = 0; i < 60000; i++) {}   // ~1ms
+      elog("hwreset done, pstate %08x\n", r32(0x24));
+      // fresh 74+ clocks + full enum
+      cmd(0, 0, CMD_RESP_NONE, 0);
+      for (volatile uint32_t i = 0; i < 400000; i++) {}  // ~10ms idle clocks
+      uint32_t r4[4] = {0,0,0,0};
+      if (cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4)) elog("postreset cmd1 %08x\n", r4[0]);
+      if (cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, r4)) elog("postreset cmd2 %08x %08x %08x %08x\n", r4[0], r4[1], r4[2], r4[3]);
+      if (cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4)) elog("postreset cmd3 %08x\n", r4[0]);
+    }
+    // ---- end k99 ----
     // ---- k98: full command scan (which indexes move the latch) ----
     for (uint16_t ci = 2; ci <= 63; ci++) {
       uint16_t fl = (ci == 2 || ci == 9 || ci == 10) ? (CMD_RESP_LONG | CMD_CRC_ENABLE)
