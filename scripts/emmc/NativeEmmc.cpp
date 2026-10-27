@@ -9,6 +9,7 @@
 #include <stdarg.h>
 #include <IOKit/IOLib.h>
 #include <IOKit/storage/IOBlockStorageDevice.h>
+#include <IOKit/IOBufferMemoryDescriptor.h>
 #include <libkern/c++/OSData.h>
 
 #define E5_EMMC_BASE 0x22200000ULL
@@ -353,7 +354,7 @@ class NativeEmmc : public IOBlockStorageDevice {
       elog("e5-emmc: sdma alloc fail\n");
       return false;
     }
-    va = md->getVirtualSegment(0, nullptr);
+    va = md->getBytesNoCopy();
     IOPhysicalAddress pa = md->getPhysicalAddress();
     elog("e5-emmc: sdma buf pa %08llx\n", (unsigned long long)pa);
     w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
