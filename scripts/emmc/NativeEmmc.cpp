@@ -121,6 +121,10 @@ class NativeEmmc : public IOBlockStorageDevice {
 
   // Issue a command without data phases.
   bool cmd(uint16_t index, uint32_t arg, uint16_t flags, uint32_t *resp = nullptr) {
+    // sprd r11: CMD-line reset between commands — the engine hangs after 136-bit R2 responses
+    w8(SDHCI_SOFTWARE_RESET, 0x02);
+    for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x02)) break; }
+    w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
     if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT, 0, 5000, 10)) {
       elog("NativeEmmc: CMD%u: cmd line stuck (pstate 0x%x)\n", index, r32(SDHCI_PRESENT_STATE));
       return false;
@@ -444,7 +448,6 @@ bool NativeEmmc::start(IOService *provider)
   bool hostOk = false;
   for (uint32_t a = 0; a < 4 && !hostOk; a++) {
     hostOk = hostInit();
-    if (hostOk) runMicroscope();
     if (!hostOk) { elog("NativeEmmc: host init retry %u\n", a); IODelay(20000); }
   }
   if (!hostOk) { elog("NativeEmmc: host init failed after retries\n"); return false; }
