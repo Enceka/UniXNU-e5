@@ -175,9 +175,9 @@ class NativeEmmc : public IOBlockStorageDevice {
     }
     w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004); // SD clock on
     w8(0x2E, 0x0E); // timeout control: max
-    // Keep completion bits enabled in the status-enable register (we poll,
-    // no signal enable needed).  Some sprd cores gate status on this.
-    w32(SDHCI_INT_ENABLE, INT_CMD_COMPLETE | INT_XFER_COMPLETE);
+    // sprd gates STATUS bits on INT_ENABLE: enable everything so error
+    // bits (timeout/CRC, high half) become visible to our polling.
+    w32(SDHCI_INT_ENABLE, 0xFFFFu);
     w32(SDHCI_INT_SIGNAL_ENABLE, 0);
     w32(SDHCI_INT_STATUS, 0xFFFF);
     elog("NativeEmmc: host up, caps 0x%x/0x%x clkctl 0x%x\n",
