@@ -353,7 +353,7 @@ class NativeEmmc : public IOBlockStorageDevice {
       elog("e5-emmc: sdma alloc fail\n");
       return false;
     }
-    va = md->getVirtualAddress();
+    va = md->getVirtualSegment(0, nullptr);
     IOPhysicalAddress pa = md->getPhysicalAddress();
     elog("e5-emmc: sdma buf pa %08llx\n", (unsigned long long)pa);
     w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
