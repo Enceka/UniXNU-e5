@@ -468,11 +468,29 @@ bool NativeEmmc::start(IOService *provider)
     elog("NativeEmmc: probe cmd9 crc %08x\n", r4[0]);
     elog("NativeEmmc: pstate %08x clkctl %04x\n", r32(SDHCI_PRESENT_STATE), r16(SDHCI_CLOCK_CONTROL));
   }
-  // RCA battery: verify R6 echo + find the working RCA for CMD9
+  // post-R2 recovery battery: the engine dies after the first R2; try resets
   {
     uint32_t rb[4];
     cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
     elog("b1 cid %08x %08x %08x %08x\n", rb[0], rb[1], rb[2], rb[3]);
+    // variant A: CMD|DATA line reset
+    w8(SDHCI_SOFTWARE_RESET, 0x06);
+    for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
+    cmd(3, 0x00010000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+    elog("b2 cmd3-after-0x06 %08x\n", rb[0]);
+    // variant B: full reset + clock re-init
+    cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
+    elog("b3 cid2 %08x\n", rb[0]);
+    w8(SDHCI_SOFTWARE_RESET, 0x07);
+    for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x07)) break; }
+    w16(SDHCI_CLOCK_CONTROL, 0x0001 | (7 << 8));
+    for (uint32_t n = 0; n < 150000; n = n + 1) { if (r16(SDHCI_CLOCK_CONTROL) & 0x0002) break; }
+    w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004);
+    w32(SDHCI_INT_ENABLE, 0x00000003);
+    cmd(1, 0x40FF8000, CMD_RESP_SHORT, rb);
+    elog("b4 cmd1-after-full %08x\n", rb[0]);
+    cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, rb);
+    elog("b5 cid-after-full %08x %08x\n", rb[0], rb[3]);
     cmd(3, 0x00010000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
     elog("b2 cmd3 arg0001 %08x\n", rb[0]);
     cmd(3, 0x55550000, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
