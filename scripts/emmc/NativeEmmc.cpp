@@ -350,6 +350,11 @@ class NativeEmmc : public IOBlockStorageDevice {
         if (lk & 0x40000u) break;
       }
       elog("e5-emmc: dll cfg %08x sts %08x %s\n", r32(0x200), lk, (lk & 0x40000u) ? "LOCKED" : "unlocked");
+    {
+      uint32_t pw = r8(0x29), hc = r8(0x28), hc2 = r16(0x3E);
+      if (!(pw & 0x01)) { w8(0x29, pw | 0x01); pw = r8(0x29); }
+      elog("e5-emmc: pw %02x hc %02x hc2 %04x blk %04x/%04x\n", pw, hc, hc2, r16(0x04), r16(0x06));
+    }
     }
     w8(SDHCI_TIMEOUT_CONTROL, 0x0E);   // data timeout counter
     {
