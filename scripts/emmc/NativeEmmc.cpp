@@ -312,6 +312,15 @@ class NativeEmmc : public IOBlockStorageDevice {
     if (!cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd7 fail\n"); return false; }
     elog("e5-emmc: cmd7 status %08x\n", resp[0]);
 
+    // CMD6 SWITCH (dataless R1b): reset card-side modes inherited from Android/LK.
+    // HS_TIMING[185]=0 legacy + BUS_WIDTH[183]=1 (1-bit SDR) — if the card was left
+    // in HS400/8-bit-DDR, SDR data reads fail silently with clean R1s (our symptom).
+    uint32_t rb[4];
+    cmd(6, 0x0300B900u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);   // EXT_CSD[185]=0
+    elog("e5-emmc: cmd6 hs_timing r1 %08x\n", rb[0]);
+    cmd(6, 0x0300B701u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);   // EXT_CSD[183]=1 (bus 1-bit)
+    elog("e5-emmc: cmd6 bus_width r1 %08x\n", rb[0]);
+
     // CMD16 SET_BLOCKLEN 512
     if (!cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd16 fail\n"); return false; }
     elog("e5-emmc: cmd16 status %08x\n", resp[0]);
