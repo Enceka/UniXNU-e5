@@ -386,6 +386,46 @@ class NativeEmmc : public IOBlockStorageDevice {
       }
       elog("e5-emmc: sdma fail st %08x\n", st);
     }
+
+    // ---- variant C: ADMA2 ----
+    w8(SDHCI_SOFTWARE_RESET, 0x04);
+    for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x04)) break; }
+    if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT | PSTATE_DAT_INHIBIT, 0, 5000, 10)) {
+      elog("e5-emmc: adma: dat busy\n");
+      return false;
+    }
+    {
+      // descriptor at buf+0, data lands at buf+512
+      uint32_t tabPA = (uint32_t)pa;
+      uint32_t datPA = tabPA + 512;
+      uint8_t *tab = va;
+      for (uint32_t i = 0; i < 16; i = i + 1) tab[i] = 0;
+      tab[0] = 0x23;                       // VALID | TRAN | END
+      tab[2] = 512 & 0xff; tab[3] = (512 >> 8) & 0xff;
+      tab[4] = datPA & 0xff; tab[5] = (datPA >> 8) & 0xff;
+      tab[6] = (datPA >> 16) & 0xff; tab[7] = (datPA >> 24) & 0xff;
+      w16(SDHCI_BLOCK_SIZE, 512 | (7 << 12));   // SDMA boundary 512K << hmm, keep 512
+      w16(SDHCI_BLOCK_COUNT, 1);
+      w32(0x58, tabPA);                    // ADMA_SYS_ADDRESS
+      w32(SDHCI_ARGUMENT, 0);
+      w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
+      w32(SDHCI_INT_ENABLE, 0xFFFFFFFFu);
+      w16(SDHCI_TRANSFER_MODE, 0x11);      // DMA_EN | read
+      w16(SDHCI_COMMAND, (8 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
+      uint32_t st = 0;
+      for (uint32_t n = 0; n < 200000; n = n + 1) {
+        st = r32(SDHCI_INT_STATUS);
+        if (st & (INT_XFER_COMPLETE | 0xFFFF0000u)) break;
+      }
+      elog("e5-emmc: adma st %08x\n", st);
+      if (st & INT_XFER_COMPLETE) {
+        for (uint32_t i = 0; i < 512; i = i + 1) extCsd[i] = va[512 + i];
+        elog("e5-emmc: adma ext_csd rev %u hs %u\n", extCsd[192], extCsd[185]);
+        sectors = (uint64_t)extCsd[212] | ((uint64_t)extCsd[213] << 8) | ((uint64_t)extCsd[214] << 16) | ((uint64_t)extCsd[215] << 24);
+        elog("e5-emmc: adma sectors %llu\n", (unsigned long long)sectors);
+        return true;
+      }
+    }
     return false;
   }
 
