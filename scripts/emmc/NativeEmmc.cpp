@@ -352,11 +352,13 @@ class NativeEmmc : public IOBlockStorageDevice {
       elog("e5-emmc: dll cfg %08x sts %08x %s\n", r32(0x200), lk, (lk & 0x40000u) ? "LOCKED" : "unlocked");
     {
       uint32_t pw = r8(0x29), hc = r8(0x28);
-      // V4 mode (HC2 bit12) remaps 0x04/0x06 into the 64-bit SDMA address -
-      // block regs read zero and data phases are zero-width. Back to V3 map.
-      if (r16(0x3E) & 0x1000) { w16(0x3E, r16(0x3E) & ~0x1000); }
-      w16(0x04, 512); w16(0x06, 1);
-      elog("e5-emmc: pw %02x hc %02x hc2 %04x blk %04x/%04x\n", pw, hc, r16(0x3E), r16(0x04), r16(0x06));
+      // 16-bit block-reg writes read back zero; try a combined 32-bit write and
+      // dump the low register file to see where values actually land.
+      w32(0x04, (1u << 16) | 512u);
+      elog("e5-emmc: blk32 %08x hc2 %04x\n", r32(0x04), r16(0x3E));
+      for (uint32_t q = 0; q < 8; q = q + 1) {
+        elog("e5-emmc: r%02x %08x\n", q * 4, r32(q * 4));
+      }
     }
     }
     w8(SDHCI_TIMEOUT_CONTROL, 0x0E);   // data timeout counter
