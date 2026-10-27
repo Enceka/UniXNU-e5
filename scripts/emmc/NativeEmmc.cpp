@@ -354,6 +354,24 @@ class NativeEmmc : public IOBlockStorageDevice {
       w16(0x06, 0xA5A5);
       elog("e5-emmc: after w06=A5A5: b04=%02x b05=%02x b06=%02x b07=%02x r04=%08x\n",
            r8(0x04), r8(0x05), r8(0x06), r8(0x07), r32(0x04));
+      // CQ block lives at base+0x300 (DTS reg triple #2). If CQE is enabled,
+      // the legacy SDHCI data path is bypassed. Probe + halt + retry legacy.
+      {
+        uint32_t cq[8];
+        for (uint32_t i = 0; i < 8; i = i + 1) cq[i] = r32(0x300 + 4 * i);
+        elog("e5-emmc: cq %08x %08x %08x %08x %08x %08x %08x %08x\n",
+             cq[0], cq[1], cq[2], cq[3], cq[4], cq[5], cq[6], cq[7]);
+        // halt CQE (CQ_CTL=0x0C bit0) and disable (CQ_CFG=0x08)
+        w32(0x30C, 1);
+        for (uint32_t n = 0; n < 50000; n = n + 1) { if (r32(0x30C) & 1) break; }
+        if (cq[1] & 1) { w32(0x308, cq[1] & ~1u); }   // clear CQ_CFG enable if set
+        elog("e5-emmc: cq halted ctl %08x cfg %08x\n", r32(0x30C), r32(0x308));
+        elog("e5-emmc: post-halt blk %04x/%04x hc2 %04x\n",
+             r16(0x04), r16(0x06), r16(0x3E));
+        // legacy block regs retry
+        w16(0x04, 512); w16(0x06, 1);
+        elog("e5-emmc: retry blk %04x/%04x\n", r16(0x04), r16(0x06));
+      }
       // spec ADMA2 path, canonical descriptor encoding (sdhci_adma_write_desc):
       // u16 cmd (0x21 Trans-Valid | 0x2 End), u16 len, u32 addr_lo [, u32 addr_hi]
       {
