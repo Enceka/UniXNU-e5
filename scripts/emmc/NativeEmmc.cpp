@@ -354,20 +354,21 @@ class NativeEmmc : public IOBlockStorageDevice {
       w16(0x06, 0xA5A5);
       elog("e5-emmc: after w06=A5A5: b04=%02x b05=%02x b06=%02x b07=%02x r04=%08x\n",
            r8(0x04), r8(0x05), r8(0x06), r8(0x07), r32(0x04));
-      // spec ADMA2 path: descriptor table + SYS_ADDR, single 512 read
+      // spec ADMA2 path, canonical descriptor encoding (sdhci_adma_write_desc):
+      // u16 cmd (0x21 Trans-Valid | 0x2 End), u16 len, u32 addr_lo [, u32 addr_hi]
       {
         IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, kIODirectionIn, 4096, 0xFFFFF000ull);
         if (bmd) {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
-          dt[0] = (0x21u << 24) | 512u;        // Valid|Act1(Trans), len 512
-          dt[1] = (uint32_t)(dva + 0x100u);    // data at +0x100
-          dt[2] = (0x23u << 24) | 0u;          // Valid|Act1|Act2(End)
-          dt[3] = 0u;
+          // variant A: 32-bit descriptors (8B): single Trans+End entry
+          for (uint32_t i = 0; i < 16; i = i + 1) dt[i] = 0;
+          dt[0] = 0x02000023u;                       // cmd=0x23 len=512
+          dt[1] = (uint32_t)(dva + 0x100u);
           __asm__ volatile ("dmb sy" ::: "memory");
           w16(0x04, 512); w16(0x06, 1);
-          w32(0x00, (uint32_t)dva);            // SYS_ADDR = descriptor PA
-          w16(SDHCI_TRANSFER_MODE, 0x13);     // DMA|read-direction
+          w32(0x3C, 0); w32(0x00, (uint32_t)dva);    // ADMA address (hi always 0)
+          w16(SDHCI_TRANSFER_MODE, 0x13);           // DMA|BCNT|read
           w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
           uint32_t stx = 0;
           for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
@@ -375,7 +376,25 @@ class NativeEmmc : public IOBlockStorageDevice {
             if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
           }
           uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100);
-          elog("e5-emmc: adma2 st %08x d0 %08x d1 %08x\n", stx, d[0], d[1]);
+          elog("e5-emmc: adma32 st %08x err %08x d0 %08x\n", stx, r32(0x54), d[0]);
+          w8(SDHCI_SOFTWARE_RESET, 0x06);
+          for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
+          // variant B: 64-bit descriptors (16B): Trans+End entry with addr pair
+          for (uint32_t i = 0; i < 16; i = i + 1) dt[i] = 0;
+          dt[0] = 0x02000023u;
+          dt[2] = (uint32_t)(dva + 0x100u);
+          dt[3] = 0;
+          __asm__ volatile ("dmb sy" ::: "memory");
+          w16(0x04, 512); w16(0x06, 1);
+          w32(0x3C, 0); w32(0x00, (uint32_t)dva);
+          w16(SDHCI_TRANSFER_MODE, 0x13);
+          w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
+          stx = 0;
+          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+            stx = r32(SDHCI_INT_STATUS);
+            if (stx & (0x20u | 0x8000u | 0x10000u | 0x200000u)) break;
+          }
+          elog("e5-emmc: adma64 st %08x err %08x d0 %08x d1 %08x\n", stx, r32(0x54), d[0], d[1]);
         } else {
           elog("e5-emmc: adma2 alloc fail\n");
         }
