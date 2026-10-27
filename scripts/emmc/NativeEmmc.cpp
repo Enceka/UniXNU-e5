@@ -409,10 +409,10 @@ class NativeEmmc : public IOBlockStorageDevice {
         if (bmd) {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
-          static const struct { const char *tag; uint32_t tm; uint32_t boundary; } vars[3] = {
-            { "uboot   ", 0x3u, 0x7000u },   // exact transcription
-            { "uboot_rd", 0x13u, 0x7000u },  // + read-direction bit (our old TM)
-            { "uboot_nb", 0x3u, 0x0000u },   // no SDMA boundary bits
+          static const struct { const char *tag; uint32_t tm; uint32_t boundary; uint32_t rsp; } vars[3] = {
+            { "uboot_ex", 0x3u, 0x7000u, 0x19u },  // k151: EXACT U-Boot RSP bits (PRESENT|CRC|OPCODE -> 0x19)
+            { "uboot_rA", 0x3u, 0x7000u, 0x1Au },  // k150's resp encoding (select=10), rest identical
+            { "uboot_ex4", 0x3u, 0x7000u, 0x09u }, // U-Boot flags w/o OPCODE bit
           };
           for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
@@ -428,7 +428,7 @@ class NativeEmmc : public IOBlockStorageDevice {
             w16(0x04, (uint16_t)(512u | vars[vi].boundary));
             w32(0x00, 1);                                     // 32-bit block count
             w32(SDHCI_ARGUMENT, 0);                          // LBA 0
-            w32(0x0C, (((17u << 8) | 0x02u | 0x08u | 0x10u | 0x20u) << 16) | vars[vi].tm);
+            w32(0x0C, (((17u << 8) | vars[vi].rsp | 0x20u) << 16) | vars[vi].tm);
             uint32_t stx = 0;
             for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
               stx = r32(SDHCI_INT_STATUS);
