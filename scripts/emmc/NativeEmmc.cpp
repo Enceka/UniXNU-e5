@@ -315,15 +315,15 @@ class NativeEmmc : public IOBlockStorageDevice {
     // CMD6 SWITCH (dataless R1b): reset card-side modes inherited from Android/LK.
     // HS_TIMING[185]=1 (High Speed 52MHz) + BUS_WIDTH[183]=1 (1-bit SDR).
     uint32_t rb[4];
-    cmd(6, 0x0300B901u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);   // EXT_CSD[185]=1 HS
-    elog("e5-emmc: cmd6 hs_timing r1 %08x\n", rb[0]);
+    // k152: STAY AT LEGACY 26MHz — HS 52M gave response CRC error (phase).
+    // Only reset bus width to 1-bit if the card inherited 8-bit from Android.
     cmd(6, 0x0300B701u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);   // EXT_CSD[183]=1 (bus 1-bit)
     elog("e5-emmc: cmd6 bus_width r1 %08x\n", rb[0]);
 
     // Re-tune controller for HS: Android left DLL delays in HS400ES state.
     // Mirrors vendor sdhci_sprd_set_clock(52M) + DTS sprd,phy-delay-mmc-highspeed
     // = <0x3f 0x40 0x3f 0x3f> -> DLL_DLY=0x3f3f403f; mmc0@HS needs DLL invert bits.
-    {
+    if (this->hsRetune) {   // k152: disabled — variants run at legacy 26M
       uint16_t cc0 = r16(0x2C);
       w16(0x2C, cc0 & (uint16_t)~0x4);   // sd_clk_off (CARD_EN)
       w16(0x2C, 0x0201);                  // ICE + select=2 (EMMC_2X 390M/2 -> 48.75M)
@@ -347,6 +347,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     return true;
   }
 
+  bool hsRetune = false;
   bool readExtCsd() {
     // CMD8 SEND_EXT_CSD: 512-byte single-block read. Try PIO then SDMA.
     if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT | PSTATE_DAT_INHIBIT, 0, 5000, 10)) return false;
@@ -410,9 +411,9 @@ class NativeEmmc : public IOBlockStorageDevice {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
           static const struct { const char *tag; uint32_t tm; uint32_t boundary; uint32_t rsp; } vars[3] = {
-            { "uboot_ex", 0x3u, 0x7000u, 0x19u },  // k151: EXACT U-Boot RSP bits (PRESENT|CRC|OPCODE -> 0x19)
-            { "uboot_rA", 0x3u, 0x7000u, 0x1Au },  // k150's resp encoding (select=10), rest identical
-            { "uboot_ex4", 0x3u, 0x7000u, 0x09u }, // U-Boot flags w/o OPCODE bit
+            { "uboot_ex", 0x3u, 0x7000u, 0x19u },  // k151 winner: CC+latch at HS; retry at 26M
+            { "uboot_ex", 0x3u, 0x7000u, 0x19u },
+            { "uboot_ex", 0x3u, 0x7000u, 0x19u },
           };
           for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
@@ -434,9 +435,16 @@ class NativeEmmc : public IOBlockStorageDevice {
               stx = r32(SDHCI_INT_STATUS);
               if (stx & (0x01u | 0x20u | 0xFFFF0000u)) break;
             }
+            uint32_t stc = 0;
+            if ((stx & 0x01u) && !(stx & 0xFFFF0000u)) {          // CC ok -> wait TC
+              for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+                stc = r32(SDHCI_INT_STATUS);
+                if (stc & (0x02u | 0xFFFF0000u)) break;           // TC or error
+              }
+            }
             __asm__ volatile ("dmb sy" ::: "memory");
-            elog("e5-emmc: %s st %08x r1 %08x d0 %08x d1 %08x\n",
-                 vars[vi].tag, stx, r32(SDHCI_RESPONSE), d[0], d[1]);
+            elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x\n",
+                 vars[vi].tag, stx, stc, r32(SDHCI_RESPONSE), d[0], d[1]);
             elog("e5-emmc: %s abuf %08x blkc %08x/%08x proc %08x pstate %08x\n",
                  vars[vi].tag, r32(0x220), r32(0x228), r32(0x22c), r32(0x240), r32(SDHCI_PRESENT_STATE));
           }
