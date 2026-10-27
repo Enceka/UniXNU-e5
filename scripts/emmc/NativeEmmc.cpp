@@ -144,9 +144,15 @@ class NativeEmmc : public IOBlockStorageDevice {
   }
 
   bool hostInit() {
-    // Full soft reset of the host (sprd: bit3 must stay set; write only bit0).
-    w8(SDHCI_SOFTWARE_RESET, 0x01);
-    if (!waitBits8(SDHCI_SOFTWARE_RESET, 0x01, 0, 100000, 10)) {
+    // Hardware reset of the card: sprd bit3 is active low, pulse it
+    // (mirrors sdhci_sprd_hw_reset in e5-linux).
+    w8(SDHCI_SOFTWARE_RESET, r8(SDHCI_SOFTWARE_RESET) & (uint8_t)~0x08);
+    IODelay(15);
+    w8(SDHCI_SOFTWARE_RESET, r8(SDHCI_SOFTWARE_RESET) | 0x08);
+    IODelay(400);
+    // Soft reset of the cmd+data lines (bit3 must stay set, sprd).
+    w8(SDHCI_SOFTWARE_RESET, 0x01 | 0x02 | 0x08);
+    if (!waitBits8(SDHCI_SOFTWARE_RESET, 0x03, 0, 100000, 10)) {
       elog("NativeEmmc: host soft reset did not clear (0x%x)\n", r8(SDHCI_SOFTWARE_RESET));
       return false;
     }
