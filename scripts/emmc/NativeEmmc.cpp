@@ -174,6 +174,14 @@ class NativeEmmc : public IOBlockStorageDevice {
       return false;
     }
     w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004); // SD clock on
+    // sprd: disable CLK_AUTO (BUSY_POSI 0x250 bits 25/24) at <=400kHz, or the
+    // auto clock gating breaks low-speed command timing (e5-linux sdhci-sprd).
+    {
+      uint32_t bp = r32(0x250);
+      elog("NativeEmmc: busy_posi 0x%x\n", bp);
+      bp &= ~((1u << 25) | (1u << 24));
+      w32(0x250, bp);
+    }
     w8(0x2E, 0x0E); // timeout control: max
     // sprd gates STATUS bits on INT_ENABLE: enable everything so error
     // bits (timeout/CRC, high half) become visible to our polling.
