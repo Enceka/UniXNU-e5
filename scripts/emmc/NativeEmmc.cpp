@@ -266,6 +266,19 @@ bool NativeEmmc::start(IOService *provider)
   elog("NativeEmmc: OCR 0x%x RCA 0x%x\n", ocr, rca);
   elog("NativeEmmc: CID %08x %08x %08x %08x\n", cid[0], cid[1], cid[2], cid[3]);
   elog("NativeEmmc: CSD %08x %08x %08x %08x\n", csd[0], csd[1], csd[2], csd[3]);
+  // sprd r11 probe matrix: do the CRC/INDEX check flags break the latch?
+  {
+    uint32_t r4[4];
+    cmd(3, 0, CMD_RESP_SHORT, r4);                       // no CRC/INDEX check
+    elog("NativeEmmc: probe cmd3 nocrc %08x\n", r4[0]);
+    cmd(3, 0, CMD_RESP_SHORT | CMD_INDEX_ENABLE, r4);    // index only
+    elog("NativeEmmc: probe cmd3 idx %08x\n", r4[0]);
+    cmd(2, 0, CMD_RESP_LONG, r4);                        // long, no crc
+    elog("NativeEmmc: probe cmd2 nocrc %08x %08x %08x %08x\n", r4[0], r4[1], r4[2], r4[3]);
+    cmd(9, (uint32_t)rca << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
+    elog("NativeEmmc: probe cmd9 crc %08x\n", r4[0]);
+    elog("NativeEmmc: pstate %08x clkctl %04x\n", r32(SDHCI_PRESENT_STATE), r16(SDHCI_CLOCK_CONTROL));
+  }
   if (readExtCsd()) {
     cardUp = true;
     elog("NativeEmmc: EXT_CSD rev %u, HS_TIMING %u, SEC_COUNT %llu (%.1f GiB)\n",
