@@ -148,7 +148,35 @@ class NativeEmmc : public IOBlockStorageDevice {
     return true;
   }
 
+  // ---- sprd clock gating: apahb-gate sdio0_eb + ap-clk emmc_2x/emmc_1x ----
+  volatile uint32_t *gate = nullptr, *apclk = nullptr;
+  bool clocksUp() {
+    IOMemoryDescriptor *gmd = IOMemoryDescriptor::withAddressRange(0x20000000, 0x3000, kIODirectionNone, nullptr);
+    if (!gmd) { kprintf("NativeEmmc: gate md failed\n"); return false; }
+    IOMemoryMap *gmap = gmd->map();
+    if (!gmap) { gmd->release(); kprintf("NativeEmmc: gate map failed\n"); return false; }
+    gate = (volatile uint32_t *)gmap->getVirtualAddress();
+    IOMemoryDescriptor *amd = IOMemoryDescriptor::withAddressRange(0x20010000, 0x200, kIODirectionNone, nullptr);
+    if (!amd) { kprintf("NativeEmmc: apclk md failed\n"); return false; }
+    IOMemoryMap *amap = amd->map();
+    if (!amap) { amd->release(); kprintf("NativeEmmc: apclk map failed\n"); return false; }
+    apclk = (volatile uint32_t *)amap->getVirtualAddress();
+    kprintf("NativeEmmc: gate0 %08x emmc2x %08x emmc1x %08x\n",
+            gate[0], apclk[0x124 / 4], apclk[0x12c / 4]);
+    gate[0x1000 / 4] = (1u << 0);           // sdio0_eb SET (enable)
+    apclk[0x124 / 4] = 0x00000001;          // emmc_2x: parent ext-26m (sel 1), div 1x
+    apclk[0x12c / 4] = 0x00000000;          // emmc_1x: div 1x
+    gate[0x1004 / 4] = (1u << 0);           // sdio0 soft reset assert
+    IODelay(2000);
+    gate[0x2004 / 4] = (1u << 0);           // deassert
+    IODelay(20000);
+    kprintf("NativeEmmc: clk up: gate0 %08x emmc2x %08x emmc1x %08x\n",
+            gate[0], apclk[0x124 / 4], apclk[0x12c / 4]);
+    return true;
+  }
+
   bool hostInit() {
+    if (!clocksUp()) return false;
     // Hardware reset of the card: sprd bit3 is active low, pulse it
 
     // Full controller reset + legacy mode (Android/LK left HS400ES strobe + V4 mode: dead at 400kHz)
