@@ -388,8 +388,8 @@ class NativeEmmc : public IOBlockStorageDevice {
           // HOST_CONTROL[4:3] DMA select: 0x10=ADMA2 (00=SDMA, default!)
           w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);
           w16(0x04, 512); w16(0x06, 0);
-          w16(0x00, 1);                              // 32-bit block count lives at 0x00 low half (sprd)!
-          w32(0x3C, 0); w32(0x00, (uint32_t)dva);    // ADMA address (hi always 0)
+          w32(0x3C, 0); w32(0x00, (uint32_t)dva);    // ADMA address first (hi always 0)
+          w16(0x00, 1);                              // block count LAST (sprd 32-bit count latch at 0x00)
           w16(SDHCI_TRANSFER_MODE, 0x13);           // DMA|BCNT|read
           w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
           uint32_t stx = 0;
@@ -409,8 +409,8 @@ class NativeEmmc : public IOBlockStorageDevice {
           __asm__ volatile ("dmb sy" ::: "memory");
           w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);   // ADMA2 select
           w16(0x04, 512); w16(0x06, 0);
-          w16(0x00, 1);                              // block count ritual
           w32(0x3C, 0); w32(0x00, (uint32_t)dva);
+          w16(0x00, 1);                              // block count LAST (sprd latch)
           w16(SDHCI_TRANSFER_MODE, 0x13);
           w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
           stx = 0;
@@ -422,8 +422,8 @@ class NativeEmmc : public IOBlockStorageDevice {
           // SDMA variant: DMA select 00 + SYS_ADDR = buffer PA + 32-bit block write
           w8(0x28, r8(0x28) & ~0x18u);             // SDMA select
           w16(0x04, 512); w16(0x06, 0);
-          w16(0x00, 1);                              // block count ritual (0x00=count latch)
           w32(0x3C, 0); w32(0x00, (uint32_t)(dva + 0x100u));
+          w16(0x00, 1);                              // block count LAST (sprd latch)
           w16(SDHCI_TRANSFER_MODE, 0x13);
           w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
           stx = 0;
