@@ -369,7 +369,7 @@ class NativeEmmc : public IOBlockStorageDevice {
         if (st & 0xFFFF0000u) break;
       }
       uint32_t w0 = got ? r32(SDHCI_BUFFER_DATA) : 0;
-      elog("e5-emmc: cmd17 st %08x buf0 %08x\n", st, w0);
+      elog("e5-emmc: cmd17 st %08x r1 %08x buf0 %08x\n", st, r32(SDHCI_RESPONSE), w0);
       if (!got) {
         for (uint32_t s = 0; s < 8; s = s + 1) {
           elog("e5-emmc: s%u pstate %08x\n", s, r32(SDHCI_PRESENT_STATE));
