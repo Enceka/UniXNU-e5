@@ -411,9 +411,9 @@ class NativeEmmc : public IOBlockStorageDevice {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
           static const struct { const char *tag; uint32_t tm; uint32_t boundary; uint32_t rsp; uint32_t comb; } vars[3] = {
-            { "enumenc", 0x13u, 0x7000u, 0x1Au, 0u },  // k154: PROVEN enum resp encoding + READ|BCNT|DMA
-            { "ub19   ", 0x3u, 0x7000u, 0x19u, 1u },  // k153 ex_tc repeat w/ clean bus
-            { "enum_c ", 0x13u, 0x7000u, 0x1Au, 1u },  // enum encoding + combined launch
+            { "TRUE   ", 0x3u, 0x7000u, 0x1Au, 1u },  // k155: EXACT U-Boot (0x3A + TM=0x3) clean bus
+            { "TRUE_x3", 0x3u, 0x7000u, 0x1Au, 1u },  // repeat (state churn check)
+            { "TM13   ", 0x13u, 0x7000u, 0x1Au, 1u }, // control: with read bit
           };
           for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
