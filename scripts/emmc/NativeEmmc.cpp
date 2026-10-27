@@ -411,9 +411,9 @@ class NativeEmmc : public IOBlockStorageDevice {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
           static const struct { const char *tag; uint32_t tm; uint32_t boundary; uint32_t rsp; uint32_t comb; } vars[3] = {
-            { "ex_tc  ", 0x3u, 0x7000u, 0x19u, 1u },  // k153: 0x19 + TC poll ALWAYS (ignore resp err)
-            { "ex_sep ", 0x3u, 0x7000u, 0x19u, 0u },  // separate TM/CMD writes
-            { "ex_09  ", 0x3u, 0x7000u, 0x09u, 1u },  // no opcode-check bit
+            { "enumenc", 0x13u, 0x7000u, 0x1Au, 0u },  // k154: PROVEN enum resp encoding + READ|BCNT|DMA
+            { "ub19   ", 0x3u, 0x7000u, 0x19u, 1u },  // k153 ex_tc repeat w/ clean bus
+            { "enum_c ", 0x13u, 0x7000u, 0x1Au, 1u },  // enum encoding + combined launch
           };
           for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
@@ -421,6 +421,20 @@ class NativeEmmc : public IOBlockStorageDevice {
             __asm__ volatile ("dmb sy" ::: "memory");
             w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
             for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
+            // k154: unstick card — CMD12 STOP (R1b) + wait busy + CMD7 re-select
+            {
+              uint32_t dummy[4];
+              w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
+              w16(SDHCI_TRANSFER_MODE, 0);
+              w16(SDHCI_COMMAND, (12 << 8) | 0x03u | 0x08u | 0x10u);  // R1b select=11
+              for (uint32_t n = 0; n < 60000 * 20; n = n + 1) {
+                if (r32(SDHCI_INT_STATUS) & 0x01u) break;
+              }
+              for (uint32_t n = 0; n < 60000 * 20; n = n + 1) {
+                if (!(r32(SDHCI_PRESENT_STATE) & 0x02u)) break;       // DAT_INHIBIT clear
+              }
+              cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, dummy);
+            }
             w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);              // clear all int status
             w8(0x28, r8(0x28) & ~0x18u);                     // HC: SDMA select
             w16(0x3E, (uint16_t)(r16(0x3E) | 0x0001u));      // HC2 |= 64BIT_ADDR (k149 state)
