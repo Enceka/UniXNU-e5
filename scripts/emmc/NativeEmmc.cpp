@@ -313,13 +313,29 @@ class NativeEmmc : public IOBlockStorageDevice {
     elog("e5-emmc: cmd7 status %08x\n", resp[0]);
 
     // CMD6 SWITCH (dataless R1b): reset card-side modes inherited from Android/LK.
-    // HS_TIMING[185]=0 legacy + BUS_WIDTH[183]=1 (1-bit SDR) — if the card was left
-    // in HS400/8-bit-DDR, SDR data reads fail silently with clean R1s (our symptom).
+    // HS_TIMING[185]=1 (High Speed 52MHz) + BUS_WIDTH[183]=1 (1-bit SDR).
     uint32_t rb[4];
-    cmd(6, 0x0300B900u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);   // EXT_CSD[185]=0
+    cmd(6, 0x0300B901u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);   // EXT_CSD[185]=1 HS
     elog("e5-emmc: cmd6 hs_timing r1 %08x\n", rb[0]);
     cmd(6, 0x0300B701u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);   // EXT_CSD[183]=1 (bus 1-bit)
     elog("e5-emmc: cmd6 bus_width r1 %08x\n", rb[0]);
+
+    // Re-tune controller for HS: Android left DLL delays in HS400ES state.
+    // Mirrors vendor sdhci_sprd_set_clock(52M) + DTS sprd,phy-delay-mmc-highspeed
+    // = <0x3f 0x40 0x3f 0x3f> -> DLL_DLY=0x3f3f403f; mmc0@HS needs DLL invert bits.
+    {
+      uint16_t cc0 = r16(0x2C);
+      w16(0x2C, cc0 & (uint16_t)~0x4);   // sd_clk_off (CARD_EN)
+      w16(0x2C, 0x0201);                  // ICE + select=2 (EMMC_2X 390M/2 -> 48.75M)
+      uint32_t spin = 0;
+      while (!(r16(0x2C) & 0x2) && spin < 2000000) spin++;  // wait internal stable
+      w16(0x2C, 0x0205);                  // card clock on
+      w32(0x250, r32(0x250) | (1u<<24) | (1u<<25));         // BUSY_POSI auto gate
+      w32(0x208, r32(0x208) | (1u<<13) | (1u<<21));         // DLL_DLY_OFFSET invert
+      w32(0x204, 0x3f3f403fu);            // DLL_DLY = phy-delay-mmc-highspeed
+      elog("e5-emmc: hs clk cc %04x->%04x spin %u dly %08x off %08x busy %08x\n",
+           cc0, r16(0x2C), spin, r32(0x204), r32(0x208), r32(0x250));
+    }
 
     // CMD16 SET_BLOCKLEN 512
     if (!cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd16 fail\n"); return false; }
