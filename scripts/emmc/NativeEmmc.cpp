@@ -174,6 +174,8 @@ class NativeEmmc : public IOBlockStorageDevice {
       return false;
     }
     w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004); // SD clock on
+    // vendor init_config: DEBOUNCE DLL_BAK|DLL_VAL before anything else.
+    w32(0x28C, r32(0x28C) | 0x3);
     // sprd: disable CLK_AUTO (BUSY_POSI 0x250 bits 25/24) at <=400kHz, or the
     // auto clock gating breaks low-speed command timing (e5-linux sdhci-sprd).
     {
@@ -211,8 +213,17 @@ class NativeEmmc : public IOBlockStorageDevice {
       elog("NativeEmmc: card never powered up, OCR 0x%x\n", ocr);
       return false;
     }
-    if (!cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid)) return false; // ALL_SEND_CID
-    elog("NativeEmmc: cmd2 raw %08x %08x %08x %08x\n", cid[0], cid[1], cid[2], cid[3]);
+    for (uint32_t tryn = 0; tryn < 20; tryn++) {             // ALL_SEND_CID
+      if (!cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid)) return false;
+      if (cid[0] != 0xFFFFFFFFu || cid[1] != 0xFFFFFFFFu ||
+          cid[2] != 0xFFFFFFFFu || cid[3] != 0xFFFFFFFFu) {
+        elog("NativeEmmc: cmd2 try%u raw %08x %08x %08x %08x\n",
+             tryn, cid[0], cid[1], cid[2], cid[3]);
+        if (cid[3] == 0x00FFFFFFu) continue;                 // still the idle-high ghost
+        break;                                               // structurally new response
+      }
+      IODelay(1000);
+    }
     rca = (uint16_t)(cid[0] >> 0); // placeholder; replaced by CMD3 below
     if (!cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE, resp)) return false;
     elog("NativeEmmc: cmd3 raw %08x\n", resp[0]);
