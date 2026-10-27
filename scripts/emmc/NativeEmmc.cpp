@@ -389,10 +389,12 @@ class NativeEmmc : public IOBlockStorageDevice {
         if (bmd) {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
-          // variant A: 32-bit descriptors (8B): single Trans+End entry
+          // variant A: linux-exact table: [Trans|Valid][NOP|End|Valid terminator]
           for (uint32_t i = 0; i < 16; i = i + 1) dt[i] = 0;
-          dt[0] = 0x02000023u;                       // cmd=0x23 len=512
+          dt[0] = 0x02000021u;                       // cmd=0x21 Trans-Valid len=512
           dt[1] = (uint32_t)(dva + 0x100u);
+          dt[2] = 0x00000003u;                       // NOP|End|Valid terminator
+          dt[3] = 0;
           __asm__ volatile ("dmb sy" ::: "memory");
           // HOST_CONTROL[4:3] DMA select: 0x10=ADMA2 (00=SDMA, default!)
           w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);
@@ -413,7 +415,7 @@ class NativeEmmc : public IOBlockStorageDevice {
                r32(0x220), r32(0x224), r32(0x228), r32(0x22c), r32(0x240), r32(0x244), r32(0x00));
           // probe the count latches directly: BLK_CNT_BUF(0x228) / BLK_CNT_IO(0x22C)
           for (uint32_t i = 0; i < 16; i = i + 1) dt[i] = 0;
-          dt[0] = 0x02000023u; dt[1] = (uint32_t)(dva + 0x100u);
+          dt[0] = 0x02000021u; dt[1] = (uint32_t)(dva + 0x100u); dt[2] = 0x00000003u; dt[3] = 0;
           __asm__ volatile ("dmb sy" ::: "memory");
           w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);
           w16(0x04, 512); w16(0x06, 0);
@@ -445,10 +447,11 @@ class NativeEmmc : public IOBlockStorageDevice {
           for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
           // variant B: 64-bit descriptors (16B): Trans+End entry with addr pair
           for (uint32_t i = 0; i < 16; i = i + 1) dt[i] = 0;
-          dt[0] = 0x02000023u;                      // cmd=0x23 len=512
+          dt[0] = 0x02000021u;                      // cmd=0x21 len=512 (linux: no End on data desc)
           dt[1] = (uint32_t)(dva + 0x100u);         // addr_lo @ offset 4 (struct sdhci_adma2_64_desc)
           dt[2] = 0;                                // addr_hi
-          dt[3] = 0;
+          dt[3] = 0;                                // pad to 16B (v4)
+          dt[4] = 0x00000003u;                      // NOP|End|Valid terminator (16B stride)
           __asm__ volatile ("dmb sy" ::: "memory");
           w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);   // ADMA2 select
           w16(0x04, 512); w16(0x06, 0);
