@@ -328,10 +328,19 @@ class NativeEmmc : public IOBlockStorageDevice {
     w16(SDHCI_BLOCK_SIZE, 512);
     w16(SDHCI_BLOCK_COUNT, 1);
 
-    // LK leaves the host in 8-bit bus mode; our CMD0 reset the card to 1-bit.
-    // Host width bits [1:0] must match the card or every data phase times out.
+    // full controller re-init mimicking the vendor driver's probe path:
+    // SOFT_RESET_ALL (keep sprd HW_RESET_CARD bit3), clock re-program, and the
+    // sprd INT_SIGNAL_MASK for INT_ENABLE (all-FF writes set vendor bits that
+    // break the data engine).
+    w8(0x2F, 0x01 | 0x08);
+    for (uint32_t n = 0; n < 100000; n = n + 1) { if (!(r8(0x2F) & 0x0F)) break; }
+    w16(SDHCI_CLOCK_CONTROL, 0x0001 | (7 << 8));
+    for (uint32_t n = 0; n < 150000; n = n + 1) { if (r16(SDHCI_CLOCK_CONTROL) & 0x0002) break; }
+    w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004);
     w8(0x28, r8(0x28) & ~0x03);
-    elog("e5-emmc: hc1 %02x\n", r8(0x28));
+    w32(SDHCI_INT_ENABLE, 0x1B7F410Bu);
+    w32(0x38, 0);  // no signal irq
+    elog("e5-emmc: reinit hc1 %02x clk %04x\n", r8(0x28), r16(SDHCI_CLOCK_CONTROL));
     w8(SDHCI_TIMEOUT_CONTROL, 0x0E);   // data timeout counter
     {
       // CMD17 probe: plain single-block read of LBA0 via PIO
