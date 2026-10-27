@@ -84,7 +84,7 @@ class NativeEmmc : public IOBlockStorageDevice {
   inline void w32(uint32_t o, uint32_t v) { *(volatile uint32_t *)((uint8_t *)regs + o) = v; }
 
   bool waitBits(uint32_t off, uint32_t mask, uint32_t want, uint32_t loops, uint32_t stepUs) {
-    for (uint32_t i = 0; i < loops; i++) {
+    for (uint32_t i = 0; i < loops; i = i + 1) {
       if ((r32(off) & mask) == want) return true;
       IODelay(stepUs);
     }
@@ -93,7 +93,7 @@ class NativeEmmc : public IOBlockStorageDevice {
 
   // SDHCI_SOFTWARE_RESET (0x2F) is not 4-byte aligned; poll it bytewise.
   bool waitBits8(uint32_t off, uint8_t mask, uint8_t want, uint32_t loops, uint32_t stepUs) {
-    for (uint32_t i = 0; i < loops; i++) {
+    for (uint32_t i = 0; i < loops; i = i + 1) {
       if ((r8(off) & mask) == want) return true;
       IODelay(stepUs);
     }
@@ -102,7 +102,7 @@ class NativeEmmc : public IOBlockStorageDevice {
 
   // Wait for a normal-interrupt bit, W1C it.  Returns false on error/timeout.
   bool waitInt(uint32_t bits, uint32_t loops, uint32_t stepUs) {
-    for (uint32_t i = 0; i < loops; i++) {
+    for (uint32_t i = 0; i < loops; i = i + 1) {
       uint32_t st = r32(SDHCI_INT_STATUS);
       if (st & INT_ERROR) {
         w32(SDHCI_INT_STATUS, st);
@@ -165,7 +165,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     // div = 26e6/(400k*10) = 6.5 -> 7 (371 kHz, within spec tolerance).
     w16(SDHCI_CLOCK_CONTROL, 0);
     w16(SDHCI_CLOCK_CONTROL, 0x0001 | (7 << 8)); // internal clock enable, div 7
-    for (uint32_t i = 0; i < 150000; i++) {
+    for (uint32_t i = 0; i < 150000; i = i + 1) {
       if (r16(SDHCI_CLOCK_CONTROL) & 0x0002) break;
       IODelay(1);
     }
@@ -207,7 +207,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     elog("bt: cmd1 argC0FF8000 -> %08x\n", resp[0]);
     // (b) loop with iteration telemetry
     uint32_t iter = 0;
-    for (uint32_t i = 0; i < 200; i++) {
+    for (uint32_t i = 0; i < 200; i = i + 1) {
       iter++;
       if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT, resp)) return false;
       ocr = resp[0];
@@ -229,12 +229,12 @@ class NativeEmmc : public IOBlockStorageDevice {
     {
       uint16_t save = r16(SDHCI_CLOCK_CONTROL);
       w16(SDHCI_CLOCK_CONTROL, save & ~0x0004);          // SD clock OFF
-      for (volatile uint32_t i = 0; i < 20000; i++) {}
+      for (volatile uint32_t i = 0; i < 20000; i = i + 1) {}
       uint32_t r4[4] = {0,0,0,0};
       bool got = cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
       elog("clkoff cmd1 -> %s %08x (fabricated if it answers)\n", got ? "complete" : "timeout", r4[0]);
       w16(SDHCI_CLOCK_CONTROL, save | 0x0004);           // clock back on
-      for (volatile uint32_t i = 0; i < 20000; i++) {}
+      for (volatile uint32_t i = 0; i < 20000; i = i + 1) {}
       got = cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4);
       elog("clkon  cmd1 -> %s %08x\n", got ? "complete" : "timeout", r4[0]);
       // garbage-arg CMD1: real card returns window+busy0 regardless
@@ -245,13 +245,13 @@ class NativeEmmc : public IOBlockStorageDevice {
     {
       uint8_t sr = r8(SDHCI_SOFTWARE_RESET);
       w8(SDHCI_SOFTWARE_RESET, sr & ~0x08);              // RST_n low
-      for (volatile uint32_t i = 0; i < 600000; i++) {}  // ~10ms at slow poll
+      for (volatile uint32_t i = 0; i < 600000; i = i + 1) {}  // ~10ms at slow poll
       w8(SDHCI_SOFTWARE_RESET, sr | 0x08);               // release
-      for (volatile uint32_t i = 0; i < 60000; i++) {}   // ~1ms
+      for (volatile uint32_t i = 0; i < 60000; i = i + 1) {}   // ~1ms
       elog("hwreset done, pstate %08x\n", r32(0x24));
       // fresh 74+ clocks + full enum
       cmd(0, 0, CMD_RESP_NONE, 0);
-      for (volatile uint32_t i = 0; i < 400000; i++) {}  // ~10ms idle clocks
+      for (volatile uint32_t i = 0; i < 400000; i = i + 1) {}  // ~10ms idle clocks
       uint32_t r4[4] = {0,0,0,0};
       if (cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4)) elog("postreset cmd1 %08x\n", r4[0]);
       if (cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, r4)) elog("postreset cmd2 %08x %08x %08x %08x\n", r4[0], r4[1], r4[2], r4[3]);
@@ -259,7 +259,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     }
     // ---- end k99 ----
     // ---- k98: full command scan (which indexes move the latch) ----
-    for (uint16_t ci = 2; ci <= 63; ci++) {
+    for (uint16_t ci = 2; ci <= 63; ci = i + 1) {
       uint16_t fl = (ci == 2 || ci == 9 || ci == 10) ? (CMD_RESP_LONG | CMD_CRC_ENABLE)
                                                       : CMD_RESP_SHORT | CMD_CRC_ENABLE;
       uint32_t r4[4] = {0, 0, 0, 0};
@@ -271,7 +271,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     elog("scan done (stale = c01f8000)\n");
     // ---- k98: RCA sweep via CMD13 SEND_STATUS ----
     static const uint32_t rcas[] = { 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0010, 0x1000, 0x10000, 0x20000, 0x4564, 0xffff };
-    for (uint32_t ri = 0; ri < 11; ri++) {
+    for (uint32_t ri = 0; ri < 11; ri = i + 1) {
       uint32_t r4[4] = {0,0,0,0};
       if (!cmd(13, rcas[ri] << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, r4)) { elog("rca %04x: err\n", rcas[ri]); continue; }
       if (r4[0] != 0xc01f8000u) elog("rca %04x ANSWERS %08x\n", rcas[ri], r4[0]);
@@ -279,7 +279,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     elog("rca sweep done\n");
     // ---- end battery ----
     if (!cmd(0, 0, CMD_RESP_NONE)) return false;          // GO_IDLE_STATE
-    for (uint32_t i = 0; i < 200; i++) {                    // SEND_OP_COND until power-up
+    for (uint32_t i = 0; i < 200; i = i + 1) {                    // SEND_OP_COND until power-up
       if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT, resp)) return false;
       ocr = resp[0];
       if (ocr & 0x80000000) break;
@@ -325,7 +325,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     w16(SDHCI_TRANSFER_MODE, TM_READ);
     w16(SDHCI_COMMAND, (8 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
     uint32_t *out = (uint32_t *)extCsd;
-    for (uint32_t i = 0; i < 512 / 4; i++) {
+    for (uint32_t i = 0; i < 512 / 4; i = i + 1) {
       if (!waitInt(INT_BUF_READ_READY, 100000, 10)) return false;
       out[i] = r32(SDHCI_BUFFER_DATA);
     }
@@ -403,7 +403,7 @@ bool NativeEmmc::start(IOService *provider)
       w16(SDHCI_CLOCK_CONTROL, 0);
       IODelay(50);
       w16(SDHCI_CLOCK_CONTROL, 0x0001 | (uint16_t)(div << 8));
-      for (uint32_t i = 0; i < 150000; i++) { if (r16(SDHCI_CLOCK_CONTROL) & 2) break; IODelay(1); }
+      for (uint32_t i = 0; i < 150000; i = i + 1) { if (r16(SDHCI_CLOCK_CONTROL) & 2) break; IODelay(1); }
       w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004);
       IODelay(1000);
       cmd(0, 0, CMD_RESP_NONE);
