@@ -30,6 +30,7 @@
 #define SDHCI_SOFTWARE_RESET  0x2F
 #define SDHCI_INT_STATUS      0x30
 #define SDHCI_INT_ENABLE      0x34
+#define SDHCI_TIMEOUT_CONTROL 0x2E
 #define SDHCI_INT_SIGNAL_ENABLE 0x38
 #define SDHCI_CAPABILITIES    0x40
 #define SDHCI_CAPABILITIES2   0x44
@@ -327,6 +328,28 @@ class NativeEmmc : public IOBlockStorageDevice {
     w16(SDHCI_BLOCK_SIZE, 512);
     w16(SDHCI_BLOCK_COUNT, 1);
 
+    w8(SDHCI_TIMEOUT_CONTROL, 0x0E);   // data timeout counter
+    {
+      // CMD17 probe: plain single-block read of LBA0 via PIO
+      w16(SDHCI_BLOCK_SIZE, 512);
+      w16(SDHCI_BLOCK_COUNT, 1);
+      w32(SDHCI_ARGUMENT, 0);
+      w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
+      w32(SDHCI_INT_ENABLE, 0xFFFFFFFFu);
+      w16(SDHCI_TRANSFER_MODE, 0x10);
+      w16(SDHCI_COMMAND, (17 << 8) | CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE | CMD_DATA_PRESENT);
+      uint32_t st = 0;
+      uint32_t got = 0;
+      for (uint32_t n = 0; n < 300000; n = n + 1) {
+        st = r32(SDHCI_INT_STATUS);
+        if (st & INT_BUF_READ_READY) { got = 1; break; }
+        if (st & 0xFFFF0000u) break;
+      }
+      uint32_t w0 = got ? r32(SDHCI_BUFFER_DATA) : 0;
+      elog("e5-emmc: cmd17 st %08x buf0 %08x\n", st, w0);
+      w8(SDHCI_SOFTWARE_RESET, 0x06);
+      for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
+    }
     // ---- variant A: PIO buffer-port read ----
     w32(SDHCI_ARGUMENT, 0);
     w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
