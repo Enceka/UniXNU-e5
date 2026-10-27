@@ -50,7 +50,7 @@
 #define CMD_RESP_SHORT        0x02 // R1/R1b/R3/R4/R5
 #define CMD_CRC_ENABLE        0x08
 #define CMD_INDEX_ENABLE      0x10
-#define CMD_DATA_PRESENT      0x20
+#define CMD_DATA_PRESENT      0x10   // SDHCI spec: bit4
 
 #define TM_READ               0x10
 
