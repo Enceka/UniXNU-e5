@@ -452,16 +452,17 @@ class NativeEmmc : public IOBlockStorageDevice {
             w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);              // clear all int status
             w8(0x28, r8(0x28) & ~0x18u);                     // HC: SDMA select
             uint64_t bdva = dva + 0x100u * (vi + 1);
-            uint64_t tdva = dva + 0x1000u + 0x20u * vi;       // desc table VA slot
+            uint64_t tva = (uint64_t)dt + 0x1000u + 0x20u * vi; // desc table VA (k161: VA not PA!)
+            uint64_t tdva = dva + 0x1000u + 0x20u * vi;           // desc table PA for 0x58
             // k159: build 16B v4 descriptor (linux values) at table, then NOP_END
-            volatile uint16_t *dt16 = (volatile uint16_t *)tdva;
-            volatile uint32_t *dt32 = (volatile uint32_t *)tdva;
+            volatile uint16_t *dt16 = (volatile uint16_t *)tva;
+            volatile uint32_t *dt32 = (volatile uint32_t *)tva;
             dt16[0] = 0x0021u; dt16[1] = 512u;                // TRAN_VALID, len
             dt32[1] = (uint32_t)bdva; dt32[2] = (uint32_t)(bdva >> 32);
             dt16[8] = 0x0003u; dt16[9] = 0;                   // NOP_END_VALID
             dt32[5] = 0; dt32[6] = 0;
-            __asm__ volatile ("dc cvac, %0" :: "r"((uint64_t)tdva & ~63ull));
-            __asm__ volatile ("dc cvac, %0" :: "r"(((uint64_t)tdva & ~63ull) + 64));
+            __asm__ volatile ("dc cvac, %0" :: "r"(tva & ~63ull));
+            __asm__ volatile ("dc cvac, %0" :: "r"((tva & ~63ull) + 64));
             __asm__ volatile ("dsb sy" ::: "memory");
             w16(0x3E, (uint16_t)(r16(0x3E) | 0x0001u));      // HC2 |= 64BIT_ADDR
             w16(SDHCI_HOST_CONTROL, (uint16_t)((r16(SDHCI_HOST_CONTROL) & ~0x18u) | 0x10u)); // ADMA2 select
