@@ -416,6 +416,13 @@ class NativeEmmc : public IOBlockStorageDevice {
             { "dly3f3f", 0x3u, 0x003f003fu },  // cmd/dat 0x3f, read/write 0
             { "dlyHS  ", 0x3u, 0x3f3f403fu },  // FDT HS pack
           };
+          // k158: DMA buffer non-coherent — invalidate dcache lines before reading
+          auto invRange = [](volatile void *p, uint32_t n) {
+            uint64_t a = ((uint64_t)p) & ~63ull;
+            uint64_t e = ((uint64_t)p) + n;
+            for (; a < e; a += 64) __asm__ volatile ("dc ivac, %0" :: "r"(a));
+            __asm__ volatile ("dsb sy" ::: "memory");
+          };
           uint32_t dlyLK0 = r32(0x204);
           elog("e5-emmc: dlyLK initial %08x dly_off %08x\n", dlyLK0, r32(0x208));
           for (uint32_t vi = 0; vi < 4; vi = vi + 1) {
@@ -464,6 +471,7 @@ class NativeEmmc : public IOBlockStorageDevice {
               if ((stc & 0xFFFF0000u) && !(stx & 0x01u)) break;     // early err w/o CC
             }
             __asm__ volatile ("dmb sy" ::: "memory");
+            invRange((volatile void *)d, 512);              // k158: pull DMA data from RAM
             elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x\n",
                  dvars[vi].tag, stx, stc, r32(SDHCI_RESPONSE), d[0], d[1]);
             elog("e5-emmc: %s rsp %08x %08x %08x %08x\n", dvars[vi].tag,
