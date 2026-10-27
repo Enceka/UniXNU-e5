@@ -437,6 +437,18 @@ class NativeEmmc : public IOBlockStorageDevice {
     }
     w8(SDHCI_TIMEOUT_CONTROL, 0x0E);   // data timeout counter
     {
+      // ---- register write-stick map probe ----
+      {
+        w32(0x00, 0x12345678u); w32(0x3C, 0x0A0B0C0Du);
+        w16(0x0C, 0x0013u); w16(0x04, 0x0222u); w16(0x06, 0x0001u);
+        w32(0x04, 0x00010222u);
+        w8(0x28, (r8(0x28) & ~0x18u) | 0x10u);
+        w8(0x2B, 0x0Eu); w8(0x2E, 0x0Eu);
+        elog("e5-emmc: ws sys %08x.%08x tm %04x blk %08x hc %02x to %02x%02x\n",
+             r32(0x00), r32(0x3C), r16(0x0C), r32(0x04), r8(0x28), r8(0x2B), r8(0x2E));
+        elog("e5-emmc: vnd %08x %08x %08x %08x %08x %08x\n",
+             r32(0x238), r32(0x23C), r32(0x240), r32(0x244), r32(0x250), r32(0x28C));
+      }
       // CMD17 probe: plain single-block read of LBA0 via PIO
       w32(0x04, 1);   // V4: 0x04 may be the 32-bit block count
       w32(SDHCI_ARGUMENT, 0);
