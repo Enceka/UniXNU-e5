@@ -287,6 +287,35 @@ bool NativeEmmc::start(IOService *provider)
     elog("NativeEmmc: probe cmd9 crc %08x\n", r4[0]);
     elog("NativeEmmc: pstate %08x clkctl %04x\n", r32(SDHCI_PRESENT_STATE), r16(SDHCI_CLOCK_CONTROL));
   }
+  // Divisor sweep: re-init from scratch at slower clocks, vendor DEBOUNCE
+  // DLL_BAK|DLL_VAL, 74-clock settle after CMD0, CMD2 re-issued 3x.
+  {
+    static const uint16_t divs[] = { 7, 15, 31, 63, 127, 255 };
+    uint32_t rr[4];
+    for (uint32_t d = 0; d < 6; d++) {
+      uint16_t div = divs[d];
+      w32(0x28C, r32(0x28C) | 0x3);            // vendor init_config
+      w16(SDHCI_CLOCK_CONTROL, 0);
+      IODelay(50);
+      w16(SDHCI_CLOCK_CONTROL, 0x0001 | (uint16_t)(div << 8));
+      for (uint32_t i = 0; i < 150000; i++) { if (r16(SDHCI_CLOCK_CONTROL) & 2) break; IODelay(1); }
+      w16(SDHCI_CLOCK_CONTROL, r16(SDHCI_CLOCK_CONTROL) | 0x0004);
+      IODelay(1000);
+      cmd(0, 0, CMD_RESP_NONE);
+      IODelay(10000);
+      if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT, rr)) { elog("NativeEmmc: sweep div%u cmd1 fail\n", div); continue; }
+      for (uint32_t tryn = 0; tryn < 3; tryn++) {
+        if (!cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, rr)) break;
+        if (rr[0] != 0xFFFFFFFFu || rr[3] != 0x00FFFFFFu) {
+          elog("NativeEmmc: sweep div%u try%u CID %08x %08x %08x %08x\n", div, tryn, rr[0], rr[1], rr[2], rr[3]);
+          cid[0]=rr[0]; cid[1]=rr[1]; cid[2]=rr[2]; cid[3]=rr[3];
+          d = 6; break;
+        }
+        IODelay(1000);
+      }
+      elog("NativeEmmc: sweep div%u cid still ff\n", div);
+    }
+  }
   if (readExtCsd()) {
     cardUp = true;
     elog("NativeEmmc: EXT_CSD rev %u, HS_TIMING %u, SEC_COUNT %llu (%.1f GiB)\n",
