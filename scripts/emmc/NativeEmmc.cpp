@@ -227,7 +227,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     w8(0x2F, r8(0x2F) | 0x08); IODelay(400);
     for (uint32_t k = 0; k < 200; k = k + 1) {
       uint32_t resp[4];
-      if (!cmd(1, 0x40FF8000, RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE, resp)) break;
+      if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE, resp)) break;
       if (resp[0] & 0x80000000u) break;
     }
     microscope("cmd1", 1, 0x1A, 0);
