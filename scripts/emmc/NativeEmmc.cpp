@@ -202,6 +202,43 @@ class NativeEmmc : public IOBlockStorageDevice {
     return true;
   }
 
+  void microscope(const char *tag, uint16_t idx, uint16_t flags, uint32_t arg) {
+    w32(0x08, arg);
+    w32(0x30, 0xFFFFFFFFu);              // clear all (w1c)
+    w32(0x34, 0xFFFFFFFFu);              // enable everything
+    uint32_t inhibitSeen = 0, iters = 0, st = 0;
+    w16(0x0E, (uint16_t)((idx << 8) | flags));
+    for (uint32_t n = 0; n < 5000000; n = n + 1) {
+      uint32_t ps = r32(0x24);
+      if (ps & 1) inhibitSeen = 1;
+      st = r32(0x30);
+      if (st & 0x0000FFFFu) { iters = n; break; }
+      iters = n;
+    }
+    kprintf("ms: %s idx%u inh%u iters%u st%08x r %08x %08x %08x %08x\n",
+            tag, idx, inhibitSeen, iters, st, r32(0x10), r32(0x14), r32(0x18), r32(0x1C));
+    w32(0x30, 0xFFFFFFFFu);
+    IODelay(50);
+  }
+
+  void runMicroscope() {
+    // fresh reset to get the card into READY (cmd1 busy set)
+    w8(0x2F, r8(0x2F) & (uint8_t)~0x08); IODelay(15);
+    w8(0x2F, r8(0x2F) | 0x08); IODelay(400);
+    for (uint32_t k = 0; k < 200; k = k + 1) {
+      uint32_t resp[4];
+      if (!cmd(1, 0x40FF8000, RESP_SHORT | CMD_CRC_ENABLE | CMD_INDEX_ENABLE, resp)) break;
+      if (resp[0] & 0x80000000u) break;
+    }
+    microscope("cmd1", 1, 0x1A, 0);
+    microscope("cmd2-long", 2, 0x09, 0);
+    microscope("cmd2-short", 2, 0x1A, 0);
+    microscope("cmd2-busy", 2, 0x1B, 0);
+    microscope("cmd3-short", 3, 0x1A, 0x10000);
+    microscope("cmd54", 54, 0x1A, 0);
+    microscope("cmd17-data", 17, 0x3A, 0);
+  }
+
   bool cardInit() {
     uint32_t resp[4];
     // ---- discriminator battery ----
@@ -379,6 +416,7 @@ bool NativeEmmc::start(IOService *provider)
   bool hostOk = false;
   for (uint32_t a = 0; a < 4 && !hostOk; a++) {
     hostOk = hostInit();
+    if (hostOk) runMicroscope();
     if (!hostOk) { elog("NativeEmmc: host init retry %u\n", a); IODelay(20000); }
   }
   if (!hostOk) { elog("NativeEmmc: host init failed after retries\n"); return false; }
