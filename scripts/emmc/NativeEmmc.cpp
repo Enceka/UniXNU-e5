@@ -777,7 +777,7 @@ bool NativeEmmc::start(IOService *provider)
     IOMemoryDescriptor *amd = IOMemoryDescriptor::withAddressRange(
         0x64400000ull, 0x40000ull, kIODirectionNone, NULL);
     if (amd) {
-      IOMemoryMap *amap = amd->createMappingInTask(kernel_task, 0, 0);
+      IOMemoryMap *amap = amd->map();
       if (amap) {
         volatile uint32_t *adi = (volatile uint32_t *)(amap->getVirtualAddress());
         auto aRd = [&adi](uint32_t r) -> uint32_t {
