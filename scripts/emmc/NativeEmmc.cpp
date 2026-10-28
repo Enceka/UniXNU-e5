@@ -323,7 +323,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     uint32_t rb[4];
     // k152: STAY AT LEGACY 26MHz — HS 52M gave response CRC error (phase).
     // Only reset bus width to 1-bit if the card inherited 8-bit from Android.
-    cmd(6, 0x0300B701u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);   // EXT_CSD[183]=1 (bus 1-bit)
+    cmd(6, 0x03B70100u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);   // EXT_CSD[183]=1 (bus 1-bit) linux arg fmt
     elog("e5-emmc: cmd6 bus_width r1 %08x\n", rb[0]);
 
     // Re-tune controller for HS: Android left DLL delays in HS400ES state.
@@ -346,6 +346,33 @@ class NativeEmmc : public IOBlockStorageDevice {
     // CMD16 SET_BLOCKLEN 512
     if (!cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd16 fail\n"); return false; }
     elog("e5-emmc: cmd16 status %08x\n", resp[0]);
+
+    // k190: RST_n discriminator. Pulse the hw reset line, then CMD13 with the
+    // freshly assigned RCA. Timeout => card fell to pre-idle (reset WORKS).
+    // 0x900 => card stayed in TRAN (RST_n does not reach the card).
+    {
+      uint32_t r13[4];
+      w8(SDHCI_SOFTWARE_RESET, r8(SDHCI_SOFTWARE_RESET) & (uint8_t)~0x08); IODelay(15);
+      w8(SDHCI_SOFTWARE_RESET, r8(SDHCI_SOFTWARE_RESET) | 0x08); IODelay(400);
+      bool alive = cmd(13, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, r13);
+      elog("e5-emmc: k190 rstn alive=%d r1 %08x\n", alive ? 1 : 0, r13[0]);
+      if (!alive) {
+        // card fell to pre-idle: re-enumerate to TRAN
+        cmd(0, 0, 0, r13);
+        for (uint32_t k = 0; k < 200; k++) {
+          if (!cmd(1, 0x40FFC000u, CMD_RESP_SHORT | CMD_CRC_ENABLE, r13)) break;
+          if (r13[0] & 0x80000000u) break;
+        }
+        uint32_t cid[4];
+        cmd(2, 0, CMD_RESP_LONG | CMD_CRC_ENABLE, cid);
+        uint32_t r3[4];
+        if (!cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, r3)) { elog("e5-emmc: reenum cmd3 fail\n"); return false; }
+        this->rca = (uint16_t)(r3[0] >> 16);
+        cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, r13);
+        cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, r13);
+        elog("e5-emmc: k190 reenum rca %04x r1 %08x\n", this->rca, r13[0]);
+      }
+    }
 
     // CMD8 READ_EXT_CSD
     if (!readExtCsd()) { elog("e5-emmc: ext_csd fail\n"); }
@@ -429,7 +456,7 @@ class NativeEmmc : public IOBlockStorageDevice {
           {
             // k171: card must be HS to match U-Boot host residue (cmd0 dropped it)
             uint32_t rb[4];
-            cmd(6, 0x0300B901u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);  // EXT_CSD[185]=1 HS
+            cmd(6, 0x03B90100u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);  // EXT_CSD[185]=1 HS linux arg fmt
             elog("e5-emmc: k171 hs r1 %08x\n", rb[0]);
             cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
           }
@@ -458,7 +485,7 @@ class NativeEmmc : public IOBlockStorageDevice {
               for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (r32(0x30) & 0x01u) break; }
               for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
               cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb2);
-              cmd(6, 0x0300B901u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb2);  // re-HS after reset?
+              cmd(6, 0x03B90100u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb2);  // re-HS after reset?
               cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb2);
             }
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100u * (vi + 1));
@@ -693,7 +720,7 @@ bool NativeEmmc::start(IOService *provider)
         // Card refuses all HS_TIMING from inherit state; try from clean 400k enum.
         {
           uint32_t rl;
-          const uint32_t lad[4] = { 0x0300B701u, 0x0300B902u, 0x0300B901u, 0x0300B900u };
+          const uint32_t lad[4] = { 0x03B70100u, 0x03B90200u, 0x03B90100u, 0x03B90000u };
           for (uint32_t li = 0; li < 4; li++) {
             w32(0x30, 0xFFFFFFFFu);
             w32(0x08, lad[li]); w16(0x0E, (6u << 8) | 0x1Bu);
