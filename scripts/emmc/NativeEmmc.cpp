@@ -227,6 +227,11 @@ class NativeEmmc : public IOBlockStorageDevice {
       w32(0x250, bp);
     }
     w8(0x2E, 0x0E); // timeout control: max
+    // k184: at <=400kHz the sprd driver clears the DLL delays entirely
+    // (linux a816c path). LK's HS400 tuning values left here corrupt legacy
+    // sampling - zero them.
+    w32(0x204, 0);
+    w32(0x208, r32(0x208) & ~((1u << 13) | (1u << 21) | (1u << 5) | (1u << 6)));
     // sprd gates STATUS bits on INT_ENABLE: enable everything so error
     // bits (timeout/CRC, high half) become visible to our polling.
     w32(SDHCI_INT_ENABLE, 0xFFFFu);
