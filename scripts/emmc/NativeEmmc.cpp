@@ -447,7 +447,7 @@ class NativeEmmc : public IOBlockStorageDevice {
               stx = r32(0x30);
               if (stx & (0x01u | 0x02u | 0x20u | 0xFFFF0000u)) break;
             }
-            uint32_t stc = r32(0x32);
+            uint32_t stc = r32(0x30) >> 16;   // err status = high half (0x32 unaligned = abort!)
             invRange((volatile void *)d, 512);
             elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x\n",
                  tg, stx, stc, r32(0x10), d[0], d[1]);
