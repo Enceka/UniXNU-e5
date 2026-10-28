@@ -675,14 +675,19 @@ bool NativeEmmc::start(IOService *provider)
         IOBufferMemoryDescriptor *bmd2 = IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task, 8192, 0x1000);
         IOPhysicalAddress dva2 = bmd2->getPhysicalAddress();
         uint32_t *dt2 = (uint32_t *)bmd2->getBytesNoCopy();
+        // k176: LK's own last SDMA buffer PA (E5MM dump [0x58]=0xBF6C8CC0)
+        IOMemoryDescriptor *lkmd = IOMemoryDescriptor::withAddressRange(0xBF6C8CC0ull & ~0xFFFull, 0x1000, kIODirectionNone, nullptr);
+        IOMemoryMap *lkmap = lkmd ? lkmd->map() : nullptr;
+        volatile uint32_t *lkbd = lkmap ? (volatile uint32_t *)((uint8_t *)lkmap->getVirtualAddress() + (0xBF6C8CC0ull & 0xFFF)) : nullptr;
+        elog("e5-emmc: k176 lkbuf va %p pre %08x\n", (void *)lkbd, lkbd ? lkbd[0] : 0);
         for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
-          const char *tg = (vi == 0) ? "LIVE1  " : ((vi == 1) ? "LIVE2  " : "LIVE3  ");
-          uint32_t *d = (uint32_t *)((uint8_t *)dt2 + 0x100u * (vi + 1));
+          const char *tg = (vi == 0) ? "LKBUFF1" : ((vi == 1) ? "LKBUFF2" : "LKBUFF3");
+          uint32_t *d = lkbd ? (uint32_t *)lkbd : (uint32_t *)((uint8_t *)dt2 + 0x100u * (vi + 1));
           for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u + vi;
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
             __asm__ volatile ("dc cvac, %0" :: "r"(la));
           __asm__ volatile ("dsb sy" ::: "memory");
-          uint32_t bdva = dva2 + 0x100u * (vi + 1);
+          uint32_t bdva = lkbd ? (uint32_t)(0xBF6C8CC0ull) : (dva2 + 0x100u * (vi + 1));
           w32(0x30, 0xFFFFFFFFu);
           w16(0x04, 0x0200u);
           w32(0x00, 1);
