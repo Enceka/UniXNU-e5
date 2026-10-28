@@ -289,11 +289,14 @@ class NativeEmmc : public IOBlockStorageDevice {
     elog("e5-emmc: cmd0 ok\n");
 
     // CMD1 SEND_OP_COND loop until busy set (card ready)
+    // k196: cold-booted eMMC memory init can take seconds; poll with real
+    // delays (2ms each, up to ~8s). Fail -> one more power cycle + retry.
     uint32_t ocr = 0;
-    for (uint32_t k = 0; k < 2000; k = k + 1) {
+    for (uint32_t k = 0; k < 4000; k = k + 1) {
       if (!cmd(1, 0x40FF8000, CMD_RESP_SHORT, resp)) break;
       ocr = resp[0];
       if (ocr & 0x80000000u) break;
+      IODelay(2000);
     }
     this->ocr = ocr;
     if (!(ocr & 0x80000000u)) { elog("e5-emmc: cmd1 never ready ocr %08x\n", ocr); }
