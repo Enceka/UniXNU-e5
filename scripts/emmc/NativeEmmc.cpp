@@ -186,9 +186,17 @@ class NativeEmmc : public IOBlockStorageDevice {
     if (!clocksUp()) return false;
     // Hardware reset of the card: sprd bit3 is active low, pulse it
 
-    // k206: NO CMD/DAT engine soft reset - w8(0x2F, 0x03/0x0B) WEDGES the sprd
-    // controller (k204-D: all reads -> 0) or kills the DAT engine while the
-    // command path survives (k195-k203 frozen PSTATE). LK/U-Boot never write it.
+    // k208: CORRECT sprd engine reset - Linux sdhci_reset(CMD|DATA) writes 0x06
+    // (RESET_CMD=0x02|RESET_DATA=0x04), NEVER RESET_ALL(0x01) which wipes the
+    // whole core (k204-D wedge), and the writeb accessor PRESERVES bit3 RST_n
+    // ("clearing it by mistake will lead the card not work" - sdhci-sprd.c).
+    {
+      uint8_t v = r8(0x2F);
+      v = (uint8_t)((v & 0x08u) | 0x06u);
+      w8(0x2F, v);
+      if (!waitBits8(0x2F, 0x06, 0, 100000, 10))
+        elog("NativeEmmc: engine reset slow %02x\n", r8(0x2F));
+    }
     w16(0x3E, 0x0000);                               // HOST_CONTROL2: SDR12/legacy, V4 off, strobe off
     w8(0x28, 0x00);                                  // HOST_CONTROL: 1-bit bus, no DMA/ADMA
     kprintf("NativeEmmc: mode cleared hc2=%04x hc1=%02x\n", r16(0x3E), r8(0x28));
@@ -394,6 +402,8 @@ class NativeEmmc : public IOBlockStorageDevice {
     for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
       __asm__ volatile ("dc cvac, %0" :: "r"(la));
     w32(0x30, 0xFFFFFFFFu);
+    { uint8_t v = r8(0x2F); w8(0x2F, (uint8_t)((v & 0x08u) | 0x06u));
+      if (!waitBits8(0x2F, 0x06, 0, 100000, 10)) elog("e5-emmc: k208 rst %02x\n", r8(0x2F)); }
     w16(0x06, 0);
     w16(0x00, 1);
     w16(0x04, 0x0200u);
@@ -405,7 +415,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     while (sp < 3000000u) { st = r32(0x30); if (st & (0x1u | 0xFFFF0000u)) break; sp++; }
     __asm__ volatile ("dsb sy" ::: "memory");
     __asm__ volatile ("ic ivau, %0" :: "r"(d) : "memory");
-    elog("e5-emmc: k207 P1 st %08x tc %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
+    elog("e5-emmc: k208 P1 st %08x tc %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
          st, r32(0x34), r32(0x10), d[0], d[1], r32(0x24), r32(0x22C));
     w32(0x30, 0xFFFFFFFFu);
 
@@ -425,7 +435,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     while (sp < 3000000u) { st = r32(0x30); if (st & (0x2u | 0xFFFF0000u)) break; sp++; }
     __asm__ volatile ("dsb sy" ::: "memory");
     __asm__ volatile ("ic ivau, %0" :: "r"(d) : "memory");
-    elog("e5-emmc: k207 P2 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
+    elog("e5-emmc: k208 P2 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
          st, r32(0x10), d[0], d[1], r32(0x24), r32(0x22C));
     w32(0x30, 0xFFFFFFFFu);
 
@@ -443,7 +453,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     while (sp < 3000000u) { st = r32(0x30); if (st & (0x2u | 0xFFFF0000u)) break; sp++; }
     __asm__ volatile ("dsb sy" ::: "memory");
     __asm__ volatile ("ic ivau, %0" :: "r"(d) : "memory");
-    elog("e5-emmc: k207 P3 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
+    elog("e5-emmc: k208 P3 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
          st, r32(0x10), d[0], d[1], r32(0x24), r32(0x22C));
     w32(0x30, 0xFFFFFFFFu);
     bmd->complete();
