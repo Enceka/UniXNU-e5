@@ -681,6 +681,47 @@ bool NativeEmmc::start(IOService *provider)
         __asm__ volatile ("dsb sy" ::: "memory");
         uint32_t bdva = dva2 + 0x100u;
         const uint32_t lkbase = 0x3434B760u;   // LK live DLL_DLY (E5MM)
+        // k178: exit HS400ES — card side to legacy SDR + 1-bit, then re-read
+        {
+          uint32_t rb6[4];
+          w32(0x30, 0xFFFFFFFFu);
+          w16(0x0C, 0); w16(0x0E, (6u << 8) | 0x3Bu); w32(0x08, 0x0300B900u);   // EXT_CSD[185]=0 legacy
+          for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (r32(0x30) & (0x01u | 0x8000u)) break; }
+          elog("e5-emmc: k178 hs0 r1 %08x st %08x\n", r32(0x10), r32(0x30));
+          for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
+          w32(0x30, 0xFFFFFFFFu);
+          w16(0x0C, 0); w16(0x0E, (6u << 8) | 0x3Bu); w32(0x08, 0x0300B701u);   // EXT_CSD[183]=1 1-bit
+          for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (r32(0x30) & (0x01u | 0x8000u)) break; }
+          elog("e5-emmc: k178 bw1 r1 %08x st %08x\n", r32(0x10), r32(0x30));
+          for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
+          uint32_t rb16[4]; cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb16);
+          elog("e5-emmc: k178 cmd16 %08x\n", rb16[0]);
+          // single read attempt at LK delay
+          for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
+          for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+            __asm__ volatile ("dc cvac, %0" :: "r"(la));
+          w32(0x204, lkbase);
+          w32(0x30, 0xFFFFFFFFu);
+          w16(0x04, 0x0200u);
+          w32(0x00, 1);
+          w32(0x58, bdva); w32(0x5C, 0);
+          w32(0x08, 0x00010000u);
+          w32(0x0C, 0x113A0003u);
+          uint32_t stx = 0;
+          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+            stx = r32(0x30);
+            if ((stx & 0x02u) || (stx & 0xFFFF0000u)) break;
+          }
+          for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+            __asm__ volatile ("dc ivac, %0" :: "r"(la));
+          __asm__ volatile ("dsb sy" ::: "memory");
+          elog("e5-emmc: k178 rd st %08x d0 %08x d1 %08x\n", stx, d[0], d[1]);
+          if (!(stx & 0x60000000u) && (stx & 0x02u) && d[0] != 0xCAFE0000u) {
+            elog("e5-emmc: k178 WIN d0 %08x d1 %08x d2 %08x d3 %08x\n", d[0], d[1], d[2], d[3]);
+            OSSafeReleaseNULL(bmd2);
+            return true;
+          }
+        }
         bool won = false;
         static const uint16_t sw[20] = { 0x0060,0x2060,0x4060,0x6060,0x8060,0xA060,0xC060,0xE060,
                                          0xB700,0xB720,0xB740,0xB760,0xB780,0xB7A0,0xB7C0,0xB7E0,
