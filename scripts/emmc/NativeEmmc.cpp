@@ -405,8 +405,46 @@ class NativeEmmc : public IOBlockStorageDevice {
     while (sp < 3000000u) { st = r32(0x30); if (st & (0x1u | 0xFFFF0000u)) break; sp++; }
     __asm__ volatile ("dsb sy" ::: "memory");
     __asm__ volatile ("ic ivau, %0" :: "r"(d) : "memory");
-    elog("e5-emmc: k205 st %08x tc %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
+    elog("e5-emmc: k207 P1 st %08x tc %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
          st, r32(0x34), r32(0x10), d[0], d[1], r32(0x24), r32(0x22C));
+    w32(0x30, 0xFFFFFFFFu);
+
+    // k207 P2: + vtable per-request INT trio (0xa7d34: [0x3C]|=b29, 0x34=0x027F003B, 0x38=0x027F803B)
+    for (uint32_t i = 0; i < 128; i++) d[i] = 0xCAFE0000u;
+    for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+      __asm__ volatile ("dc cvac, %0" :: "r"(la));
+    w32(0x3C, r32(0x3C) | 0x20000000u);
+    w32(0x34, 0x027F003Bu);
+    w32(0x38, 0x027F803Bu);
+    w32(0x30, 0xFFFFFFFFu);
+    w16(0x06, 0); w16(0x00, 1); w16(0x04, 0x0200u);
+    w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
+    w32(0x08, 0x00010000u);
+    w16(0x0E, (17u << 8) | 0x3Au);
+    st = 0; sp = 0;
+    while (sp < 3000000u) { st = r32(0x30); if (st & (0x2u | 0xFFFF0000u)) break; sp++; }
+    __asm__ volatile ("dsb sy" ::: "memory");
+    __asm__ volatile ("ic ivau, %0" :: "r"(d) : "memory");
+    elog("e5-emmc: k207 P2 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
+         st, r32(0x10), d[0], d[1], r32(0x24), r32(0x22C));
+    w32(0x30, 0xFFFFFFFFu);
+
+    // k207 P3: + HC2 0x3000 (LK bit13 + V4 bit12)
+    for (uint32_t i = 0; i < 128; i++) d[i] = 0xCAFE0000u;
+    for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+      __asm__ volatile ("dc cvac, %0" :: "r"(la));
+    w16(0x3E, 0x3000u);
+    w32(0x30, 0xFFFFFFFFu);
+    w16(0x06, 0); w16(0x00, 1); w16(0x04, 0x0200u);
+    w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
+    w32(0x08, 0x00010000u);
+    w16(0x0E, (17u << 8) | 0x3Au);
+    st = 0; sp = 0;
+    while (sp < 3000000u) { st = r32(0x30); if (st & (0x2u | 0xFFFF0000u)) break; sp++; }
+    __asm__ volatile ("dsb sy" ::: "memory");
+    __asm__ volatile ("ic ivau, %0" :: "r"(d) : "memory");
+    elog("e5-emmc: k207 P3 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
+         st, r32(0x10), d[0], d[1], r32(0x24), r32(0x22C));
     w32(0x30, 0xFFFFFFFFu);
     bmd->complete();
     bmd->release();
