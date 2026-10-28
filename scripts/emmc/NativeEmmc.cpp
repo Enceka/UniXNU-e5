@@ -729,91 +729,30 @@ bool NativeEmmc::start(IOService *provider)
             rl = r32(0x10);
             elog("e5-emmc: k189 lad%u r1 %08x %s\n", li, rl, (rl & 0x80u) ? "ERR" : "ok");
           }
-          // raw DAT line sampling during cmd17 PIO attempt
-          w32(0x30, 0xFFFFFFFFu);
-          w16(0x04, 0x0200u); w32(0x00, 1); w16(0x0C, 0x0010u);   // TM read PIO
-          w32(0x08, 0u); w16(0x0E, (17u << 8) | 0x3Au);
-          uint32_t ps[10];
-          for (uint32_t i = 0; i < 10; i++) { ps[i] = r32(0x24); for (uint32_t j=0;j<2000;j++){ (void)r32(0x24); } }
-          elog("e5-emmc: k189 pio pstate %08x %08x %08x %08x %08x\n", ps[0],ps[2],ps[4],ps[6],ps[8]);
-          w32(0x30, 0xFFFFFFFFu);
-          // CMD24 WRITE probe (never tested): write sector 0x8000 with marker
-          for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xE5E5C3C3u;
-          for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
-            __asm__ volatile ("dc cvac, %0" :: "r"(la));
-          w32(0x30, 0xFFFFFFFFu);
-          w16(0x04, 0x0200u); w32(0x00, 1);
-          w32(0x58, (uint32_t)(dva2 + 0x100u)); w32(0x5C, 0);
-          w32(0x08, 0x8000u);
-          w16(0x0C, 0x0003u); w16(0x0E, (24u << 8) | 0x3Au);
-          uint32_t stw = 0;
-          for (uint32_t i = 0; i < 60000u * 80u; i++) { stw = r32(0x30); if ((stw & 0x8001u) || (stw & 0x02u)) break; }
-          elog("e5-emmc: k189 WR st %08x\n", stw);
-          // CMD18 MULTI read probe
+          // k191: single U-Boot-verbatim SDMA read at LK state (card now legacy via ladder).
           w32(0x30, 0xFFFFFFFFu);
           for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
             __asm__ volatile ("dc cvac, %0" :: "r"(la));
-          w16(0x04, 0x0200u); w32(0x00, 1);
-          w32(0x58, (uint32_t)(dva2 + 0x100u)); w32(0x5C, 0);
-          w32(0x08, 0u);
-          w16(0x0C, 0x0003u); w16(0x0E, (18u << 8) | 0x3Au);
-          uint32_t st18 = 0;
-          for (uint32_t i = 0; i < 60000u * 80u; i++) { st18 = r32(0x30); if ((st18 & 0x8001u) || (st18 & 0x02u)) break; }
-          elog("e5-emmc: k189 RD18 st %08x d0 %08x\n", st18, d[0]);
-        }
-      }
-        bool won = false;
-        static const uint16_t sw[20] = { 0x0060,0x2060,0x4060,0x6060,0x8060,0xA060,0xC060,0xE060,
-                                         0xB700,0xB720,0xB740,0xB760,0xB780,0xB7A0,0xB7C0,0xB7E0,
-                                         0x0000,0xFFFF,0x4040,0x8080 };
-        for (uint32_t si = 0; si < 20 && !won; si = si + 1) {
-          uint32_t dly = (lkbase & 0xFFFF0000u) | sw[si];
-          w32(0x204, dly);
-          w32(0x30, 0xFFFFFFFFu);
-          w16(0x04, 0x0200u);
-          w32(0x00, 1);
           w32(0x58, bdva); w32(0x5C, 0);
+          w16(0x04, 0x7200u);   // blksz 512 | SDMA boundary
+          w32(0x00, 1);
           w32(0x08, 0x00010000u);
-          w32(0x0C, 0x113A0003u);
-          uint32_t stx = 0;
-          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-            stx = r32(0x30);
-            if ((stx & 0x02u) || (stx & 0xFFFF0000u)) break;
+          w32(0x0C, 0x113A0003u);   // (cmd17|0x3A)<<16 | TM 0x3 (U-Boot verbatim)
+          uint32_t st191 = 0;
+          for (uint32_t n = 0; n < 60000 * 60; n = n + 1) {
+            st191 = r32(0x30);
+            if ((st191 & 0x02u) || (st191 & 0xFFFF0000u)) break;
           }
-          uint32_t e = stx >> 16;
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
             __asm__ volatile ("dc ivac, %0" :: "r"(la));
           __asm__ volatile ("dsb sy" ::: "memory");
-          elog("e5-emmc: SW dly %08x st %08x d0 %08x d1 %08x\n", dly, stx, d[0], d[1]);
-          if (!(e & 0x60u) && (stx & 0x02u) && d[0] != 0xCAFE0000u) {
-            won = true;
-            elog("e5-emmc: SW WIN dly %08x d0 %08x d1 %08x d2 %08x d3 %08x\n", dly, d[0], d[1], d[2], d[3]);
-            break;
-          }
+          elog("e5-emmc: k191 rd st %08x d0 %08x d1 %08x\n", st191, d[0], d[1]);
           w32(0x30, 0xFFFFFFFFu);
-          w16(0x0C, 0); w16(0x0E, (12u << 8) | 0x1Bu);
-          for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (r32(0x30) & 0x01u) break; }
-          for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
-          uint32_t rp[4];
-          cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rp);
-          if ((rp[0] & 0x1F00u) != 0x0900u) {
-            cmd(0, 0, 0, rp); cmd(1, 0x40FF8080u, 0, rp);
-            cmd(2, 0, CMD_RESP_LONG, rp);
-            cmd(3, 0, CMD_RESP_SHORT, rp);
-            uint32_t rr = (rp[0] >> 16) & 0xFFFFu;
-            cmd(7, rr << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, rp);
-            cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rp);
-            this->rca = (uint16_t)rr;
-            elog("e5-emmc: SW reenum rca %04x\n", rr);
-          }
-          for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
-          for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
-            __asm__ volatile ("dc cvac, %0" :: "r"(la));
+          OSSafeReleaseNULL(bmd2);
+          // k191: fall through to clean hostInit + enum + k190 discriminator + readExtCsd.
         }
-        if (!won) elog("e5-emmc: SW sweep done no win\n");
-        OSSafeReleaseNULL(bmd2);
-        return true;
+        }
       }
 
   bool hostOk = false;
