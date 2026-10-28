@@ -394,7 +394,7 @@ class NativeEmmc : public IOBlockStorageDevice {
           kernel_task, kIODirectionInOut, 8192, 0x7FFFF000ull);
       if (bmd) {
         bmd->prepare();
-        uint32_t *d = (uint32_t *)(bmd->getVirtualAddress());
+        uint32_t *d = (uint32_t *)(bmd->getBytesNoCopy());
         IOByteCount blen = 0;
         uint64_t bdva = (uint64_t)bmd->getPhysicalSegment(0, &blen);
         for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
