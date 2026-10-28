@@ -688,56 +688,52 @@ bool NativeEmmc::start(IOService *provider)
         const uint32_t lkbase = 0x3434B760u;   // LK live DLL_DLY (E5MM)
         // k178: exit HS400ES — card side to legacy SDR + 1-bit, then re-read
         {
-          // k188: HS_TIMING LADDER + host 400k.  k187 clean-switch evidence:
-        // bw1 accepted (r1 900), hs0 REFUSED (r1 980 SWITCH_ERROR) -> card sits
-        // in HS400/HS400ES and demands stepwise exit: 185=2 -> 1 -> 0.
+          // k189: post-enum 400k clean ladder + write/multi/raw-DAT probes.
+        // Note: LK live HC=0x20 (1-bit SDMA, no HS400) - HS400ES exit theories dead.
+        // Card refuses all HS_TIMING from inherit state; try from clean 400k enum.
         {
           uint32_t rl;
-          // step 0: bus width 1-bit (accepted per k187)
-          w32(0x30, 0xFFFFFFFFu);
-          w32(0x08, 0x0300B701u); w16(0x0E, (6u << 8) | 0x1Bu);
-          for (uint32_t i = 0; i < 300000u; i++) { if (r32(0x30) & 0x8001u) break; }
-          for (uint32_t i = 0; i < 300000u && (r32(0x24) & 0x3u); i++) { }
-          elog("e5-emmc: k188 bw1 r1 %08x\n", r32(0x10));
-          // ladder
-          const uint32_t lad[3] = { 0x0300B902u, 0x0300B901u, 0x0300B900u };
-          for (uint32_t li = 0; li < 3; li++) {
+          const uint32_t lad[4] = { 0x0300B701u, 0x0300B902u, 0x0300B901u, 0x0300B900u };
+          for (uint32_t li = 0; li < 4; li++) {
             w32(0x30, 0xFFFFFFFFu);
             w32(0x08, lad[li]); w16(0x0E, (6u << 8) | 0x1Bu);
             for (uint32_t i = 0; i < 300000u; i++) { if (r32(0x30) & 0x8001u) break; }
             for (uint32_t i = 0; i < 300000u && (r32(0x24) & 0x3u); i++) { }
             rl = r32(0x10);
-            elog("e5-emmc: k188 lad%u(%08x) r1 %08x %s\n", li, lad[li], rl, (rl & 0x80u) ? "SWITCH_ERR" : "ok");
+            elog("e5-emmc: k189 lad%u r1 %08x %s\n", li, rl, (rl & 0x80u) ? "ERR" : "ok");
           }
-          // host clock to 400k (NO controller reset)
-          w16(0x2C, 0);
-          w16(0x2C, 0x0001u | (7u << 8));
-          for (uint32_t i = 0; i < 150000u; i++) { if (r16(0x2C) & 0x0002u) break; }
-          w16(0x2C, r16(0x2C) | 0x0004u);
-          elog("e5-emmc: k188 clk %04x\n", r16(0x2C));
-          // cmd16 then read
+          // raw DAT line sampling during cmd17 PIO attempt
           w32(0x30, 0xFFFFFFFFu);
-          w32(0x08, 512); w16(0x0E, (16u << 8) | 0x1Au);
-          for (uint32_t i = 0; i < 300000u; i++) { if (r32(0x30) & 0x1u) break; }
-          elog("e5-emmc: k188 cmd16 r1 %08x\n", r32(0x10));
-          for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
+          w16(0x04, 0x0200u); w32(0x00, 1); w16(0x0C, 0x0010u);   // TM read PIO
+          w32(0x08, 0u); w16(0x0E, (17u << 8) | 0x3Au);
+          uint32_t ps[10];
+          for (uint32_t i = 0; i < 10; i++) { ps[i] = r32(0x24); for (volatile uint32_t j=0;j<2000;j++){} }
+          elog("e5-emmc: k189 pio pstate %08x %08x %08x %08x %08x\n", ps[0],ps[2],ps[4],ps[6],ps[8]);
+          w32(0x30, 0xFFFFFFFFu);
+          // CMD24 WRITE probe (never tested): write sector 0x8000 with marker
+          for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xE5E5C3C3u;
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
             __asm__ volatile ("dc cvac, %0" :: "r"(la));
           w32(0x30, 0xFFFFFFFFu);
           w16(0x04, 0x0200u); w32(0x00, 1);
           w32(0x58, (uint32_t)(dva2 + 0x100u)); w32(0x5C, 0);
-          w32(0x08, 0u);
-          w16(0x0C, 0x0003u); w16(0x0E, (17u << 8) | 0x3Au);
-          uint32_t stx = 0, i1;
-          for (i1 = 0; i1 < 60000u * 80u; i1 = i1 + 1) {
-            stx = r32(0x30);
-            if ((stx & 0x02u) || (stx & 0xFFFF0000u)) break;
-          }
+          w32(0x08, 0x8000u);
+          w16(0x0C, 0x0003u); w16(0x0E, (24u << 8) | 0x3Au);
+          uint32_t stw = 0;
+          for (uint32_t i = 0; i < 60000u * 80u; i++) { stw = r32(0x30); if ((stw & 0x8001u) || (stw & 0x02u)) break; }
+          elog("e5-emmc: k189 WR st %08x\n", stw);
+          // CMD18 MULTI read probe
+          w32(0x30, 0xFFFFFFFFu);
+          for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
-            __asm__ volatile ("dc ivac, %0" :: "r"(la));
-          __asm__ volatile ("dsb sy" ::: "memory");
-          elog("e5-emmc: k188 st %08x spins %u bc %08x d0 %08x d1 %08x\n",
-               stx, i1, r32(0x22C), d[0], d[1]);
+            __asm__ volatile ("dc cvac, %0" :: "r"(la));
+          w16(0x04, 0x0200u); w32(0x00, 1);
+          w32(0x58, (uint32_t)(dva2 + 0x100u)); w32(0x5C, 0);
+          w32(0x08, 0u);
+          w16(0x0C, 0x0003u); w16(0x0E, (18u << 8) | 0x3Au);
+          uint32_t st18 = 0;
+          for (uint32_t i = 0; i < 60000u * 80u; i++) { st18 = r32(0x30); if ((st18 & 0x8001u) || (st18 & 0x02u)) break; }
+          elog("e5-emmc: k189 RD18 st %08x d0 %08x\n", st18, d[0]);
         }
       }
         bool won = false;
