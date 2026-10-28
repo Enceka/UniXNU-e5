@@ -688,22 +688,38 @@ bool NativeEmmc::start(IOService *provider)
         const uint32_t lkbase = 0x3434B760u;   // LK live DLL_DLY (E5MM)
         // k178: exit HS400ES — card side to legacy SDR + 1-bit, then re-read
         {
-          // k186: INHERIT-VERBATIM - LK just completed data reads in exactly this
-        // state (E5MM live dump).  Touch NOTHING except LK's own enable values
-        // and fire the same cmd17 U-Boot/LK style.  Zero resets, zero clock changes.
+          // k187: CLEAN SWITCH - all prior cmd6 used flags 0x3B which set
+        // DATA_PRESENT (bit5) on a non-data command, arming the data engine and
+        // latching CRC garbage across the switch.  Correct R1b = 0x1B.
+        // Sequence: clear errors -> switch (BW[183]=1, then HS_TIMING[185]=0)
+        // -> wait DAT0 busy clear -> cmd13 verify -> cmd17 read at inherited state.
         {
-          w32(0x3C, 0x30000000u);                 // LK live value (bits 28+29)
-          w32(0x34, 0x027F000Bu);                 // LK live INT_ENABLE
-          w32(0x38, 0x027F000Bu);                 // LK live SIGNAL_ENABLE
+          uint32_t r6a, r6b;
+          w32(0x30, 0xFFFFFFFFu);                       // clear all latched errors
+          w32(0x08, 0x0300B701u); w16(0x0E, (6u << 8) | 0x1Bu);   // BW=1bit R1b CLEAN
+          for (uint32_t i = 0; i < 300000u; i++) { r6a = r32(0x30); if (r6a & 0x8001u) break; }
+          elog("e5-emmc: k187 bw1 st %08x r1 %08x busy %08x\n", r6a, r32(0x10), r32(0x24));
+          for (uint32_t i = 0; i < 300000u && (r32(0x24) & 0x3u); i++) { }
+          w32(0x30, 0xFFFFFFFFu);
+          w32(0x08, 0x0300B900u); w16(0x0E, (6u << 8) | 0x1Bu);   // HS=legacy R1b CLEAN
+          for (uint32_t i = 0; i < 300000u; i++) { r6b = r32(0x30); if (r6b & 0x8001u) break; }
+          elog("e5-emmc: k187 hs0 st %08x r1 %08x busy %08x\n", r6b, r32(0x10), r32(0x24));
+          for (uint32_t i = 0; i < 300000u && (r32(0x24) & 0x3u); i++) { }
+          // cmd13 status check
+          w32(0x30, 0xFFFFFFFFu);
+          w32(0x08, ((uint32_t)this->rca) << 16); w16(0x0E, (13u << 8) | 0x1Au);
+          uint32_t r13 = 0;
+          for (uint32_t i = 0; i < 300000u; i++) { r13 = r32(0x30); if (r13 & 0x1u) break; }
+          elog("e5-emmc: k187 cmd13 %08x\n", r32(0x10));
+          // now the read: U-Boot style with v4 count + SDMA
           for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
             __asm__ volatile ("dc cvac, %0" :: "r"(la));
           w32(0x30, 0xFFFFFFFFu);
-          w16(0x04, 0x0200u);                     // blksz 512
-          w32(0x00, 1);                           // count (LK: w32(0x00,1))
-          w32(0x58, 0xBF6C8CC0u); w32(0x5C, 0);   // LK's own SDMA buffer PA
-          w32(0x08, 0x00010000u);                 // arg = LK's own sector 0x10000
-          w16(0x0C, 0x0003u); w16(0x0E, (17u << 8) | 0x3Au);   // TM=DMA|BCNT, cmd17 DATA
+          w16(0x04, 0x0200u); w32(0x00, 1);
+          w32(0x58, (uint32_t)((uint64_t)dpa & 0xFFFFFFFFull)); w32(0x5C, 0);
+          w32(0x08, 0u);                                  // sector 0
+          w16(0x0C, 0x0003u); w16(0x0E, (17u << 8) | 0x3Au);
           uint32_t stx = 0, i1;
           for (i1 = 0; i1 < 60000u * 80u; i1 = i1 + 1) {
             stx = r32(0x30);
@@ -712,11 +728,8 @@ bool NativeEmmc::start(IOService *provider)
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
             __asm__ volatile ("dc ivac, %0" :: "r"(la));
           __asm__ volatile ("dsb sy" ::: "memory");
-          elog("e5-emmc: k186 st %08x spins %u pstate %08x bc %08x d0 %08x d1 %08x\n",
-               stx, i1, r32(0x24), r32(0x22C), d[0], d[1]);
-          // also peek LK's own buffer region for new content
-          uint32_t lk0 = *(volatile uint32_t *)0xBF6C8CC0u;
-          elog("e5-emmc: k186 lkbuf %08x %08x\n", lk0, *(volatile uint32_t *)0xBF6C8CC4u);
+          elog("e5-emmc: k187 st %08x spins %u bc %08x d0 %08x d1 %08x\n",
+               stx, i1, r32(0x22C), d[0], d[1]);
         }
       }
         bool won = false;
