@@ -431,6 +431,43 @@ class NativeEmmc : public IOBlockStorageDevice {
              r32(0x00), r32(0x04), r32(0x08), r32(0x0C), r32(0x10), r32(0x20), r32(0x24), r32(0x2C));
         elog("e5-emmc: k199 vnd %08x %08x %08x %08x %08x %08x %08x %08x\n",
              r32(0x200), r32(0x204), r32(0x208), r32(0x220), r32(0x224), r32(0x228), r32(0x22C), r32(0x3C));
+        // k200: same pristine probe but with LK's exact DLL config written first
+        // (LK-live DLL_CFG=0xaf250d02 has DLL_EN bit21=1; cold state 0xa0000102=off)
+        w32(0x200, 0xaf250d02u);
+        for (uint32_t lk = 0; lk < 2000u * 200; lk = lk + 1) { (void)r32(0x210); }
+        w32(0x204, 0x3434b760u);   // LK-live DLL_DLY
+        w32(0x208, 0x00202000u);   // LK-live DLL_DLY_OFFSET
+        for (uint32_t lk = 0; lk < 2000u * 200; lk = lk + 1) { (void)r32(0x210); }
+        elog("e5-emmc: k200 dll cfg %08x sts %08x dly %08x\n",
+             r32(0x200), r32(0x210), r32(0x204));
+        for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
+        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+          __asm__ volatile ("dc cvac, %0" :: "r"(la));
+        w32(0x30, 0xFFFFFFFFu);
+        w16(0x06, 0);
+        w16(0x00, 1);
+        w16(0x04, 0x0200u);
+        w8(0x28, 0x20u);
+        w32(0x58, (uint32_t)bdva); w32(0x5C, 0);
+        w8(0x0C, 0x3);
+        w32(0x08, 0x00010000u);
+        w16(0x0E, (17u << 8) | 0x3Au);
+        uint32_t st200 = 0;
+        uint32_t psB[12] = {0}, bcB[12] = {0};
+        uint32_t piB = 0;
+        for (uint32_t n = 0; n < 60000u * 30; n = n + 1) {
+          if ((n & 0xFFFFu) == 0 && piB < 12) {
+            psB[piB] = r32(0x24); bcB[piB] = r32(0x22C); piB = piB + 1;
+          }
+          st200 = r32(0x30);
+          if ((st200 & 0x02u) || (st200 & 0xFFFF0000u)) break;
+        }
+        elog("e5-emmc: k200 st %08x r1 %08x d0 %08x d1 %08x\n",
+             st200, r32(0x10), d[0], d[1]);
+        for (uint32_t q = 0; q < piB; q = q + 1)
+          elog("e5-emmc: k200 s%u ps %08x bc %08x\n", q, psB[q], bcB[q]);
+        elog("e5-emmc: k200 vnd %08x %08x %08x %08x %08x %08x %08x\n",
+             r32(0x200), r32(0x204), r32(0x208), r32(0x210), r32(0x220), r32(0x22C), r32(0x3C));
         for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
           __asm__ volatile ("dc ivac, %0" :: "r"(la));
         __asm__ volatile ("dsb sy" ::: "memory");
