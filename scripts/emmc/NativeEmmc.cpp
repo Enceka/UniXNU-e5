@@ -770,6 +770,50 @@ bool NativeEmmc::start(IOService *provider)
         }
       }
 
+  // k194: PMIC VDDEMMCCORE power cycle. HS400ES has no CMD6 exit (JEDEC); VCC
+  // power cycle cold-boots the card into legacy mode. UMP9620 PMIC via ADI r5p0
+  // at 0x64400000: write = MMIO into slave window (+0x20000), read = RD_CMD/RD_DATA.
+  {
+    IOMemoryDescriptor *amd = IOMemoryDescriptor::withAddressRange(
+        0x64400000ull, 0x40000ull, kIODirectionNone, NULL);
+    if (amd) {
+      IOMemoryMap *amap = amd->createMappingInTask(kernel_task, 0, 0);
+      if (amap) {
+        volatile uint32_t *adi = (volatile uint32_t *)(amap->getVirtualAddress());
+        auto aRd = [&adi](uint32_t r) -> uint32_t {
+          adi[0x28 / 4] = r;
+          for (uint32_t i = 0; i < 100000u; i++) {
+            uint32_t v = adi[0x2C / 4];
+            if (!(v & 0x80000000u)) return v & 0xFFFFu;
+          }
+          return 0xDEADu;
+        };
+        auto aWr = [&adi](uint32_t r, uint32_t v) {
+          for (uint32_t i = 0; i < 10000u; i++) {
+            if (!(adi[0x30 / 4] & 0x800u)) break;
+          }
+          *(volatile uint32_t *)((uintptr_t)adi + 0x20000ull + r) = v;
+        };
+        uint32_t pd0 = aRd(0x21A0u);
+        uint32_t vl0 = aRd(0x21A4u);
+        elog("e5-emmc: k194 adi pd %04x vol %04x\n", pd0, vl0);
+        aWr(0x21A0u, (pd0 & 0xFFFEu) | 1u);      // power down
+        for (uint32_t i = 0; i < 500000u; i++) { (void)adi[0x34 / 4]; }
+        uint32_t pd1 = aRd(0x21A0u);
+        elog("e5-emmc: k194 pd-down %04x\n", pd1);
+        aWr(0x21A0u, pd1 & 0xFFFEu);             // power up
+        for (uint32_t i = 0; i < 500000u; i++) { (void)adi[0x34 / 4]; }
+        elog("e5-emmc: k194 pd-up %04x vol %04x\n", aRd(0x21A0u), aRd(0x21A4u));
+        amap->release();
+      } else {
+        elog("e5-emmc: k194 adi map fail\n");
+      }
+      amd->release();
+    } else {
+      elog("e5-emmc: k194 adi desc fail\n");
+    }
+  }
+
   bool hostOk = false;
   for (uint32_t a = 0; a < 4 && !hostOk; a++) {
     hostOk = hostInit();
