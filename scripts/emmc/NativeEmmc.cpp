@@ -413,11 +413,24 @@ class NativeEmmc : public IOBlockStorageDevice {
         w32(0x08, 0x00010000u);       // sector 0x10000
         w16(0x0E, (17u << 8) | 0x3Au);
         uint32_t st198 = 0, tc198 = 0;
+        uint32_t ps[12] = {0}, bc12[12] = {0};
+        uint32_t pi = 0;
         for (uint32_t n = 0; n < 60000u * 30; n = n + 1) {
+          if ((n & 0xFFFFu) == 0 && pi < 12) {
+            ps[pi] = r32(0x24); bc12[pi] = r32(0x22C); pi = pi + 1;
+          }
           st198 = r32(0x30);
           if ((st198 & 0x02u) || (st198 & 0xFFFF0000u)) break;
         }
         tc198 = r32(0x3C);
+        elog("e5-emmc: k199 st %08x tc %08x r1 %08x d0 %08x d1 %08x\n",
+             st198, tc198, r32(0x10), d[0], d[1]);
+        for (uint32_t q = 0; q < pi; q = q + 1)
+          elog("e5-emmc: k199 s%u ps %08x bc %08x\n", q, ps[q], bc12[q]);
+        elog("e5-emmc: k199 regs %08x %08x %08x %08x %08x %08x %08x %08x\n",
+             r32(0x00), r32(0x04), r32(0x08), r32(0x0C), r32(0x10), r32(0x20), r32(0x24), r32(0x2C));
+        elog("e5-emmc: k199 vnd %08x %08x %08x %08x %08x %08x %08x %08x\n",
+             r32(0x200), r32(0x204), r32(0x208), r32(0x220), r32(0x224), r32(0x228), r32(0x22C), r32(0x3C));
         for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
           __asm__ volatile ("dc ivac, %0" :: "r"(la));
         __asm__ volatile ("dsb sy" ::: "memory");
