@@ -688,37 +688,45 @@ bool NativeEmmc::start(IOService *provider)
         const uint32_t lkbase = 0x3434B760u;   // LK live DLL_DLY (E5MM)
         // k178: exit HS400ES — card side to legacy SDR + 1-bit, then re-read
         {
-          // k187: CLEAN SWITCH - all prior cmd6 used flags 0x3B which set
-        // DATA_PRESENT (bit5) on a non-data command, arming the data engine and
-        // latching CRC garbage across the switch.  Correct R1b = 0x1B.
-        // Sequence: clear errors -> switch (BW[183]=1, then HS_TIMING[185]=0)
-        // -> wait DAT0 busy clear -> cmd13 verify -> cmd17 read at inherited state.
+          // k188: HS_TIMING LADDER + host 400k.  k187 clean-switch evidence:
+        // bw1 accepted (r1 900), hs0 REFUSED (r1 980 SWITCH_ERROR) -> card sits
+        // in HS400/HS400ES and demands stepwise exit: 185=2 -> 1 -> 0.
         {
-          uint32_t r6a, r6b;
-          w32(0x30, 0xFFFFFFFFu);                       // clear all latched errors
-          w32(0x08, 0x0300B701u); w16(0x0E, (6u << 8) | 0x1Bu);   // BW=1bit R1b CLEAN
-          for (uint32_t i = 0; i < 300000u; i++) { r6a = r32(0x30); if (r6a & 0x8001u) break; }
-          elog("e5-emmc: k187 bw1 st %08x r1 %08x busy %08x\n", r6a, r32(0x10), r32(0x24));
-          for (uint32_t i = 0; i < 300000u && (r32(0x24) & 0x3u); i++) { }
+          uint32_t rl;
+          // step 0: bus width 1-bit (accepted per k187)
           w32(0x30, 0xFFFFFFFFu);
-          w32(0x08, 0x0300B900u); w16(0x0E, (6u << 8) | 0x1Bu);   // HS=legacy R1b CLEAN
-          for (uint32_t i = 0; i < 300000u; i++) { r6b = r32(0x30); if (r6b & 0x8001u) break; }
-          elog("e5-emmc: k187 hs0 st %08x r1 %08x busy %08x\n", r6b, r32(0x10), r32(0x24));
+          w32(0x08, 0x0300B701u); w16(0x0E, (6u << 8) | 0x1Bu);
+          for (uint32_t i = 0; i < 300000u; i++) { if (r32(0x30) & 0x8001u) break; }
           for (uint32_t i = 0; i < 300000u && (r32(0x24) & 0x3u); i++) { }
-          // cmd13 status check
+          elog("e5-emmc: k188 bw1 r1 %08x\n", r32(0x10));
+          // ladder
+          const uint32_t lad[3] = { 0x0300B902u, 0x0300B901u, 0x0300B900u };
+          for (uint32_t li = 0; li < 3; li++) {
+            w32(0x30, 0xFFFFFFFFu);
+            w32(0x08, lad[li]); w16(0x0E, (6u << 8) | 0x1Bu);
+            for (uint32_t i = 0; i < 300000u; i++) { if (r32(0x30) & 0x8001u) break; }
+            for (uint32_t i = 0; i < 300000u && (r32(0x24) & 0x3u); i++) { }
+            rl = r32(0x10);
+            elog("e5-emmc: k188 lad%u(%08x) r1 %08x %s\n", li, lad[li], rl, (rl & 0x80u) ? "SWITCH_ERR" : "ok");
+          }
+          // host clock to 400k (NO controller reset)
+          w16(0x2C, 0);
+          w16(0x2C, 0x0001u | (7u << 8));
+          for (uint32_t i = 0; i < 150000u; i++) { if (r16(0x2C) & 0x0002u) break; }
+          w16(0x2C, r16(0x2C) | 0x0004u);
+          elog("e5-emmc: k188 clk %04x\n", r16(0x2C));
+          // cmd16 then read
           w32(0x30, 0xFFFFFFFFu);
-          w32(0x08, ((uint32_t)this->rca) << 16); w16(0x0E, (13u << 8) | 0x1Au);
-          uint32_t r13 = 0;
-          for (uint32_t i = 0; i < 300000u; i++) { r13 = r32(0x30); if (r13 & 0x1u) break; }
-          elog("e5-emmc: k187 cmd13 %08x\n", r32(0x10));
-          // now the read: U-Boot style with v4 count + SDMA
+          w32(0x08, 512); w16(0x0E, (16u << 8) | 0x1Au);
+          for (uint32_t i = 0; i < 300000u; i++) { if (r32(0x30) & 0x1u) break; }
+          elog("e5-emmc: k188 cmd16 r1 %08x\n", r32(0x10));
           for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
             __asm__ volatile ("dc cvac, %0" :: "r"(la));
           w32(0x30, 0xFFFFFFFFu);
           w16(0x04, 0x0200u); w32(0x00, 1);
           w32(0x58, (uint32_t)(dva2 + 0x100u)); w32(0x5C, 0);
-          w32(0x08, 0u);                                  // sector 0
+          w32(0x08, 0u);
           w16(0x0C, 0x0003u); w16(0x0E, (17u << 8) | 0x3Au);
           uint32_t stx = 0, i1;
           for (i1 = 0; i1 < 60000u * 80u; i1 = i1 + 1) {
@@ -728,7 +736,7 @@ bool NativeEmmc::start(IOService *provider)
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
             __asm__ volatile ("dc ivac, %0" :: "r"(la));
           __asm__ volatile ("dsb sy" ::: "memory");
-          elog("e5-emmc: k187 st %08x spins %u bc %08x d0 %08x d1 %08x\n",
+          elog("e5-emmc: k188 st %08x spins %u bc %08x d0 %08x d1 %08x\n",
                stx, i1, r32(0x22C), d[0], d[1]);
         }
       }
