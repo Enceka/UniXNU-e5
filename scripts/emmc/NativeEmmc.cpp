@@ -715,6 +715,65 @@ bool NativeEmmc::start(IOService *provider)
         }
         OSSafeReleaseNULL(bmd2);
         return true;
+      IOMemoryDescriptor *lkmd = nullptr; IOMemoryMap *lkmap = nullptr; (void)lkmd; (void)lkmap;
+        uint32_t *d = (uint32_t *)((uint8_t *)dt2 + 0x100u);
+        for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
+        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+          __asm__ volatile ("dc cvac, %0" :: "r"(la));
+        __asm__ volatile ("dsb sy" ::: "memory");
+        uint32_t bdva = dva2 + 0x100u;
+        const uint32_t lkbase = 0x3434B760u;
+        bool won = false;
+        static const uint16_t sw[20] = { 0x0060,0x2060,0x4060,0x6060,0x8060,0xA060,0xC060,0xE060,
+                                         0xB700,0xB720,0xB740,0xB760,0xB780,0xB7A0,0xB7C0,0xB7E0,
+                                         0x0000,0xFFFF,0x4040,0x8080 };
+        for (uint32_t si = 0; si < 20 && !won; si = si + 1) {
+          uint32_t dly = (lkbase & 0xFFFF0000u) | sw[si];
+          w32(0x204, dly);
+          w32(0x30, 0xFFFFFFFFu);
+          w16(0x04, 0x0200u);
+          w32(0x00, 1);
+          w32(0x58, bdva); w32(0x5C, 0);
+          w32(0x08, 0x00010000u);
+          w32(0x0C, 0x113A0003u);
+          uint32_t stx = 0;
+          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+            stx = r32(0x30);
+            if ((stx & 0x02u) || (stx & 0xFFFF0000u)) break;
+          }
+          uint32_t e = stx >> 16;
+          for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+            __asm__ volatile ("dc ivac, %0" :: "r"(la));
+          __asm__ volatile ("dsb sy" ::: "memory");
+          elog("e5-emmc: SW dly %08x st %08x d0 %08x d1 %08x\n", dly, stx, d[0], d[1]);
+          if (!(e & 0x60u) && (stx & 0x02u) && d[0] != 0xCAFE0000u) {
+            won = true;
+            elog("e5-emmc: SW WIN dly %08x d0 %08x d1 %08x d2 %08x d3 %08x\n", dly, d[0], d[1], d[2], d[3]);
+            break;
+          }
+          w32(0x30, 0xFFFFFFFFu);
+          w16(0x0C, 0); w16(0x0E, (12u << 8) | 0x1Bu);
+          for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (r32(0x30) & 0x01u) break; }
+          for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
+          uint32_t rp[4];
+          cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rp);
+          if ((rp[0] & 0x1F00u) != 0x0900u) {
+            cmd(0, 0, 0, rp); cmd(1, 0x40FF8080u, 0, rp);
+            cmd(2, 0, CMD_RESP_LONG, rp);
+            cmd(3, 0, CMD_RESP_SHORT, rp);
+            uint32_t rr = (rp[0] >> 16) & 0xFFFFu;
+            cmd(7, rr << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, rp);
+            cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rp);
+            this->rca = (uint16_t)rr;
+            elog("e5-emmc: SW reenum rca %04x\n", rr);
+          }
+          for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
+          for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+            __asm__ volatile ("dc cvac, %0" :: "r"(la));
+        }
+        if (!won) elog("e5-emmc: SW sweep done no win\n");
+        OSSafeReleaseNULL(bmd2);
+        return true;
       }
 
   bool hostOk = false;
