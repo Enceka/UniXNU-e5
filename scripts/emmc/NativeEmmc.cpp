@@ -997,11 +997,11 @@ bool NativeEmmc::start(IOService *provider)
       for (uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
       K204PROBE("B-cmd0");
       { uint32_t ocr_ = 0;
-        for (int t_ = 0; t_ < 4000; t_++) {
+        for (int t_ = 0; t_ < 40; t_++) {
           cmd(1, 0x40ff8080u, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
           ocr_ = resp204[0];
           if (ocr_ & 0x80000000u) break;
-          IOSleep(2);
+          IOSleep(20);
         }
         elog("e5-emmc: k204 enum ocr %08x\n", ocr_); }
       { uint32_t cid_[4]; cmd(2, 0, 0, cid_); }
@@ -1046,11 +1046,11 @@ bool NativeEmmc::start(IOService *provider)
       cmd(0, 0, 0, resp204);
       for (uint32_t jj = 0; jj < 400000; jj++) { (void)r32(0x24); }
       { uint32_t ocr_ = 0;
-        for (int t_ = 0; t_ < 4000; t_++) {
+        for (int t_ = 0; t_ < 40; t_++) {
           cmd(1, 0x40ff8080u, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
           ocr_ = resp204[0];
           if (ocr_ & 0x80000000u) break;
-          IOSleep(2); } }
+          IOSleep(20); } }
       { uint32_t cid_[4]; cmd(2, 0, 0, cid_); }
       { cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204); this->rca = resp204[0] >> 16;
         cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
