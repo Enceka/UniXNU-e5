@@ -410,91 +410,48 @@ class NativeEmmc : public IOBlockStorageDevice {
         if (bmd) {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
-          static const struct { const char *tag; uint32_t tm; uint32_t dly; } dvars[3] = {
-            { "FLADMA ", 0x13u, 0xFFFFFFFFu },  // k159: ADMA + flushed desc table + ivac data
-            { "FLADMA2", 0x13u, 0xFFFFFFFFu },  // repeat after reselect
-            { "FLSDMA ", 0x3u, 0xFFFFFFFFu },   // control: sdma-style TM
+          // k165: U-Boot live-state verbatim (E5MM snapshot) — SDMA path
+          static const struct { const char *tag; uint32_t lba; } uvars[3] = {
+            { "UBOOT1 ", 0x00010000u },  // the LBA U-Boot last read
+            { "UBOOT2 ", 0x00000000u },  // LBA 0
+            { "UBOOT3 ", 0x00010000u },  // repeat = stability
           };
-          // k158: DMA buffer non-coherent — invalidate dcache lines before reading
-          auto invRange = [](volatile void *p, uint32_t n) {
-            uint64_t a = ((uint64_t)p) & ~63ull;
-            uint64_t e = ((uint64_t)p) + n;
-            for (; a < e; a += 64) __asm__ volatile ("dc ivac, %0" :: "r"(a));
-            __asm__ volatile ("dsb sy" ::: "memory");
-          };
-          uint32_t dlyLK0 = r32(0x204);
-          elog("e5-emmc: dlyLK initial %08x dly_off %08x\n", dlyLK0, r32(0x208));
-          for (uint32_t vi = 0; vi < 4; vi = vi + 1) {
-            uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100 * (vi + 1));
+          w32(0x200, 0xA0000102u);            // DLL CFG (U-Boot)
+          w32(0x204, 0x3434B760u);            // DLL_DLY torture-calibrated
+          w32(0x208, 0x00202000u);            // DLL_DLY_OFFSET bit5|21
+          w32(0x02C, 0x080E0207u);            // CLOCK_CONTROL verbatim
+          w8(0x28, 0x20u);                    // HC: SDMA select + vendor bit5
+          w32(0x034, 0x027F000Bu);            // INT_ENABLE (U-Boot)
+          w32(0x038, 0x027F000Bu);            // SIGNAL_ENABLE
+          w32(0x03C, 0x30000000u);            // FORCE_EVENT residue (bit28|29)
+          elog("e5-emmc: ub-state hc %02x clk %08x dll %08x dly %08x off %08x\n",
+               r8(0x28), r32(0x2C), r32(0x200), r32(0x204), r32(0x208));
+          for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
+            uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100u * (vi + 1));
             for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u + vi;
-            // k163: flush dirty marker lines to RAM so DMA can overwrite and ivac works
             for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
               __asm__ volatile ("dc cvac, %0" :: "r"(la));
             __asm__ volatile ("dsb sy" ::: "memory");
-            (void)d;
-            w8(SDHCI_SOFTWARE_RESET, 0x06 | (r8(SDHCI_SOFTWARE_RESET) & 0x08));
-            for (uint32_t n = 0; n < 50000; n = n + 1) { if (!(r8(SDHCI_SOFTWARE_RESET) & 0x06)) break; }
-            // k154: unstick card — CMD12 STOP (R1b) + wait busy + CMD7 re-select
-            {
-              uint32_t dummy[4];
-              w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
-              w16(SDHCI_TRANSFER_MODE, 0);
-              w16(SDHCI_COMMAND, (12 << 8) | 0x03u | 0x08u | 0x10u);  // R1b select=11
-              for (uint32_t n = 0; n < 60000 * 20; n = n + 1) {
-                if (r32(SDHCI_INT_STATUS) & 0x01u) break;
-              }
-              for (uint32_t n = 0; n < 60000 * 20; n = n + 1) {
-                if (!(r32(SDHCI_PRESENT_STATE) & 0x02u)) break;       // DAT_INHIBIT clear
-              }
-              cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, dummy);
-            }
-            // k156: U-Boot per-request interrupt trio (uboot_a @0xa7d34)
-            w32(0x3C, r32(0x3C) | 0x20000000u);   // FORCE_EVENT bit29
-            w32(0x34, 0x027F003Bu);               // INT_ENABLE
-            w32(0x38, 0x027F803Bu);               // SIGNAL_ENABLE
-            w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);              // clear all int status
-            w8(0x28, r8(0x28) & ~0x18u);                     // HC: SDMA select
-            uint64_t bva = (uint64_t)dt + 0x100u * (vi + 1);   // data VA (k162: reads via VA!)
-            uint64_t bdva = dva + 0x100u * (vi + 1);             // data PA for descriptor
-            uint64_t tva = (uint64_t)dt + 0x1000u + 0x20u * vi; // desc table VA (k161: VA not PA!)
-            uint64_t tdva = dva + 0x1000u + 0x20u * vi;           // desc table PA for 0x58
-            // k159: build 16B v4 descriptor (linux values) at table, then NOP_END
-            volatile uint16_t *dt16 = (volatile uint16_t *)tva;
-            volatile uint32_t *dt32 = (volatile uint32_t *)tva;
-            dt16[0] = 0x0021u; dt16[1] = 512u;                // TRAN_VALID, len
-            dt32[1] = (uint32_t)bdva; dt32[2] = (uint32_t)(bdva >> 32);
-            dt16[8] = 0x0003u; dt16[9] = 0;                   // NOP_END_VALID
-            dt32[5] = 0; dt32[6] = 0;
-            __asm__ volatile ("dc cvac, %0" :: "r"(tva & ~63ull));
-            __asm__ volatile ("dc cvac, %0" :: "r"((tva & ~63ull) + 64));
-            __asm__ volatile ("dsb sy" ::: "memory");
-            w16(0x3E, (uint16_t)(r16(0x3E) | 0x0001u));      // HC2 |= 64BIT_ADDR
-            w16(SDHCI_HOST_CONTROL, (uint16_t)((r16(SDHCI_HOST_CONTROL) & ~0x18u) | 0x10u)); // ADMA2 select
-            w32(0x58, (uint32_t)tdva); w32(0x5C, (uint32_t)(tdva >> 32));  // TABLE pointer
-            w16(0x06, 0);                                     // clear legacy count
-            w16(0x04, 512u);
-            w16(0x00, 1);                                     // v4 16-bit count
-            w32(SDHCI_ARGUMENT, 0);                          // LBA 0
-            w32(0x0C, (((17u << 8) | 0x1Au | 0x20u) << 16) | dvars[vi].tm);  // 0x3A + TM
+            uint32_t bdva = dva + 0x100u * (vi + 1);
+            w32(0x030, 0xFFFFFFFFu);           // clear all ints
+            w16(0x04, 0x0200u);                // blksz 512, NO boundary
+            w32(0x00, 1);                      // V4 32-bit count = 1
+            w32(0x58, bdva); w32(0x5C, 0);     // v4 SDMA buffer
+            w32(0x08, uvars[vi].lba);
+            w32(0x0C, (0x113Au << 16) | 0x3u); // cmd17 resp 0x1A + data 0x20, TM=0x3
             uint32_t stx = 0;
             for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-              stx = r32(SDHCI_INT_STATUS);
-              if (stx & (0x01u | 0x20u | 0xFFFF0000u)) break;
+              stx = r32(0x30);
+              if (stx & (0x01u | 0x02u | 0x20u | 0xFFFF0000u)) break;
             }
-            uint32_t stc = 0;
-            for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {      // k153: TC poll ALWAYS
-              stc = r32(SDHCI_INT_STATUS);
-              if (stc & (0x02u | 0x00080000u | 0x00100000u)) break; // TC / DMA err / ADMA err
-              if ((stc & 0xFFFF0000u) && !(stx & 0x01u)) break;     // early err w/o CC
-            }
-            __asm__ volatile ("dmb sy" ::: "memory");
-            invRange((volatile void *)bva, 512);              // k162: invalidate data via VA
+            uint32_t stc = r32(0x32);
+            invRange((volatile void *)d, 512); // invalidate data via VA
             elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x\n",
-                 dvars[vi].tag, stx, stc, r32(SDHCI_RESPONSE), *(volatile uint32_t *)bva, *(((volatile uint32_t *)bva) + 1));
-            elog("e5-emmc: %s rsp %08x %08x %08x %08x\n", dvars[vi].tag,
+                 uvars[vi].tag, stx, stc, r32(0x10), d[0], d[1]);
+            elog("e5-emmc: %s rsp %08x %08x %08x %08x\n", uvars[vi].tag,
                  r32(0x10), r32(0x14), r32(0x18), r32(0x1C));
-            elog("e5-emmc: %s abuf %08x blkc %08x/%08x proc %08x pstate %08x\n",
-                 dvars[vi].tag, r32(0x220), r32(0x228), r32(0x22c), r32(0x240), r32(SDHCI_PRESENT_STATE));
+            elog("e5-emmc: %s abuf %08x blkc %08x/%08x proc %08x pstate %08x sdma %08x\n",
+                 uvars[vi].tag, r32(0x220), r32(0x228), r32(0x22c), r32(0x240), r32(SDHCI_PRESENT_STATE), r32(0x58));
           }
           elog("e5-emmc: k150 dva %08x\n", (uint32_t)dva);
         } else {
