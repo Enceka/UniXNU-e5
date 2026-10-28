@@ -417,48 +417,44 @@ class NativeEmmc : public IOBlockStorageDevice {
             for (; a < e; a += 64) __asm__ volatile ("dc ivac, %0" :: "r"(a));
             __asm__ volatile ("dsb sy" ::: "memory");
           };
-          // k167: U-Boot live-state verbatim via LOCAL absolute MMIO ptr (no this->regs)
-          volatile uint32_t *R = (volatile uint32_t *)0x22200000ULL;
-          static const struct { const char *tag; uint32_t lba; } uvars[3] = {
-            { "UBOOT1 ", 0x00010000u },
-            { "UBOOT2 ", 0x00000000u },
-            { "UBOOT3 ", 0x00010000u },
-          };
-          R[0x200/4] = 0xA0000102u;            // DLL CFG
-          R[0x204/4] = 0x3434B760u;            // DLL_DLY calibrated
-          R[0x208/4] = 0x00202000u;            // DLL_DLY_OFFSET bit5|21
-          R[0x02C/4] = 0x080E0207u;            // CLOCK_CONTROL
-          *(volatile uint8_t *)&R[0x28/4] = 0x20u;  // HC: SDMA select + bit5
-          R[0x034/4] = 0x027F000Bu;
-          R[0x038/4] = 0x027F000Bu;
+          // k168: U-Boot live-state verbatim via driver accessors (mapped regs)
+          static const uint32_t ubLba[3] = { 0x00010000u, 0x00000000u, 0x00010000u };
+          w32(0x200, 0xA0000102u);            // DLL CFG
+          w32(0x204, 0x3434B760u);            // DLL_DLY calibrated
+          w32(0x208, 0x00202000u);            // DLL_DLY_OFFSET bit5|21
+          w32(0x02C, 0x080E0207u);            // CLOCK_CONTROL
+          w8(0x28, 0x20u);                    // HC: SDMA select + vendor bit5
+          w32(0x034, 0x027F000Bu);
+          w32(0x038, 0x027F000Bu);
           elog("e5-emmc: ub-state hc %02x clk %08x dll %08x dly %08x off %08x\n",
-               *(volatile uint8_t *)&R[0x28/4], R[0x2C/4], R[0x200/4], R[0x204/4], R[0x208/4]);
+               r8(0x28), r32(0x2C), r32(0x200), r32(0x204), r32(0x208));
           for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
+            const char *tg = (vi == 0) ? "UBOOT1 " : ((vi == 1) ? "UBOOT2 " : "UBOOT3 ");
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100u * (vi + 1));
             for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u + vi;
             for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
               __asm__ volatile ("dc cvac, %0" :: "r"(la));
             __asm__ volatile ("dsb sy" ::: "memory");
             uint32_t bdva = dva + 0x100u * (vi + 1);
-            R[0x30/4] = 0xFFFFFFFFu;           // clear ints
-            *(volatile uint16_t *)&R[0x04/4] = 0x0200u;   // blksz 512 no boundary
-            R[0x00/4] = 1;                      // v4 count
-            R[0x58/4] = bdva; R[0x5C/4] = 0;    // v4 SDMA buffer
-            R[0x08/4] = uvars[vi].lba;
-            R[0x0C/4] = (0x113Au << 16) | 0x3u; // cmd17, TM=3
+            w32(0x30, 0xFFFFFFFFu);           // clear ints
+            w16(0x04, 0x0200u);               // blksz 512 no boundary
+            w32(0x00, 1);                     // v4 count
+            w32(0x58, bdva); w32(0x5C, 0);    // v4 SDMA buffer
+            w32(0x08, ubLba[vi]);
+            w32(0x0C, (0x113Au << 16) | 0x3u);
             uint32_t stx = 0;
             for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-              stx = R[0x30/4];
+              stx = r32(0x30);
               if (stx & (0x01u | 0x02u | 0x20u | 0xFFFF0000u)) break;
             }
-            uint32_t stc = R[0x32/4];
+            uint32_t stc = r32(0x32);
             invRange((volatile void *)d, 512);
             elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x\n",
-                 uvars[vi].tag, stx, stc, R[0x10/4], d[0], d[1]);
-            elog("e5-emmc: %s rsp %08x %08x %08x %08x\n", uvars[vi].tag,
-                 R[0x10/4], R[0x14/4], R[0x18/4], R[0x1C/4]);
+                 tg, stx, stc, r32(0x10), d[0], d[1]);
+            elog("e5-emmc: %s rsp %08x %08x %08x %08x\n", tg,
+                 r32(0x10), r32(0x14), r32(0x18), r32(0x1C));
             elog("e5-emmc: %s abuf %08x blkc %08x/%08x proc %08x pstate %08x sdma %08x\n",
-                 uvars[vi].tag, R[0x220/4], R[0x228/4], R[0x22C/4], R[0x240/4], R[0x24/4], R[0x58/4]);
+                 tg, r32(0x220), r32(0x228), r32(0x22C), r32(0x240), r32(0x24), r32(0x58));
           }
           elog("e5-emmc: k150 dva %08x\n", (uint32_t)dva);
         } else {
