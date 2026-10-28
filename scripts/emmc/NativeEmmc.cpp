@@ -442,10 +442,14 @@ class NativeEmmc : public IOBlockStorageDevice {
             w32(0x58, bdva); w32(0x5C, 0);    // v4 SDMA buffer
             w32(0x08, ubLba[vi]);
             w32(0x0C, (0x113Au << 16) | 0x3u);
+            // k170: wait for TC (bit1) or error — CC fires at response, data still in flight
+            for (uint32_t w = 0; w < 60000 * 40; w = w + 1) {
+              if (!(r32(0x24) & 0x2u)) break;   // DAT_INHIBIT clear = data done
+            }
             uint32_t stx = 0;
-            for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
+            for (uint32_t w = 0; w < 60000 * 200; w = w + 1) {
               stx = r32(0x30);
-              if (stx & (0x01u | 0x02u | 0x20u | 0xFFFF0000u)) break;
+              if ((stx & 0x02u) || (stx & 0xFFFF0000u)) break;   // TC or err
             }
             uint32_t stc = r32(0x30) >> 16;   // err status = high half (0x32 unaligned = abort!)
             invRange((volatile void *)d, 512);
