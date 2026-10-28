@@ -186,9 +186,9 @@ class NativeEmmc : public IOBlockStorageDevice {
     if (!clocksUp()) return false;
     // Hardware reset of the card: sprd bit3 is active low, pulse it
 
-    // Full controller reset + legacy mode (Android/LK left HS400ES strobe + V4 mode: dead at 400kHz)
-    w8(0x2F, 0x03);                                  // reset CMD+DAT state machines
-    if (!waitBits8(0x2F, 0x03, 0, 100000, 10)) { kprintf("NativeEmmc: soft reset stuck %02x\n", r8(0x2F)); }
+    // k206: NO CMD/DAT engine soft reset - w8(0x2F, 0x03/0x0B) WEDGES the sprd
+    // controller (k204-D: all reads -> 0) or kills the DAT engine while the
+    // command path survives (k195-k203 frozen PSTATE). LK/U-Boot never write it.
     w16(0x3E, 0x0000);                               // HOST_CONTROL2: SDR12/legacy, V4 off, strobe off
     w8(0x28, 0x00);                                  // HOST_CONTROL: 1-bit bus, no DMA/ADMA
     kprintf("NativeEmmc: mode cleared hc2=%04x hc1=%02x\n", r16(0x3E), r8(0x28));
@@ -197,12 +197,6 @@ class NativeEmmc : public IOBlockStorageDevice {
     IODelay(15);
     w8(SDHCI_SOFTWARE_RESET, r8(SDHCI_SOFTWARE_RESET) | 0x08);
     IODelay(400);
-    // Soft reset of the cmd+data lines (bit3 must stay set, sprd).
-    w8(SDHCI_SOFTWARE_RESET, 0x01 | 0x02 | 0x08);
-    if (!waitBits8(SDHCI_SOFTWARE_RESET, 0x03, 0, 100000, 10)) {
-      elog("NativeEmmc: host soft reset did not clear (0x%x)\n", r8(SDHCI_SOFTWARE_RESET));
-      return false;
-    }
     // 400 kHz from the 26 MHz sprd base: SDHCI v3 divider base/(div*10):
     // div = 26e6/(400k*10) = 6.5 -> 7 (371 kHz, within spec tolerance).
     w16(SDHCI_CLOCK_CONTROL, 0);
@@ -522,108 +516,6 @@ bool NativeEmmc::start(IOService *provider)
         }
         }
       }
-
-  // k204: stepwise cold-path attribution. The inherited LK state ENGAGES the data
-  // engine (k143+); the cold path never does (k197+ PSTATE frozen). Apply the cold
-  // steps ONE AT A TIME onto the live inherited state, probing after each, to find
-  // which step kills the engine. Runs BEFORE the k194 PMIC cycle.
-  {
-    IOBufferMemoryDescriptor *b204 = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
-        kernel_task, kIODirectionInOut, 8192, 0x7FFFF000ull);
-    if (b204) {
-      b204->prepare();
-      uint32_t *d204 = (uint32_t *)(b204->getBytesNoCopy());
-      IOByteCount bl204 = 0;
-      uint64_t pa204 = (uint64_t)b204->getPhysicalSegment(0, &bl204);
-      uint32_t resp204[4] = {0, 0, 0, 0};
-
-      #define K204PROBE(TAG) do { \
-        d204[0] = 0xCAFE0000u; d204[1] = 0xCAFE0000u; \
-        for (uint64_t la = (uint64_t)d204 & ~63ull; la < (uint64_t)d204 + 512; la += 64) \
-          __asm__ volatile ("dc cvac, %0" :: "r"(la)); \
-        w32(0x30, 0xFFFFFFFFu); \
-        w16(0x04, 0x0200u); w32(0x00, 1); w8(0x28, 0x20u); \
-        w32(0x58, (uint32_t)pa204); w32(0x5C, 0); \
-        w32(0x08, 0x00010000u); \
-        w16(0x0E, (17u << 8) | 0x3Au); \
-        uint32_t st_ = 0, sp_ = 0; \
-        while (sp_ < 3000000u) { st_ = r32(0x30); if (st_ & (0x1u | 0xFFFF0000u)) break; sp_++; } \
-        __asm__ volatile ("dsb sy" ::: "memory"); \
-        __asm__ volatile ("ic ivau, %0" :: "r"(d204) : "memory"); \
-        elog("e5-emmc: k204 %s st %08x r1 %08x d0 %08x ps %08x bc %08x sp %u\n", \
-             TAG, st_, r32(0x10), d204[0], r32(0x24), r32(0x22C), sp_); \
-        cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204); \
-        w32(0x30, 0xFFFFFFFFu); \
-      } while (0)
-
-      K204PROBE("A-inherit");
-      cmd(0, 0, 0, resp204);
-      for (uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
-      K204PROBE("B-cmd0");
-      { uint32_t ocr_ = 0;
-        for (int t_ = 0; t_ < 40; t_++) {
-          cmd(1, 0x40ff8080u, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
-          ocr_ = resp204[0];
-          if (ocr_ & 0x80000000u) break;
-          IOSleep(20);
-        }
-        elog("e5-emmc: k204 enum ocr %08x\n", ocr_); }
-      { uint32_t cid_[4]; cmd(2, 0, 0, cid_); }
-      { uint32_t rca_ = 0;
-        cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
-        rca_ = resp204[0] >> 16;
-        this->rca = rca_;
-        cmd(7, rca_ << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
-        cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
-        elog("e5-emmc: k204 enum rca %04x r1 %08x\n", rca_, resp204[0]); }
-      K204PROBE("C-enum");
-      w8(0x2F, 0x7);
-      for (uint32_t jj = 0; jj < 400000; jj++) { (void)r32(0x24); }
-      w32(0x2C, 0x080E0707u);
-      for (uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
-      cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
-      K204PROBE("D-reset");
-      w32(0x2C, 0x080E0000u);
-      for (uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
-      w32(0x2C, 0x080E0707u);
-      for (uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
-      cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
-      K204PROBE("E-clkdance");
-      { IOMemoryDescriptor *amdF = IOMemoryDescriptor::withAddressRange(0x64400000ull, 0x40000ull, kIODirectionNone, NULL);
-        IOMemoryMap *amapF = amdF ? amdF->map() : NULL;
-        if (amapF) {
-          volatile uint32_t *adiF = (volatile uint32_t *)(amapF->getVirtualAddress());
-          auto frd = [&adiF](uint32_t r) -> uint32_t {
-            adiF[0x28 / 4] = r;
-            for (uint32_t ii = 0; ii < 100000u; ii++) { uint32_t v = adiF[0x2C / 4]; if (!(v & 0x80000000u)) return v & 0xFFFFu; }
-            return 0xDEADu; };
-          auto fwr = [&adiF](uint32_t r, uint32_t v) {
-            for (uint32_t ii = 0; ii < 10000u; ii++) { if (!(adiF[0x30 / 4] & 0x800u)) break; }
-            *(volatile uint32_t *)((uintptr_t)adiF + 0x20000ull + r) = v; };
-          uint32_t pdF = frd(0x21A0u);
-          fwr(0x21A0u, pdF | 1u);
-          for (uint32_t ii = 0; ii < 5000000u; ii++) { (void)adiF[0x34 / 4]; }
-          fwr(0x21A0u, pdF & 0xFFFEu);
-          for (uint32_t ii = 0; ii < 1000000u; ii++) { (void)adiF[0x34 / 4]; }
-          elog("e5-emmc: k204 pmic cycled %04x->%04x\n", pdF, frd(0x21A0u));
-        } }
-      cmd(0, 0, 0, resp204);
-      for (uint32_t jj = 0; jj < 400000; jj++) { (void)r32(0x24); }
-      { uint32_t ocr_ = 0;
-        for (int t_ = 0; t_ < 40; t_++) {
-          cmd(1, 0x40ff8080u, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
-          ocr_ = resp204[0];
-          if (ocr_ & 0x80000000u) break;
-          IOSleep(20); } }
-      { uint32_t cid_[4]; cmd(2, 0, 0, cid_); }
-      { cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204); this->rca = resp204[0] >> 16;
-        cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
-        cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204); }
-      K204PROBE("F-pmicenum");
-      #undef K204PROBE
-      b204->complete();
-    }
-  }
 
   // k194: PMIC VDDEMMCCORE power cycle. HS400ES has no CMD6 exit (JEDEC); VCC
   // power cycle cold-boots the card into legacy mode. UMP9620 PMIC via ADI r5p0
