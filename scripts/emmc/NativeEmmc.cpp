@@ -419,6 +419,13 @@ class NativeEmmc : public IOBlockStorageDevice {
           };
           // k168: U-Boot live-state verbatim via driver accessors (mapped regs)
           static const uint32_t ubLba[3] = { 0x00010000u, 0x00000000u, 0x00010000u };
+          {
+            // k171: card must be HS to match U-Boot host residue (cmd0 dropped it)
+            uint32_t rb[4];
+            cmd(6, 0x0300B901u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);  // EXT_CSD[185]=1 HS
+            elog("e5-emmc: k171 hs r1 %08x\n", rb[0]);
+            cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+          }
           w32(0x200, 0xA0000102u);            // DLL CFG
           w32(0x204, 0x3434B760u);            // DLL_DLY calibrated
           w32(0x208, 0x00202000u);            // DLL_DLY_OFFSET bit5|21
@@ -430,6 +437,16 @@ class NativeEmmc : public IOBlockStorageDevice {
                r8(0x28), r32(0x2C), r32(0x200), r32(0x204), r32(0x208));
           for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
             const char *tg = (vi == 0) ? "UBOOT1 " : ((vi == 1) ? "UBOOT2 " : "UBOOT3 ");
+            if (vi != 0) {   // k171: unstick card between attempts
+              uint32_t rb2[4];
+              w32(0x30, 0xFFFFFFFFu);
+              w16(0x0C, 0); w16(0x0E, (12 << 8) | 0x03u | 0x08u | 0x10u);
+              for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (r32(0x30) & 0x01u) break; }
+              for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
+              cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb2);
+              cmd(6, 0x0300B901u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb2);  // re-HS after reset?
+              cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb2);
+            }
             uint32_t *d = (uint32_t *)((uint8_t *)dt + 0x100u * (vi + 1));
             for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u + vi;
             for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
