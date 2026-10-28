@@ -707,7 +707,7 @@ bool NativeEmmc::start(IOService *provider)
           w16(0x04, 0x0200u); w32(0x00, 1); w16(0x0C, 0x0010u);   // TM read PIO
           w32(0x08, 0u); w16(0x0E, (17u << 8) | 0x3Au);
           uint32_t ps[10];
-          for (uint32_t i = 0; i < 10; i++) { ps[i] = r32(0x24); for (volatile uint32_t j=0;j<2000;j++){} }
+          for (uint32_t i = 0; i < 10; i++) { ps[i] = r32(0x24); for (uint32_t j=0;j<2000;j++){ (void)r32(0x24); } }
           elog("e5-emmc: k189 pio pstate %08x %08x %08x %08x %08x\n", ps[0],ps[2],ps[4],ps[6],ps[8]);
           w32(0x30, 0xFFFFFFFFu);
           // CMD24 WRITE probe (never tested): write sector 0x8000 with marker
