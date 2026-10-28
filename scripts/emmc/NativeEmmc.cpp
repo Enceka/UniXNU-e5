@@ -719,6 +719,7 @@ bool NativeEmmc::start(IOService *provider)
           for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
           uint32_t rp9[4]; cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rp9);
         }
+      }
         bool won = false;
         static const uint16_t sw[20] = { 0x0060,0x2060,0x4060,0x6060,0x8060,0xA060,0xC060,0xE060,
                                          0xB700,0xB720,0xB740,0xB760,0xB780,0xB7A0,0xB7C0,0xB7E0,
