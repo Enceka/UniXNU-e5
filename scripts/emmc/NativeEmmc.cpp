@@ -426,10 +426,17 @@ class NativeEmmc : public IOBlockStorageDevice {
             elog("e5-emmc: k171 hs r1 %08x\n", rb[0]);
             cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
           }
+          // k172: DLL relock dance (sprd: clock off -> set DLL -> stable -> on -> wait lock)
+          w32(0x2C, 0x080E0206u);             // clock OFF (keep divisor, drop bit0)
           w32(0x200, 0xA0000102u);            // DLL CFG
-          w32(0x204, 0x3434B760u);            // DLL_DLY calibrated
+          w32(0x204, 0x3434B760u);            // DLL_DLY calibrated (LK live)
           w32(0x208, 0x00202000u);            // DLL_DLY_OFFSET bit5|21
-          w32(0x02C, 0x080E0207u);            // CLOCK_CONTROL
+          for (volatile uint32_t q = 0; q < 60000 * 20; q = q + 1) {}
+          w32(0x2C, 0x080E0207u);             // clock ON
+          for (uint32_t q = 0; q < 60000 * 60; q = q + 1) {
+            if (r32(0x210) & 0x2u) break;     // DLL LOCKED bit
+          }
+          elog("e5-emmc: k172 dll sts %08x\n", r32(0x210));
           w8(0x28, 0x20u);                    // HC: SDMA select + vendor bit5
           w32(0x034, 0x027F000Bu);
           w32(0x038, 0x027F000Bu);
