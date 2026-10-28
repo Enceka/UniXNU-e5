@@ -410,12 +410,13 @@ class NativeEmmc : public IOBlockStorageDevice {
     w8(0x28, 0x20u);
     w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
     w32(0x08, 0x00010000u);
+    w16(0x0C, 0x0013u);   // k209: TRANSFER_MODE = DMA_EN|BLK_CNT_EN|READ
     w16(0x0E, (17u << 8) | 0x3Au);
     uint32_t st = 0, sp = 0;
     while (sp < 3000000u) { st = r32(0x30); if (st & (0x1u | 0xFFFF0000u)) break; sp++; }
     __asm__ volatile ("dsb sy" ::: "memory");
     __asm__ volatile ("ic ivau, %0" :: "r"(d) : "memory");
-    elog("e5-emmc: k208 P1 st %08x tc %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
+    elog("e5-emmc: k209 P1 st %08x tc %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
          st, r32(0x34), r32(0x10), d[0], d[1], r32(0x24), r32(0x22C));
     w32(0x30, 0xFFFFFFFFu);
 
@@ -430,12 +431,13 @@ class NativeEmmc : public IOBlockStorageDevice {
     w16(0x06, 0); w16(0x00, 1); w16(0x04, 0x0200u);
     w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
     w32(0x08, 0x00010000u);
+    w16(0x0C, 0x0013u);   // k209: TRANSFER_MODE
     w16(0x0E, (17u << 8) | 0x3Au);
     st = 0; sp = 0;
     while (sp < 3000000u) { st = r32(0x30); if (st & (0x2u | 0xFFFF0000u)) break; sp++; }
     __asm__ volatile ("dsb sy" ::: "memory");
     __asm__ volatile ("ic ivau, %0" :: "r"(d) : "memory");
-    elog("e5-emmc: k208 P2 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
+    elog("e5-emmc: k209 P2 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
          st, r32(0x10), d[0], d[1], r32(0x24), r32(0x22C));
     w32(0x30, 0xFFFFFFFFu);
 
@@ -448,12 +450,13 @@ class NativeEmmc : public IOBlockStorageDevice {
     w16(0x06, 0); w16(0x00, 1); w16(0x04, 0x0200u);
     w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
     w32(0x08, 0x00010000u);
+    w16(0x0C, 0x0013u);   // k209: TRANSFER_MODE
     w16(0x0E, (17u << 8) | 0x3Au);
     st = 0; sp = 0;
     while (sp < 3000000u) { st = r32(0x30); if (st & (0x2u | 0xFFFF0000u)) break; sp++; }
     __asm__ volatile ("dsb sy" ::: "memory");
     __asm__ volatile ("ic ivau, %0" :: "r"(d) : "memory");
-    elog("e5-emmc: k208 P3 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
+    elog("e5-emmc: k209 P3 st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x\n",
          st, r32(0x10), d[0], d[1], r32(0x24), r32(0x22C));
     w32(0x30, 0xFFFFFFFFu);
     bmd->complete();
