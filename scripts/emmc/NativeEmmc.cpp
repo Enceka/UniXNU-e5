@@ -401,22 +401,28 @@ class NativeEmmc : public IOBlockStorageDevice {
         for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
           __asm__ volatile ("dc cvac, %0" :: "r"(la));
         w32(0x30, 0xFFFFFFFFu);
+        // k198: v4-correct count ritual (LTS sdhci_set_block_info): clear legacy
+        // count, load via w16(0x00). LK-live style: blksz=0x200 plain, HC=0x20,
+        // TM=0x3 (LK's actual last-read value, no read-direction bit).
+        w16(0x06, 0);
+        w16(0x00, 1);
+        w16(0x04, 0x0200u);
+        w8(0x28, 0x20u);              // HC: LK-live DMA select
         w32(0x58, (uint32_t)bdva); w32(0x5C, 0);
-        w16(0x04, 0x7200u);          // blksz 512 | SDMA boundary
-        w32(0x00, 1);                 // 32-bit count (U-Boot v4)
+        w8(0x0C, 0x3);                 // TM: LK-live 0x3
         w32(0x08, 0x00010000u);       // sector 0x10000
-        w32(0x0C, 0x113A0003u);       // cmd17 | 0x3A flags | TM 0x3
-        uint32_t st197 = 0, tc197 = 0;
+        w16(0x0E, (17u << 8) | 0x3Au);
+        uint32_t st198 = 0, tc198 = 0;
         for (uint32_t n = 0; n < 60000u * 30; n = n + 1) {
-          st197 = r32(0x30);
-          if ((st197 & 0x02u) || (st197 & 0xFFFF0000u)) break;
+          st198 = r32(0x30);
+          if ((st198 & 0x02u) || (st198 & 0xFFFF0000u)) break;
         }
-        tc197 = r32(0x3C);
+        tc198 = r32(0x3C);
         for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
           __asm__ volatile ("dc ivac, %0" :: "r"(la));
         __asm__ volatile ("dsb sy" ::: "memory");
-        elog("e5-emmc: k197 pristine sdma st %08x tc %08x r1 %08x d0 %08x d1 %08x bc %08x v220 %08x v260 %08x\n",
-             st197, tc197, r32(0x10), d[0], d[1], r32(0x22C), r32(0x220), r32(0x260));
+        elog("e5-emmc: k198 v4count sdma st %08x tc %08x r1 %08x d0 %08x d1 %08x bc %08x b04 %08x hc %02x\n",
+             st198, tc198, r32(0x10), d[0], d[1], r32(0x22C), r32(0x04), r8(0x28));
         w32(0x30, 0xFFFFFFFFu);
         bmd->complete();
         bmd->release();
