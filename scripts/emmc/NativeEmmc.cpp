@@ -994,7 +994,7 @@ bool NativeEmmc::start(IOService *provider)
 
       K204PROBE("A-inherit");
       cmd(0, 0, 0, resp204);
-      for (volatile uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
+      for (uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
       K204PROBE("B-cmd0");
       { uint32_t ocr_ = 0;
         for (int t_ = 0; t_ < 4000; t_++) {
@@ -1014,15 +1014,15 @@ bool NativeEmmc::start(IOService *provider)
         elog("e5-emmc: k204 enum rca %04x r1 %08x\n", rca_, resp204[0]); }
       K204PROBE("C-enum");
       w8(0x2F, 0x7);
-      for (volatile uint32_t jj = 0; jj < 400000; jj++) { (void)r32(0x24); }
+      for (uint32_t jj = 0; jj < 400000; jj++) { (void)r32(0x24); }
       w32(0x2C, 0x080E0707u);
-      for (volatile uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
+      for (uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
       cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
       K204PROBE("D-reset");
       w32(0x2C, 0x080E0000u);
-      for (volatile uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
+      for (uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
       w32(0x2C, 0x080E0707u);
-      for (volatile uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
+      for (uint32_t jj = 0; jj < 200000; jj++) { (void)r32(0x24); }
       cmd(7, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
       K204PROBE("E-clkdance");
       { IOMemoryDescriptor *amdF = IOMemoryDescriptor::withAddressRange(0x64400000ull, 0x40000ull, kIODirectionNone, NULL);
@@ -1044,7 +1044,7 @@ bool NativeEmmc::start(IOService *provider)
           elog("e5-emmc: k204 pmic cycled %04x->%04x\n", pdF, frd(0x21A0u));
         } }
       cmd(0, 0, 0, resp204);
-      for (volatile uint32_t jj = 0; jj < 400000; jj++) { (void)r32(0x24); }
+      for (uint32_t jj = 0; jj < 400000; jj++) { (void)r32(0x24); }
       { uint32_t ocr_ = 0;
         for (int t_ = 0; t_ < 4000; t_++) {
           cmd(1, 0x40ff8080u, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp204);
