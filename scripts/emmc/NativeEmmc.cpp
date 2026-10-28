@@ -688,41 +688,35 @@ bool NativeEmmc::start(IOService *provider)
         const uint32_t lkbase = 0x3434B760u;   // LK live DLL_DLY (E5MM)
         // k178: exit HS400ES — card side to legacy SDR + 1-bit, then re-read
         {
-          // k180: PIO port read — engine may never engage DMA; data lives in BUFFER_DATA_PORT
-        for (uint32_t hv = 0; hv < 2; hv = hv + 1) {
-          uint8_t hc = (hv == 0) ? 0x20u : 0x00u;
-          const char *nm = (hv == 0) ? "PIO20" : "PIO00";
+          // k185: stream-capture the BUFFER_DATA_PORT during cmd8/cmd17 - grab
+        // whatever flows regardless of CRC status (k153 saw real data in 0x20/0x24)
+        for (uint32_t v8 = 0; v8 < 3; v8 = v8 + 1) {
+          const char *nm = (v8 == 0) ? "P8A" : ((v8 == 1) ? "P8B" : "P17");
           for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
-          for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
-            __asm__ volatile ("dc cvac, %0" :: "r"(la));
-          w8(0x28, hc);
+          w8(0x28, 0x00u);
           w32(0x30, 0xFFFFFFFFu);
           w16(0x04, 0x0200u);
           w32(0x00, 1);
-          w32(0x08, 0x00010000u);
-          w32(0x0C, 0x113A0003u);   // cmd17, no DMA bits: BCNT_EN|READ|DATA_PRESENT
-          uint32_t brdy = 0;
-          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-            brdy = r32(0x24);
-            if ((brdy & 0x800u) || (r32(0x30) & 0xFFFF0000u)) break;   // bit11 BUF_READ_READY
+          w32(0x08, (v8 == 2) ? 0x00030000u : 0x00000000u);
+          w16(0x0C, 0); w16(0x0E, ((v8 == 2) ? 17u : 8u) << 8 | 0x3Au);   // DATA present, PIO
+          uint32_t cap = 0;
+          for (uint32_t t = 0; t < 60000u * 80u && cap < 128; t = t + 1) {
+            uint32_t ps = r32(0x24);
+            if (ps & 0x00000800u) {            // BUF_READ_READY bit11
+              d[cap] = r32(0x20); cap = cap + 1;
+            }
+            if (r32(0x30) & 0xFFFF0000u) break;
           }
-          for (uint32_t i = 0; i < 128; i = i + 1) d[i] = r32(0x20);
-          uint32_t stx = 0;
-          for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
-            stx = r32(0x30);
-            if ((stx & 0x02u) || (stx & 0xFFFF0000u)) break;
-          }
-          elog("e5-emmc: k180 %s pstate %08x st %08x d0 %08x d1 %08x d2 %08x d3 %08x\n",
-               nm, brdy, stx, d[0], d[1], d[2], d[3]);
-          if (d[0] != 0xCAFE0000u && d[0] != 0) {
-            elog("e5-emmc: k180 WIN %s d0 %08x d1 %08x d2 %08x d3 %08x\n", nm, d[0], d[1], d[2], d[3]);
+          elog("e5-emmc: k185 %s cap %u st %08x d0 %08x d1 %08x d2 %08x d3 %08x\n",
+               nm, cap, r32(0x30), d[0], d[1], d[2], d[3]);
+          if (cap > 16 && d[0] != 0 && d[0] != 0xCAFE0000u) {
+            elog("e5-emmc: k185 WIN %s cap %u d0 %08x d1 %08x d2 %08x d3 %08x\n", nm, cap, d[0], d[1], d[2], d[3]);
             break;
           }
           w32(0x30, 0xFFFFFFFFu);
           w16(0x0C, 0); w16(0x0E, (12u << 8) | 0x1Bu);
           for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (r32(0x30) & 0x01u) break; }
           for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
-          uint32_t rp9[4]; cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rp9);
         }
       }
         bool won = false;
