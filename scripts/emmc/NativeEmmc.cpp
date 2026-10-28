@@ -410,6 +410,13 @@ class NativeEmmc : public IOBlockStorageDevice {
         if (bmd) {
           uint32_t *dt = (uint32_t *)bmd->getBytesNoCopy();
           uint64_t dva = bmd->getPhysicalAddress();
+          // k158: DMA buffer non-coherent — invalidate dcache lines before reading
+          auto invRange = [](volatile void *p, uint32_t n) {
+            uint64_t a = ((uint64_t)p) & ~63ull;
+            uint64_t e = ((uint64_t)p) + n;
+            for (; a < e; a += 64) __asm__ volatile ("dc ivac, %0" :: "r"(a));
+            __asm__ volatile ("dsb sy" ::: "memory");
+          };
           // k165: U-Boot live-state verbatim (E5MM snapshot) — SDMA path
           static const struct { const char *tag; uint32_t lba; } uvars[3] = {
             { "UBOOT1 ", 0x00010000u },  // the LBA U-Boot last read
