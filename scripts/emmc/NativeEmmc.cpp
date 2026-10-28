@@ -717,7 +717,7 @@ bool NativeEmmc::start(IOService *provider)
             __asm__ volatile ("dc cvac, %0" :: "r"(la));
           w32(0x30, 0xFFFFFFFFu);
           w16(0x04, 0x0200u); w32(0x00, 1);
-          w32(0x58, (uint32_t)((uint64_t)dpa & 0xFFFFFFFFull)); w32(0x5C, 0);
+          w32(0x58, (uint32_t)(dva2 + 0x100u)); w32(0x5C, 0);
           w32(0x08, 0u);                                  // sector 0
           w16(0x0C, 0x0003u); w16(0x0E, (17u << 8) | 0x3Au);
           uint32_t stx = 0, i1;
