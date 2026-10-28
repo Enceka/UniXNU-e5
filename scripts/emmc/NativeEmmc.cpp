@@ -430,7 +430,6 @@ class NativeEmmc : public IOBlockStorageDevice {
           w8(0x28, 0x20u);                    // HC: SDMA select + vendor bit5
           w32(0x034, 0x027F000Bu);            // INT_ENABLE (U-Boot)
           w32(0x038, 0x027F000Bu);            // SIGNAL_ENABLE
-          w32(0x03C, 0x30000000u);            // FORCE_EVENT residue (bit28|29)
           elog("e5-emmc: ub-state hc %02x clk %08x dll %08x dly %08x off %08x\n",
                r8(0x28), r32(0x2C), r32(0x200), r32(0x204), r32(0x208));
           for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
