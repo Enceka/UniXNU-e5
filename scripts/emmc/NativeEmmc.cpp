@@ -712,7 +712,7 @@ bool NativeEmmc::start(IOService *provider)
           __asm__ volatile ("dc cvac, %0" :: "r"(la));
         __asm__ volatile ("dsb sy" ::: "memory");
         uint32_t bdva = dva2 + 0x100u;
-        const uint32_t lkbase = 0x3434B760u;   // LK live DLL_DLY (E5MM)
+        // lkbase retired with k177 sweep
         // k178: exit HS400ES — card side to legacy SDR + 1-bit, then re-read
         {
           // k189: post-enum 400k clean ladder + write/multi/raw-DAT probes.
