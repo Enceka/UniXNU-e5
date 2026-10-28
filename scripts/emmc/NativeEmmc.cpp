@@ -275,6 +275,48 @@ class NativeEmmc : public IOBlockStorageDevice {
   }
 
   bool cardInit() {
+    // k173: LK live-state inheritance — if LK left a verified-good cmd17 state, use it untouched
+        if ((r32(0x10) & 0x1F00u) == 0x0900u && (r8(0x28) & 0x20u) && (r32(0x0C) & 0xFF000000u) == 0x0D000000u) {
+          elog("e5-emmc: k173 LK-live inherit (rsp %08x cmd %08x)\n", r32(0x10), r32(0x0C));
+          IOBufferMemoryDescriptor *bmd2 = IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task, 8192, 0x1000);
+          IOPhysicalAddress dva2 = bmd2->getPhysicalAddress();
+          uint32_t *dt2 = (uint32_t *)bmd2->getBytesNoCopy();
+          for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
+            const char *tg = (vi == 0) ? "LIVE1  " : ((vi == 1) ? "LIVE2  " : "LIVE3  ");
+            uint32_t *d = (uint32_t *)((uint8_t *)dt2 + 0x100u * (vi + 1));
+            for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u + vi;
+            for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+              __asm__ volatile ("dc cvac, %0" :: "r"(la));
+            __asm__ volatile ("dsb sy" ::: "memory");
+            uint32_t bdva = dva2 + 0x100u * (vi + 1);
+            w32(0x30, 0xFFFFFFFFu);
+            w16(0x04, 0x0200u);
+            w32(0x00, 1);
+            w32(0x58, bdva); w32(0x5C, 0);
+            w32(0x08, 0x00010000u + vi);
+            w32(0x0C, 0x113A0003u);   // cmd17 SDMA TM=3 (U-Boot verbatim)
+            for (uint32_t w = 0; w < 60000 * 40; w = w + 1) { if (!(r32(0x24) & 0x2u)) break; }
+            uint32_t stx = 0;
+            for (uint32_t w = 0; w < 60000 * 200; w = w + 1) {
+              stx = r32(0x30);
+              if ((stx & 0x02u) || (stx & 0xFFFF0000u)) break;
+            }
+            uint32_t stc = r32(0x30) >> 16;
+            for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+              __asm__ volatile ("dc ivac, %0" :: "r"(la));
+            __asm__ volatile ("dsb sy" ::: "memory");
+            elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x sdma %08x blkc %08x/%08x\n",
+                 tg, stx, stc, r32(0x10), d[0], d[1], r32(0x58), r32(0x228), r32(0x22C));
+            if (vi != 0) {
+              w32(0x30, 0xFFFFFFFFu);
+              w16(0x0C, 0); w16(0x0E, (12 << 8) | 0x1Bu);
+              for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (r32(0x30) & 0x01u) break; }
+              for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
+            }
+          }
+          OSSafeReleaseNULL(bmd2);
+          return true;
+        }
     // ---- pure JEDEC eMMC enumeration: NO extra commands between states ----
     uint32_t resp[4];
 
@@ -349,48 +391,7 @@ class NativeEmmc : public IOBlockStorageDevice {
 
   bool hsRetune = false;
   bool readExtCsd() {
-    // k173: LK live-state inheritance — if LK left a verified-good cmd17 state, use it untouched
-    if ((r32(0x10) & 0x1F00u) == 0x0900u && (r8(0x28) & 0x20u) && (r32(0x0C) & 0xFF000000u) == 0x0D000000u) {
-      elog("e5-emmc: k173 LK-live inherit (rsp %08x cmd %08x)\n", r32(0x10), r32(0x0C));
-      IOBufferMemoryDescriptor *bmd2 = IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task, 8192, 0x1000);
-      IOPhysicalAddress dva2 = bmd2->getPhysicalAddress();
-      uint32_t *dt2 = (uint32_t *)bmd2->getBytesNoCopy();
-      for (uint32_t vi = 0; vi < 3; vi = vi + 1) {
-        const char *tg = (vi == 0) ? "LIVE1  " : ((vi == 1) ? "LIVE2  " : "LIVE3  ");
-        uint32_t *d = (uint32_t *)((uint8_t *)dt2 + 0x100u * (vi + 1));
-        for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u + vi;
-        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
-          __asm__ volatile ("dc cvac, %0" :: "r"(la));
-        __asm__ volatile ("dsb sy" ::: "memory");
-        uint32_t bdva = dva2 + 0x100u * (vi + 1);
-        w32(0x30, 0xFFFFFFFFu);
-        w16(0x04, 0x0200u);
-        w32(0x00, 1);
-        w32(0x58, bdva); w32(0x5C, 0);
-        w32(0x08, 0x00010000u + vi);
-        w32(0x0C, 0x113A0003u);   // cmd17 SDMA TM=3 (U-Boot verbatim)
-        for (uint32_t w = 0; w < 60000 * 40; w = w + 1) { if (!(r32(0x24) & 0x2u)) break; }
-        uint32_t stx = 0;
-        for (uint32_t w = 0; w < 60000 * 200; w = w + 1) {
-          stx = r32(0x30);
-          if ((stx & 0x02u) || (stx & 0xFFFF0000u)) break;
-        }
-        uint32_t stc = r32(0x30) >> 16;
-        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
-          __asm__ volatile ("dc ivac, %0" :: "r"(la));
-        __asm__ volatile ("dsb sy" ::: "memory");
-        elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x sdma %08x blkc %08x/%08x\n",
-             tg, stx, stc, r32(0x10), d[0], d[1], r32(0x58), r32(0x228), r32(0x22C));
-        if (vi != 0) {
-          w32(0x30, 0xFFFFFFFFu);
-          w16(0x0C, 0); w16(0x0E, (12 << 8) | 0x1Bu);
-          for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (r32(0x30) & 0x01u) break; }
-          for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
-        }
-      }
-      OSSafeReleaseNULL(bmd2);
-      return true;
-    }
+    
     // CMD8 SEND_EXT_CSD: 512-byte single-block read. Try PIO then SDMA.
     if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT | PSTATE_DAT_INHIBIT, 0, 5000, 10)) return false;
     w32(SDHCI_INT_ENABLE, 0xFFFFFFFFu);
