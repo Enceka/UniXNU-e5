@@ -695,7 +695,7 @@ bool NativeEmmc::start(IOService *provider)
           w16(0x04, 0x0200u);
           w32(0x00, 1);
           w32(0x08, 0x00010000u);
-          w32(0x0C, 0x023A0003u);   // no DMA bits: BCNT_EN|READ|DATA_PRESENT
+          w32(0x0C, 0x113A0003u);   // cmd17, no DMA bits: BCNT_EN|READ|DATA_PRESENT
           uint32_t brdy = 0;
           for (uint32_t w = 0; w < 60000 * 60; w = w + 1) {
             brdy = r32(0x24);
