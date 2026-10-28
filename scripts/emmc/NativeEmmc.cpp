@@ -468,6 +468,50 @@ class NativeEmmc : public IOBlockStorageDevice {
           elog("e5-emmc: k200 s%u ps %08x bc %08x\n", q, psB[q], bcB[q]);
         elog("e5-emmc: k200 vnd %08x %08x %08x %08x %08x %08x %08x\n",
              r32(0x200), r32(0x204), r32(0x208), r32(0x210), r32(0x220), r32(0x22C), r32(0x3C));
+        // k201: persona variants on the cold card — (A) HC2=0x3000 (LK bit13),
+        // (B) + U-Boot INT trio, (C) + LK clock + LK INT values.
+        {
+          struct { const char *tag; uint32_t hc2; bool trioU; bool trioL; bool lkclk; } vs[3] = {
+            {"A", 0x3000u, false, false, false},
+            {"B", 0x3000u, true,  false, false},
+            {"C", 0x3000u, false, true,  true },
+          };
+          for (int v = 0; v < 3; v = v + 1) {
+            for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
+            for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+              __asm__ volatile ("dc cvac, %0" :: "r"(la));
+            w32(0x30, 0xFFFFFFFFu);
+            w16(0x3E, (uint16_t)vs[v].hc2);
+            if (vs[v].trioU) {
+              w32(0x3C, r32(0x3C) | 0x20000000u);
+              w32(0x34, 0x027F003Bu);
+              w32(0x38, 0x027F803Bu);
+            }
+            if (vs[v].trioL) {
+              w32(0x3C, r32(0x3C) | 0x30000000u);
+              w32(0x34, 0x027F000Bu);
+              w32(0x38, 0x027F000Bu);
+            }
+            if (vs[v].lkclk) w32(0x2C, 0x080E0207u);
+            w16(0x06, 0);
+            w16(0x00, 1);
+            w16(0x04, 0x0200u);
+            w8(0x28, 0x20u);
+            w32(0x58, (uint32_t)bdva); w32(0x5C, 0);
+            w8(0x0C, 0x3);
+            w32(0x08, 0x00010000u);
+            w16(0x0E, (17u << 8) | 0x3Au);
+            uint32_t stv = 0; uint32_t psA[8] = {0}; uint32_t pa = 0;
+            for (uint32_t n = 0; n < 60000u * 10; n = n + 1) {
+              if ((n & 0xFFFFu) == 0 && pa < 8) { psA[pa] = r32(0x24); pa = pa + 1; }
+              stv = r32(0x30);
+              if ((stv & 0x02u) || (stv & 0xFFFF0000u)) break;
+            }
+            elog("e5-emmc: k201 %s st %08x r1 %08x d0 %08x hc2 %04x ps0 %08x ps7 %08x bc %08x\n",
+                 vs[v].tag, stv, r32(0x10), d[0], r16(0x3E), psA[0], (pa ? psA[pa-1] : 0), r32(0x22C));
+          }
+        }
+
         for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
           __asm__ volatile ("dc ivac, %0" :: "r"(la));
         __asm__ volatile ("dsb sy" ::: "memory");
