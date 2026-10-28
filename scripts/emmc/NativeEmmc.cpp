@@ -471,18 +471,19 @@ class NativeEmmc : public IOBlockStorageDevice {
         // k203: CLKCTRL isolation - LK runs SDCLKFS=2, our cold hostInit leaves FS=7
     {
       const uint32_t fs[3]={0x080E0107u,0x080E0207u,0x080E0407u};
+      uint32_t rb3[4]={0,0,0,0};
       for(int fi=0; fi<3; fi++){
         w32(0x2C, fs[fi]);
-        for (volatile uint32_t j=0;j<200000;j++){ (void)r32(0x24); }
-        w32(0x58, dva); w32(0x5C, 0);
-        w16(0x04, 0x0200);
+        for (uint32_t j=0;j<200000;j++){ (void)r32(0x24); }
+        w32(0x58, (uint32_t)bdva); w32(0x5C, 0);
+        w16(0x04, 0x0200u);
         w32(0x00, 1);
         w32(0x08, 0x10000);
-        w32(0x0C, 0x113A0003u);
+        w16(0x0E, (17u << 8) | 0x3Au);
         uint32_t st=0, spins=0;
-        while (spins<3000000) { st=r32(0x30); if (st & (0x1u|0xFFFF0000u)) break; spins++; }
+        while (spins<3000000u) { st=r32(0x30); if (st & (0x1u|0xFFFF0000u)) break; spins++; }
         uint32_t bc=r32(0x22C), ps0=r32(0x24);
-        elog("e5-emmc: k203 fs%x st %08x r1 %08x d0 %08x ps0 %08x bc %08x\n", fs[fi]&0xFFFF, st, r32(0x10), ((volatile uint32_t*)dva)[0], ps0, bc);
+        elog("e5-emmc: k203 fs%x st %08x r1 %08x d0 %08x ps0 %08x bc %08x\n", fs[fi]&0xFFFF, st, r32(0x10), d[0], ps0, bc);
         w32(0x30, 0xFFFFFFFFu);
         cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb3); cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb3);
       }
