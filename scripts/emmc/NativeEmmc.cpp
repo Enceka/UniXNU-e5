@@ -683,18 +683,17 @@ bool NativeEmmc::start(IOService *provider)
         const uint32_t lkbase = 0x3434B760u;   // LK live DLL_DLY (E5MM)
         // k178: exit HS400ES — card side to legacy SDR + 1-bit, then re-read
         {
-          w32(0x30, 0xFFFFFFFFu);
-          w16(0x0C, 0); w16(0x0E, (6u << 8) | 0x3Bu); w32(0x08, 0x0300B900u);   // EXT_CSD[185]=0 legacy
-          for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (r32(0x30) & (0x01u | 0x8000u)) break; }
-          elog("e5-emmc: k178 hs0 r1 %08x st %08x\n", r32(0x10), r32(0x30));
-          for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
-          w32(0x30, 0xFFFFFFFFu);
-          w16(0x0C, 0); w16(0x0E, (6u << 8) | 0x3Bu); w32(0x08, 0x0300B701u);   // EXT_CSD[183]=1 1-bit
-          for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (r32(0x30) & (0x01u | 0x8000u)) break; }
-          elog("e5-emmc: k178 bw1 r1 %08x st %08x\n", r32(0x10), r32(0x30));
-          for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
-          uint32_t rb16[4]; cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb16);
-          elog("e5-emmc: k178 cmd16 %08x\n", rb16[0]);
+          // k179: JEDEC stepwise exit — HS_TIMING=1 (SDR) first, then BUS_WIDTH=1
+          for (uint32_t st_i = 0; st_i < 3; st_i = st_i + 1) {
+            uint32_t arg = (st_i == 0) ? 0x0300B901u : ((st_i == 1) ? 0x0300B701u : 0x0300B900u);
+            const char *nm = (st_i == 0) ? "hs1" : ((st_i == 1) ? "bw1" : "hs0");
+            w32(0x30, 0xFFFFFFFFu);
+            w16(0x0C, 0); w16(0x0E, (6u << 8) | 0x3Bu); w32(0x08, arg);
+            for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (r32(0x30) & (0x01u | 0x80u)) break; }
+            for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (!(r32(0x24) & 0x02u)) break; }
+            uint32_t rb16[4]; cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb16);
+            elog("e5-emmc: k179 %s r1 %08x cmd16 %08x\n", nm, r32(0x10), rb16[0]);
+          }
           // single read attempt at LK delay
           for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
           for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
