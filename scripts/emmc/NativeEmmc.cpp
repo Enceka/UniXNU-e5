@@ -385,7 +385,44 @@ class NativeEmmc : public IOBlockStorageDevice {
 
   bool hsRetune = false;
   bool readExtCsd() {
-    
+
+    // k197: FIRST data command on a pristine cold-legacy card, BEFORE any
+    // DLL re-init / CQ halt / ladder probes contaminate the host state.
+    // U-Boot-verbatim SDMA single-block read of sector 0x10000.
+    {
+      IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+          kernel_task, kIODirectionInOut, 8192, 0x7FFFF000ull);
+      if (bmd) {
+        bmd->prepare();
+        uint32_t *d = (uint32_t *)(bmd->getVirtualAddress());
+        IOByteCount blen = 0;
+        uint64_t bdva = (uint64_t)bmd->getPhysicalSegment(0, &blen);
+        for (uint32_t i = 0; i < 128; i = i + 1) d[i] = 0xCAFE0000u;
+        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+          __asm__ volatile ("dc cvac, %0" :: "r"(la));
+        w32(0x30, 0xFFFFFFFFu);
+        w32(0x58, (uint32_t)bdva); w32(0x5C, 0);
+        w16(0x04, 0x7200u);          // blksz 512 | SDMA boundary
+        w32(0x00, 1);                 // 32-bit count (U-Boot v4)
+        w32(0x08, 0x00010000u);       // sector 0x10000
+        w32(0x0C, 0x113A0003u);       // cmd17 | 0x3A flags | TM 0x3
+        uint32_t st197 = 0, tc197 = 0;
+        for (uint32_t n = 0; n < 60000u * 30; n = n + 1) {
+          st197 = r32(0x30);
+          if ((st197 & 0x02u) || (st197 & 0xFFFF0000u)) break;
+        }
+        tc197 = r32(0x3C);
+        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+          __asm__ volatile ("dc ivac, %0" :: "r"(la));
+        __asm__ volatile ("dsb sy" ::: "memory");
+        elog("e5-emmc: k197 pristine sdma st %08x tc %08x r1 %08x d0 %08x d1 %08x bc %08x v220 %08x v260 %08x\n",
+             st197, tc197, r32(0x10), d[0], d[1], r32(0x22C), r32(0x220), r32(0x260));
+        w32(0x30, 0xFFFFFFFFu);
+        bmd->complete();
+        bmd->release();
+      }
+    }
+
     // CMD8 SEND_EXT_CSD: 512-byte single-block read. Try PIO then SDMA.
     if (!waitBits(SDHCI_PRESENT_STATE, PSTATE_CMD_INHIBIT | PSTATE_DAT_INHIBIT, 0, 5000, 10)) return false;
     w32(SDHCI_INT_ENABLE, 0xFFFFFFFFu);
