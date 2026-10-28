@@ -382,7 +382,6 @@ class NativeEmmc : public IOBlockStorageDevice {
         elog("e5-emmc: %s st %08x tc %08x r1 %08x d0 %08x d1 %08x sdma %08x blkc %08x/%08x\n",
              tg, stx, stc, r32(0x10), d[0], d[1], r32(0x58), r32(0x228), r32(0x22C));
         if (vi != 0) {
-          uint32_t rb3[4];
           w32(0x30, 0xFFFFFFFFu);
           w16(0x0C, 0); w16(0x0E, (12 << 8) | 0x1Bu);
           for (uint32_t n = 0; n < 60000 * 20; n = n + 1) { if (r32(0x30) & 0x01u) break; }
