@@ -683,7 +683,6 @@ bool NativeEmmc::start(IOService *provider)
         const uint32_t lkbase = 0x3434B760u;   // LK live DLL_DLY (E5MM)
         // k178: exit HS400ES — card side to legacy SDR + 1-bit, then re-read
         {
-          uint32_t rb6[4];
           w32(0x30, 0xFFFFFFFFu);
           w16(0x0C, 0); w16(0x0E, (6u << 8) | 0x3Bu); w32(0x08, 0x0300B900u);   // EXT_CSD[185]=0 legacy
           for (uint32_t n = 0; n < 60000 * 40; n = n + 1) { if (r32(0x30) & (0x01u | 0x8000u)) break; }
