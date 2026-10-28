@@ -798,12 +798,20 @@ bool NativeEmmc::start(IOService *provider)
         uint32_t vl0 = aRd(0x21A4u);
         elog("e5-emmc: k194 adi pd %04x vol %04x\n", pd0, vl0);
         aWr(0x21A0u, (pd0 & 0xFFFEu) | 1u);      // power down
-        for (uint32_t i = 0; i < 500000u; i++) { (void)adi[0x34 / 4]; }
+        for (uint32_t i = 0; i < 5000000u; i++) { (void)adi[0x34 / 4]; }  // ~1s full discharge
         uint32_t pd1 = aRd(0x21A0u);
         elog("e5-emmc: k194 pd-down %04x\n", pd1);
         aWr(0x21A0u, pd1 & 0xFFFEu);             // power up
-        for (uint32_t i = 0; i < 500000u; i++) { (void)adi[0x34 / 4]; }
+        // k195 cold boot: 50ms settle, then hostInit provides clocks; give the
+        // card its boot clocks (74 @400kHz < 1ms) before any cmd0.
+        for (uint32_t i = 0; i < 500000u; i++) { (void)adi[0x34 / 4]; }   // ~100ms
         elog("e5-emmc: k194 pd-up %04x vol %04x\n", aRd(0x21A0u), aRd(0x21A4u));
+        // pre-cmd0 boot clocks: gate sd clock off/on then idle-spin 5ms
+        w32(0x2C, 0x080E0000u);                  // int clk en only
+        for (uint32_t i = 0; i < 20000u; i++) { (void)r32(0x24); }
+        w32(0x2C, 0x080E0207u);                  // 400k sd clk on
+        for (uint32_t i = 0; i < 200000u; i++) { (void)r32(0x24); }  // ~5ms = 2000 clocks
+        elog("e5-emmc: k195 boot clocks done\n");
         amap->release();
       } else {
         elog("e5-emmc: k194 adi map fail\n");
