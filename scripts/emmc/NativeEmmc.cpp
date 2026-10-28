@@ -698,6 +698,21 @@ bool NativeEmmc::start(IOService *provider)
   if (!map) { md->release(); elog("NativeEmmc: map failed\n"); return false; }
   regs = (volatile uint32_t *)map->getVirtualAddress();
   elog("NativeEmmc: regs mapped at %p\n", (void *)regs);
+  // k192: AP pin controller state at XNU driver start (compare vs E5PIN UEFI dump)
+  {
+    IOMemoryDescriptor *pmd = IOMemoryDescriptor::withAddressRange(0x642E0000ull, 0x200, kIODirectionNone, nullptr);
+    if (pmd) {
+      IOMemoryMap *pmap = pmd->map();
+      if (pmap) {
+        volatile uint32_t *pin = (volatile uint32_t *)pmap->getVirtualAddress();
+        for (uint32_t i = 0; i < 128; i += 8)
+          elog("e5-emmc: PIN%03x %08x %08x %08x %08x %08x %08x %08x %08x\n",
+               i * 4, pin[i],pin[i+1],pin[i+2],pin[i+3],pin[i+4],pin[i+5],pin[i+6],pin[i+7]);
+        pmap->release();
+      }
+      pmd->release();
+    }
+  }
   // LK leftovers in the response file, before any of our resets:
   elog("NativeEmmc: resp0 pre %08x %08x %08x %08x\n",
         r32(SDHCI_RESPONSE), r32(SDHCI_RESPONSE+4), r32(SDHCI_RESPONSE+8), r32(SDHCI_RESPONSE+12));
