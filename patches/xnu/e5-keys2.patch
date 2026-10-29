@@ -180,7 +180,7 @@
  		cons_cinput((char)chr); /* Buffer up the character */
  	}
  
-+	e5k_poll_input(); /* E5: matrix keypad + vol-down feed the console tty */
++	/* e5k_poll_input(); E5: disabled in 244 - execution-vs-layout probe */
 +
  	clock_interval_to_deadline(16, 1000000, &next); /* Get time of pop */
  
