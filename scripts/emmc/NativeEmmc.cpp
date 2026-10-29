@@ -526,7 +526,8 @@ class NativeEmmc : public IOBlockStorageDevice {
               cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx); }
           }
         }
-        return;
+        elog("e5-emmc: k220 done\n");
+        return false;
         w32(0x30, 0xFFFFFFFFu);
         { uint32_t rbx[4]; cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx);
           cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx); }
