@@ -1,0 +1,64 @@
+--- a/osfmk/console/video_console.c
++++ b/osfmk/console/video_console.c
+@@ -443,6 +443,20 @@
+ 		gc_ops.enable(TRUE);
+ 		gc_enabled           = TRUE;
+ 		disableConsoleOutput = FALSE;
++	}
++}
++
++/*
++ * E5: force-enable the text renderer even though the serial console is the
++ * active console (boot-arg serial=3 keeps kernel printf on the UART).
++ * Called lazily by the e5-fb write hook in bsd/kern/sys_generic.c so the
++ * first userspace write to fd 230 acquires the screen.
++ */
++void
++vc_e5_acquire(void)
++{
++	if (gc_initialized && gc_enabled == FALSE) {
++		gc_enable(TRUE);
+ 	}
+ }
+ 
+--- a/bsd/kern/sys_generic.c
++++ b/bsd/kern/sys_generic.c
+@@ -697,6 +697,38 @@
+ 				e5ul[5 + nbyte] = '\0';
+ 				e5_panic_print(e5ul);
+ 				*retval = nbyte;
++				return 0;
++			}
++		}
++	}
++
++	/*
++	 * E5 framebuffer console: write(fd == 230, ...) renders the buffer on the
++	 * boot video console, and writes to fd 1/2 are mirrored there so seed
++	 * binaries print on the panel too.  vcputc paints directly through the
++	 * mapped boot framebuffer, so this works with timer interrupts off; the
++	 * serial console stays the active kernel console for debug logs.
++	 */
++	if (__improbable(nbyte > 0 && (fd == 230 || fd == 1 || fd == 2))) {
++		extern boolean_t PE_parse_boot_argn(const char *arg_string,
++		    void *arg_ptr, int max_arg);
++		extern void vc_e5_acquire(void);
++		extern void vcputc(char c);
++		if (PE_parse_boot_argn("e5-fb", NULL, 0)) {
++			char e5fb[256];
++			user_size_t e5n = nbyte > sizeof(e5fb) ? sizeof(e5fb) : nbyte;
++			if (copyin(buf, e5fb, e5n) == 0) {
++				user_size_t e5i;
++				vc_e5_acquire();
++				for (e5i = 0; e5i < e5n; e5i++) {
++					if (e5fb[e5i] == '\r') {
++						continue;
++					}
++					vcputc(e5fb[e5i]);
++				}
++			}
++			if (fd == 230) {
++				*retval = (user_ssize_t)nbyte;
+ 				return 0;
+ 			}
+ 		}

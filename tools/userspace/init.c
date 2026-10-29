@@ -108,34 +108,53 @@ int main(void){
         uplink_dec("EXIT|", (w>=0 && st>=0) ? (st>>8) : w);
     }
     uplink("INIT-DONE\n");
-    // ---- persistent shell loop: system stays up ----
-    uplink("SH|READY console fd0\n");
+    // ---- persistent shell loop: on-screen terminal via e5-keys/e5-fb ----
+    // fd 230 write renders on the panel (kernel e5-fb hook mirrors fd 1/2
+    // too, so spawned tools print on the screen); fd 230 read polls the
+    // matrix keypad (kernel e5-keys hook).  fd 229 stays the serial uplink
+    // for remote logs.  Line editing: back erases, select submits.
+    uplink("SH|READY screen fd230\n");
+    write(230, "E5 XNU seed shell\n", 18);
     static char line[256];
-    for(;;){
-        uplink("SH|PROMPT E5# \n");
-        // blocking read from console fd 0
-        i64 n = sys6(3, 0, (u64)line, 255, 0, 0, 0);
-        if(n <= 0){ uplink("SH|READ-END\n"); break; }
-        line[n] = 0;
+    int alive = 1;
+    while(alive){
+        write(230, "E5# ", 4);
+        int len = 0;
+        for(;;){
+            char c = 0;
+            i64 n = sys6(3, 230, (u64)&c, 1, 0, 0, 0);
+            if(n <= 0){ uplink("SH|READ-END\n"); alive = 0; break; }
+            if(c == '\n' || c == '\r'){ break; }
+            if(c == '\b' || c == 0x7f){
+                if(len > 0){ len--; write(230, "\b \b", 3); }
+                continue;
+            }
+            if(c < 0x20){ continue; }
+            if(len < 255){ line[len++] = c; write(230, &c, 1); }
+        }
+        if(alive == 0){ break; }
+        write(230, "\n", 1);
+        line[len] = 0;
         uplink("SH|GOT "); uplink(line); uplink("\n");
         char *argv[9]; int ac = 0;
         char *s = line;
-        while(*s && *s != '\n') *(s++);
-        *s = 0;
-        s = line;
         while(*s && ac < 8){
             while(*s == ' ') *s++ = 0;
             if(*s) argv[ac++] = s;
             while(*s && *s != ' ') s++;
         }
         argv[ac] = 0;
-        if(!ac) continue;
+        if(ac == 0) continue;
         i64 pid = 0;
         i64 r = posix_spawn(&pid, argv[0], 0, argv, 0);
-        if(r != 0){ uplink_dec("SH|SPAWN-FAIL ", r); continue; }
+        if(r){
+            uplink_dec("SH|SPAWN-FAIL ", r);
+            write(230, "spawn failed\n", 13);
+            continue;
+        }
         i64 st = 0;
         i64 w = wait4(-1, &st, 0, 0);
-        uplink_dec("SH|EXIT|", (w>=0) ? (st>>8) : w);
+        uplink_dec("SH|EXIT|", (w >= 0) ? (st >> 8) : w);
     }
     // never exit: keep PID1 alive forever
     static u64 m[4];

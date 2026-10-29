@@ -1,0 +1,174 @@
+--- a/bsd/kern/sys_generic.c
++++ b/bsd/kern/sys_generic.c
+@@ -342,6 +342,131 @@
+ 
+ 	fp_drop(p, fd, fp, 0);
+ 	return error;
++}
++
++extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
++extern void delay(int usec);
++
++/*
++ * E5 keys: read(fd == 230) polls the sprd matrix keypad and the AON GPIO
++ * vol-down key and returns ASCII.  Blocking, no interrupts needed (the
++ * platform has no working periodic timers yet).  Register layout comes from
++ * the vendor sprd_keypad.c and gpio-sprd.c drivers; this board wires rows
++ * 0,1,3 of a 4x7 matrix plus GPIO 127 (vol-down, active low).
++ */
++#define E5K_KPD_INT_CLR    0x10
++#define E5K_KPD_POLARITY   0x18
++#define E5K_KPD_DEBOUNCE   0x1c
++#define E5K_KPD_LONG_KEY   0x20
++#define E5K_KPD_SLEEP_CNT  0x24
++#define E5K_KPD_CLK_DIV    0x28
++#define E5K_KPD_KEY_STATUS 0x2c
++
++static vm_offset_t e5k_kpd;
++static vm_offset_t e5k_aon;
++static vm_offset_t e5k_gpio;
++static boolean_t   e5k_init_done = FALSE;
++static uint32_t    e5k_voldn_level = 1;
++
++static void
++e5k_put32(vm_offset_t base, uint32_t off, uint32_t v)
++{
++	*(volatile uint32_t *)(uintptr_t)(base + off) = v;
++}
++
++static uint32_t
++e5k_get32(vm_offset_t base, uint32_t off)
++{
++	return *(volatile uint32_t *)(uintptr_t)(base + off);
++}
++
++static char     e5k_ring[32];
++static uint32_t e5k_head, e5k_tail;
++
++static void
++e5k_push(const char *s)
++{
++	while (*s) {
++		uint32_t next = (e5k_head + 1) % sizeof(e5k_ring);
++		if (next == e5k_tail) {
++			break;
++		}
++		e5k_ring[e5k_head] = *s++;
++		e5k_head = next;
++	}
++}
++
++static const char e5k_map[4][7][4] = {
++	/* row 0: back 3 6 9 pound right up */
++	{ "\b", "3", "6", "9", "#", "\033[C", "\033[A" },
++	/* row 1: select left down 2 5 8 0 */
++	{ "\n", "\033[D", "\033[B", "2", "5", "8", "0" },
++	/* row 2: not wired on E5 */
++	{ "", "", "", "", "", "", "" },
++	/* row 3: menu phone - 1 4 7 dot */
++	{ "\033", "~", "", "1", "4", "7", "." },
++};
++
++static void
++e5k_init(void)
++{
++	/* AON APB gate: enable keypad + AON GPIO clocks (set-mirror regs). */
++	e5k_aon  = ml_io_map(0x06490000, 0x3000);
++	e5k_gpio = ml_io_map(0x00170000, 0x10000);
++	e5k_kpd  = ml_io_map(0x641B0000, 0x1000);
++	e5k_put32(e5k_aon, 0x1004, (1u << 3) | (1u << 1));  /* kpd_eb|gpio_eb */
++	e5k_put32(e5k_aon, 0x1018, (1u << 1));              /* kpd rtc scan */
++	delay(1000);
++
++	/* Keypad: vendor hw_init; INT_EN stays 0 (poll raw status, no IRQ). */
++	e5k_put32(e5k_kpd, E5K_KPD_INT_CLR, 0xfff);
++	e5k_put32(e5k_kpd, E5K_KPD_POLARITY, 0x0000ffff);
++	e5k_put32(e5k_kpd, E5K_KPD_CLK_DIV, 1);
++	e5k_put32(e5k_kpd, E5K_KPD_LONG_KEY, 584);
++	e5k_put32(e5k_kpd, E5K_KPD_DEBOUNCE, 2);
++	e5k_put32(e5k_kpd, E5K_KPD_SLEEP_CNT, 32767);
++	e5k_put32(e5k_kpd, 0x04, 0);
++	e5k_put32(e5k_kpd, 0x00, (0xFu << 16) | (0x7Fu << 8) | 0x3);
++
++	/* AON GPIO 127 (vol-down, active low): input + input-enable + mask. */
++	{
++		vm_offset_t bank = e5k_gpio + 0x80 * 7;
++		e5k_put32(bank, 0x08, e5k_get32(bank, 0x08) & ~(1u << 15));
++		e5k_put32(bank, 0x28, e5k_get32(bank, 0x28) | (1u << 15));
++		e5k_put32(bank, 0x04, e5k_get32(bank, 0x04) | (1u << 15));
++	}
++	e5k_init_done = TRUE;
++}
++
++static void
++e5k_scan(void)
++{
++	uint32_t raw  = e5k_get32(e5k_kpd, 0x08) & 0xff;
++	uint32_t ks   = e5k_get32(e5k_kpd, E5K_KPD_KEY_STATUS);
++	uint32_t data = e5k_get32(e5k_gpio + 0x80 * 7, 0x00);
++	uint32_t slot;
++
++	e5k_put32(e5k_kpd, E5K_KPD_INT_CLR, 0xfff);
++
++	/* Press events sit in slots 0-3 (release in 4-7); read KEY_STATUS
++	 * for the row/col of each latched slot. */
++	for (slot = 0; slot < 4; slot++) {
++		uint32_t col, row;
++		if (((raw >> slot) & 1) == 0) {
++			continue;
++		}
++		col = (ks >> (slot * 8)) & 7;
++		row = (ks >> (slot * 8 + 4)) & 7;
++		if (row < 4 && col < 7) {
++			e5k_push(e5k_map[row][col]);
++		}
++	}
++
++	/* Vol-down GPIO127 active low: falling edge -> TAB. */
++	if (((data >> 15) & 1) == 0 && e5k_voldn_level == 1) {
++		e5k_push("\t");
++	}
++	e5k_voldn_level = (data >> 15) & 1;
+ }
+ 
+ static int
+@@ -351,6 +476,39 @@
+ 	UIO_STACKBUF(uio_buf, 1);
+ 	uio_t uio;
+ 	int spacetype = IS_64BIT_PROCESS(p) ? UIO_USERSPACE64 : UIO_USERSPACE32;
++	/*
++	 * E5 keys: read(fd == 230, ...) polls the hardware keypad (blocking)
++	 * and returns raw ASCII.  No file, no uio: the hook consumes the call.
++	 */
++	if (__improbable(fd == 230 && nbyte > 0)) {
++		extern boolean_t PE_parse_boot_argn(const char *arg_string,
++		    void *arg_ptr, int max_arg);
++		if (PE_parse_boot_argn("e5-keys", NULL, 0)) {
++			char e5buf[32];
++			user_size_t e5want = nbyte < sizeof(e5buf) ? nbyte : sizeof(e5buf);
++			user_size_t e5got = 0;
++
++			if (e5k_init_done == FALSE) {
++				e5k_init();
++			}
++			while (e5k_head == e5k_tail) {
++				e5k_scan();
++				if (e5k_head == e5k_tail) {
++					delay(2000);
++				}
++			}
++			while (e5k_head != e5k_tail && e5got < e5want) {
++				e5buf[e5got++] = e5k_ring[e5k_tail];
++				e5k_tail = (e5k_tail + 1) % sizeof(e5k_ring);
++			}
++			if (copyout(e5buf, buf, e5got) == 0) {
++				*retval = (user_ssize_t)e5got;
++				return 0;
++			}
++			*retval = 0;
++			return EFAULT;
++		}
++	}
+ 
+ 	if (nbyte > INT_MAX) {
+ 		*retval = 0;
