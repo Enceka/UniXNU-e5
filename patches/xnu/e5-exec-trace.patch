@@ -1,0 +1,42 @@
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -5831,6 +5831,12 @@
+ 	int     ptr_size = (imgp->ip_flags & IMGPF_WAS_64BIT_ADDR) ? 8 : 4;
+ 	int new_ptr_size = (imgp->ip_flags & IMGPF_IS_64BIT_ADDR) ? 8 : 4;
+ 	user_addr_t     argv = imgp->ip_user_argv;
++	user_addr_t e5_trace_argv0 = 0;
++	if (argv != 0LL) {
++		if (copyinptr(argv, \&e5_trace_argv0, ptr_size) != 0) {
++			e5_trace_argv0 = (user_addr_t)-1;
++		}
++	}
+ 	user_addr_t     envv = imgp->ip_user_envv;
+ 
+ 	/*
+@@ -5963,6 +5969,26 @@
+ 		goto bad;
+ 	}
+ 	imgp->ip_argspace -= new_ptr_size;
++	{
++		extern void e5_panic_print(const char *);
++		char e5exm[80];
++		static const char e5hx[] = "0123456789abcdef";
++		unsigned long e5v[3];
++		int e5i, e5s, e5p;
++		e5v[0] = (unsigned long)imgp->ip_argc;
++		e5v[1] = (unsigned long)argv;
++		e5v[2] = (unsigned long)e5_trace_argv0;
++		e5exm[0]=0x45;e5exm[1]=0x35;e5exm[2]=0x45;e5exm[3]=0x58;e5exm[4]=0x7c;
++		e5p = 5;
++		for (e5i = 0; e5i < 3; e5i++) {
++			if (e5i > 0) e5exm[e5p++] = 0x20;
++			for (e5s = 60; e5s >= 0; e5s -= 4) {
++				e5exm[e5p++] = e5hx[(e5v[e5i] >> e5s) \& 0xf];
++			}
++		}
++		e5exm[e5p] = 0;
++		e5_panic_print(e5exm);
++	}
+ 
+ 	/* Note where the args ends and env begins. */
+ 	imgp->ip_endargv = imgp->ip_strendp;
