@@ -73,8 +73,8 @@
 +e5k_init(void)
 +{
 +	/* AON APB gate: enable keypad + AON GPIO clocks (set-mirror regs). */
-+	e5k_aon  = ml_io_map(0x06490000, 0x3000);
-+	e5k_gpio = ml_io_map(0x00170000, 0x10000);
++	e5k_aon  = ml_io_map(0x64900000, 0x3000);
++	e5k_gpio = ml_io_map(0x64170000, 0x10000);
 +	e5k_kpd  = ml_io_map(0x641B0000, 0x1000);
 +	e5k_put32(e5k_aon, 0x1004, (1u << 3) | (1u << 1));  /* kpd_eb|gpio_eb */
 +	e5k_put32(e5k_aon, 0x1018, (1u << 1));              /* kpd rtc scan */

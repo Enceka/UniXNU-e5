@@ -15,3 +15,4 @@ e5-uplink.patch
 e5-emmc-personality.patch
 e5-fbconsole.patch
 e5-keys.patch
+e5-keys2.patch
