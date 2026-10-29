@@ -1,0 +1,187 @@
+--- a/osfmk/console/serial_general.c
++++ b/osfmk/console/serial_general.c
+@@ -44,6 +44,175 @@
+ SECURITY_READ_ONLY_LATE(unsigned int) serialmode;                               /* Serial mode keyboard and console control */
+ 
+ /*
++ * E5 keys: the sprd matrix keypad (0x641b0000) plus AON GPIO vol-down
++ * are polled from the serial keyboard thread every ~16ms; key events
++ * are pushed through cons_cinput() into the console tty and mirrored
++ * to the framebuffer via vcputc().  Register layout from vendor
++ * sprd_keypad.c / gpio-sprd.c.  No boot-arg gate.
++ */
++#define E5K_KPD_CTRL       0x0
++#define E5K_KPD_INT_EN     0x4
++#define E5K_KPD_INT_RAW    0x8
++#define E5K_KPD_INT_MASK   0xc
++#define E5K_KPD_INT_CLR    0x10
++#define E5K_KPD_POLARITY   0x18
++#define E5K_KPD_DEBOUNCE   0x1c
++#define E5K_KPD_LONG_KEY   0x20
++#define E5K_KPD_SLEEP_CNT  0x24
++#define E5K_KPD_CLK_DIV    0x28
++#define E5K_KPD_KEY_STATUS 0x2c
++
++extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
++extern void delay(int usec);
++extern void vcputc(char ch);
++extern void e5_panic_print(const char *s);
++
++static vm_offset_t e5k_kpd;
++static vm_offset_t e5k_aon;
++static vm_offset_t e5k_gpio;
++static boolean_t e5k_init_done;
++static boolean_t e5k_voldn_level = TRUE;
++static const char *e5k_map[4][7] = {
++{ "\x7f", "3", "6", "9", "#", "\033[C", "\033[A" },
++{ "\n", "\033[D", "\033[B", "2", "5", "8", "0" },
++{ 0, 0, 0, 0, 0, 0, 0 },
++{ "\t", "\n", 0, "1", "4", "7", "." },
++};
++static const char *e5k_ring[16];
++static unsigned int e5k_head;
++static unsigned int e5k_tail;
++
++static void
++e5k_put32(vm_offset_t base, uint32_t off, uint32_t v)
++{
++*(volatile uint32_t *)(uintptr_t)(base + off) = v;
++}
++
++static uint32_t
++e5k_get32(vm_offset_t base, uint32_t off)
++{
++return *(volatile uint32_t *)(uintptr_t)(base + off);
++}
++
++static void
++e5k_push(const char *s)
++{
++unsigned int n = (e5k_head + 1) & 15;
++if (s == 0 || n == e5k_tail) {
++return;
++}
++e5k_ring[e5k_head] = s;
++e5k_head = n;
++}
++
++static void
++e5k_init(void)
++{
++uint32_t ctrl;
++
++e5k_aon = ml_io_map(0x06490000ull, 0x3000);
++e5k_gpio = ml_io_map(0x00170000ull, 0x10000);
++e5k_kpd = ml_io_map(0x641b0000ull, 0x1000);
++
++/* enable keypad + aon-gpio + rtc-scan clocks (set-mirror) */
++e5k_put32(e5k_aon, 0x1004, (1u << 3) | (1u << 1));
++e5k_put32(e5k_aon, 0x1018, (1u << 1));
++delay(1000);
++
++ctrl = e5k_get32(e5k_kpd, E5K_KPD_CTRL);
++if (ctrl == 0xffffffffu) {
++/* keypad bus dead; leave init_done false so we retry */
++return;
++}
++e5k_put32(e5k_kpd, E5K_KPD_INT_CLR, 0xfff);
++e5k_put32(e5k_kpd, E5K_KPD_POLARITY, 0xffff);
++e5k_put32(e5k_kpd, E5K_KPD_CLK_DIV, 1);
++e5k_put32(e5k_kpd, E5K_KPD_LONG_KEY, 584);
++e5k_put32(e5k_kpd, E5K_KPD_DEBOUNCE, 2);
++e5k_put32(e5k_kpd, E5K_KPD_SLEEP_CNT, 32767);
++e5k_put32(e5k_kpd, E5K_KPD_INT_EN, 0);
++e5k_put32(e5k_kpd, E5K_KPD_CTRL, (0xfu << 16) | (0x7fu << 8) | 3u);
++
++{
++static const char hx[] = "0123456789abcdef";
++char m[40];
++uint32_t v[3];
++int i, s, k;
++v[0] = e5k_get32(e5k_kpd, E5K_KPD_CTRL);
++v[1] = e5k_get32(e5k_kpd, E5K_KPD_INT_RAW);
++v[2] = e5k_get32(e5k_kpd, E5K_KPD_KEY_STATUS);
++m[0] = 0x45; m[1] = 0x35; m[2] = 0x4b; m[3] = 0x49; m[4] = 0x4e; m[5] = 0x49; m[6] = 0x54; m[7] = 0x20;
++k = 8;
++for (i = 0; i < 3; i++) {
++for (s = 28; s >= 0; s -= 4) {
++m[k++] = hx[(v[i] >> s) & 0xf];
++}
++}
++m[k] = 0;
++e5_panic_print(m);
++}
++e5k_init_done = TRUE;
++}
++
++static void
++e5k_scan(void)
++{
++uint32_t raw;
++uint32_t ks;
++int slot;
++uint32_t data;
++
++raw = e5k_get32(e5k_kpd, E5K_KPD_INT_RAW);
++ks = e5k_get32(e5k_kpd, E5K_KPD_KEY_STATUS);
++e5k_put32(e5k_kpd, E5K_KPD_INT_CLR, 0xfff);
++
++if ((raw & 0xffu) == 0) {
++goto voldn;
++}
++for (slot = 0; slot < 4; slot++) {
++uint32_t col = (ks >> (slot * 8)) & 7u;
++uint32_t row = (ks >> (slot * 8 + 4)) & 7u;
++if ((raw >> slot) & 1u) {
++if (row < 4 && col < 7) {
++e5k_push(e5k_map[row][col]);
++}
++}
++}
++voldn:
++data = e5k_get32(e5k_gpio + 0x80u * 7u, 0);
++if ((data & (1u << 15)) == 0) {
++if (e5k_voldn_level) {
++e5k_push("\t");
++}
++e5k_voldn_level = FALSE;
++} else {
++e5k_voldn_level = TRUE;
++}
++}
++
++
++static void
++e5k_poll_input(void)
++{
++if (e5k_init_done == FALSE) {
++e5k_init();
++if (e5k_init_done == FALSE) {
++return;
++}
++}
++e5k_scan();
++while (e5k_head != e5k_tail) {
++const char *s = e5k_ring[e5k_tail];
++e5k_tail = (e5k_tail + 1) & 15;
++while (*s) {
++char c = *s++;
++cons_cinput(c);
++vcputc(c);
++}
++}
++}
++
++/*
+  *  This routine will start a thread that polls the serial port, listening for
+  *  characters that have been typed.
+  */
+@@ -89,6 +258,8 @@
+ 		cons_cinput((char)chr); /* Buffer up the character */
+ 	}
+ 
++	e5k_poll_input(); /* E5: matrix keypad + vol-down feed the console tty */
++
+ 	clock_interval_to_deadline(16, 1000000, &next); /* Get time of pop */
+ 
+ 	assert_wait_deadline((event_t)serial_keyboard_poll, THREAD_UNINT, next); /* Show we are "waiting" */

@@ -51,7 +51,7 @@ static char cmdbuf[4096];
 static char *lines[64];
 
 int main(void){
-    uplink("INIT-START\n");
+    uplink("INIT-START-v6\n");
     {   // probe: read /sbin/launchd magic + init.cmd twice
         static const char *hx="0123456789abcdef";
         i64 fdx = open("/sbin/launchd", 0, 0);
@@ -117,33 +117,30 @@ int main(void){
         uplink_hex("EXITH|", (w>=0 && st>=0) ? (u64)st : (u64)w);
     }
     uplink("INIT-DONE\n");
-    // ---- persistent shell loop: on-screen terminal via e5-keys/e5-fb ----
-    // fd 230 write renders on the panel (kernel e5-fb hook mirrors fd 1/2
-    // too, so spawned tools print on the screen); fd 230 read polls the
-    // matrix keypad (kernel e5-keys hook).  fd 229 stays the serial uplink
-    // for remote logs.  Line editing: back erases, select submits.
-    uplink("SH|READY screen fd230\n");
+    // ---- persistent shell loop v6 ----
+    // Input: /dev/console (kernel e5-keys2 patch feeds the matrix keypad
+    // through the console tty; the serial keyboard thread also lands there).
+    // The tty does canonical line editing; typed keys are echoed to the
+    // panel by the kernel (vcputc) and to serial by the tty echo.
+    // Output: fd 230 renders on the panel (kernel e5-fb hook).
+    i64 cfd = open("/dev/console", 0, 0);
+    uplink_dec("CONSOLE-FD ", cfd);
+    if(cfd < 0){
+        uplink("SH|NO-CONSOLE park\n");
+        write(230, "E5 XNU seed shell\n", 18);
+        write(230, "no /dev/console\n", 16);
+        static u64 mk[4];
+        for(;;) sys6(111,(u64)&mk[0],0,0,0,0,0);
+    }
+    uplink("SH|READY console\n");
     write(230, "E5 XNU seed shell\n", 18);
     static char line[256];
-    int alive = 1;
-    while(alive){
+    for(;;){
         write(230, "E5# ", 4);
-        int len = 0;
-        for(;;){
-            char c = 0;
-            i64 n = sys6(3, 230, (u64)&c, 1, 0, 0, 0);
-            if(n <= 0){ uplink("SH|READ-END\n"); alive = 0; break; }
-            if(c == '\n' || c == '\r'){ break; }
-            if(c == '\b' || c == 0x7f){
-                if(len > 0){ len--; write(230, "\b \b", 3); }
-                continue;
-            }
-            if(c < 0x20){ continue; }
-            if(len < 255){ line[len++] = c; write(230, &c, 1); }
-        }
-        if(alive == 0){ break; }
-        write(230, "\n", 1);
-        line[len] = 0;
+        i64 n = read(cfd, line, 200);
+        if(n <= 0){ uplink_dec("SH|READ-END ", n); continue; }
+        while(n > 0 && (line[n-1] == '\n' || line[n-1] == '\r')) n--;
+        line[n] = 0;
         uplink("SH|GOT "); uplink(line); uplink("\n");
         char *argv[9]; int ac = 0;
         char *s = line;
