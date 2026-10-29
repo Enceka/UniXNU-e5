@@ -51,7 +51,7 @@ static char cmdbuf[4096];
 static char *lines[64];
 
 int main(void){
-    uplink("INIT-START-v6\n");
+    uplink("INIT-START-v8\n");
     {   // probe: read /sbin/launchd magic + init.cmd twice
         static const char *hx="0123456789abcdef";
         i64 fdx = open("/sbin/launchd", 0, 0);
@@ -135,12 +135,13 @@ int main(void){
     uplink("SH|READY console\n");
     write(230, "E5 XNU seed shell\n", 18);
     static char line[256];
+    write(230, "E5# ", 4);
     for(;;){
-        write(230, "E5# ", 4);
         i64 n = read(cfd, line, 200);
         if(n <= 0){ uplink_dec("SH|READ-END ", n); continue; }
         while(n > 0 && (line[n-1] == '\n' || line[n-1] == '\r')) n--;
         line[n] = 0;
+        if(line[0] == 0) continue;
         uplink("SH|GOT "); uplink(line); uplink("\n");
         char *argv[9]; int ac = 0;
         char *s = line;
@@ -161,6 +162,7 @@ int main(void){
         i64 st = 0;
         i64 w = wait4(-1, &st, 0, 0);
         uplink_dec("SH|EXIT|", (w >= 0) ? (st >> 8) : w);
+        write(230, "E5# ", 4);
     }
     // never exit: keep PID1 alive forever
     static u64 m[4];
