@@ -6,7 +6,7 @@
  	user_addr_t     argv = imgp->ip_user_argv;
 +	user_addr_t e5_trace_argv0 = 0;
 +	if (argv != 0LL) {
-+		if (copyinptr(argv, \&e5_trace_argv0, ptr_size) != 0) {
++		if (copyinptr(argv, &e5_trace_argv0, ptr_size) != 0) {
 +			e5_trace_argv0 = (user_addr_t)-1;
 +		}
 +	}
@@ -31,7 +31,7 @@
 +		for (e5i = 0; e5i < 3; e5i++) {
 +			if (e5i > 0) e5exm[e5p++] = 0x20;
 +			for (e5s = 60; e5s >= 0; e5s -= 4) {
-+				e5exm[e5p++] = e5hx[(e5v[e5i] >> e5s) \& 0xf];
++				e5exm[e5p++] = e5hx[(e5v[e5i] >> e5s) & 0xf];
 +			}
 +		}
 +		e5exm[e5p] = 0;
