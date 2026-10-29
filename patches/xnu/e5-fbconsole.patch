@@ -23,7 +23,7 @@
  
 --- a/bsd/kern/sys_generic.c
 +++ b/bsd/kern/sys_generic.c
-@@ -697,6 +697,50 @@
+@@ -697,6 +697,52 @@
  				e5ul[5 + nbyte] = '\0';
  				e5_panic_print(e5ul);
  				*retval = nbyte;
@@ -70,6 +70,8 @@
 +					e5_panic_print(e5up);
 +				}
 +			if (fd == 230) {
++				extern boolean_t e5k_armed;
++				e5k_armed = TRUE;
 +				*retval = (user_ssize_t)nbyte;
  				return 0;
  			}
