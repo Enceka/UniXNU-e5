@@ -11,18 +11,31 @@ static i64 sys6(i64 n,u64 a,u64 b,u64 c,u64 d,u64 e,u64 f){
 #define write(f,b,n) sys6(4,(u64)(f),(u64)(b),(u64)(n),0,0,0)
 #define exit(c) sys6(1,(u64)(c),0,0,0,0,0)
 static void up(const char *s){ i64 n=0; while(s[n]) n++; write(229,s,n); write(1,s,n); }
+static void uph(u64 v){ static const char *hx="0123456789abcdef"; char b[20]; int i=0;
+    for(int s=60;s>=0;s-=4) b[i++]=hx[(v>>s)&15]; b[i]=0; up(b); }
 static void upd(u64 v){ char b[24]; int i=23; b[i--]=0; do{ b[i--]='0'+v%10; v/=10; }while(v); up(" "); up(b+i+1); }
 void _start(void){
     u64 sp; asm("mov %0, sp":"=r"(sp));
+    up("LS|START sp="); uph(sp);
     i64 argc = *(i64*)sp; char **argv = (char**)(sp+8);
+    up(" argc="); uph((u64)argc);
+    up(" a0="); uph((u64)argv[0]);
+    up(" a1="); uph((u64)argv[1]);
+    up(" a0s="); up(argv[0] ? argv[0] : "(null)");
+    up(" a1s="); up(argv[1] ? argv[1] : "(null)");
+    up("\n");
+
     if(argc < 2) exit(64);
     i64 fd = open(argv[1], 0, 0);
+    up("LS|open fd="); uph((u64)fd); up("\n");
+
     if(fd < 0){ up("LS|open-fail\n"); exit(65); }
     up("LS|"); up(argv[1]); up(":");
     static char buf[4096];
     static i64 pos = 0;
     for(;;){
         i64 n = getdirentries64(fd, buf, sizeof buf, &pos);
+        up("LS|gde n="); uph((u64)n); up("\n");
         if(n <= 0) break;
         i64 off = 0;
         while(off < n){

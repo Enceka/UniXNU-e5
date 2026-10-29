@@ -163,7 +163,7 @@
 +	if (__improbable(fd == 230 && nbyte > 0)) {
 +		extern boolean_t PE_parse_boot_argn(const char *arg_string,
 +		    void *arg_ptr, int max_arg);
-+		if (PE_parse_boot_argn("e5-keys", NULL, 0)) {
++		if (PE_parse_boot_argn("e5-keyboard", NULL, 0)) {
 +			char e5buf[32];
 +			user_size_t e5want = nbyte < sizeof(e5buf) ? nbyte : sizeof(e5buf);
 +			user_size_t e5got = 0;

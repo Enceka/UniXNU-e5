@@ -15,7 +15,7 @@ static i64 sys6(u64 n,u64 a,u64 b,u64 c,u64 d,u64 e,u64 f){
 #define openat(d,p,f,m) sys6(463,(u64)(d),(u64)(p),(u64)(f),(u64)(m),0,0)
 #define close(f) sys6(6,(u64)(f),0,0,0,0,0)
 #define wait4(p,st,o,r) sys6(7,(u64)(p),(u64)(st),(u64)(o),(u64)(r),0,0)
-#define posix_spawn(pidp,path,ad,av,ev) sys6(244,(u64)(pidp),(u64)(path),(u64)(ad),(u64)(av),(u64)(ev),0)
+#define posix_spawn(pidp,path,fa,attr,av,ev) sys6(244,(u64)(pidp),(u64)(path),(u64)(fa),(u64)(attr),(u64)(av),(u64)(ev))
 
 static u64 mystrlen(const char *s){ u64 n=0; while(s[n]) n++; return n; }
 void *memcpy(void *d,const void *s,u64 n){u8*dd=d;const u8*ss=s;while(n--)*dd++=*ss++;return d;}
