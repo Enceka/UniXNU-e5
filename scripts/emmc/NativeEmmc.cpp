@@ -491,13 +491,24 @@ class NativeEmmc : public IOBlockStorageDevice {
           while (spx < 200000u) { stx = r32(0x30); if (stx & 0x1u) break; spx++; }
           elog("e5-emmc: k219 cc st %08x ps %08x\n", stx, r32(0x24)); }
         // NOW: while data hangs, poll cmd13 8 times (CLK still available for commands?)
-        // k220 REPLACEMENT: cmd17 with U-Boot's exact flag byte 0x1A (NO bit5!).
-        // k219 proved the card never enters data state with our 0x3A flags.
+        // k221: 8-BIT BUS + LK clock - LK's actual read configuration.
+        // All previous reads were 1-bit; LK reads 8-bit (EXT_CSD[183]=1).
         {
-          static const struct { uint16_t fl; const char *tag; } fv[3] = {
-            { 0x001Au, "F-1a" },   // U-Boot verbatim R1+data encoding
-            { 0x0019u, "F-19" },   // k151's alternate
-            { 0x003Au, "F-3a" },   // our current (control)
+          uint32_t rb8[4];
+          cmd(6, 0x0300B701u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb8);   // BUS_WIDTH=8bit SDR
+          elog("e5-emmc: k221 bw8 r1 %08x\n", rb8[0]);
+          cmd(6, 0x0300B901u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb8);   // HS_TIMING=1
+          elog("e5-emmc: k221 hs1 r1 %08x\n", rb8[0]);
+          // LK's exact clock value
+          w32(0x2C, 0x080E0200u);
+          w32(0x2C, 0x080E0202u);
+          { uint32_t g = 0; while (g < 20000u) { if (r16(0x2C) & 0x2u) break; g++; } }
+          w32(0x2C, 0x080E0207u);
+          { for (uint32_t q = 0; q < 2000; q++) (void)r32(0x24); }
+          static const struct { uint8_t hc; const char *tag; } fv[3] = {
+            { 0x28u, "B8-sdma" },  // 8-bit + SDMA
+            { 0x30u, "B8-adma" },  // 8-bit + ADMA2
+            { 0x08u, "B1-sdma" },  // 1-bit control (bus cmd may have failed)
           };
           for (int v = 0; v < 3; v++) {
             for (uint32_t q = 0; q < 128; q++) d[q] = 0xCAFE0000u;
@@ -508,8 +519,8 @@ class NativeEmmc : public IOBlockStorageDevice {
             w32(0x30, 0xFFFFFFFFu); w16(0x06, 0); w16(0x04, 0x0200u);
             w8(0x2B, 0x0Eu);
             w32(0x00, 1); w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
-            w8(0x28, 0x08u); w32(0x08, 0x00010000u); w16(0x0C, 0x0013u);
-            w16(0x0E, (17u << 8) | fv[v].fl);
+            w8(0x28, fv[v].hc); w32(0x08, 0x00010000u); w16(0x0C, 0x0013u);
+            w16(0x0E, (17u << 8) | 0x3Au);
             uint32_t stx = 0, spx = 0;
             while (spx < 6000000u) { stx = r32(0x30); if ((stx & 0x2u) || (stx & 0xFFFF0000u)) break; spx++; }
             __asm__ volatile ("dsb sy" ::: "memory");
