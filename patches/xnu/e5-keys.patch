@@ -1,11 +1,9 @@
 --- a/bsd/kern/sys_generic.c
 +++ b/bsd/kern/sys_generic.c
-@@ -342,8 +342,151 @@
- 
- 	fp_drop(p, fd, fp, 0);
+@@ -344,6 +344,149 @@
  	return error;
-+}
-+
+ }
+ 
 +extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
 +extern void delay(int usec);
 +
@@ -116,8 +114,8 @@
 +		e5_panic_print(m);
 +	}
 +	e5k_init_done = TRUE;
- }
- 
++}
++
 +static void
 +e5k_scan(void)
 +{
@@ -152,7 +150,7 @@
  static int
  read_internal(struct proc *p, int fd, user_addr_t buf, user_size_t nbyte,
      off_t offset, int flags, user_ssize_t *retval)
-@@ -351,7 +494,40 @@
+@@ -351,7 +494,39 @@
  	UIO_STACKBUF(uio_buf, 1);
  	uio_t uio;
  	int spacetype = IS_64BIT_PROCESS(p) ? UIO_USERSPACE64 : UIO_USERSPACE32;
@@ -161,9 +159,8 @@
 +	 * and returns raw ASCII.  No file, no uio: the hook consumes the call.
 +	 */
 +	if (__improbable(fd == 230 && nbyte > 0)) {
-+		extern boolean_t PE_parse_boot_argn(const char *arg_string,
-+		    void *arg_ptr, int max_arg);
-+		if (PE_parse_boot_argn("e5-keyboard", NULL, 0)) {
++		/* e5-keys gate removed: fd-230 keypad read is compile-time active. */
++		{
 +			char e5buf[32];
 +			user_size_t e5want = nbyte < sizeof(e5buf) ? nbyte : sizeof(e5buf);
 +			user_size_t e5got = 0;
