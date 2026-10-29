@@ -39,6 +39,14 @@ static void uplink_dec(const char *tag, i64 v){
     uplink(buf);
 }
 
+static void uplink_hex(const char *tag, u64 v){
+    static const char *hxd="0123456789abcdef";
+    char *t=buf; while(*t=*tag++) t++;
+    int started=0;
+    for(int s=60;s>=0;s-=4){ int d=(v>>s)&15; if(d||started||s==0){ *t++=hxd[d]; started=1; } }
+    *t++=0x0a; *t++=0;
+    uplink(buf);
+}
 static char cmdbuf[4096];
 static char *lines[64];
 
@@ -101,12 +109,12 @@ int main(void){
         }
         argv[ac] = 0;
         i64 pid = 0;
-        i64 r = posix_spawn(&pid, lines[i], 0, argv, 0);
+        i64 r = posix_spawn(&pid, lines[i], 0, 0, argv, 0);
         if(r != 0){ uplink_dec("SPAWN-FAIL ", r); continue; }
         i64 st = 0;
         i64 w = wait4(-1, &st, 0, 0);
         uplink_dec("EXIT|", (w>=0 && st>=0) ? (st>>8) : w);
-        uplink_dec("EXITRAW|", (w>=0 && st>=0) ? st : w);
+        uplink_hex("EXITH|", (w>=0 && st>=0) ? (u64)st : (u64)w);
     }
     uplink("INIT-DONE\n");
     // ---- persistent shell loop: on-screen terminal via e5-keys/e5-fb ----
@@ -147,7 +155,7 @@ int main(void){
         argv[ac] = 0;
         if(ac == 0) continue;
         i64 pid = 0;
-        i64 r = posix_spawn(&pid, argv[0], 0, argv, 0);
+        i64 r = posix_spawn(&pid, argv[0], 0, 0, argv, 0);
         if(r){
             uplink_dec("SH|SPAWN-FAIL ", r);
             write(230, "spawn failed\n", 13);
