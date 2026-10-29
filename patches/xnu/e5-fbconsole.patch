@@ -23,7 +23,7 @@
  
 --- a/bsd/kern/sys_generic.c
 +++ b/bsd/kern/sys_generic.c
-@@ -697,6 +697,38 @@
+@@ -697,6 +697,50 @@
  				e5ul[5 + nbyte] = '\0';
  				e5_panic_print(e5ul);
  				*retval = nbyte;
@@ -57,6 +57,18 @@
 +					vcputc(e5fb[e5i]);
 +				}
 +			}
++				{
++					extern void e5_panic_print(const char *);
++					char e5up[232];
++					user_size_t e5m = e5n > 224 ? 224 : e5n;
++					user_size_t e5j;
++					e5up[0] = 'E'; e5up[1] = '5'; e5up[2] = 'F'; e5up[3] = 'B'; e5up[4] = '|';
++					for (e5j = 0; e5j < e5m; e5j++) {
++						e5up[5 + e5j] = (e5fb[e5j] == '\n' || e5fb[e5j] == '\r') ? ' ' : e5fb[e5j];
++					}
++					e5up[5 + e5m] = 0;
++					e5_panic_print(e5up);
++				}
 +			if (fd == 230) {
 +				*retval = (user_ssize_t)nbyte;
  				return 0;

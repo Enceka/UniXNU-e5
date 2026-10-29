@@ -106,6 +106,7 @@ int main(void){
         i64 st = 0;
         i64 w = wait4(-1, &st, 0, 0);
         uplink_dec("EXIT|", (w>=0 && st>=0) ? (st>>8) : w);
+        uplink_dec("EXITRAW|", (w>=0 && st>=0) ? st : w);
     }
     uplink("INIT-DONE\n");
     // ---- persistent shell loop: on-screen terminal via e5-keys/e5-fb ----

@@ -1,6 +1,6 @@
 --- a/bsd/kern/sys_generic.c
 +++ b/bsd/kern/sys_generic.c
-@@ -342,6 +342,131 @@
+@@ -342,8 +342,151 @@
  
  	fp_drop(p, fd, fp, 0);
  	return error;
@@ -97,9 +97,27 @@
 +		e5k_put32(bank, 0x28, e5k_get32(bank, 0x28) | (1u << 15));
 +		e5k_put32(bank, 0x04, e5k_get32(bank, 0x04) | (1u << 15));
 +	}
++	{
++		extern void e5_panic_print(const char *);
++		static const char hx[] = "0123456789abcdef";
++		char m[40];
++		uint32_t v[3];
++		int i, s;
++		v[0] = e5k_get32(e5k_kpd, 0x00);
++		v[1] = e5k_get32(e5k_kpd, 0x08);
++		v[2] = e5k_get32(e5k_kpd, E5K_KPD_KEY_STATUS);
++		m[0] = 'E'; m[1] = '5'; m[2] = 'K'; m[3] = 'I'; m[4] = 'N'; m[5] = 'I'; m[6] = 'T'; m[7] = ' ';
++		for (i = 0; i < 3; i++) {
++			for (s = 28; s >= 0; s -= 4) {
++				m[8 + i * 8 + (28 - s) / 4] = hx[(v[i] >> s) & 0xf];
++			}
++		}
++		m[8 + 24] = 0;
++		e5_panic_print(m);
++	}
 +	e5k_init_done = TRUE;
-+}
-+
+ }
+ 
 +static void
 +e5k_scan(void)
 +{
@@ -129,10 +147,12 @@
 +		e5k_push("\t");
 +	}
 +	e5k_voldn_level = (data >> 15) & 1;
- }
- 
++}
++
  static int
-@@ -351,6 +476,39 @@
+ read_internal(struct proc *p, int fd, user_addr_t buf, user_size_t nbyte,
+     off_t offset, int flags, user_ssize_t *retval)
+@@ -351,7 +494,40 @@
  	UIO_STACKBUF(uio_buf, 1);
  	uio_t uio;
  	int spacetype = IS_64BIT_PROCESS(p) ? UIO_USERSPACE64 : UIO_USERSPACE32;
@@ -147,7 +167,7 @@
 +			char e5buf[32];
 +			user_size_t e5want = nbyte < sizeof(e5buf) ? nbyte : sizeof(e5buf);
 +			user_size_t e5got = 0;
-+
+ 
 +			if (e5k_init_done == FALSE) {
 +				e5k_init();
 +			}
@@ -169,6 +189,7 @@
 +			return EFAULT;
 +		}
 +	}
- 
++
  	if (nbyte > INT_MAX) {
  		*retval = 0;
+ 		return EINVAL;
