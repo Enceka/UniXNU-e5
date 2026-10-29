@@ -406,52 +406,77 @@ class NativeEmmc : public IOBlockStorageDevice {
     // w8(0x28,0x20) all along = 8-bit bus + DMA OFF -> engine armed but no mover.
     // k215 showed: hs1 accepted clean, clock rate changes behavior (26M TC@0.75s).
     {
+      // k218: post-TM-fix retests. The working sequence (clock 26M, HS, SDMA)
+      // now exists - redo the experiments that ran under broken no-TM code.
       uint32_t rr6[4];
       cmd(6, 0x0300B901u, CMD_RESP_SHORT | CMD_CRC_ENABLE, rr6);   // HS_TIMING=1
-      elog("e5-emmc: k217 hs1 r1 %08x\n", rr6[0]);
+      elog("e5-emmc: k218 hs1 r1 %08x\n", rr6[0]);
       w32(0x2C, 0x08040200u);
       w32(0x2C, 0x08040202u);
       { uint32_t g = 0; while (g < 20000u) { if (r16(0x2C) & 0x2u) break; g++; } }
       w32(0x2C, 0x08040207u);
       { for (uint32_t q = 0; q < 2000; q++) (void)r32(0x24); }
-      // k217: CLEAR the busy auto-clock-gate bits (0x250 bits 24/25). Set in
-      // k148 per the >52M path - if the gate misjudges DAT0 busy, the host
-      // stops the clock mid-transfer and the card freezes at DAT0-low.
-      static const struct { uint32_t gate; const char *tag; } gv[3] = {
-        { 0x00000000u, "G-clr" },   // bits 24/25 cleared
-        { 0x01000000u, "G-b24" },   // only bit24
-        { 0x036a8800u, "G-k148" },  // k148 value (control)
-      };
-      for (int v = 0; v < 3; v++) {
-        uint32_t bp = r32(0x250);
-        bp = (bp & ~0x03000000u) | gv[v].gate;
-        w32(0x250, bp);
-        for (uint32_t q = 0; q < 128; q++) d[q] = 0xCAFE0000u;
-        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
-          __asm__ volatile ("dc cvac, %0" :: "r"(la));
-        { uint8_t rr = r8(0x2F); w8(0x2F, (uint8_t)((rr & 0x08u) | 0x06u));
-          if (!waitBits8(0x2F, 0x06, 0, 100000, 10)) elog("e5-emmc: k217 rst wedge\n"); }
-        w32(0x30, 0xFFFFFFFFu);
-        w16(0x06, 0);
-        w16(0x04, 0x0200u);
-        w32(0x00, 1);
-        w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
-        w8(0x28, 0x08u);   // SDMA select
-        w32(0x08, 0x00010000u);
-        w16(0x0C, 0x0013u);
-        w16(0x0E, (17u << 8) | 0x3Au);
-        uint32_t st = 0, sp = 0;
-        while (sp < 4000000u) { st = r32(0x30); if ((st & 0x2u) || (st & 0xFFFF0000u)) break; sp++; }
-        __asm__ volatile ("dsb sy" ::: "memory");
-        __asm__ volatile ("dc ivac, %0" :: "r"((void*)d) : "memory");
-        __asm__ volatile ("dsb sy" ::: "memory");
-        elog("e5-emmc: k217 %s bp %08x st %08x d0 %08x d1 %08x ps %08x sp %u\n",
-             gv[v].tag, r32(0x250), st, d[0], d[1], r32(0x24), sp);
-        if (d[0] != 0xCAFE0000u && d[0] != 0) { elog("e5-emmc: k217 *** DATA *** d2 %08x d3 %08x\n", d[2], d[3]); break; }
-        w32(0x30, 0xFFFFFFFFu);
-        uint32_t rb[4]; cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
-        cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+      // helper lambda-ish: one armed read; returns spins; logs
+      #define K218_ARM(tag, bufDva, to) do { \
+        for (uint32_t q = 0; q < 128; q++) d[q] = 0xCAFE0000u; \
+        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64) \
+          __asm__ volatile ("dc cvac, %0" :: "r"(la)); \
+        { uint8_t rrx = r8(0x2F); w8(0x2F, (uint8_t)((rrx & 0x08u) | 0x06u)); \
+          if (!waitBits8(0x2F, 0x06, 0, 100000, 10)) elog("e5-emmc: k218 rst wedge\n"); } \
+        w32(0x30, 0xFFFFFFFFu); w16(0x06, 0); w16(0x04, 0x0200u); \
+        w8(0x2B, (to)); \
+        w32(0x00, 1); w32(0x58, (uint32_t)(bufDva)); w32(0x5C, 0); \
+        w8(0x28, 0x08u); w32(0x08, 0x00010000u); w16(0x0C, 0x0013u); \
+        w16(0x0E, (17u << 8) | 0x3Au); \
+        { uint32_t stx = 0, spx = 0; \
+          while (spx < 6000000u) { stx = r32(0x30); if ((stx & 0x2u) || (stx & 0xFFFF0000u)) break; spx++; } \
+          __asm__ volatile ("dsb sy" ::: "memory"); \
+          __asm__ volatile ("dc ivac, %0" :: "r"((void*)d) : "memory"); \
+          __asm__ volatile ("dsb sy" ::: "memory"); \
+          elog("e5-emmc: k218 %s st %08x d0 %08x d1 %08x ps %08x sp %u\n", \
+               (tag), stx, d[0], d[1], r32(0x24), spx); \
+          if (d[0] != 0xCAFE0000u && d[0] != 0) elog("e5-emmc: k218 *** DATA *** %08x %08x\n", d[2], d[3]); } \
+        w32(0x30, 0xFFFFFFFFu); \
+        { uint32_t rbx[4]; cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx); \
+          cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx); } \
+      } while (0)
+
+      // B1: LK's own buffer PA (k176 rerun with WORKING sequence)
+      {
+        IOMemoryDescriptor *lmd = IOMemoryDescriptor::withAddressRange(
+            0xBF6C8CC0ull, 0x1000, kIODirectionNone, nullptr);
+        IOMemoryMap *lmap = lmd ? lmd->map() : nullptr;
+        if (lmap) {
+          volatile uint32_t *ld = (volatile uint32_t *)lmap->getVirtualAddress();
+          elog("e5-emmc: k218 lkbuf pre %08x\n", ld[0]);
+          // point SDMA at LK's physical buffer, keep our d[] for comparison
+          for (uint32_t q = 0; q < 128; q++) d[q] = 0xCAFE0000u;
+          for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+            __asm__ volatile ("dc cvac, %0" :: "r"(la));
+          { uint8_t rrx = r8(0x2F); w8(0x2F, (uint8_t)((rrx & 0x08u) | 0x06u));
+            if (!waitBits8(0x2F, 0x06, 0, 100000, 10)) elog("e5-emmc: k218 rst wedge\n"); }
+          w32(0x30, 0xFFFFFFFFu); w16(0x06, 0); w16(0x04, 0x0200u);
+          w8(0x2B, 0x0Eu);
+          w32(0x00, 1); w32(0x58, 0xBF6C8CC0u); w32(0x5C, 0);
+          w8(0x28, 0x08u); w32(0x08, 0x00010000u); w16(0x0C, 0x0013u);
+          w16(0x0E, (17u << 8) | 0x3Au);
+          { uint32_t stx = 0, spx = 0;
+            while (spx < 6000000u) { stx = r32(0x30); if ((stx & 0x2u) || (stx & 0xFFFF0000u)) break; spx++; }
+            elog("e5-emmc: k218 LK-buf st %08x lk0 %08x lk1 %08x ps %08x sp %u\n",
+                 stx, ld[0], ld[1], r32(0x24), spx);
+            if (ld[0] != 0x39303030u && ld[0] != 0) elog("e5-emmc: k218 *** LK DATA *** %08x\n", ld[0]); }
+          w32(0x30, 0xFFFFFFFFu);
+          { uint32_t rbx[4]; cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx);
+            cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx); }
+          lmap->release(); lmd->release();
+        } else { elog("e5-emmc: k218 lkbuf map fail\n"); if (lmd) lmd->release(); }
       }
+      // B2: timeout discrimination - 0x2B=0x0 (2^13 min) should collapse the 0.75s TC to ~0
+      K218_ARM("T-min", (uint32_t)(uintptr_t)dva, 0x00u);
+      // B3: control with normal 0xE
+      K218_ARM("T-0e", (uint32_t)(uintptr_t)dva, 0x0Eu);
+      // B4: max 0xF - if the wait grows, TC is timeout-driven
+      K218_ARM("T-max", (uint32_t)(uintptr_t)dva, 0x0Fu);
     }
     bmd->complete();
     bmd->release();
