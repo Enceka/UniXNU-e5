@@ -473,10 +473,38 @@ class NativeEmmc : public IOBlockStorageDevice {
       }
       // B2: timeout discrimination - 0x2B=0x0 (2^13 min) should collapse the 0.75s TC to ~0
       K218_ARM("T-min", (uint32_t)(uintptr_t)dva, 0x00u);
-      // B3: control with normal 0xE
-      K218_ARM("T-0e", (uint32_t)(uintptr_t)dva, 0x0Eu);
-      // B4: max 0xF - if the wait grows, TC is timeout-driven
-      K218_ARM("T-max", (uint32_t)(uintptr_t)dva, 0x0Fu);
+      // B3b: k219 - arm read, then mid-transfer cmd13 to interrogate card state.
+      // R1 CURRENT_STATE: 4=tran (card never entered data), 6=sending data (card started)
+      {
+        for (uint32_t q = 0; q < 128; q++) d[q] = 0xCAFE0000u;
+        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+          __asm__ volatile ("dc cvac, %0" :: "r"(la));
+        { uint8_t rrx = r8(0x2F); w8(0x2F, (uint8_t)((rrx & 0x08u) | 0x06u));
+          if (!waitBits8(0x2F, 0x06, 0, 100000, 10)) elog("e5-emmc: k219 rst wedge\n"); }
+        w32(0x30, 0xFFFFFFFFu); w16(0x06, 0); w16(0x04, 0x0200u);
+        w8(0x2B, 0x0Eu);
+        w32(0x00, 1); w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
+        w8(0x28, 0x08u); w32(0x08, 0x00010000u); w16(0x0C, 0x0013u);
+        w16(0x0E, (17u << 8) | 0x3Au);
+        // wait for CC only
+        { uint32_t stx = 0, spx = 0;
+          while (spx < 200000u) { stx = r32(0x30); if (stx & 0x1u) break; spx++; }
+          elog("e5-emmc: k219 cc st %08x ps %08x\n", stx, r32(0x24)); }
+        // NOW: while data hangs, poll cmd13 8 times (CLK still available for commands?)
+        for (int i = 0; i < 8; i++) {
+          // wait CMD_INHIBIT clear for the cmd13 itself
+          { uint32_t g = 0; while (g < 200000u) { if (!(r32(0x24) & 0x1u)) break; g++; } }
+          uint32_t rs[4];
+          bool ok = cmd(13, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, rs);
+          elog("e5-emmc: k219 s%d cmd13 %d r1 %08x ps %08x\n", i, ok, rs[0], r32(0x24));
+          for (uint32_t q = 0; q < 200000; q++) (void)r32(0x24);   // ~60ms
+        }
+        // final: did TC arrive while polling?
+        elog("e5-emmc: k219 end st %08x d0 %08x ps %08x\n", r32(0x30), d[0], r32(0x24));
+        w32(0x30, 0xFFFFFFFFu);
+        { uint32_t rbx[4]; cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx);
+          cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx); }
+      }
     }
     bmd->complete();
     bmd->release();
