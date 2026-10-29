@@ -419,6 +419,11 @@ class NativeEmmc : public IOBlockStorageDevice {
         { uint8_t rr = r8(0x2F); w8(0x2F, (uint8_t)((rr & 0x08u) | 0x06u));
           if (!waitBits8(0x2F, 0x06, 0, 100000, 10)) elog("e5-emmc: k213 rst wedge\n"); }
         w32(0x30, 0xFFFFFFFFu);
+        if (v == 0) {  // k214: once, before first sweep point - disable CQ engine
+          w32(0x308, 0x00000000u);   // CQ_CTL: clear
+          w32(0x344, 0x00000000u);   // CQ_CFG: CQ_ENABLE off
+          elog("e5-emmc: k214 cq off %08x %08x\n", r32(0x308), r32(0x344));
+        }
         w16(0x06, 0);
         w16(0x04, 0x0200u);
         w32(0x00, 1);
