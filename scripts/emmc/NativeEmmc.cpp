@@ -309,9 +309,10 @@ class NativeEmmc : public IOBlockStorageDevice {
     for (int q = 0; q < 4; q = q + 1) this->cid[q] = resp[q];
     elog("e5-emmc: cid %08x %08x %08x %08x\n", resp[0], resp[1], resp[2], resp[3]);
 
-    // CMD3 SEND_RELATIVE_ADDR (once) -> RCA, card -> STBY
-    if (!cmd(3, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd3 fail\n"); return false; }
-    this->rca = (uint16_t)(resp[0] >> 16);
+    // CMD3 SET_RELATIVE_ADDR (eMMC: HOST supplies RCA in arg; Android uses 0x0001,
+    // k83-era LK used 0x0002 - never 0, because cmd7(0) = DESELECT_ALL)
+    if (!cmd(3, 0x00010000u, CMD_RESP_SHORT | CMD_CRC_ENABLE, resp)) { elog("e5-emmc: cmd3 fail\n"); return false; }
+    this->rca = 0x0001u;
     elog("e5-emmc: rca %04x status %08x\n", this->rca, resp[0] & 0xFFFFu);
 
     // CMD9 SEND_CSD (R2, arg = rca<<16)
