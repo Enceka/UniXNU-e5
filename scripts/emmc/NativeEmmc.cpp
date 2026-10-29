@@ -491,16 +491,42 @@ class NativeEmmc : public IOBlockStorageDevice {
           while (spx < 200000u) { stx = r32(0x30); if (stx & 0x1u) break; spx++; }
           elog("e5-emmc: k219 cc st %08x ps %08x\n", stx, r32(0x24)); }
         // NOW: while data hangs, poll cmd13 8 times (CLK still available for commands?)
-        for (int i = 0; i < 8; i++) {
-          // wait CMD_INHIBIT clear for the cmd13 itself
-          { uint32_t g = 0; while (g < 200000u) { if (!(r32(0x24) & 0x1u)) break; g++; } }
-          uint32_t rs[4];
-          bool ok = cmd(13, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, rs);
-          elog("e5-emmc: k219 s%d cmd13 %d r1 %08x ps %08x\n", i, ok, rs[0], r32(0x24));
-          for (uint32_t q = 0; q < 200000; q++) (void)r32(0x24);   // ~60ms
+        // k220 REPLACEMENT: cmd17 with U-Boot's exact flag byte 0x1A (NO bit5!).
+        // k219 proved the card never enters data state with our 0x3A flags.
+        {
+          static const struct { uint16_t fl; const char *tag; } fv[3] = {
+            { 0x001Au, "F-1a" },   // U-Boot verbatim R1+data encoding
+            { 0x0019u, "F-19" },   // k151's alternate
+            { 0x003Au, "F-3a" },   // our current (control)
+          };
+          for (int v = 0; v < 3; v++) {
+            for (uint32_t q = 0; q < 128; q++) d[q] = 0xCAFE0000u;
+            for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+              __asm__ volatile ("dc cvac, %0" :: "r"(la));
+            { uint8_t rrx = r8(0x2F); w8(0x2F, (uint8_t)((rrx & 0x08u) | 0x06u));
+              if (!waitBits8(0x2F, 0x06, 0, 100000, 10)) elog("e5-emmc: k220 rst wedge\n"); }
+            w32(0x30, 0xFFFFFFFFu); w16(0x06, 0); w16(0x04, 0x0200u);
+            w8(0x2B, 0x0Eu);
+            w32(0x00, 1); w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
+            w8(0x28, 0x08u); w32(0x08, 0x00010000u); w16(0x0C, 0x0013u);
+            w16(0x0E, (17u << 8) | fv[v].fl);
+            uint32_t stx = 0, spx = 0;
+            while (spx < 6000000u) { stx = r32(0x30); if ((stx & 0x2u) || (stx & 0xFFFF0000u)) break; spx++; }
+            __asm__ volatile ("dsb sy" ::: "memory");
+            __asm__ volatile ("dc ivac, %0" :: "r"((void*)d) : "memory");
+            __asm__ volatile ("dsb sy" ::: "memory");
+            // card state after: TRAN(4)=never started, SENDING(6)=data phase!
+            uint32_t rs[4];
+            cmd(13, ((uint32_t)this->rca) << 16, CMD_RESP_SHORT | CMD_CRC_ENABLE, rs);
+            elog("e5-emmc: k220 %s st %08x r1 %08x d0 %08x d1 %08x ps %08x sp %u\n",
+                 fv[v].tag, stx, rs[0], d[0], d[1], r32(0x24), spx);
+            if (d[0] != 0xCAFE0000u && d[0] != 0) { elog("e5-emmc: k220 *** DATA *** %08x %08x %08x\n", d[2], d[3], d[4]); break; }
+            w32(0x30, 0xFFFFFFFFu);
+            { uint32_t rbx[4]; cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx);
+              cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx); }
+          }
         }
-        // final: did TC arrive while polling?
-        elog("e5-emmc: k219 end st %08x d0 %08x ps %08x\n", r32(0x30), d[0], r32(0x24));
+        return;
         w32(0x30, 0xFFFFFFFFu);
         { uint32_t rbx[4]; cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx);
           cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rbx); }
