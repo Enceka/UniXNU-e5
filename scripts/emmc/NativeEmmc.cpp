@@ -401,26 +401,40 @@ class NativeEmmc : public IOBlockStorageDevice {
     for (uint32_t i = 0; i < 128; i++) d[i] = 0xCAFE0000u;
     for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
       __asm__ volatile ("dc cvac, %0" :: "r"(la));
-    w32(0x30, 0xFFFFFFFFu);
-    { uint8_t v = r8(0x2F); w8(0x2F, (uint8_t)((v & 0x08u) | 0x06u));
-      if (!waitBits8(0x2F, 0x06, 0, 100000, 10)) elog("e5-emmc: k208 rst %02x\n", r8(0x2F)); }
-    w16(0x06, 0);
-    w16(0x00, 1);
-    w16(0x04, 0x0200u);
-    w8(0x28, 0x20u);
-    w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x5C, 0);
-    w32(0x08, 0x00010000u);
-    w16(0x0C, 0x0013u);   // k209: TRANSFER_MODE = DMA_EN|BLK_CNT_EN|READ
-    w16(0x0E, (17u << 8) | 0x3Au);
-    uint32_t st = 0, sp = 0; uint32_t psMid = 0;
-    while (sp < 30000000u) { st = r32(0x30); if ((st & 0x2u) || (st & 0xFFFF0000u)) break; if (sp == 1000) psMid = r32(0x24); sp++; }
-    __asm__ volatile ("dsb sy" ::: "memory");
-    __asm__ volatile ("dc ivac, %0" :: "r"((void*)d) : "memory");
-    __asm__ volatile ("dsb sy" ::: "memory");
-    elog("e5-emmc: k210 P1 st %08x r1 %08x d0 %08x d1 %08x d2 %08x d3 %08x psm %08x ps %08x bc %08x sp %u\n",
-         st, r32(0x10), d[0], d[1], d[2], d[3], psMid, r32(0x24), r32(0x22C), sp);
-    w32(0x30, 0xFFFFFFFFu);
-
+    // k211: four count encodings on the ARMED engine (TM present), LTS order.
+    {
+      struct { const char *tag; uint8_t mode; } vs[4] = {
+        {"V1-w32-first", 0}, {"V2-w32-after58", 1}, {"V3-w16", 2}, {"V4-w32-hi", 3},
+      };
+      for (int v = 0; v < 4; v++) {
+        for (uint32_t q = 0; q < 128; q++) d[q] = 0xCAFE0000u;
+        for (uint64_t la = (uint64_t)d & ~63ull; la < (uint64_t)d + 512; la += 64)
+          __asm__ volatile ("dc cvac, %0" :: "r"(la));
+        { uint8_t rr = r8(0x2F); w8(0x2F, (uint8_t)((rr & 0x08u) | 0x06u));
+          if (!waitBits8(0x2F, 0x06, 0, 100000, 10)) elog("e5-emmc: k211 rst wedge\n"); }
+        w32(0x30, 0xFFFFFFFFu);
+        w16(0x06, 0);
+        w16(0x04, 0x0200u);
+        if (vs[v].mode == 0 || vs[v].mode == 3) { w32(0x00, 1); w32(0x58, (uint32_t)(uintptr_t)dva); }
+        else if (vs[v].mode == 1) { w32(0x58, (uint32_t)(uintptr_t)dva); w32(0x00, 1); }
+        else { w16(0x00, 1); w32(0x58, (uint32_t)(uintptr_t)dva); }
+        w32(0x5C, 0);
+        w8(0x28, 0x20u);
+        w32(0x08, 0x00010000u);
+        w16(0x0C, 0x0013u);
+        w16(0x0E, (17u << 8) | 0x3Au);
+        uint32_t st = 0, sp = 0;
+        while (sp < 20000000u) { st = r32(0x30); if ((st & 0x2u) || (st & 0xFFFF0000u)) break; sp++; }
+        __asm__ volatile ("dsb sy" ::: "memory");
+        __asm__ volatile ("dc ivac, %0" :: "r"((void*)d) : "memory");
+        __asm__ volatile ("dsb sy" ::: "memory");
+        elog("e5-emmc: k211 %s st %08x r1 %08x d0 %08x d1 %08x ps %08x bc %08x r00 %08x sp %u\n",
+             vs[v].tag, st, r32(0x10), d[0], d[1], r32(0x24), r32(0x22C), r32(0x00), sp);
+        w32(0x30, 0xFFFFFFFFu);
+        uint32_t rb[4]; cmd(12, 0, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+        cmd(16, 512, CMD_RESP_SHORT | CMD_CRC_ENABLE, rb);
+      }
+    }
     bmd->complete();
     bmd->release();
     return false;
