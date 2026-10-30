@@ -122,6 +122,17 @@ class NativeSd : public IOBlockStorageDevice {
     }
     return ~crc;
   }
+  static uint32_t crc32n(const uint8_t *p, uint32_t bytes) {
+    // Same polynomial over an arbitrary length; used for the ext4 directory
+    // block whose golden reference (docs/logs/sd-ext4/rootdir.bin) is the
+    // whole 4096-byte block, not its first sector.
+    uint32_t crc = 0xffffffffu;
+    for (uint32_t i = 0; i < bytes; i++) {
+      crc ^= p[i];
+      for (unsigned bit = 0; bit < 8; bit++) crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
+    }
+    return ~crc;
+  }
   bool idle(uint32_t mask) {
     for (unsigned i = 0; i < 10000; i++) {
       if ((r32(0x24) & mask) == 0) return true;
@@ -554,7 +565,7 @@ class NativeSd : public IOBlockStorageDevice {
                   sdlog("NativeSd: ext4 root ext logical %u len %u start %u\n",
                         ext[0].logical, ext[0].len, ext[0].start);
                   if (readSectors(partLba + ext[0].start * (bs / 512), 8)) {
-                    uint32_t dirCrc = crc32(buffer);
+                    uint32_t dirCrc = crc32n(buffer, bs);
                     uint32_t dotInode = 0;
                     unsigned entries = E5Sd::ext4CountDirents(buffer, bs, &dotInode);
                     sdlog("NativeSd: ext4 rootdir %u entries dot %u crc %08x\n",
