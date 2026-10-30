@@ -93,7 +93,7 @@ class NativeEmmc : public IOBlockStorageDevice {
   bool cardUp = false;
   bool partMode = false;
   uint64_t baseLba = 0;
-  uint64_t cacheSectors = 0x200000ull;
+  uint64_t cacheSectors = E5Emmc::cacheSectorCount;
   static NativeEmmc *s_host;
   bool windowPub = false;
 
@@ -558,7 +558,11 @@ bool NativeEmmc::start(IOService *provider)
     scanGpt(d, d8, dva);
     verifyReadback(d, d8, dva);
     // v5: keep regs/DMA page alive; the read path runs in doAsyncReadWrite.
-    baseLba = 0xd0a800ull;
+    baseLba = E5Emmc::cacheFirstLba;
+    if (!E5Emmc::windowFitsCard(sectors, baseLba, cacheSectors)) {
+      elog("NativeEmmc: cache window exceeds card capacity\n");
+      return true;
+    }
     windowPub = true;
     elog("NativeEmmc: v8 read-only service; errors override completion\n");
     elog("NativeEmmc: publishing cache window (%llu sectors @ lba %llx)\n",

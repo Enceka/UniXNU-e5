@@ -25,5 +25,21 @@ int main() {
       return 1;
     }
   }
-  printf("PASS: %zu SDHCI completion/error cases\n", sizeof(cases) / sizeof(cases[0]));
+  struct Window { uint64_t sectors, first, count; bool accepted; };
+  const Window windows[] = {
+    {61079552, E5Emmc::cacheFirstLba, E5Emmc::cacheSectorCount, true},
+    {10, 5, 5, true},
+    {10, 5, 6, false},
+    {10, 10, 1, false},
+    {10, 5, 0, false},
+    {UINT64_MAX, UINT64_MAX - 5, 6, false},
+  };
+  for (const auto &test : windows) {
+    if (E5Emmc::windowFitsCard(test.sectors, test.first, test.count) != test.accepted) {
+      fprintf(stderr, "FAIL: cache window boundary/overflow case\n");
+      return 1;
+    }
+  }
+  printf("PASS: %zu SDHCI completion/error cases; %zu window boundary cases\n",
+         sizeof(cases) / sizeof(cases[0]), sizeof(windows) / sizeof(windows[0]));
 }
