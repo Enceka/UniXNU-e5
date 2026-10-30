@@ -271,8 +271,14 @@ class NativeSd : public IOBlockStorageDevice {
       pmicWrite(0x21bc, E5Sd::ldoVolUv(3000000)); // vddsdio (vqmmc) 3.0V...
       pmicWrite(0x21b8, ioPd & ~1u);              // ...PD clear = enabled.
       IODelay(20000);
-      sdlog("NativeSd: pmic after sdcore pd %04x vol %04x sdio pd %04x vol %04x pstate %04x\n",
-            pmicRead(0x21ac), pmicRead(0x21b0), pmicRead(0x21b8), pmicRead(0x21bc), r16(0x24));
+      { // Wait for the card pull-ups to raise CMD/DAT after the LDO ramp;
+        // PSTATE 0x24 bits 20-24 mirror the five line levels.
+        uint32_t ps = r32(0x24); unsigned lt;
+        for (lt = 0; lt < 1000 && !(ps & 0x01f00000u); lt++) { IODelay(1000); ps = r32(0x24); }
+        sdlog("NativeSd: lines ready pstate %08x tries %u\n", ps, lt);
+      }
+      sdlog("NativeSd: pmic after sdcore pd %04x vol %04x sdio pd %04x vol %04x pstate %08x\n",
+            pmicRead(0x21ac), pmicRead(0x21b0), pmicRead(0x21b8), pmicRead(0x21bc), r32(0x24));
     }
     { // Vendor fast-hotplug sequence (realme/oppo sdhci-sprd.c set_power):
       // rmldo-en aon 0xba0 bit0 through the APB-prot window; 0x520 gets
@@ -282,8 +288,8 @@ class NativeSd : public IOBlockStorageDevice {
       protPut(aon, 0xba0, rm0 | 1u);
       protPut(aon, 0x520, E5Sd::hotplugValue(hp0));
       IODelay(20000);
-      sdlog("NativeSd: hotplug %08x->%08x rmldo %08x->%08x prot %08x pstate %04x\n",
-            hp0, aon.get(0x520), rm0, aon.get(0xba0), aon.get(0xff0), r16(0x24));
+      sdlog("NativeSd: hotplug %08x->%08x rmldo %08x->%08x prot %08x pstate %08x\n",
+            hp0, aon.get(0x520), rm0, aon.get(0xba0), aon.get(0xff0), r32(0x24));
     }
     w16(0x2c, 0);
     clocks.put(0x280, (clocks.get(0x280) & ~7u) | 1u); // ext-26m.
@@ -296,15 +302,27 @@ class NativeSd : public IOBlockStorageDevice {
     w32(0x250, r32(0x250) & ~0x03000000u);
     w32(0x34, 0x1b7f410b); w32(0x38, 0);
     if (!setClock(400000)) return false;
+    IODelay(10000);
     uint32_t st = command(0x0000, 0);
+    IODelay(2000);
+    st = command(0x0000, 0); // mmc_go_idle pulses CMD0 twice.
     sdlog("NativeSd: CMD0 st %08x clk %04x\n", st, r16(0x2c));
     if (!commandOk(st)) return false;
-    st = command(0x081a, 0x1aa);
-    sdlog("NativeSd: CMD8 st %08x r7 %08x\n", st, r32(0x10));
-    if (!commandOk(st) || (r32(0x10) & 0xfff) != 0x1aa) {
-      sdlog("NativeSd: CMD8 fail pstate %04x err %04x dllsts %08x dly %08x\n",
-            r16(0x24), r16(0x32), r32(0x210), r32(0x208));
-      return false;
+    { // CMD8 with retries: a freshly powered card can CRC-flake the echo.
+      unsigned ct = 0;
+      for (;;) {
+        st = command(0x081a, 0x1aa);
+        if (commandOk(st) && (r32(0x10) & 0xfff) == 0x1aa) break;
+        if (++ct >= 10) break;
+        sdlog("NativeSd: CMD8 try %u st %08x r7 %08x err %08x\n", ct, st, r32(0x10), r16(0x32));
+        IODelay(5000);
+      }
+      sdlog("NativeSd: CMD8 st %08x r7 %08x\n", st, r32(0x10));
+      if (!commandOk(st) || (r32(0x10) & 0xfff) != 0x1aa) {
+        sdlog("NativeSd: CMD8 fail pstate %08x err %04x dllsts %08x dly %08x\n",
+              r32(0x24), r16(0x32), r32(0x210), r32(0x208));
+        return false;
+      }
     }
     uint32_t ocr = 0; unsigned tries;
     for (tries = 0; tries < 1000; tries++) {
@@ -316,7 +334,7 @@ class NativeSd : public IOBlockStorageDevice {
     }
     sdlog("NativeSd: ACMD41 st %08x ocr %08x tries %u\n", st, ocr, tries);
     if (!commandOk(st) || (ocr & 0xc0000000u) != 0xc0000000u) {
-      sdlog("NativeSd: ACMD41 fail pstate %04x err %04x\n", r16(0x24), r16(0x32));
+      sdlog("NativeSd: ACMD41 fail pstate %08x err %04x\n", r32(0x24), r16(0x32));
       return false;
     }
     st = command(0x0209, 0); if (!commandOk(st)) return false;
