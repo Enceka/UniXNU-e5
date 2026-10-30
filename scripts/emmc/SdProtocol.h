@@ -37,4 +37,10 @@ constexpr bool readyTran(uint32_t response) {
 constexpr uint32_t hotplugValue(uint32_t cur) {
   return (cur | 0x00100001u) & ~0x002001feu;
 }
+
+// UMP9620 linear LDO VOL encoding (vendor ump9620-regulator.c): 10mV steps
+// from 1.2V, 8-bit field -> 3.0V = 0xb4, 3.3V = 0xd2.
+constexpr uint32_t ldoVolUv(uint32_t microvolts) {
+  return (microvolts - 1200000u) / 10000u;
+}
 }

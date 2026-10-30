@@ -25,5 +25,10 @@ int main() {
   if (E5Sd::hotplugValue(0) != 0x00100001u) return 12;
   if (E5Sd::hotplugValue(0x002001feu) != 0x00100001u) return 13;
   if (E5Sd::hotplugValue(0xffc00000u) != 0xffd00001u) return 14;
-  puts("PASS: SD response ordering, card capacity, divider ceilings, R1 state, hotplug value");
+  // UMP9620 linear LDO VOL: 1.2V floor, 10mV step -> 3.0V = 0xb4, 3.3V = 0xd2.
+  if (E5Sd::ldoVolUv(3000000) != 0xb4u) return 15;
+  if (E5Sd::ldoVolUv(3300000) != 0xd2u) return 16;
+  if (E5Sd::ldoVolUv(1200000) != 0u) return 17;
+  if (E5Sd::ldoVolUv(3750000) != 0xffu) return 18;
+  puts("PASS: SD response ordering, card capacity, divider ceilings, R1 state, hotplug value, LDO VOL");
 }

@@ -31,7 +31,7 @@ class NativeSd : public IOBlockStorageDevice {
     }
     uint32_t get(uint32_t o) const { return *(volatile uint32_t *)(bytes + o); }
     void put(uint32_t o, uint32_t v) { *(volatile uint32_t *)(bytes + o) = v; }
-  } host, ahb, aon, clocks;
+  } host, ahb, aon, clocks, adi, adiSlave;
   IOBufferMemoryDescriptor *dma = nullptr;
   IOLock *lock = nullptr;
   uint8_t *buffer = nullptr;
@@ -55,6 +55,38 @@ class NativeSd : public IOBlockStorageDevice {
     if (cmd & 0x8000u) reg.put(0xff0, 0x68960001u);   // lock direct access
     reg.put(off, v);
     if (cmd & 0x8000u) reg.put(0xff0, 0x97690001u);   // unlock
+  }
+
+  // UMS9620 ADI (qogirn6pro, r5px) master at 0x400000: PMIC register X is
+  // written through the 15-bit slave window at 0x420000+X and read back
+  // through the RD_CMD/RD_DATA pair (vendor spi-sprd-adi.c protocol).
+  bool adiDrain() {
+    for (unsigned i = 0; i < 20000; i++) {
+      if (adi.get(0x30) & (1u << 10)) return true; // ARM fifo empty.
+      IODelay(10);
+    }
+    return false;
+  }
+  bool adiWriteWait() {
+    for (unsigned i = 0; i < 20000; i++) {
+      if (!(adi.get(0x30) & (1u << 31))) return true; // write retired.
+      IODelay(10);
+    }
+    return false;
+  }
+  uint32_t pmicRead(uint32_t off) {
+    adi.put(0x28, 0x420000u + off);
+    for (unsigned i = 0; i < 20000; i++) {
+      uint32_t v = adi.get(0x2c);
+      if (!(v & 0x80000000u)) return v & 0xffffu; // busy cleared.
+      IODelay(10);
+    }
+    return 0xffffu;
+  }
+  bool pmicWrite(uint32_t off, uint32_t v) {
+    if (!adiDrain() || (adi.get(0x30) & (1u << 11))) return false; // fifo full.
+    adiSlave.put(off, v);
+    return adiWriteWait();
   }
 
   static void cache(void *p, bool clean) {
@@ -182,7 +214,25 @@ class NativeSd : public IOBlockStorageDevice {
       }
     }
     if (dmaQuarantined) return false;
-    sdlog("NativeSd: cold legacy begin (rmldo+hotplug enable)\n");
+    sdlog("NativeSd: cold legacy begin (PMIC LDO enable)\n");
+    { // UMP9620 power controller over ADI (vendor ump9620-regulator.c):
+      // write-unlock 0x23d0 = 0x6e7f once, then enable = clear the PD bit0,
+      // VOL is linear 10mV from 1.2V -> 3.0V = 0xb4. vmmc first, then vqmmc.
+      uint32_t prot = pmicRead(0x23d0);
+      uint32_t scPd = pmicRead(0x21ac), scV = pmicRead(0x21b0);
+      uint32_t ioPd = pmicRead(0x21b8), ioV = pmicRead(0x21bc);
+      sdlog("NativeSd: pmic prot %04x sdcore pd %04x vol %04x sdio pd %04x vol %04x\n",
+            prot, scPd, scV, ioPd, ioV);
+      pmicWrite(0x23d0, 0x6e7f);                  // regulator write unlock.
+      pmicWrite(0x21b0, E5Sd::ldoVolUv(3000000)); // vddsdcore (vmmc) 3.0V...
+      pmicWrite(0x21ac, scPd & ~1u);              // ...PD clear = enabled.
+      IODelay(1000);
+      pmicWrite(0x21bc, E5Sd::ldoVolUv(3000000)); // vddsdio (vqmmc) 3.0V...
+      pmicWrite(0x21b8, ioPd & ~1u);              // ...PD clear = enabled.
+      IODelay(20000);
+      sdlog("NativeSd: pmic after sdcore pd %04x vol %04x sdio pd %04x vol %04x pstate %04x\n",
+            pmicRead(0x21ac), pmicRead(0x21b0), pmicRead(0x21b8), pmicRead(0x21bc), r16(0x24));
+    }
     { // Vendor fast-hotplug sequence (realme/oppo sdhci-sprd.c set_power):
       // rmldo-en aon 0xba0 bit0 through the APB-prot window; 0x520 gets
       // protect-en bit20, debounce-en bit0, debounce count bits1-8 = 0 and
@@ -190,10 +240,9 @@ class NativeSd : public IOBlockStorageDevice {
       uint32_t rm0 = aon.get(0xba0), hp0 = aon.get(0x520);
       protPut(aon, 0xba0, rm0 | 1u);
       protPut(aon, 0x520, E5Sd::hotplugValue(hp0));
-      w8(0x29, 0x0f); // mirror the proven eMMC host power byte
       IODelay(20000);
-      sdlog("NativeSd: hotplug %08x->%08x rmldo %08x->%08x prot %08x pstate %04x power %02x\n",
-            hp0, aon.get(0x520), rm0, aon.get(0xba0), aon.get(0xff0), r16(0x20), r8(0x29));
+      sdlog("NativeSd: hotplug %08x->%08x rmldo %08x->%08x prot %08x pstate %04x\n",
+            hp0, aon.get(0x520), rm0, aon.get(0xba0), aon.get(0xff0), r16(0x24));
     }
     w16(0x2c, 0);
     clocks.put(0x280, (clocks.get(0x280) & ~7u) | 1u); // ext-26m.
@@ -213,7 +262,7 @@ class NativeSd : public IOBlockStorageDevice {
     sdlog("NativeSd: CMD8 st %08x r7 %08x\n", st, r32(0x10));
     if (!commandOk(st) || (r32(0x10) & 0xfff) != 0x1aa) {
       sdlog("NativeSd: CMD8 fail pstate %04x err %04x dllsts %08x dly %08x\n",
-            r16(0x20), r16(0x32), r32(0x210), r32(0x208));
+            r16(0x24), r16(0x32), r32(0x210), r32(0x208));
       return false;
     }
     uint32_t ocr = 0; unsigned tries;
@@ -226,7 +275,7 @@ class NativeSd : public IOBlockStorageDevice {
     }
     sdlog("NativeSd: ACMD41 st %08x ocr %08x tries %u\n", st, ocr, tries);
     if (!commandOk(st) || (ocr & 0xc0000000u) != 0xc0000000u) {
-      sdlog("NativeSd: ACMD41 fail pstate %04x err %04x\n", r16(0x20), r16(0x32));
+      sdlog("NativeSd: ACMD41 fail pstate %04x err %04x\n", r16(0x24), r16(0x32));
       return false;
     }
     st = command(0x0209, 0); if (!commandOk(st)) return false;
@@ -250,7 +299,8 @@ public:
     if (!IOBlockStorageDevice::start(provider)) return false;
     sdlog("NativeSd: v1 start, independent SDIO0 host\n");
     if (!ahb.open(0x20000000, 0x2000) || !aon.open(0x64900000, 0x2000) ||
-        !clocks.open(0x64920000, 0x1000)) { sdlog("NativeSd: clock map failed\n"); return false; }
+        !clocks.open(0x64920000, 0x1000) || !adi.open(0x400000, 0x40) ||
+        !adiSlave.open(0x420000, 0x8000)) { sdlog("NativeSd: clock map failed\n"); return false; }
     ahb.put(0x1000, 1u); aon.put(0x113c, (1u << 2) | (1u << 3));
     IODelay(1000);
     sdlog("NativeSd: gates ahb %08x aon %08x\n", ahb.get(0), aon.get(0x13c));
@@ -288,6 +338,7 @@ public:
     } else if (dma) sdlog("NativeSd: quarantined DMA after failed reset\n");
     if (lock) IOLockFree(lock);
     host.close(); clocks.close(); aon.close(); ahb.close();
+    adi.close(); adiSlave.close();
     IOBlockStorageDevice::free();
   }
   char *getVendorString() override { return const_cast<char *>("SD"); }
