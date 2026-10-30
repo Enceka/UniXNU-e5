@@ -42,4 +42,4 @@
 
 [payload.adt]
 packed_data_ramdisk = "Payloads/seed.dbr"
-root_match_volume_uuid = "5F43242C-064B-4F60-87C9-BDA3241862F1"
+root_match_volume_uuid = "36E07D3C-7F6F-40B0-B714-E0025D0118C6"
