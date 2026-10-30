@@ -428,3 +428,63 @@ Throughput ladder so far: 6.5MHz single-block (v14) -> 24.375MHz
 single-block (1.77 MiB/s) -> 24.375MHz 16-sector CMD18 (10.7 MiB/s).
 Next rungs when needed: SDR50/SDR104 + DLL tuning (vendor
 enable_phy_dll + tuning procedure), larger DMA than one page.
+
+## Round 17 prep — ext4 read-side walk (branch stage2/sd-ext4)
+
+Offline recon against the card over adb (dumps archived in docs/logs/sd-ext4/
++ sd-ext4-reference.json): the partition at LBA 2048 is an ext4 volume named
+`e5-openwrt` (last_mounted `/newroot`) laid out like an OpenWrt rootfs —
+4096B blocks, 32768 bpg, 8192 ipg, 116 groups. GDT at fs-block 1; gd0 places
+the group-0 inode table at fs-block 145. Root inode 2 (itable+256) is a
+4096-byte extent-mapped directory whose single extent points at fs-block
+4241; that block holds 22 dirents (`.` `..` lost+found bin dev etc init lib
+lib64 mnt opt overlay proc rom root sbin sys tmp usr var www run), CRC32
+70633ae6. Image quirk: the superblock's first_ino/inode_size fields are
+corrupt (0/11) — the real inode stride is 256 (proven from f30a placements),
+so the walk passes the stride explicitly and never trusts those fields.
+
+v16 (commit 23ceb15): pure parsers ext4ParseExtents()/ext4CountDirents() in
+SdProtocol.h (unit-tested against the golden bytes, cases 27-31), driver walk
+after the speed-mode verify via readSectors (CMD18 multi), soft-guarded.
+Checker (e5-xnu d2a363e) requires the four ext4 evidence lines with the
+golden values. CI kernel 279 dispatched (run 41143425911).
+
+## Round 17 (kernel 279, v16 ext4 walk) — walk proven, CRC scope bug
+
+Report: docs/logs/uefi-report-073110.txt. Boot green, eMMC regression green.
+Walk evidence (all four lines first board appearance):
+
+- `ext4 sb ok inodes 950272 blocks 3780347 ipg 8192` (golden)
+- `ext4 gd0 itable 145` (golden)
+- `ext4 root ext logical 0 len 1 start 4241` (golden)
+- `ext4 rootdir 22 entries dot 2 crc c564f66b` — entries/dot golden; CRC
+  mismatch: c564f66b = crc32 of the first 512 bytes only (the sector-sized
+  crc32 helper), while the golden 70633ae6 covers the whole 4096-byte
+  directory block (verified offline: crc32(rootdir.bin[:512]) = c564f66b,
+  crc32(rootdir.bin) = 70633ae6).
+
+tp single 128 sectors 32565 us; tp multi 128 sectors 4955 us match y.
+Checker FAIL: "ext4 rootdir CRC mismatch: c564f66b" (expected).
+
+Fix (e1e38d7): added crc32n(p, bytes) and CRC bs bytes at the rootdir site;
+reference and checker unchanged (they were right). Round 18 (kernel 280)
+re-runs the same walk for the PASS record.
+
+## Round 18 (kernel 280, v16 + whole-block CRC) — FULL PASS, ext4 round closed
+
+Report: docs/logs/uefi-report-074725.txt. Boot green, eMMC regression green.
+
+- `ext4 sb ok inodes 950272 blocks 3780347 ipg 8192` (golden)
+- `ext4 gd0 itable 145` (golden)
+- `ext4 root ext logical 0 len 1 start 4241` (golden)
+- `ext4 rootdir 22 entries dot 2 crc 70633ae6` (golden — whole-block CRC fix e1e38d7 verified)
+- tp single 128 sectors 36134 us; tp multi 128 sectors 7285 us match y
+- probe Success default-4bit-24MHz; publishing read-only SD card 30244864 sectors
+
+Checker (tools/e5-sd-check.py, e5-xnu d2a363e): PASS exit 0 —
+"SD 30244864 sectors via default-4bit-24MHz, reference 4/4 CRC match,
+repeat 16/16; eMMC v8 + E5EMMC mount + shell intact (EXITH 5/5)".
+
+The ext4-mapping round objective is met: XNU natively walks the card's
+ext4 (superblock → group descriptor → root inode extent tree → root
+directory) and verifies content against the Android-side golden captures.

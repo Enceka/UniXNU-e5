@@ -61,4 +61,61 @@ constexpr uint32_t hotplugValue(uint32_t cur) {
 constexpr uint32_t ldoVolUv(uint32_t microvolts) {
   return (microvolts - 1200000u) / 10000u;
 }
+
+// ---- ext4 read-side walk (pure, unit-tested) ----
+// The e5-openwrt image on this card was written by project tooling: its
+// superblock carries a corrupt first_ino (0) and inode_size (11). The real
+// geometry (proven from the on-disk tables, dumps/sd-ext4/) is a 256-byte
+// inode stride with the standard (inode-1)*isize table layout, so callers
+// pass the stride explicitly and never trust those two sb fields.
+struct Ext4Extent {
+  uint32_t logical; // first logical file block
+  uint16_t len;     // blocks (uninit flag stripped)
+  uint32_t start;   // physical fs block
+};
+
+// Parse the extent tree root in i_block[] of an inode. Only depth-0 trees
+// (all our directories/files of interest) are supported; returns 0 on any
+// inconsistency.
+inline unsigned ext4ParseExtents(const uint8_t *inode, uint32_t inodeSize,
+                                 Ext4Extent *out, unsigned max) {
+  const uint8_t *ib = inode + 40; // i_block at inode+40
+  uint16_t magic = (uint16_t)(ib[0] | (ib[1] << 8));
+  uint16_t entries = (uint16_t)(ib[2] | (ib[3] << 8));
+  uint16_t depth = (uint16_t)(ib[6] | (ib[7] << 8));
+  if (magic != 0xf30a || depth != 0 || entries == 0 || entries > max)
+    return 0;
+  for (unsigned i = 0; i < entries; i++) {
+    const uint8_t *e = ib + 12 + 12 * i;
+    out[i].logical = (uint32_t)e[0] | ((uint32_t)e[1] << 8) |
+                     ((uint32_t)e[2] << 16) | ((uint32_t)e[3] << 24);
+    out[i].len = (uint16_t)((uint16_t)(e[4] | (e[5] << 8)) & 0x7fff);
+    out[i].start = (uint32_t)e[8] | ((uint32_t)e[9] << 8) |
+                   ((uint16_t)e[6] | ((uint16_t)e[7] << 8)) * 65536u;
+    if (out[i].len == 0) return 0;
+  }
+  return entries;
+}
+
+// Iterate a directory block: counts valid entries and captures the inode of
+// the "." entry. Stops at the first malformed rec_len. Returns entry count.
+inline unsigned ext4CountDirents(const uint8_t *block, uint32_t bytes,
+                                 uint32_t *dotInode) {
+  unsigned n = 0;
+  uint32_t off = 0;
+  while (off + 8 <= bytes) {
+    uint32_t ino = (uint32_t)block[off] | ((uint32_t)block[off + 1] << 8) |
+                   ((uint32_t)block[off + 2] << 16) |
+                   ((uint32_t)block[off + 3] << 24);
+    uint16_t recl = (uint16_t)(block[off + 4] | (block[off + 5] << 8));
+    uint8_t nlen = block[off + 6];
+    if (recl < 8 || off + recl > bytes || 8 + (uint32_t)nlen > recl) break;
+    if (ino != 0) {
+      if (nlen == 1 && block[off + 8] == '.') *dotInode = ino;
+      n++;
+    }
+    off += recl;
+  }
+  return n;
+}
 }
