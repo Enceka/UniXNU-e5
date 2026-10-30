@@ -145,16 +145,16 @@ next_action = ["Inventory the UMS9621 GPU block and check whether a Turnip/AirNi
 
 [[area]]
 id = "network"
-status = "not-applicable"
-components = []
-paths = []
-inputs = []
+status = "planned"
+components = ["Ath12kWifi"]
+paths = ["drivers/Ath12kWifi"]
+inputs = ["Wi-Fi/Bluetooth combo chip identity and interfaces on this board are not yet identified from the vendor tree."]
 configuration = []
 procedure = []
-findings = []
+findings = ["The catalog provides the Ath12kWifi component (legacy name NativeWifi) for Atheros ath12k hardware."]
 completion = []
-limits = ["The device has a 5G modem; no Wi-Fi component exists for UMS9621 and modem bring-up is out of scope for this record."]
-next_action = []
+limits = ["Chip identity, firmware loading path and RF calibration data location are unknown; the 5G modem remains out of scope for this record."]
+next_action = ["Identify the Wi-Fi combo chip from the vendor device tree and boot logs, then evaluate the Ath12kWifi component interface against it."]
 
 [[area]]
 id = "audio"
