@@ -428,3 +428,23 @@ Throughput ladder so far: 6.5MHz single-block (v14) -> 24.375MHz
 single-block (1.77 MiB/s) -> 24.375MHz 16-sector CMD18 (10.7 MiB/s).
 Next rungs when needed: SDR50/SDR104 + DLL tuning (vendor
 enable_phy_dll + tuning procedure), larger DMA than one page.
+
+## Round 17 prep — ext4 read-side walk (branch stage2/sd-ext4)
+
+Offline recon against the card over adb (dumps archived in docs/logs/sd-ext4/
++ sd-ext4-reference.json): the partition at LBA 2048 is an ext4 volume named
+`e5-openwrt` (last_mounted `/newroot`) laid out like an OpenWrt rootfs —
+4096B blocks, 32768 bpg, 8192 ipg, 116 groups. GDT at fs-block 1; gd0 places
+the group-0 inode table at fs-block 145. Root inode 2 (itable+256) is a
+4096-byte extent-mapped directory whose single extent points at fs-block
+4241; that block holds 22 dirents (`.` `..` lost+found bin dev etc init lib
+lib64 mnt opt overlay proc rom root sbin sys tmp usr var www run), CRC32
+70633ae6. Image quirk: the superblock's first_ino/inode_size fields are
+corrupt (0/11) — the real inode stride is 256 (proven from f30a placements),
+so the walk passes the stride explicitly and never trusts those fields.
+
+v16 (commit 23ceb15): pure parsers ext4ParseExtents()/ext4CountDirents() in
+SdProtocol.h (unit-tested against the golden bytes, cases 27-31), driver walk
+after the speed-mode verify via readSectors (CMD18 multi), soft-guarded.
+Checker (e5-xnu d2a363e) requires the four ext4 evidence lines with the
+golden values. CI kernel 279 dispatched (run 41143425911).
