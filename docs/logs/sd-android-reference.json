@@ -1,0 +1,53 @@
+{
+  "card_name": "SD16G",
+  "card_type": "SDHC",
+  "cid_sha256": "69c6a04d2a26340873bc48c54f376aebe78f5db258c645f1727ac25903865e76",
+  "properties": {
+    "csd": "400e00325b590000735f7f800a400000",
+    "ocr": "0x00040000",
+    "rca": "0x5048",
+    "name": "SD16G",
+    "type": "SD"
+  },
+  "sectors": 30244864,
+  "sector_bytes": 512,
+  "host": {
+    "base": "0x22210000",
+    "size": "0x1000",
+    "interrupt_spi": 203,
+    "gic_intid": 235,
+    "ap_ahb_set": "0x20001000 bit0",
+    "aon_clock_set": "0x6490113c bits2,3",
+    "clock_mux": "0x64920280"
+  },
+  "partition": {
+    "first_lba": 2048,
+    "sectors": 30242783,
+    "type": "0c",
+    "filesystem": "ext4"
+  },
+  "ios": "clock:\t\t208000000 Hz\nvdd:\t\t18 (3.0 ~ 3.1 V)\nbus mode:\t2 (push-pull)\nchip select:\t0 (don't care)\npower mode:\t2 (on)\nbus width:\t2 (4 bits)\ntiming spec:\t6 (sd uhs SDR104)\nsignal voltage:\t1 (1.80 V)\ndriver type:\t0 (driver type B)",
+  "reference_blocks": [
+    {
+      "lba": 0,
+      "crc32": "f9e85b82",
+      "sha256": "1b60dd117cab1b770fdfd25987d5417de12129031d75b6f145d368a175c07265"
+    },
+    {
+      "lba": 1,
+      "crc32": "b2aa7578",
+      "sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+    },
+    {
+      "lba": 2048,
+      "crc32": "b2aa7578",
+      "sha256": "076a27c79e5ace2a3d47f9dd2e83e4ff6ea8872b3c2218f66c92b89b55f36560"
+    },
+    {
+      "lba": 2050,
+      "crc32": "c1117912",
+      "sha256": "404b0a8f9c1c535b141f194ff8ff73a06a65ab3b249619f92bc20f7cad42d225"
+    }
+  ],
+  "scope": "Read-only Android reference; no native SD acceptance claimed."
+}
