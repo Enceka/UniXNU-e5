@@ -400,8 +400,8 @@ public:
       for (uint32_t b = 0; b < 2; b++) {
         uint32_t st = sdmaRead512(0x113A, bases[i] + offs[i] + b, d, dva);
         cacheInvalidate(d, 512);
-        elog("NativeEmmc: verify %s blk %u words %08x %08x %08x %08x crc %08x",
-             tags[i], b, d[0], d[1], d[2], d[3], crc32(d8, 512));
+        elog("NativeEmmc: verify %s blk %u st %08x words %08x %08x %08x %08x crc %08x",
+             tags[i], b, st, d[0], d[1], d[2], d[3], crc32(d8, 512));
       }
     }
   }
