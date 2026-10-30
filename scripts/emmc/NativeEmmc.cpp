@@ -422,7 +422,9 @@ bool NativeEmmc::start(IOService *provider)
   // One physically-contiguous page below 4 GiB: receive buffer at +0, the
   // ADMA2 descriptor at +512, mirroring the UEFI probe's DMA page layout.
   IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
-      kernel_task, kIODirectionInOut | kIOMemoryPhysicallyContiguous, 8192, 8192, 0xFFFFE000ull);
+      kernel_task,
+      (IOOptionBits)kIODirectionInOut | (IOOptionBits)kIOMemoryPhysicallyContiguous,
+      8192, 0xFFFFE000ull);
   if (!bmd) { elog("NativeEmmc: dma alloc failed\n"); map->release(); md->release(); return true; }
   bmd->prepare();
   uint32_t *d = (uint32_t *)bmd->getBytesNoCopy();
