@@ -99,3 +99,25 @@ adi.open(0x64400000, 0x1000)；adiSlave.open(0x64600000, 0x8000)（slave
 窗口 = 控制器+0x20000，vendor spi-sprd-adi.c channel_offset 0x20000）；
 pmicRead 的 RD_CMD 写**物理从机地址** 0x64600000+off。gate/rst/mux 序列
 保留（无害且 checker 已依赖）。其余不变。
+
+## 2026-10-30 kernel 268 / v6（uefi-report-211xxx.txt）——地址修复生效：无 panic，PMIC 真实可读
+v6 把 ADI 基址改为 0x64400000 后：**不再 panic**，XNU 正常到 shell，eMMC 回归全绿，
+NativeSd 两次探针均干净走完冷路径。真实 PMIC 读数回来了：
+`adi gate a7ffff8f->a7ffff8f`（bit9 本来就置位）、`adi rst 0->0`、`adi mux 2->2`
+（本来就选 rco-25m）——v4/v5 的门控/复位/mux 全是"本来就好"的空转。
+`pmic prot 8000 sdcore pd 0001 vol 00b4 sdio pd 0001 vol 00b4`：两路 LDO
+VOL 已是 3.0V 码值，但 PD=1（掉电）→ 与第 2 轮"卡没电"结论一致。
+**但 5 次 pmicWrite 全部异常**：日志里 5 条 `E5SERRSKIP`（本内核的延迟 SError
+跳过处理器）与 5 次写一一对应，`pmic after` 显示 PD/VOL/pstate 全没变。
+存储走 fire-and-forget → 写入未映射物理孔洞以延迟中止返回。
+
+### v6 仍然错了一处算术：slave 窗口
+channel_offset=0x20000，窗口 = 0x64400000+0x20000 = **0x64420000**（DT reg
+跨度 0x64400000..0x64500000 内）。v6 误映射 0x64600000（相当于 +0x220000，
+在 reg 范围外 → 孔洞 → 写 SError）。读没受影响的原因：RD_CMD 的数值被 ADI
+控制器按 17 位掩码解码（0x646023d0 & 0x1FFFF = 0x23d0，恰好对）。
+
+### v7（commit 97a0c67，kernel 269）
+adiSlave.open(0x64420000, 0x8000)；pmicRead RD_CMD = 0x64420000+off。
+预期：PMIC 写落地（unlock 0x23d0=0x6e7f → VOL 已 0xb4 → PD 清零），
+随后 pstate 出现 CINS/CMD 电平，CMD8 应答 r7=0x1aa。
