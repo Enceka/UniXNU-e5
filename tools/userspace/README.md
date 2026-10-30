@@ -16,6 +16,10 @@ Minimal PID1 + probes, all raw syscalls (no libSystem), built with iphoneos SDK 
 
 Build ls/cat with the assembly entry. A C entry that samples SP after its
 prologue reads its own frame instead of argc/argv.
+The entry also aligns the working SP to 16 bytes before entering C while
+passing the original argument-area pointer in x0. XNU's static string/pointer
+copyout only guarantees pointer alignment; argument lengths can otherwise
+leave SP at 8 modulo 16 and fault in the first C stack access.
 
 ```sh
 sh tools/userspace/build-console-tools.sh out/userspace

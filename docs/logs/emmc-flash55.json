@@ -1,0 +1,73 @@
+{
+  "flash": 55,
+  "kernel_sha256": "9cd61f12978ed8e8b8b089f65ef3a1ed83c3a908bcde4f6dceb89664af5d68d6",
+  "root_image_sha256": "ddda150a9be2459752f367023a423e82a79d79eae6187ca13ea68f931d55ebc5",
+  "root_and_payload_full_readback": true,
+  "post_boot_root_unchanged": true,
+  "root": {
+    "root_uuid": "238A9EDD-6788-4B2E-BA4E-C1F70AE25B64",
+    "kernel": 260,
+    "seed": "v9",
+    "binaries": [
+      {
+        "path": "sbin/launchd",
+        "sha256": "c459e33c773fbce324c6d4cd75a1bb22a9a358abb488d430ab3957b5e4957a3d",
+        "cdhash": "c04e598b25a3fdc31328bc7f2eeed2594146ff58"
+      },
+      {
+        "path": "bin/ls",
+        "sha256": "879656e571d47ea4c2faa2f9d9fb81623a257b8b7e2022b0633f7d8803ff1e29",
+        "cdhash": "3ebefc361b234b67007177185231d8706918c0e7"
+      },
+      {
+        "path": "bin/cat",
+        "sha256": "0225e4a7a033ab71652cada279500e1a1a0000946e859d482aea5c2ba9ad2628",
+        "cdhash": "b2a53279300d983ead75f59bef9eadcd67edb4cb"
+      },
+      {
+        "path": "bin/clock",
+        "sha256": "a7bebd991f42a0dffcf79ae6e64e4e794b8a7cbbd48f560328953170eaf229f4",
+        "cdhash": "e7c3788afc693f7fe555b89ef1ffdf77d3bb1054"
+      },
+      {
+        "path": "1",
+        "sha256": "879656e571d47ea4c2faa2f9d9fb81623a257b8b7e2022b0633f7d8803ff1e29",
+        "cdhash": "3ebefc361b234b67007177185231d8706918c0e7"
+      },
+      {
+        "path": "2",
+        "sha256": "0225e4a7a033ab71652cada279500e1a1a0000946e859d482aea5c2ba9ad2628",
+        "cdhash": "b2a53279300d983ead75f59bef9eadcd67edb4cb"
+      }
+    ],
+    "trust_cache_sha256": "61a19218b3e2b45caf7711d2a271df5c4e984411e8680615e76b194375665b3f"
+  },
+  "payload": {
+    "baseline": "uefi/build/emmc-v9-k260",
+    "baseline_payload_sha256": "c81edcf512f3bfa6ccd08c32f74b11cce87ce8b9ca2d85309e009d2c9d784e55",
+    "payload_sha256": "1fb99a66d080eafa3ba351e513aff77d4b36502de29668dabd94ce30cca3b35d",
+    "seed_sha256": "d633984f596c32d0fb3e84a7970dc2898e4cb08201841a809660a4e297f979c5",
+    "trust_cache_sha256": "61a19218b3e2b45caf7711d2a271df5c4e984411e8680615e76b194375665b3f",
+    "preserved_files": [
+      "kernel.macho",
+      "kernel.macho.adt",
+      "E5BootMenu.efi",
+      "DarwinBoot.efi",
+      "UniXNU.efi",
+      "startup.nsh",
+      "EFI/UniXNU/unixnu.toml"
+    ]
+  },
+  "report": "uefi-report-161217.txt",
+  "standard_batch_raw_statuses": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "extra_diagnostic_raw_status": 10,
+  "device_after_test": {
+    "sys.boot_completed": "1",
+    "ro.boot.slot_suffix": "_a"
+  }
+}

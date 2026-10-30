@@ -16,13 +16,18 @@ configuration = ["board.name = e5; board.soc = UMS9621; board.soc_source = ums96
 procedure = ["Run ./unixnu defconfig e5_defconfig --device <repo> from the UniXNU checkout.", "Run ./unixnu status --json --device <repo> and confirm profiles, source pins and patch order.", "CI (kernel-builder workflow) builds kernel.macho from the pinned sources on a macOS runner."]
 findings = ["Arrays replace inherited selections in board.toml; the device list restates every required component.", "CI rebuilds from identical patch content are not byte-identical; kernel behaviour was validated by flash evidence instead of binary hashes.", "Patches must be generated against the arch+soc+os-patched tree; anchors against pristine Apple XNU fail where UniXNU series modify the same files (for example arm_init.c gains boot_progress helpers)."]
 completion = ["All source pins resolve; every selected component has a record; status shows the intended overrides and patch order."]
-limits = ["Kernel binary layout is fragile: rebuilds with patch deltas beyond the validated series can die before the kernel console starts (observed in flashes 20, 21, 23, 27, 28); the mechanism is unresolved."]
-next_action = ["Keep the validated patch series pinned until the pre-console fragility is understood; document any new patch with its flash evidence."]
+limits = ["Hardware-facing patch changes still require device validation. The earlier general binary-layout-fragility diagnosis was withdrawn after fixed-seed control experiments isolated incorrect keypad MMIO addresses."]
+next_action = ["Keep source and payload inputs pinned per experiment; change one variable and retain matching flash evidence for hardware-facing changes."]
 
 [[area.evidence]]
 kind = "source"
 reference = "board.toml"
 result = "Configuration and archives described in this section"
+
+[[area.evidence]]
+kind = "source"
+reference = "docs/keypad-control.md"
+result = "Fixed-seed controls and two-instruction MMIO correction supersede the earlier kernel-layout and e5-key-token failure claims."
 
 [[area]]
 id = "firmware"
@@ -44,6 +49,13 @@ command = "sh tools/e5-uefi-cycle.sh flash; sh tools/e5-uefi-cycle.sh collect (e
 revision = "529e91c58650464d7cf1fe5523f53d4285a46f83"
 result = "Full chain observed on device: LK boots BootShim, UEFI menu renders, DarwinBoot loads kernel.macho 52035584 bytes with trust cache Success, XNU reaches the seed root and PID 1 shell."
 
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/uefi-report-163029.txt"
+command = "PAYLOAD=<flash57>/payload/e5-uefi.bin sh tools/e5-uefi-cycle.sh flash; sh tools/e5-uefi-cycle.sh collect (e5-xnu repository)"
+revision = "b7e4e3797fba39e343f9aa277133395b2248b9ce"
+result = "Flash #57: retained firmware and kernel 260 load the updated trust cache, eMMC E5EMMC root mounts, v9 PID1 runs five commands with raw status 0 and reaches the canonical console. Full payload readback and Android A-slot recovery are recorded in docs/logs/emmc-flash57.json."
+
 [[area]]
 id = "cpu"
 status = "implemented"
@@ -56,6 +68,11 @@ findings = ["cpu@600/cpu@700 capacity 0x400 against 0x1a4 for cpu@0 to cpu@500 c
 completion = ["Every enabled CPU reaches its entry checkpoint and timer and IPI handling works on each enabled CPU."]
 limits = ["Enabled-core coverage inside XNU and IPI delivery across clusters are not yet measured."]
 next_action = ["Instrument XNU CPU_START paths per core and record which of the 8 cores come online."]
+
+[[area.evidence]]
+kind = "source"
+reference = "feeds.toml"
+result = "Pinned UMS9621 SoC tree supplies CPU/PSCI/GIC declarations; enabled-core and IPI acceptance remains unmeasured."
 
 [[area]]
 id = "memory"
@@ -70,18 +87,23 @@ completion = ["All handoff regions are accounted for and each enabled DMA engine
 limits = ["SMMU is not configured; DMA uses coherently-mapped buffers with explicit cache maintenance."]
 next_action = ["Document the reserved-memory map end to end (LK, UEFI, XNU) in one table with dump references."]
 
+[[area.evidence]]
+kind = "source"
+reference = "dts/e5.dts"
+result = "Device memory declaration: physical 0x80000000, size 0x80000000; full handoff and DMA ownership audit remains pending."
+
 [[area]]
 id = "storage"
 status = "implemented"
 components = ["RamBlock"]
-paths = ["scripts/emmc/**", "scripts/*ufs*", "tools/userspace/**"]
-inputs = ["Unisoc SDHCI host controller at 0x41000000 window (warm-inherited from LK: card selected in TRAN state, RCA 1), eMMC 29 GiB with a 70-entry GPT, cache partition at LBA 0xd0a800 size 0x200000 sectors, full disk mmcblk0."]
-configuration = ["NativeEmmc (scripts/emmc/NativeEmmc.cpp) is compiled into the kernel by e5_emmc_build.py against the storage ABI derived from the pinned kernelcache.", "v2-v4 probes: identity (CMD0/CMD2/CMD9/CMD13), warm CMD17 reads, EXT_CSD, LBA0/LBA1 CRC references, boot_b and misc read-back verification against host-flashed bytes.", "v5 publishes the whole-disk IOBlockStorageDevice (61079552 sectors) with a locked synchronous read path; the XnuPrelink IOStorageFamily attaches, GUIDPartitionScheme re-parses the GPT and publishes 70 partition medias.", "v6/v6.1 add a second cache-window block device (base LBA 0xd0a800) started from a kernel publisher thread so AppleAPFSFilter can claim a bare APFS container written to the cache partition."]
-procedure = ["Write a bare APFS container to the cache partition from Android (dd to /dev/block/mmcblk0p47) and verify the NXSB survives warm reboots.", "Patch the ADT root UUID to the container volume UUID, point board.toml root_match_volume_uuid at it, rebuild the payload and flash.", "Read the NativeEmmc elog markers (inherit lines, v4 result, part enumeration, publishing, rw calls) from the collected report."]
-findings = ["GPT entries-array writes are deterministically restored by the boot chain (LK validates and rebuilds the canonical GPT), so partition-type GUID edits are not a viable root-matching path; partition-data writes persist.", "IOStorageFamily attaches to the whole-disk device published from a standard matched start(); a second manually-created block device registered from inside the parent start() gets zero client matches, and starting it from a kernel publisher thread is required (ShengUfs publishThread pattern).", "All IOKit reads through doAsyncReadWrite succeed (trace shows single and 32-block reads at LBA 0, 1, 2 with no failures), so the read path is verified end to end on device.", "The cache-window volume is not yet claimed: with the root UUID pointed at the eMMC container the kernel waits for IOMedia UUID 36E07D3C-7F6F-40B0-B714-E0025D0118C6, times out and panics in IOKitBSDInit mountroot."]
-completion = ["Host: register, clock, link and SMMU facts match the board inventory.", "Reads: SCSI capacity, GPT and known blocks are correct; OS/SystemOS windows stay within userdata.", "Root: the configured volume mounts and launchd starts. Persistence: writes survive reboot within the allocated Data region."]
-limits = ["Read-only: no write path yet. Root volume still boots from the ramdisk seed; the eMMC APFS container is not claimed by the family yet (flash 52 evidence).", "Writes to the GPT area do not survive reboot (restored by LK); partition-content writes do."]
-next_action = ["Publish the cache window with a GPT-wrapped APFS container image (mirroring the ramdisk seed layout that already works through GUIDPartitionScheme) and retest root matching on eMMC."]
+paths = ["scripts/emmc/**", "scripts/*ufs*", "tools/userspace/**", "docs/emmc-seed.md", "docs/logs/emmc-*.json", "docs/logs/uefi-report-161217.txt", "docs/logs/uefi-report-162200.txt", "docs/logs/uefi-report-163029.txt"]
+inputs = ["Unisoc sprd,sdhci-r11 eMMC host at physical 0x22200000 (warm-inherited from LK: card selected in TRAN state, RCA 1), eMMC 61079552 sectors (29.125 GiB) with a 70-entry GPT, cache partition at LBA 0xd0a800 size 0x200000 sectors, full disk mmcblk0."]
+configuration = ["NativeEmmc (scripts/emmc/NativeEmmc.cpp) is compiled into the kernel by e5_emmc_build.py against the storage ABI derived from the pinned kernelcache.", "v2-v4 probes cover card identification, EXT_CSD, SDMA/ADMA MBR/GPT reads and boot_b/misc readback. v5 publishes the whole disk and IOGUIDPartitionScheme enumerates 70 partitions.", "Current v7 uses the originally matched block device to publish only the cache window: base LBA 0xd0a800, length 0x200000 sectors. The 8 MiB test image inside that partition contains its own GPT and an APFS volume E5EMMC; the physical eMMC GPT is unchanged.", "board.toml and the ADT match volume UUID 238A9EDD-6788-4B2E-BA4E-C1F70AE25B64. The current flash #57 baseline uses kernel 260, v9 PID1, aligned ls/cat entry stubs, numeric aliases and a trust cache from the installed signed binaries."]
+procedure = ["Clone the existing test image, preserve its volume UUID, create /dev and install the signed v9 PID1, ls/cat/clock and numeric aliases. Generate the trust cache from the actual installed binaries; see docs/emmc-seed.md.", "Back up and compare the previous 8 MiB cache test image before replacing only that existing test region from Android; verify the entire replacement by readback SHA256.", "Keep kernel/ADT/EFI/configuration fixed, rebuild FAT and rerun mk-boot-payload.py, flash through e5-uefi-cycle.sh and verify the full boot payload by readback before collect.", "Require the expected eMMC window, E5EMMC UUID/mount, INIT-START-v9, console fd0, TIOCGETA/ICANON, raw command exit statuses and SH READY/READ-BLOCK in the same report."]
+findings = ["Physical GPT edits were restored across reboot in earlier tests; the boot-chain mechanism is not isolated. Partition-content writes survive. Current tests leave the physical GPT untouched.", "The v6 second-device/bare-container attempts did not produce a root mount, including the publisher-thread variant. v7 publishes the GPT-wrapped image through the original matched service and mounts it; the separate effects of GPT wrapping and publication were not isolated.", "IOKit reads through doAsyncReadWrite are verified for GPT, APFS metadata and seed executables. This proves the tested read path, not every error/recovery case.", "Flash #54 mounts E5EMMC with old v8; #55 adds v9, real console fd0, ICANON and four standard commands exiting 0. An extra long-argument cat SIGBUS is reproduced before its first trace in #56. #57 fixes the shared static-tool C stack alignment: all five commands exit 0 and the marker file is read. Its original argument pointer is 0x16fdffde8 (8 modulo 16), preserved while the working SP is aligned. SH READY/READ-BLOCK follow with no devfs, AMFI or child exception failure.", "The #55, #56 and #57 root images are byte-identical when read back after their XNU boots. #57's kernel/ADT/EFI/configuration file hashes remain unchanged across the userspace correction."]
+completion = ["Host: SDHCI register, clock, card mode and DMA facts match the board inventory.", "Reads: eMMC capacity, GPT and known blocks are correct; all exported windows stay within their containing partition.", "Root: the configured volume mounts and launchd starts. Persistence: writes survive reboot within the allocated Data region."]
+limits = ["XNU eMMC writes are unsupported. This is a custom minimal APFS seed, not the original OS/SystemOS or a writable Data volume.", "The source currently advertises writable media while rejecting write requests, and the normal read loop checks completion without rejecting all error bits. Correct and test those contracts before extending storage acceptance.", "Five batch commands and tty setup passed in #57; physical keypad and serial command entry remain separate acceptance items."]
+next_action = ["Correct storage error/write-protection contracts, audit the real OS/SystemOS/Data layout and memory requirements, and progress toward the original system userland using the frozen #57 eMMC seed as the read-path baseline."]
 
 [[area.evidence]]
 kind = "device"
@@ -96,6 +118,25 @@ reference = "docs/logs/uefi-report-125906.txt"
 command = "sh tools/e5-uefi-cycle.sh flash; sh tools/e5-uefi-cycle.sh collect (e5-xnu repository)"
 revision = "a4e12906d4490185cf106d066e69ab89d52dd8e5"
 result = "Kernel 251 publishing block device 61079552 sectors; IOKit reads succeed (rw calls at LBA 0, 1 and 2 by 32 blocks, no failures); E5SEED ramdisk root still mounts and the shell reaches SH READY."
+
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/uefi-report-161217.txt"
+command = "PAYLOAD=<flash55>/e5-uefi.bin sh tools/e5-uefi-cycle.sh flash; sh tools/e5-uefi-cycle.sh collect (e5-xnu repository)"
+revision = "a74631cb840c8c4a95c59a16f0a9e798d3539f12"
+result = "Flash #55, kernel 260: cache window -> disk3s1/E5EMMC UUID 238A9EDD -> v9 PID1, console fd0, four standard raw exits 0, canonical tty and shell READ-BLOCK. Fifth diagnostic command SIGBUS is retained in the report. Exact root/binary/payload hashes are in docs/logs/emmc-flash55.json."
+
+[[area.evidence]]
+kind = "source"
+reference = "tools/userspace/cat.c"
+result = "Persistent startup/argument/read checkpoints for the additional SIGBUS investigation; failed reads now return a nonzero exit code."
+
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/uefi-report-163029.txt"
+command = "PAYLOAD=<flash57>/payload/e5-uefi.bin sh tools/e5-uefi-cycle.sh flash; sh tools/e5-uefi-cycle.sh collect (e5-xnu repository)"
+revision = "b7e4e3797fba39e343f9aa277133395b2248b9ce"
+result = "Flash #57 accepts E5EMMC mount, v9 PID1, all five raw wait statuses 0, long-argument cat with original SP 0x16fdffde8, tty ICANON and shell READ-BLOCK. Root and boot payload match full readback after boot; exact binaries and recovery state are in docs/logs/emmc-flash57.json."
 
 [[area]]
 id = "display"
@@ -121,50 +162,79 @@ result = "Kernel 241 with boot-args e5-uplink e5-fb boots and renders the shell 
 id = "input"
 status = "implemented"
 components = []
-paths = ["package/*Button*", "patches/xnu/e5-keys.patch"]
+paths = ["package/*Button*", "patches/xnu/e5-keys.patch", "patches/xnu/e5-keys2.patch", "docs/keypad-control.md"]
 inputs = ["sprd,sc9860-keypad matrix controller at 0x641B0000 (4 rows by 7 cols, KEY_STATUS event slots), AON GPIO bank 7 pin 15 volume-down (active low), PMIC EIC volume-up and power keys."]
-configuration = ["UEFI: E5BootMenu installs a SimpleTextIn merge (keypad first, chained serial ConIn) on a vendor-path handle so the official UniXNU menu counts it; countdown stops on the first key.", "XNU: the seed shell reads /dev/console (canonical tty fed by the serial keyboard thread); the e5-keys patch exposes the matrix keypad through read of fd 230 gated by the e5-keys boot-arg."]
+configuration = ["UEFI: E5BootMenu installs a SimpleTextIn merge (keypad first, chained serial ConIn) on a vendor-path handle so the official UniXNU menu counts it.", "XNU: e5-keys2.patch polls the matrix keypad in the serial keyboard path and feeds cons_cinput into /dev/console. AON gate 0x64900000 and AON GPIO 0x64170000 require set-mirror clock writes before peripheral access. The older fd230 e5-keys path is retained but is not the normal tty input path."]
 procedure = ["Watch the menu stop its countdown on a physical key press and navigate with arrows and select.", "Boot the seed and type through the serial console into the on-screen shell."]
-findings = ["The keypad block reads sane values in XNU (E5KINIT 000f7f030000000077777777: CTRL rows/cols enables correct, KEY_STATUS idle pattern) even though its caller is unconfirmed.", "Boot-args containing e5-key tokens deterministically kill the kernel before the console starts, and any e5-keys.patch content delta beyond the validated series does the same token-free; kernel-side physical keys stay blocked by the binary fragility documented in the configuration area.", "The /dev/console input path is fully working (open, canonical line editing, serial keyboard thread feed); only the keypad-to-cons_cinput bridge is missing."]
+findings = ["The keypad block reads sane values in XNU (E5KINIT 000f7f030000000077777777: CTRL row/column enables correct, KEY_STATUS idle pattern). The caller is the implemented e5-keys2 serial poll hook.", "Fixed-v8 controls: original kernel 242 fails (#35); changing only two address-forming instructions succeeds (#36), and source-built 244 succeeds (#37). An e5-keys token with kernel 241 also boots (#38). Earlier claims of general binary-layout or token-content fragility are withdrawn.", "Flash #41 verifies real console fd0, TIOCGETA=0 and ICANON=1, four commands exiting 0 and a blocking canonical read. Earlier CONSOLE-FD 2 was an unhandled ENOENT from a missing /dev directory. Physical key and serial command entry still require separate on-device acceptance.", "Stock Android enumerates tlsc6x_touch in addition to sprd-keypad and gpio-keys; the claim that this board has no touch panel is withdrawn. Touch hardware binding and XNU HID support remain pending."]
 completion = ["Touches map to the display, simultaneous contacts keep stable IDs, release events arrive, and buttons produce expected HID reports."]
-limits = ["Touch panel is absent (bar phone keypad input only). Kernel-side keypad feed is blocked by the kernel binary fragility; UEFI menu input works."]
-next_action = ["Once the pre-console fragility is fixed, feed the matrix keypad into cons_cinput from the console poll path and repeat the on-device acceptance."]
+limits = ["Matrix-to-tty polling is implemented and register initialization is verified, but physical command entry and serial input have not been accepted on device. Touch is unported; Android enumeration alone does not verify coordinates, contacts or interrupts."]
+next_action = ["At the seed prompt, enter 1 plus confirm and 2 plus confirm using physical keys, then separately verify serial command entry. Identify the bound tlsc6x bus/IRQ before implementing HID."]
+
+[[area.evidence]]
+kind = "source"
+reference = "patches/xnu/e5-keys2.patch"
+result = "Serial poll hook, corrected AON/GPIO physical addresses and matrix-key-to-cons_cinput implementation."
+
+[[area.evidence]]
+kind = "source"
+reference = "docs/keypad-control.md"
+result = "Control-experiment conclusions, real v9 tty acceptance and pending physical input checks."
 
 [[area]]
 id = "gpu"
 status = "planned"
 components = []
+evidence = []
 paths = ["package/*Gpu*"]
 inputs = ["UMS9621 embeds an ARM Mali-class GPU (vendor ro.hardware GPU family); no UniXNU GPU component targets this SoC yet."]
-configuration = []
-procedure = []
+configuration = ["No GPU component is selected; the current display uses CPU framebuffer rendering."]
+procedure = ["Read the bound Android mali_kbase device and live GPU node; inventory IP revision, clocks, firmware, memory translation and submission ABI before selecting an implementation."]
 findings = ["No GPU bring-up attempted; all rendering so far uses the CPU framebuffer console."]
 completion = ["GPU submissions complete, mapping and fence handling are correct, a known image renders, and the selected Metal client presents it."]
 limits = ["Out of current scope; the Adreno740/AdrenoMetal components target SM8550 and do not apply."]
-next_action = ["Inventory the UMS9621 GPU block and check whether a Turnip/AirNir-style software path is feasible for a 2D console accel goal."]
+next_action = ["Identify the actual Mali IP and evaluate a matching Mali implementation and target OS frontend; keep GPU work separate from the working CPU console."]
 
 [[area]]
 id = "network"
 status = "planned"
-components = ["Ath12kWifi"]
-paths = ["drivers/Ath12kWifi"]
-inputs = ["Wi-Fi/Bluetooth combo chip identity and interfaces on this board are not yet identified from the vendor tree."]
-configuration = []
-procedure = []
-findings = ["The catalog provides the Ath12kWifi component (legacy name NativeWifi) for Atheros ath12k hardware."]
-completion = []
-limits = ["Chip identity, firmware loading path and RF calibration data location are unknown; the 5G modem remains out of scope for this record."]
-next_action = ["Identify the Wi-Fi combo chip from the vendor device tree and boot logs, then evaluate the Ath12kWifi component interface against it."]
+components = []
+paths = ["docs/network-bringup.md", "docs/logs/android-wcn-*.json", "docs/logs/android-wcn-*.log"]
+inputs = ["Stock Android uses Unisoc sprd_wlan_combo.ko (SC2355 backend) and wcn_bsp.ko; runtime chip ID 0x2355B001 identifies Marlin3 Lite. Parent compatible unisoc,marlin3lite_sdio; WLAN child sprd,sc2355-sdio-wifi.", "Wi-Fi host: sprd,sdhci-r11 at physical 0x22220000, size 0x1000, 4-bit SDIO; mmc2 negotiates SDR104. DT interrupt SPI 202 (GIC INTID 234), level high. WCN power/reset/wake GPIOs and PMIC rails are shared with BT/FM/GNSS.", "Actual firmware /odm/firmware/wcnmodem.bin (947120 bytes, SHA256 780c448afbaa614efdb1ffc71ffb6bc05b91d34f752d7994569d5c2dbf1c2a41); Android selects wifi_board_config.xpe.ini (7395 bytes, SHA256 3ff60f8e6756e839cf51531d52965dc43446492d843c749da60f1ad70ac7fde6)."]
+configuration = ["No Wi-Fi component is selected in board.toml. Ath12kWifi targets different hardware and has been removed from this area; a Unisoc WCN/SC2355 implementation and XNU network interface are required.", "Vendor modules: sprd_wlan_combo depends on cfg80211, wcn_bsp and sipc-core; wcn_bsp depends on sipc-core and trusty-ipc. These combo-module dependencies do not change this board's observed SDIO transport.", "Android firmware search path is /vendor/firmware,/odm/firmware. Preserve the XPE board configuration, regulatory data and per-unit factory addresses when preparing local driver inputs; do not substitute AA configuration or generate calibration values."]
+procedure = ["In Android, run python3 tools/e5-wcn-inventory.py --output <record.json> --extract dumps/android-wcn-private from e5-xnu; the capture reads modules, bindings, WCN boot messages and vendor blobs without changing radio state.", "Compare the live /sprd-marlin3 node, SDIO host and module aliases with the extracted module metadata; pin matching SC2355/WCN source and firmware before implementing board hooks.", "Implement WCN power/reset/clock and SDIO CMD52/CMD53/IRQ handling, then reproduce firmware boot, CMD_SYNC_VERSION, CMD_DOWNLOAD_INI and CMD_GET_INFO before network registration.", "Add the XNU networking/802.11 adapter, then measure scan, association, key installation, DHCP, bidirectional traffic and repeated stop/start before claiming device support."]
+findings = ["Android confirms SC2355 SDIO with chipid=2355b001 and firmware MARLIN3_20A_RLS2_W24.17.7 / sc2355_marlin3_lite, dated 2024-04-28 15:41:09. The generic combo module also contains SC2332/SIPC and SC2355/PCIe aliases; those are not evidence of this board using either bus.", "The DTS firmware partition /dev/block/by-name/wcnmodem does not exist on this device. The extracted ODM firmware size matches the 947120-byte successful Android download; use the actual ODM file as the input.", "Android selects Marlin3 Lite chip index 2 with IPD(1), parses wifi_board_config.xpe.ini and sends CMD_DOWNLOAD_INI. Boot logs also contain command-version mismatches and an UNKNOWN_ERROR response for the third INI section; a future port must handle firmware responses rather than assume every section is accepted.", "The TSX symlink targets missing /mnt/vendor/productinfo/wcn/tsx_bt_data.txt; Android logs the default 0xffff. /mnt/vendor/wcn is empty at capture. This does not establish an absent RF calibration requirement; board INI, efuse and factory data still need auditing."]
+completion = ["Host resources and shared WCN power ownership match the stock board; SDIO functions and IRQ/data transfers work.", "Firmware reaches its version checkpoint and SC2355 command/event framing, credits, board configuration and regulatory setup work.", "XNU scans and associates with the chosen security mode, obtains an address, transfers packets in both directions and recovers across repeated stop/start cycles."]
+limits = ["Only Android inventory and blob extraction are verified; no XNU WCN/SC2355 driver or networking acceptance yet.", "Source equivalence to the extracted dirty vendor revisions, SDIO DMA/cache constraints, command framing, firmware/efuse calibration handling and the target iPadOS 802.11 ABI still need implementation/audit.", "Factory addresses stay local. Bluetooth, FM, GNSS and the 5G modem are separate follow-up work; shared WCN power handling must preserve their ownership."]
+next_action = ["Compare the six hashed source files at sprd-linux-devs/linux b93bbc3a36fd3c1acae0e44b93d909f7fe942182 with the extracted vendor module metadata and command ABI. Then implement board power/reset, SDIO function/IRQ transfer and the WCN firmware version checkpoint as the first milestone."]
+
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/android-wcn-20261030.json"
+command = "python3 tools/e5-wcn-inventory.py --output <record.json> --extract dumps/android-wcn-private (e5-xnu repository; stock Android)"
+revision = "a74631cb840c8c4a95c59a16f0a9e798d3539f12"
+result = "Read-only stock-Android inventory: sprd_wlan_combo/wcn_bsp bindings, SC2355 chip ID, SDIO boot, XPE INI selection, firmware version, missing legacy firmware partition/TSX target and SHA256/size for 10 extracted inputs. Revision identifies the device-record snapshot, not an XNU network driver."
+
+[[area.evidence]]
+kind = "source"
+reference = "docs/network-bringup.md"
+result = "Board wiring, vendor module metadata and staged Unisoc SDIO/WCN/SC2355 plan; Ath12kWifi is not applicable to this hardware."
+
+[[area.evidence]]
+kind = "source"
+reference = "docs/logs/android-wcn-source-candidate.json"
+result = "Pinned candidate source files and hashes for SC2355 SDIO, command/event handling, board configuration, command versions and WCN boot. Channel definitions and XPE selection agree with the observed interfaces; exact equivalence to the dirty vendor modules is not claimed."
 
 [[area]]
 id = "audio"
 status = "planned"
 components = []
+evidence = []
 paths = ["package/*Audio*"]
 inputs = ["Unisoc audio DSP path unknown; bar-phone speaker and receiver present."]
-configuration = []
-procedure = []
-findings = []
+configuration = ["No XNU audio component or route is configured."]
+procedure = ["Read the live Android audio graph and bound codec/DSP drivers; record firmware, clocks and route ownership before implementing playback or capture."]
+findings = ["Audio playback and capture have not been attempted in XNU."]
 completion = ["Each declared route carries the selected audio format through playback or capture and handles start and stop correctly."]
 limits = ["No audio work yet."]
 next_action = ["Dump the vendor audio graph (ADSP, codec, routing) from the live device tree before selecting components."]
@@ -173,10 +243,11 @@ next_action = ["Dump the vendor audio graph (ADSP, codec, routing) from the live
 id = "power"
 status = "planned"
 components = []
+evidence = []
 paths = ["package/*Battery*", "package/*Power*"]
 inputs = ["Removable battery (senior bar phone), PMIC over the ADI bus, AON always-on domain."]
-configuration = []
-procedure = []
+configuration = ["No XNU battery or charging component is configured; bring-up retains the existing watchdog recovery path."]
+procedure = ["Read Android PMIC, battery and charging bindings and units; compare a first read-only XNU report against the same device state before adding control writes."]
 findings = ["Volume-up and power keys sit behind the PMIC EIC over ADI and were deliberately skipped for the UEFI input path."]
 completion = ["Declared power controls and battery readings match observations; each claimed sleep and resume transition restores its dependent peripherals."]
 limits = ["No power management beyond PSCI SYSTEM_OFF and the LK watchdog reset observed so far."]
@@ -190,7 +261,7 @@ paths = ["patches/**", "tools/**", "payload/**"]
 inputs = ["kernel.macho from CI, hardware.dtb, ADT with root volume UUID, packed APFS seed ramdisk, trust cache (cdhash list), E5BootMenu, DarwinBoot, UniXNU.efi and startup.nsh on a 56 MiB FAT payload."]
 configuration = ["make-e5-payload.py assembles the payload FAT; mk-boot-payload.py wraps BootShim plus SILICIUM_UEFI.fd plus payload into the 62,926,860-byte boot image flashed to boot_b at LBA 8.", "The trust cache must be rebuilt whenever any seed binary is rebuilt (ad-hoc cdhashes change every build).", "The ADT root volume UUID and board.toml root_match_volume_uuid must track the APFS seed container UUID."]
 procedure = ["Build seed binaries with the iphoneos SDK, ad-hoc codesign, collect cdhashes with codesign -dvvv, build the trust cache, pack the seed, assemble the payload, wrap the boot image and flash."]
-findings = ["Payload FAT layout and boot image size are stable across rounds; the packed ramdisk size varies with the seed contents and shifts the staging window without breaking boot.", "A stale trust cache produces an AMFI unsuitable-CT-policy panic for PID 1; rebuilding the cache fixed it (flash 7 to 8)."]
+findings = ["Payload FAT layout and boot image size are stable across rounds; the packed ramdisk size varies with the seed contents and shifts the staging window without breaking boot.", "A stale trust cache produces an AMFI unsuitable-CT-policy panic for PID 1; rebuilding the cache fixed it (flash 7 to 8).", "Flashes #55-#57 preserve kernel/ADT/EFI/configuration file hashes while replacing the trust cache for the actual signed eMMC-root binaries. Root and boot payload are fully read back before reboot; the static-tool entry correction changes ls/cat signatures and requires rebuilding both numeric aliases and the cache."]
 completion = ["Kernel and prelink succeed, payload contains all declared inputs, and the boot image matches the bootloader format and size limit."]
 limits = ["The boot image is built on the host and flashed from Android; no on-device packaging yet."]
 next_action = ["Automate the seed-to-payload chain into one script with a single UUID hand-off to reduce manual ADT patching."]
@@ -208,7 +279,12 @@ paths = ["tools/userspace/**", "patches/xnu/e5-ram-console-tee.patch", "patches/
 inputs = ["Persistent pstore ramoops zones (dmesg-ramoops-0..5, console-ramoops-0) surviving the watchdog reboot into Android; e5-uplink fd 229 write mirror; E5FB rendered-text mirror; E5KINIT register read-back."]
 configuration = ["tools/e5-uefi-cycle.sh collect pulls the pstore zones into dumps/uefi-report-HHMMSS.txt after each flash cycle.", "The E5UL uplink lines are written from the seed shell through the kernel write hook with the E5UL prefix and reach the persistent ring."]
 procedure = ["Flash, wait for the watchdog reboot into Android, then collect and grep the report for the E5 markers."]
-findings = ["dmesg-ramoops-0 is a circular ring holding multiple boots; per-build markers (INIT-START-vN) are required to separate fresh output from residue.", "Kernel printf stays buffered without timer interrupts; the e5_panic_print tee path is what reliably reaches pstore."]
+findings = ["dmesg-ramoops-0 is a circular ring holding multiple boots; per-build markers (INIT-START-vN) are required to separate fresh output from residue.", "Kernel printf stays buffered without timer interrupts; the e5_panic_print tee path is what reliably reaches pstore.", "Raw wait status matters: #55/#56 print EXIT 0 for a child killed by SIGBUS, but EXITH is 0x0a. Cat startup traces locate the failure before C entry; #57 aligns the C stack while preserving the original argc/argv pointer and all five commands exit 0. Read errors in cat now return exit 67 instead of silently reporting success."]
 completion = ["Each claimed milestone has a reproducible command, a matching source or image revision and an accessible result."]
 limits = ["Reports concatenate several boots; ring rotation can wipe early markers during log floods."]
 next_action = ["Add a boot-counter prefix to every uplink tag so multi-boot residue is unambiguous."]
+
+[[area.evidence]]
+kind = "source"
+reference = "patches/xnu/e5-ram-console-tee.patch"
+result = "Persistent kernel log transport implementation; existing device reports contain the E5UL/E5FB checkpoints."

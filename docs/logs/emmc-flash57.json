@@ -1,0 +1,92 @@
+{
+  "flash": 57,
+  "source_revision": "b7e4e3797fba39e343f9aa277133395b2248b9ce",
+  "kernel_sha256": "9cd61f12978ed8e8b8b089f65ef3a1ed83c3a908bcde4f6dceb89664af5d68d6",
+  "root_image_sha256": "30a10449cbb80ef69b2fa928e26797a160d1ebfea1819b089a7826e453fe3173",
+  "root_and_payload_full_readback": true,
+  "post_boot_root_unchanged": true,
+  "root": {
+    "source_revision": "b7e4e3797fba39e343f9aa277133395b2248b9ce",
+    "root_uuid": "238A9EDD-6788-4B2E-BA4E-C1F70AE25B64",
+    "kernel": 260,
+    "seed": "v9 with aligned static tool entry and traced cat",
+    "binaries": [
+      {
+        "path": "sbin/launchd",
+        "sha256": "c459e33c773fbce324c6d4cd75a1bb22a9a358abb488d430ab3957b5e4957a3d",
+        "cdhash": "c04e598b25a3fdc31328bc7f2eeed2594146ff58"
+      },
+      {
+        "path": "bin/cat",
+        "sha256": "f6cbe4b91360ef05143c712d3fef48873ac430a6ff8d440eb5b5860bca212c82",
+        "cdhash": "873c41475964847d9308b3cce3306dce790679d6"
+      },
+      {
+        "path": "bin/ls",
+        "sha256": "7e3a4b0778cae41885c075308e6cb49a8d0a8f948269b8002928d097e7fec34d",
+        "cdhash": "a27c439522fb6413697a8a69f6e98a0ce319c090"
+      },
+      {
+        "path": "bin/clock",
+        "sha256": "a7bebd991f42a0dffcf79ae6e64e4e794b8a7cbbd48f560328953170eaf229f4",
+        "cdhash": "e7c3788afc693f7fe555b89ef1ffdf77d3bb1054"
+      },
+      {
+        "path": "1",
+        "sha256": "7e3a4b0778cae41885c075308e6cb49a8d0a8f948269b8002928d097e7fec34d",
+        "cdhash": "a27c439522fb6413697a8a69f6e98a0ce319c090"
+      },
+      {
+        "path": "2",
+        "sha256": "f6cbe4b91360ef05143c712d3fef48873ac430a6ff8d440eb5b5860bca212c82",
+        "cdhash": "873c41475964847d9308b3cce3306dce790679d6"
+      }
+    ],
+    "trust_cache_sha256": "4ae856c984116bb785dadb4e2b2445296444b475bc1177cc7e94c29b8aabb46e"
+  },
+  "payload": {
+    "baseline": "uefi/build/flash56-k260-cat-probe/payload",
+    "baseline_payload_sha256": "5a690cdb8cc7c92d49fed6ca5fb3d7052213a46d0ea402bb44fe7becab20b914",
+    "payload_sha256": "d788adacfad21a6ce45a5373300e3c5ee7dae195d5fca94b8e99856a08743704",
+    "seed_sha256": "d633984f596c32d0fb3e84a7970dc2898e4cb08201841a809660a4e297f979c5",
+    "trust_cache_sha256": "4ae856c984116bb785dadb4e2b2445296444b475bc1177cc7e94c29b8aabb46e",
+    "preserved_files": [
+      "kernel.macho",
+      "kernel.macho.adt",
+      "E5BootMenu.efi",
+      "DarwinBoot.efi",
+      "UniXNU.efi",
+      "startup.nsh",
+      "EFI/UniXNU/unixnu.toml"
+    ]
+  },
+  "report": "uefi-report-163029.txt",
+  "raw_command_statuses": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "cat_initial_argument_pointers": [
+    "0x16fdffdf0",
+    "0x16fdffe10",
+    "0x16fdffde8"
+  ],
+  "device_after_test": {
+    "sys.boot_completed": "1",
+    "ro.boot.slot_suffix": "_a",
+    "slots": [
+      {
+        "priority": 15,
+        "tries": 1,
+        "successful": 1
+      },
+      {
+        "priority": 14,
+        "tries": 1,
+        "successful": 0
+      }
+    ]
+  }
+}

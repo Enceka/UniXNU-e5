@@ -1,0 +1,123 @@
+{
+  "captured_at_utc": "2026-10-30T08:06:21.422470+00:00",
+  "scope": "Stock Android inventory; no XNU Wi-Fi implementation or acceptance claimed.",
+  "commands": {
+    "getprop ro.build.fingerprint; uname -r; getprop ro.boot.slot_suffix": "UNISOC/s9863a1h10_Natv/s9863a1h10:13/TP1A.220624.014/10413:userdebug/test-keys\n5.15.119-android13-8-00018-ga78ea39db117-ab10710420\n_a",
+    "cat /sys/bus/platform/devices/sprd-marlin3/uevent /sys/bus/platform/devices/sprd-marlin3:wlan/uevent": "DRIVER=sprd_wcn\nOF_NAME=sprd-marlin3\nOF_FULLNAME=/sprd-marlin3\nOF_COMPATIBLE_0=unisoc,marlin3lite_sdio\nOF_COMPATIBLE_N=1\nMODALIAS=of:Nsprd-marlin3T(null)Cunisoc,marlin3lite_sdio\nDRIVER=wlan\nOF_NAME=wlan\nOF_FULLNAME=/sprd-marlin3/wlan\nOF_COMPATIBLE_0=sprd,sc2355-sdio-wifi\nOF_COMPATIBLE_N=1\nMODALIAS=of:NwlanT(null)Csprd,sc2355-sdio-wifi",
+    "grep -E 'sprd_wlan_combo|wcn_bsp' /vendor/lib/modules/modules.dep": "/vendor/lib/modules/sprd_fm.ko: /vendor/lib/modules/wcn_bsp.ko\n/vendor/lib/modules/sprd_wlan_combo.ko: /vendor/lib/modules/cfg80211.ko /vendor/lib/modules/wcn_bsp.ko\n/vendor/lib/modules/sprdbt_tty.ko: /vendor/lib/modules/wcn_bsp.ko\n/vendor/lib/modules/wcn_bsp.ko:\n/vendor/lib/modules/gnss_common_ctl_all.ko: /vendor/lib/modules/sprd_ump96xx_tsensor.ko /vendor/lib/modules/wcn_bsp.ko\n/vendor/lib/modules/gnss_pmnotify_ctl.ko: /vendor/lib/modules/gnss_common_ctl_all.ko /vendor/lib/modules/sprd_ump96xx_tsensor.ko /vendor/lib/modules/wcn_bsp.ko",
+    "od -An -tx1 /sys/firmware/devicetree/base/soc/ap-ahb/sdio@22220000/reg": "02 22 00 00 00 00 10 00",
+    "od -An -tx1 /sys/firmware/devicetree/base/soc/ap-ahb/sdio@22220000/interrupts": "00 00 00 00 00 00 00 ca 00 00 00 04",
+    "od -An -tx1 /sys/firmware/devicetree/base/soc/ap-ahb/ranges": "00 00 00 00 00 00 00 00 20 00 00 00 02 2f 00 00",
+    "ls -l /sys/bus/sdio/devices": "total 0",
+    "cat /sys/module/firmware_class/parameters/path": "/vendor/firmware,/odm/firmware",
+    "readlink /vendor/firmware/tsx_data; if test -f /vendor/firmware/tsx_data; then echo present; else echo missing; fi": "/mnt/vendor/productinfo/wcn/tsx_bt_data.txt\nmissing",
+    "if test -e /dev/block/by-name/wcnmodem; then echo present; else echo missing; fi": "missing",
+    "ls -la /mnt/vendor/wcn": "total 8\ndrwxrwx--x  2 system root   4096 1970-01-01 08:00 .\ndrwxrwxr-x 10 system system 4096 2026-07-10 03:07 ..",
+    "cat /vendor/etc/wifi/vendor_hals/unisoc_wifi_hal_arm64.xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<WifiVendorHal version=\"1\">\n<path>/vendor/lib64/hw/libwifi-hal-unisoc.so</path>\n<primary>1</primary>\n</WifiVendorHal>",
+    "getprop ro.product.model; getprop ro.product.device; getprop ro.board.platform": "E5\nums9158_1h10\nums9621"
+  },
+  "modules": [
+    "sprdbt_tty 61440 0 - Live 0x0000000000000000 (OE)",
+    "sprd_wlan_combo 1146880 0 - Live 0x0000000000000000 (OE)",
+    "cfg80211 1470464 1 sprd_wlan_combo, Live 0x0000000000000000 (E)",
+    "wcn_bsp 589824 4 gnss_common_ctl_all,sprd_fm,sprdbt_tty,sprd_wlan_combo, Live 0x0000000000000000 (E)",
+    "sipc_core 196608 18 ims_bridge,sprd_cp_dvfs,agdsp_pd,sprd_ddr_dvfs,sprd_pmic_wdt,sprdbt_tty,sprd_wlan_combo,wcn_bsp,sensorhub,sblock_bridge,sbuf_bridge,slog_bridge,sprd_iq,sprd_modem_loader,sipx,spool,spipe,sipa_dele, Live 0x0000000000000000 (E)"
+  ],
+  "boot_log": [
+    "[    6.230653] [-,] 6,7488,6230653,-,caller=T105@C7;sprd-wlan: sc2355_sdio_init: register 5 ops",
+    "[    6.295909] [-,] 6,7566,6295909,-,caller=T106@C7;mmc2: new ultra high speed SDR104 SDIO card at address 8800",
+    "[    6.296159] [-,] 6,7568,6296159,-,caller=T106@C7;WCN SDIO: sdiohal_probe func num is 1!!!",
+    "[    6.297271] [-,] 6,7578,6297271,-,caller=T106@C7;WCN SDIO: sdiohal_probe scaffcard successful! nodify callback:00000000cc2c56e0",
+    "[    6.298128] [-,] 6,7581,6298128,-,caller=T106@C7;WCN BASE btwifi_download_firmware tx_img_size = 947120",
+    "[    6.298137] [-,] 6,7583,6298137,-,caller=T106@C7;WCN BASE btwifi_download_firmware firmware->size = 947120",
+    "[    6.368404] [-,] 6,8616,6368404,-,caller=T106@C7;WCN BASEmarlin btwifi_download_firmware successfully!",
+    "[    6.368411] [-,] 6,8619,6368411,-,caller=T106@C7;WCN BASEtsx cali init flag 303174162",
+    "[    6.369319] [-,] 6,8637,6369319,-,caller=T106@C7;WCN BASEtsx_dac_data:65535",
+    "[    6.548039] [-,] 6,9519,6548039,-,caller=T268@C6;WCN SDIO: : at cmd read:WCN_VER:Platform Version:MARLIN3_20A_RLS2_W24.17.7~Project Version:sc2355_marlin3_lite~04-28-2024 15:41:09~",
+    "[    6.600605] [-,] 4,9607,6600605,-,caller=T105@C7;sprd-wlan: [6568]ctx_id 0 send[CMD_SYNC_VERSION]",
+    "[    6.604762] [-,] 6,9612,6604762,-,caller=T96@C1;sprd-wlan: ctx_id 0 recv rsp[CMD_SYNC_VERSION]",
+    "[    6.604783] [-,] 4,9613,6604783,-,caller=T105@C7;sprd-wlan: ctx_id:0 cmd_id:9 [CMD_SYNC_VERSION]rsp received",
+    "[    6.604785] [-,] 6,9614,6604785,-,caller=T105@C7;sprd-wlan: API version not match!! CMD ID:11,drv:2,fw:3",
+    "[    6.604788] [-,] 6,9615,6604788,-,caller=T105@C7;sprd-wlan: API version not match!! CMD ID:65,drv:1,fw:0",
+    "[    6.604789] [-,] 6,9616,6604789,-,caller=T105@C7;sprd-wlan: API version not match!! CMD ID:86,drv:0,fw:1",
+    "[    6.604791] [-,] 6,9617,6604791,-,caller=T105@C7;sprd-wlan: API version not match!! CMD ID:90,drv:0,fw:1",
+    "[    6.604792] [-,] 6,9618,6604792,-,caller=T105@C7;sprd-wlan: API version not match!! CMD ID:91,drv:0,fw:1",
+    "[    6.604794] [-,] 6,9619,6604794,-,caller=T105@C7;sprd-wlan: API version not match!! CMD ID:144,drv:0,fw:1",
+    "[    6.604795] [-,] 6,9620,6604795,-,caller=T105@C7;sprd-wlan: API version not match!! CMD ID:162,drv:0,fw:1",
+    "[    6.604797] [-,] 6,9621,6604797,-,caller=T105@C7;sprd-wlan: API version not match!! CMD ID:250,drv:0,fw:1",
+    "[    6.616784] [-,] 6,9650,6616784,-,caller=T105@C7;sprd-wlan: sc2355_get_nvm_table, chip id of marlin3 lite is 2, IPD(1) open wifi_board_config.xpe.ini",
+    "[    6.618476] [-,] 6,9652,6618476,-,caller=T105@C7;sprd-wlan: hw_param_nvm_parse read wifi_board_config.xpe.ini data_len:0x1ce3",
+    "[    6.619207] [-,] 6,9841,6619207,-,caller=T105@C7;sprd-wlan: hw_param_nvm_parse(), parsing ini data result=0",
+    "[    6.619225] [-,] 4,9846,6619225,-,caller=T105@C7;sprd-wlan: [6587]ctx_id 0 send[CMD_DOWNLOAD_INI]",
+    "[    6.621216] [-,] 6,9852,6621216,-,caller=T96@C1;sprd-wlan: ctx_id 0 recv rsp[CMD_DOWNLOAD_INI]",
+    "[    6.621307] [-,] 4,9857,6621307,-,caller=T105@C7;sprd-wlan: [6589]ctx_id 0 send[CMD_DOWNLOAD_INI]",
+    "[    6.623236] [-,] 6,9862,6623236,-,caller=T96@C1;sprd-wlan: ctx_id 0 recv rsp[CMD_DOWNLOAD_INI]",
+    "[    6.623273] [-,] 4,9867,6623273,-,caller=T105@C7;sprd-wlan: [6591]ctx_id 0 send[CMD_DOWNLOAD_INI]",
+    "[    6.624067] [-,] 6,9870,6624067,-,caller=T96@C1;sprd-wlan: ctx_id 0 recv rsp[CMD_DOWNLOAD_INI]",
+    "[    6.624073] [-,] 3,9871,6624073,-,caller=T96@C1;sprd-wlan: sc2355_rx_rsp_process ctx_id 0 recv rsp[CMD_DOWNLOAD_INI] status[SPRD_CMD_STATUS_UNKNOWN_ERROR]",
+    "[    6.624103] [-,] 4,9876,6624103,-,caller=T105@C7;sprd-wlan: [6591]ctx_id 0 send[CMD_DOWNLOAD_INI]",
+    "[    6.624711] [-,] 6,9879,6624711,-,caller=T96@C1;sprd-wlan: ctx_id 0 recv rsp[CMD_DOWNLOAD_INI]",
+    "[    6.631863] [-,] 6,9893,6631863,-,caller=T105@C7;sprd-wlan: sc2355_get_fw_info, TLV type=1, len=1, data_chk=1",
+    "[    6.631866] [-,] 6,9894,6631866,-,caller=T105@C7;sprd-wlan: sc2355_get_fw_info, drv_version=2, fw_version=2, compat_ver=0, ap_version=0",
+    "[    6.631868] [-,] 6,9895,6631868,-,caller=T105@C7;sprd-wlan: chip_model:0x2355, chip_ver:0x0",
+    "[    6.631872] [-,] 6,9897,6631872,-,caller=T105@C7;sprd-wlan: credit_capa:TX_WITH_CREDIT",
+    "[    6.631897] [-,] 6,9914,6631897,-,caller=T105@C7;sprd-wlan: \\x09Dual band supported"
+  ],
+  "files": [
+    {
+      "android_path": "/vendor/lib/modules/sprd_wlan_combo.ko",
+      "size": 39198016,
+      "sha256": "e34e3aa95b61727c84ac53040d4347a3d1b3d5ed77066312e4d0981b5d49e1f9"
+    },
+    {
+      "android_path": "/vendor/lib/modules/wcn_bsp.ko",
+      "size": 9565456,
+      "sha256": "b4ccc0f0aeee0d70151d00f848eced179c4ce5f03ccef0de77142b382e74ce71"
+    },
+    {
+      "android_path": "/odm/firmware/wcnmodem.bin",
+      "size": 947120,
+      "sha256": "780c448afbaa614efdb1ffc71ffb6bc05b91d34f752d7994569d5c2dbf1c2a41"
+    },
+    {
+      "android_path": "/odm/firmware/gnssmodem.bin",
+      "size": 595757,
+      "sha256": "e7d43929ecb9605556a1e04d0b0c3af9e2877a032b63c5c01df1676b723e0e36"
+    },
+    {
+      "android_path": "/odm/firmware/wifi_board_config.ini",
+      "size": 7395,
+      "sha256": "cc258bd4a6939ca15d47c7887632effcfeab5cf5027db3715dc9dd0e39502e73"
+    },
+    {
+      "android_path": "/odm/firmware/wifi_board_config.xpe.ini",
+      "size": 7395,
+      "sha256": "3ff60f8e6756e839cf51531d52965dc43446492d843c749da60f1ad70ac7fde6"
+    },
+    {
+      "android_path": "/odm/firmware/wifi_board_config_aa.ini",
+      "size": 7023,
+      "sha256": "91b5954f8bb80df4f3f673d82069dd4de186999cefd39386d7675517489d0b33"
+    },
+    {
+      "android_path": "/odm/firmware/wifi_board_config_aa.xpe.ini",
+      "size": 7023,
+      "sha256": "91b5954f8bb80df4f3f673d82069dd4de186999cefd39386d7675517489d0b33"
+    },
+    {
+      "android_path": "/odm/firmware/bt_configure_pskey.xpe.ini",
+      "size": 5442,
+      "sha256": "82267aedf0e3e85eb3bccde90b61e2f7ca56fecb4d9081829bb8410023538641"
+    },
+    {
+      "android_path": "/odm/firmware/bt_configure_rf.xpe.ini",
+      "size": 3115,
+      "sha256": "f72242d1513661094ff1d8f4faf518dd9c04dc0c330246e3d5b274806378a166"
+    }
+  ],
+  "initial_dmesg_observation": {
+    "command": "adb shell '/debug_ramdisk/su -c dmesg'",
+    "line": "[    6.148638] [-,] 6,7373,6148638,-,caller=T106@C7;WCN BASEmarlin: chipid=2355b001, marlin_get_wcn_chipid",
+    "note": "Observed during the initial read before blob extraction; the kernel ring rotated before the later structured capture."
+  }
+}

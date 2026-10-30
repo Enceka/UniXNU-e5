@@ -1,0 +1,117 @@
+Captured 2026-10-30 from the stock E5 Android modules; see android-wcn-20261030.json for hashes.
+
+String dump of section '.modinfo':
+[     0] parmtype=wfa_cap:uint
+[    16] parm=wfa_cap:set capability for WFA test
+[    3f] license=GPL v2
+[    4e] description=Spreadtrum WLAN Driver
+[    71] author=Carson Yang <carson.yang@unisoc.com>
+[    9d] description=Spreadtrum Wireless LAN Common Code
+[    cd] author=Spreadtrum WCN Division
+[    ec] license=GPL
+[    f8] description=Spreadtrum SC2332 WLAN Driver
+[   122] author=Spreadtrum WCN Division
+[   141] license=GPL
+[   14d] parmtype=dump_data:uint
+[   165] parm=dump_data:dump data packet
+[   185] parmtype=tcp_ack_drop_cnt:uint
+[   1a4] parm=tcp_ack_drop_cnt:valid values: [1, 13]
+[   1d0] description=Spreadtrum SC2355 WLAN Driver
+[   1fa] author=Spreadtrum WCN Division
+[   219] license=GPL
+[   225] vermagic=5.15.119-android13-8-gf0c1c2c751e6-dirty SMP preempt mod_unload modversions aarch64
+[   282] name=sprd_wlan_combo
+[   297] depends=cfg80211,wcn_bsp,sipc-core
+[   2ba] alias=of:N*T*Csprd,sc2332-sipc-wifi
+[   2de] alias=of:N*T*Csprd,sc2332-sipc-wifiC*
+[   304] alias=of:N*T*Csprd,sc2355-pcie-wifi
+[   328] alias=of:N*T*Csprd,sc2355-pcie-wifiC*
+[   34e] alias=of:N*T*Csprd,sc2355-sdio-wifi
+[   372] alias=of:N*T*Csprd,sc2355-sdio-wifiC*
+[   398] alias=of:N*T*Csprd,sc2355-sipc-wifi
+[   3bc] alias=of:N*T*Csprd,sc2355-sipc-wifiC*
+[   3e2] scmversion=g13f11a6756dc-dirty
+
+String dump of section '.modinfo':
+[     0] license=GPL v2
+[     f] description=Spreadtrum WCN Driver
+[    31] author=Carson Yang <carson.yang@unisoc.com>
+[    5d] parmtype=clktype:int
+[    72] parmtype=slot_suffix:charp
+[    8d] parmtype=slot_suffix:charp
+[    a8] vermagic=5.15.119-android13-8-gf0c1c2c751e6-dirty SMP preempt mod_unload modversions aarch64
+[   105] name=wcn_bsp
+[   112] intree=Y
+[   11b] depends=sipc-core,trusty-ipc
+[   138] scmversion=gf0c1c2c751e6-dirty
+SC2355 source basenames from WLAN DWARF (vendor workspace prefixes removed):
+common/cfg80211.c
+common/debug.c
+common/delay_work.c
+common/iface.c
+common/msg.c
+common/npi.c
+common/report.c
+common/sprd_wlan.c
+common/tdls.c
+merlion/api_version.c
+merlion/cfg80211.c
+merlion/cmdevt.c
+merlion/core_sc2355.c
+merlion/debug.c
+merlion/defrag.c
+merlion/edma_test.c
+merlion/fcc.c
+merlion/ibss.c
+merlion/if_sc2355.c
+merlion/main.c
+merlion/mm.c
+merlion/msg.c
+merlion/nan.c
+merlion/npi.c
+merlion/qos.c
+merlion/reorder.c
+merlion/rf_marlin3.c
+merlion/rnd_mac_addr.c
+merlion/rtt.c
+merlion/rx_msg_sc2355.c
+merlion/sipc_debug.c
+merlion/sipc_txrx_mm.c
+merlion/tcp_ack.c
+merlion/tracer.c
+merlion/tx_msg_sc2355.c
+merlion/txrx.c
+merlion/txrx_buf_mm.c
+merlion/vendor.c
+merlion/work.c
+sc2332/acs.c
+sc2332/cmdevt.c
+sc2332/fcc.c
+sc2332/init.c
+sc2332/qos.c
+sc2332/scan.c
+sc2332/sipc.c
+sc2332/tcp_ack.c
+sc2332/txrx.c
+sc2332/vendor.c
+sc2332/wapi.c
+sc2355/acs.c
+sc2355/api_version.c
+sc2355/cmdevt.c
+sc2355/defrag.c
+sc2355/fcc.c
+sc2355/hw_param.c
+sc2355/init.c
+sc2355/mm.c
+sc2355/nan.c
+sc2355/pcie.c
+sc2355/pcie_buf.c
+sc2355/qos.c
+sc2355/reorder.c
+sc2355/rtt.c
+sc2355/rx.c
+sc2355/scan.c
+sc2355/sdio.c
+sc2355/tcp_ack.c
+sc2355/tx.c
+sc2355/vendor.c

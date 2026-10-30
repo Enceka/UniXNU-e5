@@ -1,0 +1,38 @@
+{
+  "repository": "https://github.com/sprd-linux-devs/linux",
+  "revision": "b93bbc3a36fd3c1acae0e44b93d909f7fe942182",
+  "scope": "Source candidate inspected against Android paths, bus channels and XPE selection; not proven byte/source-equivalent to dirty vendor modules.",
+  "files": [
+    {
+      "path": "drivers/unisoc_platform/sprd_wlan_combo/sc2355/sdio.c",
+      "sha256": "263a0273d892a0a6ff30b76629d09bcc3bad3ea82f3c8af60107844c6a5d8563"
+    },
+    {
+      "path": "drivers/unisoc_platform/sprd_wlan_combo/sc2355/sdio.h",
+      "sha256": "548d35e7fd474016761148a1ff1b0b6da85aebf859bb4332d501d88d1dee6f2c"
+    },
+    {
+      "path": "drivers/unisoc_platform/sprd_wlan_combo/sc2355/cmdevt.c",
+      "sha256": "66a78bfa8a80099502a59db65617387de39523cb3c4eaac73d16ea8135f29444"
+    },
+    {
+      "path": "drivers/unisoc_platform/sprd_wlan_combo/sc2355/hw_param.c",
+      "sha256": "81832f468480eee0c0044ec30bcb9e9a49f6c59a9a3ec86f1611a4459c12bdb3"
+    },
+    {
+      "path": "drivers/unisoc_platform/sprd_wlan_combo/sc2355/api_version.c",
+      "sha256": "30d18cea53046c78a519b7cb9d10ff1dc57b5646b06c3a86b7bce5a496f297e3"
+    },
+    {
+      "path": "drivers/unisoc_platform/sprdwcn/platform/wcn_boot.c",
+      "sha256": "3916578f9d24eac7d2889b2c9e78e75f1d5190617d201be882e9fbfb9dc65037"
+    }
+  ],
+  "sdio_channels": {
+    "rx_command_event": 22,
+    "rx_packet_log": 23,
+    "rx_data": 24,
+    "tx_command": 8,
+    "tx_data": 10
+  }
+}

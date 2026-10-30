@@ -29,10 +29,10 @@ Working rules for this device:
 
 - The kernel is built by the `unixnu-e5-kernel-builder` CI from pinned
   sources; device patches must match the exact upstream context and be
-  validated by a flash before they are trusted. Kernel binaries are
-  fragile to patch deltas beyond the validated series (see the
-  configuration area of `porting.toml`); record every new patch with its
-  flash evidence.
+  validated by a flash before they are trusted. The earlier general
+  kernel-layout-fragility diagnosis was withdrawn after fixed-seed
+  controls isolated incorrect keypad MMIO addresses (see
+  `docs/keypad-control.md`). Record every new patch with its flash evidence.
 - Seed binaries are ad-hoc signed; rebuild the trust cache whenever any
   seed binary changes, keep the ADT root UUID and
   `root_match_volume_uuid` in sync with the seed volume UUID, and always
