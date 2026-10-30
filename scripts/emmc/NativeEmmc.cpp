@@ -94,7 +94,7 @@ class NativeEmmc : public IOBlockStorageDevice {
   uint64_t baseLba = 0;
   uint64_t cacheSectors = 0x200000ull;
   static NativeEmmc *s_host;
-  static void e5PartPublishThread(void *arg, wait_result_t w);
+  bool windowPub = false;
 
   inline uint8_t  r8 (uint32_t o) const { return *(volatile uint8_t  *)((uint8_t *)regs + o); }
   inline uint16_t r16(uint32_t o) const { return *(volatile uint16_t *)((uint8_t *)regs + o); }
@@ -475,7 +475,7 @@ public:
   char *getAdditionalDeviceInfoString() override { return const_cast<char *>("UEFI-validated v4 port"); }
   IOReturn reportBlockSize(UInt64 *value) override { *value = 512; return kIOReturnSuccess; }
   IOReturn reportEjectability(bool *value) override { *value = false; return kIOReturnSuccess; }
-  IOReturn reportMaxValidBlock(UInt64 *value) override { UInt64 n = partMode ? cacheSectors : sectors; *value = n ? n - 1 : 0; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *value) override { UInt64 n = (partMode || windowPub) ? cacheSectors : sectors; *value = n ? n - 1 : 0; return kIOReturnSuccess; }
   IOReturn reportMediaState(bool *present, bool *changed) override { *present = cardUp; if (changed) *changed = false; return kIOReturnSuccess; }
   IOReturn reportRemovability(bool *value) override { *value = false; return kIOReturnSuccess; }
   IOReturn reportWriteProtection(bool *value) override { *value = false; return kIOReturnSuccess; }
@@ -486,11 +486,12 @@ public:
   IOReturn doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block, UInt64 count,
                                    IOStorageAttributes *, IOStorageCompletion *completion) override {
     NativeEmmc *h = partMode ? s_host : this;
+    UInt64 baseOff = (partMode || windowPub) ? baseLba : 0;
     if (buffer == nullptr || completion == nullptr || completion->action == nullptr || count == 0)
       return kIOReturnBadArgument;
     if (buffer->getDirection() != kIODirectionIn) return kIOReturnNotWritable;
     if (h->cardUp == false || h->ioLock == nullptr || h->dmaD == nullptr) return kIOReturnNotReady;
-    UInt64 maxSec = partMode ? cacheSectors : sectors;
+    UInt64 maxSec = (partMode || windowPub) ? cacheSectors : sectors;
     if (block > maxSec || count > maxSec - block) return kIOReturnBadArgument;
     UInt64 total = count * 512;
     if (buffer->getLength() < total) return kIOReturnBadArgument;
@@ -502,7 +503,7 @@ public:
                     (int)buffer->getDirection(), (unsigned long long)buffer->getLength());
     IOLockLock(h->ioLock);
     while (done + 512 <= total) {
-      uint32_t st = h->sdmaRead512(0x113A, (uint32_t)(baseLba + block + done / 512), h->dmaD, h->dmaPhys);
+      uint32_t st = h->sdmaRead512(0x113A, (uint32_t)(baseOff + block + done / 512), h->dmaD, h->dmaPhys);
       cacheInvalidate(h->dmaD, 512);
       if ((st & 0x00000003u) == 0x00000003u &&
           buffer->writeBytes(done, h->dmaD8, 512) == 512) {
@@ -520,21 +521,6 @@ public:
     return kIOReturnSuccess;
   }
 };
-static NativeEmmc *s_pendingPart = nullptr;
-
-void NativeEmmc::e5PartPublishThread(void *arg, wait_result_t)
-{
-  NativeEmmc *host = (NativeEmmc *)arg;
-  NativeEmmc *part = s_pendingPart;
-  if (part && part->start(host)) {
-    elog("NativeEmmc: cache window published (%llu sectors @ lba %llx)\n",
-         (unsigned long long)part->cacheSectors, (unsigned long long)part->baseLba);
-  } else {
-    elog("NativeEmmc: cache window start failed\n");
-  }
-  host->release();
-}
-
 OSDefineMetaClassAndStructors(NativeEmmc, IOBlockStorageDevice)
 NativeEmmc *NativeEmmc::s_host = nullptr;
 
@@ -571,26 +557,11 @@ bool NativeEmmc::start(IOService *provider)
     scanGpt(d, d8, dva);
     verifyReadback(d, d8, dva);
     // v5: keep regs/DMA page alive; the read path runs in doAsyncReadWrite.
-    elog("NativeEmmc: publishing block device (%llu sectors)\n", (unsigned long long)sectors);
+    baseLba = 0xd0a800ull;
+    windowPub = true;
+    elog("NativeEmmc: publishing cache window (%llu sectors @ lba %llx)\n",
+         (unsigned long long)cacheSectors, (unsigned long long)baseLba);
     registerService();
-    s_host = this;
-    NativeEmmc *part = OSTypeAlloc(NativeEmmc);
-    if (part && part->init((OSDictionary *)nullptr)) {
-      part->partMode = true;
-      part->baseLba = 0xd0a800ull;
-      part->cacheSectors = 0x200000ull;
-      if (part->attach(this)) {
-        s_pendingPart = part;
-        thread_t th = nullptr;
-        retain();
-        if (kernel_thread_start(e5PartPublishThread, this, &th) != KERN_SUCCESS) {
-          release();
-          elog("NativeEmmc: publisher thread failed\n");
-        } else {
-          thread_deallocate(th);
-        }
-      }
-    }
     return true;
   }
   resetLines();
