@@ -189,3 +189,50 @@ On CMD8 retry exhaustion:
 3. All fail → `CMD55b` repeat + standard `CMD8 fail` line, return false.
 Standard grammar lines (`CMD8 st … r7 …`, `CMD8 fail …`) preserved; no
 checker change needed.
+
+## Round 9 (kernel 271, v9) — all matrix configs negative; Linux rebind bisect
+
+Both probes identical: CMD8 tries 1-9 st 00018001 r7 00000000 err 0001;
+**CMD55 st 00018001 r1 00000000 err 0001** — every response command
+CRCs with the response register suppressed → response-path corruption
+is global, not CMD8-specific. Matrix noinv / clk200 / noinv-clk200: all
+identical → DLL_DLY_OFFSET inversion (0x208 bits 13,21) and clock rate
+(382k vs 200k) both irrelevant. CMD55b after matrix: same.
+
+Android-side bisect (decisive): `echo 22210000.sdio >
+.../sdhci_sprd_r11/unbind; bind` under Linux re-initializes the card
+warm (regulators off→on, 400k 1-bit legacy init, re-tune) with **zero**
+errors — straight back to SDR104, same RCA 5048, same tuning result.
+So the card, pads, pinmux (DT has none for this node — pins are
+MUX UNCLAIMED under Android), pull-ups and warm-power-cycle behavior
+are all fine; the gap is purely our register sequence vs sdhci core.
+
+Vendor source facts (sdhci-sprd.c): probe order is clocks →
+`sdhci_sprd_init_config` (0x28c |= DLL_BAK|DLL_VAL bits 0,1) →
+sdhci_setup_host (sdhci core does SDHCI_RESET_ALL in sdhci_init) →
+power up (vmmc on, 200us, vqmmc on via signal_voltage_on_off) →
+voltage_switch (vqmmc set + `sdhci_reset(CMD|DAT)` — vendor comment:
+"Otherwise the controller will not work normally. We had ever
+encoutered CMD2 timeout before") → 400k clock → CMD0. We did
+everything except RESET_ALL and the 0x28c debounce bits; the CMD|DAT
+reset after vqmmc was already present (resetLines).
+
+## v10 (commit 97f5091, kernel 272) — RESET_ALL + DLL backup mode
+
+At the head of the cold path (before clock config): write 0x2f = 0x09
+(RESET_ALL bit0 self-clearing | Unisoc card-hw-reset bit3), poll bit0
+clear, then `0x28c |= 3`, log `host reset %02x->%02x deb %08x`, fail
+`host reset stuck` if bit0 never clears. Rationale: the controller
+carries SDR104-era sampler state across the warm reboot; RESET_ALL is
+the only thing that restores the command/response sampler to defaults.
+Checker (e5-xnu commit pending): requires the new line (after bit0
+clear, deb bits 0,1 set) + new fail marker; also split clean() into
+cmdClean (command statuses: error bits clear + CC, no TC requirement —
+fixes a latent bug that would have failed a real successful probe) and
+clean (data transfers: CC+TC).
+
+Live-DT extras recorded: sprd,phy-delay-legacy = <0 0 0 0> (our
+0x204=0 write matches DT); highspeed 7f 7f c0 c0, sdr50 7f 7f 4d 4d,
+sdr104 7f a3 b2 b2. pinctrl: 642e0000.pinctrl, SD0 pins 121-126
+(CMD/D_0/D_1/CLK/D_2/D_3), SD1 pins 65-70, plus *_MISC sets — all
+MUX UNCLAIMED/GPIO UNCLAIMED under Android.
