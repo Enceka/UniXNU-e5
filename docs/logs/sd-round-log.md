@@ -337,3 +337,18 @@ matrix is removed; the standard `CMD8 st %08x r7 %08x` retry-loop grammar
 returns. Unit tests cases 12-14 updated (hotplugValue(0) == 0x00210001).
 Checker (e5-xnu) v14: the hotplug line must show bit21 set. Round 14 =
 the clean-driver confirmation boot.
+
+## Round 14 (kernel 276) — clean v14 confirms: polarity was the whole fix
+
+No matrix, no diagnostics: the corrected hotplug value lands directly
+(`hotplug 00000000->00210001`), and the card initializes on the first pass —
+ACMD41 ocr c0ff8000 (35 tries), CMD3 rca 5048, CSD/sectors match, all four
+reference CRCs green, 16 repeats clean, `probe Success sectors 30244864
+mode legacy-4bit-13MHz`, media published read-only. IOMedia probed it
+(3× rw). eMMC regression green. Report dumps/uefi-report-235704.txt.
+
+Checker FAILed on a grammar artifact only: the `CMD8 st … r7 …` line lived
+inside the failure branch, so a first-try success never printed it
+(63775cc prints it on the clean path too; ace8448 removes a duplicated
+brace my first edit left). Kernel 277 carries the fix; round 15 is the
+final acceptance record.
