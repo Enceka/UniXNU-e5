@@ -352,3 +352,19 @@ inside the failure branch, so a first-try success never printed it
 (63775cc prints it on the clean path too; ace8448 removes a duplicated
 brace my first edit left). Kernel 277 carries the fix; round 15 is the
 final acceptance record.
+
+## Round 15 (kernel 277) — FINAL: checker PASS
+
+First-try CMD8 echo prints the standard grammar line
+(`CMD8 st 00000001 r7 000001aa`), full init green, and
+tools/e5-sd-check.py returns:
+
+  PASS: SD 30244864 sectors via legacy-4bit-13MHz, reference 4/4 CRC
+  match, repeat 16/16; eMMC v8 + E5EMMC mount + shell intact (EXITH 5/5)
+
+Report dumps/uefi-report-001448.txt. SD bring-up objective achieved:
+identity, capacity, and known-sector reads verified natively at low-speed
+legacy mode, published read-only; eMMC regression green throughout.
+Follow-ups for later rounds: throughput (SDR50/104 + DLL tuning, vendor
+tuning procedure already captured in /tmp/sdhci-sprd-vendor.c), ext4
+image block mapping, OS/SystemOS hookup.
