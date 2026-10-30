@@ -34,6 +34,7 @@
 #include <IOKit/storage/IOBlockStorageDevice.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <kern/thread.h>
+#include "TransferStatus.h"
 
 #define E5_EMMC_BASE 0x22200000ULL
 #define E5_EMMC_LEN  0x400ULL
@@ -171,7 +172,7 @@ class NativeEmmc : public IOBlockStorageDevice {
   }
   static bool cmdOk(uint32_t st) { return (st & 0xFFFF8001u) == INT_CMD_COMPLETE; }
   static bool transferOk(uint32_t st) {
-    return (st & 0xFFFF8000u) == 0 && (st & 0x03u) == 0x03u;
+    return E5Emmc::transferOk(st);
   }
 
   // CMD|DATA line reset with Unisoc RST_n (bit3) preserved; never RESET_ALL.
@@ -423,7 +424,7 @@ public:
   bool scanGpt(uint32_t *d, uint8_t *d8, uint64_t dva) {
     uint32_t st = sdmaRead512(0x113A, 1, d, dva);
     cacheInvalidate(d, 512);
-    if ((st & 0x00000003u) == 0x00000003u && d8[0] == 0x45 && d8[1] == 0x46 &&
+    if (transferOk(st) && d8[0] == 0x45 && d8[1] == 0x46 &&
         d8[2] == 0x49 && d8[3] == 0x20 && d8[4] == 0x50 && d8[5] == 0x41 &&
         d8[6] == 0x52 && d8[7] == 0x54) {
       uint64_t entriesLba = 0;
@@ -439,7 +440,7 @@ public:
           uint32_t lba = (uint32_t)entriesLba + e / perLba;
           st = sdmaRead512(0x113A, lba, d, dva);
           cacheInvalidate(d, 512);
-          if ((st & 0x00000003u) == 0x00000003u) {
+          if (transferOk(st)) {
             uint8_t *ent = d8 + (e % perLba) * eSize;
             uint32_t nz = 0;
             for (uint32_t i = 0; i < 16; i++) nz |= ent[i];
@@ -471,14 +472,14 @@ public:
   }
 
   char *getProductString() override { return const_cast<char *>("eMMC 5.1 (sprd,sdhci-r11)"); }
-  char *getRevisionString() override { return const_cast<char *>("2"); }
+  char *getRevisionString() override { return const_cast<char *>("8"); }
   char *getAdditionalDeviceInfoString() override { return const_cast<char *>("UEFI-validated v4 port"); }
   IOReturn reportBlockSize(UInt64 *value) override { *value = 512; return kIOReturnSuccess; }
   IOReturn reportEjectability(bool *value) override { *value = false; return kIOReturnSuccess; }
   IOReturn reportMaxValidBlock(UInt64 *value) override { UInt64 n = (partMode || windowPub) ? cacheSectors : sectors; *value = n ? n - 1 : 0; return kIOReturnSuccess; }
   IOReturn reportMediaState(bool *present, bool *changed) override { *present = cardUp; if (changed) *changed = false; return kIOReturnSuccess; }
   IOReturn reportRemovability(bool *value) override { *value = false; return kIOReturnSuccess; }
-  IOReturn reportWriteProtection(bool *value) override { *value = false; return kIOReturnSuccess; }
+  IOReturn reportWriteProtection(bool *value) override { *value = true; return kIOReturnSuccess; }
   IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
   IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
   IOReturn getWriteCacheState(bool *value) override { *value = false; return kIOReturnSuccess; }
@@ -505,7 +506,7 @@ public:
     while (done + 512 <= total) {
       uint32_t st = h->sdmaRead512(0x113A, (uint32_t)(baseOff + block + done / 512), h->dmaD, h->dmaPhys);
       cacheInvalidate(h->dmaD, 512);
-      if ((st & 0x00000003u) == 0x00000003u &&
+      if (transferOk(st) &&
           buffer->writeBytes(done, h->dmaD8, 512) == 512) {
         done += 512;
       } else {
@@ -559,6 +560,7 @@ bool NativeEmmc::start(IOService *provider)
     // v5: keep regs/DMA page alive; the read path runs in doAsyncReadWrite.
     baseLba = 0xd0a800ull;
     windowPub = true;
+    elog("NativeEmmc: v8 read-only service; errors override completion\n");
     elog("NativeEmmc: publishing cache window (%llu sectors @ lba %llx)\n",
          (unsigned long long)cacheSectors, (unsigned long long)baseLba);
     registerService();
