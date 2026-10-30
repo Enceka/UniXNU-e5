@@ -227,6 +227,30 @@ class NativeSd : public IOBlockStorageDevice {
       sdlog("NativeSd: adi gate %08x->%08x\n", g0, g1);
       if (!(g1 & 0x200u)) { sdlog("NativeSd: adi gate enable refused\n"); return false; }
     }
+    { // The ADI may be held in soft reset (RESET_AON_APB_ADI_SOFT_RST,
+      // vendor ums9620-clk.c aon resets: reg 0x14 bit9, SC assert write
+      // at +0x1000, deassert at +0x2000 per drivers/clk/sprd/reset.c).
+      // A held reset decodes nothing and external-aborts reads, exactly
+      // the round 3/4 signature.
+      uint32_t r0 = aon.get(0x14);
+      aon.put(0x1014, 1u << 9);            // assert
+      IODelay(50);
+      aon.put(0x2014, 1u << 9);            // deassert (release)
+      IODelay(1000);
+      uint32_t r1 = aon.get(0x14);
+      sdlog("NativeSd: adi rst %08x->%08x\n", r0, r1);
+      if (r1 & 0x200u) { sdlog("NativeSd: adi rst stuck\n"); return false; }
+    }
+    { // ADI functional clock: mux "adi" (aonapb-clk 0x64920034 bits[2:0];
+      // parents 0 rco-100m-4m, 1 ext-26m, 2 rco-100m-25m, 3/4 PLLs).
+      // Force the always-on RCO 25 MHz source Android itself selects.
+      uint32_t m0 = clocks.get(0x34);
+      clocks.put(0x34, (m0 & ~7u) | 2u);
+      IODelay(1000);
+      uint32_t m1 = clocks.get(0x34);
+      sdlog("NativeSd: adi mux %08x->%08x\n", m0, m1);
+      if ((m1 & 7u) != 2u) { sdlog("NativeSd: adi mux stuck\n"); return false; }
+    }
     { // UMP9620 power controller over ADI (vendor ump9620-regulator.c):
       // write-unlock 0x23d0 = 0x6e7f once, then enable = clear the PD bit0,
       // VOL is linear 10mV from 1.2V -> 3.0V = 0xb4. vmmc first, then vqmmc.
@@ -310,7 +334,7 @@ public:
   bool start(IOService *provider) override {
     if (!IOBlockStorageDevice::start(provider)) return false;
     sdlog("NativeSd: v1 start, independent SDIO0 host\n");
-    if (!ahb.open(0x20000000, 0x2000) || !aon.open(0x64900000, 0x2000) ||
+    if (!ahb.open(0x20000000, 0x2000) || !aon.open(0x64900000, 0x3000) ||
         !clocks.open(0x64920000, 0x1000) || !adi.open(0x400000, 0x1000) ||
         !adiSlave.open(0x420000, 0x8000)) { sdlog("NativeSd: clock map failed\n"); return false; }
     ahb.put(0x1000, 1u); aon.put(0x113c, (1u << 2) | (1u << 3));
