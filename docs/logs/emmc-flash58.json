@@ -1,0 +1,68 @@
+{
+  "flash": 58,
+  "kernel": 262,
+  "source_revision": "35c8cc87c5743bc627978aa8ad340ac11795a544",
+  "build": {
+    "dispatched_at_utc": "2026-10-30T08:48:18.661343+00:00",
+    "inputs": {
+      "unixnu_ref": "066c8d8315f83749d28bcae2faf3595718646be5",
+      "device_ref": "35c8cc87c5743bc627978aa8ad340ac11795a544",
+      "xcode": "26.6",
+      "adt": "true"
+    },
+    "run_id": 41028920314,
+    "run_number": 262,
+    "status": "completed",
+    "url": "https://github.com/Enceka/unixnu-e5-kernel-builder/actions/runs/41028920314",
+    "conclusion": "success",
+    "artifact_directory": "/Volumes/Projects/e5-xnu/uefi/build/e5-kernel-artifact-262",
+    "kernel_sha256": "ba82d602e90aed24d10de14ce53ab16dd168936a51d2ffdec786719284debe96",
+    "artifacts": [
+      {
+        "name": "e5-kernel-066c8d8315f83749d28bcae2faf3595718646be5-262",
+        "sha256": "5172c445c195290a3081b036f7a051d6525cb95d1161ca0c45473d3e4b5b6500"
+      },
+      {
+        "name": "e5-kernel-logs-262",
+        "sha256": "76d6fb67008426bd19f84e717671a60e5f3ef7490082cd408fe1b76318e6456b"
+      }
+    ],
+    "public_run_deleted": true
+  },
+  "published_window_sectors": 131072,
+  "physical_partition_bytes": 67108864,
+  "root_uuid": "238A9EDD-6788-4B2E-BA4E-C1F70AE25B64",
+  "root_image_sha256": "30a10449cbb80ef69b2fa928e26797a160d1ebfea1819b089a7826e453fe3173",
+  "payload_sha256": "17577d13c3f9555d226eb70fdb2af43ce4948af5a3e0fc1743dea528e563344e",
+  "root_and_payload_full_readback": true,
+  "post_boot_root_unchanged": true,
+  "raw_command_statuses": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "host_cases": {
+    "transfer_status": 13,
+    "window_bounds": 6
+  },
+  "report": "uefi-report-170641.txt",
+  "device_after_test": {
+    "sys.boot_completed": "1",
+    "ro.boot.slot_suffix": "_a",
+    "slots": [
+      {
+        "priority": 15,
+        "tries": 1,
+        "successful": 1
+      },
+      {
+        "priority": 14,
+        "tries": 1,
+        "successful": 0
+      }
+    ]
+  },
+  "scope": "Successful IOKit/APFS/seed reads with read-only media; error bit combinations and overflow were tested on host, not injected into hardware."
+}

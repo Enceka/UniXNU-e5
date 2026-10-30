@@ -1,0 +1,4 @@
+Source revision: 35c8cc87c5743bc627978aa8ad340ac11795a544
+Command: xcrun clang++ -std=c++17 -Wall -Wextra -Werror scripts/emmc/tests/transfer-status.cpp -o <test>; <test>
+PASS: 13 SDHCI completion/error cases; 6 window boundary cases
+Regression control with the previous normal-read predicate: FAIL 00008003 (error summary with both completion bits)

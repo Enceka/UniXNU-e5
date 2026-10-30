@@ -14,7 +14,7 @@ paths = ["board.toml", "feeds.toml", "configs/**", ".gitmodules", ".github/**", 
 inputs = ["UMS9621 SoC feed, iPadOS 17.7.11 build 21H461 OS profile, XNU 10063.141.1 source pin, device defconfig."]
 configuration = ["board.name = e5; board.soc = UMS9621; board.soc_source = ums9621; board.os_profile = ipados-17.7.11-21H461; schema_version = 2.", "kernel.defconfig = e5_defconfig; patch_series applies arch, soc, os then device series.", "Device kernel archives add e5_emmc_build.py (NativeEmmc IOKit storage driver), RamBlock with virtio-mmio bindings, e5_derive_audit.py storage ABI audit from the pinned kernelcache IPSW, SoftwareAES bindings and mockfs fixture."]
 procedure = ["Run ./unixnu defconfig e5_defconfig --device <repo> from the UniXNU checkout.", "Run ./unixnu status --json --device <repo> and confirm profiles, source pins and patch order.", "CI (kernel-builder workflow) builds kernel.macho from the pinned sources on a macOS runner."]
-findings = ["Arrays replace inherited selections in board.toml; the device list restates every required component.", "CI rebuilds from identical patch content are not byte-identical; kernel behaviour was validated by flash evidence instead of binary hashes.", "Patches must be generated against the arch+soc+os-patched tree; anchors against pristine Apple XNU fail where UniXNU series modify the same files (for example arm_init.c gains boot_progress helpers)."]
+findings = ["Arrays replace inherited selections in board.toml; the device list restates every required component.", "CI rebuilds from identical patch content are not byte-identical; kernel behaviour was validated by flash evidence instead of binary hashes.", "Patches must be generated against the arch+soc+os-patched tree; anchors against pristine Apple XNU fail where UniXNU series modify the same files (for example arm_init.c gains boot_progress helpers). The next payload requests 512 MiB through payload.adt.owned_memory_size; flash #59 holds kernel 262 and all other inputs fixed to qualify that setting."]
 completion = ["All source pins resolve; every selected component has a record; status shows the intended overrides and patch order."]
 limits = ["Hardware-facing patch changes still require device validation. The earlier general binary-layout-fragility diagnosis was withdrawn after fixed-seed control experiments isolated incorrect keypad MMIO addresses."]
 next_action = ["Keep source and payload inputs pinned per experiment; change one variable and retain matching flash evidence for hardware-facing changes."]
@@ -78,14 +78,14 @@ result = "Pinned UMS9621 SoC tree supplies CPU/PSCI/GIC declarations; enabled-co
 id = "memory"
 status = "implemented"
 components = []
-paths = ["dts/**", "package/*Memory*"]
+paths = ["dts/**", "package/*Memory*", "board.toml", "docs/system-volume-audit.md", "docs/logs/system-*.json"]
 inputs = ["2 GiB DRAM starting at 0x80000000; vendor reserved regions from the live device tree; kernel, ADT, ramdisk and boot-args staging windows."]
-configuration = ["DarwinBoot stages kernel at physical 0xC407C000 (virtual 0xFFFFFFF00427C000), boot-args at 0xC81A0000 and the packed seed ramdisk below 0xC821C000.", "PE_init_platform copies boot_args Video fields; Video v_display is forced to 0 so XNU picks the text-mode console and maps the framebuffer itself."]
+configuration = ["Flash #57/#58 use a 256 MiB owned window with kernel physical base 0xC407C000, boot-args at 0xC819C000 and staging top 0xC8234000. The ADT declares 2 GiB DRAM but originally omitted darwinboot-memory-size.", "payload.adt.owned_memory_size is now 0x20000000 (512 MiB), pending flash #59 acceptance. The existing UEFI High RAM donor is 0xC4000000..0xF0000000; a 512 MiB window at the baseline base fits below its end and the top-of-RAM log reservations.", "PE_init_platform copies boot_args Video fields; Video v_display is forced to 0 so XNU picks the text-mode console and maps the framebuffer itself."]
 procedure = ["Read the DarwinBoot staging debug lines (kernel va/pa, args address, video base) from a collected report.", "Verify the APFS seed volume mounts from the ramdisk (E5SEED volume UUID in board.toml)."]
-findings = ["The packed ramdisk growth from 291040 to 467184 bytes shifted the staging top by 0x2C000 without affecting boot; staging is size-independent within the reserved window.", "Memory ownership hand-off follows the boot_args ABI of XNU 10063.141.1 (struct sizes 0x480 verified against pexpert/arm64/boot.h)."]
+findings = ["The packed ramdisk growth from 291040 to 467184 bytes shifted the staging top by 0x2C000 without affecting boot; staging is size-independent within the reserved window.", "Memory ownership hand-off follows the boot_args ABI of XNU 10063.141.1 (struct sizes 0x480 verified against pexpert/arm64/boot.h).", "The complete clean sidecar is parsed before/after the 512 MiB request; all properties except /device-tree/chosen/darwinboot-memory-size remain byte-identical. Kernel, seed, trust cache, EFI files and firmware are held fixed for flash #59."]
 completion = ["All handoff regions are accounted for and each enabled DMA engine accesses its allocated range with the documented cache policy."]
 limits = ["SMMU is not configured; DMA uses coherently-mapped buffers with explicit cache maintenance."]
-next_action = ["Document the reserved-memory map end to end (LK, UEFI, XNU) in one table with dump references."]
+next_action = ["Run flash #59 with the single ADT memory-request change; require a 512 MiB loader handoff, E5EMMC root, five zero command statuses and canonical tty. Keep the verified 256 MiB #58 payload as fallback; then audit runtime memory pressure with original userland."]
 
 [[area.evidence]]
 kind = "source"
@@ -96,14 +96,14 @@ result = "Device memory declaration: physical 0x80000000, size 0x80000000; full 
 id = "storage"
 status = "implemented"
 components = ["RamBlock"]
-paths = ["scripts/emmc/**", "scripts/*ufs*", "tools/userspace/**", "docs/emmc-seed.md", "docs/logs/emmc-*.json", "docs/logs/uefi-report-161217.txt", "docs/logs/uefi-report-162200.txt", "docs/logs/uefi-report-163029.txt"]
+paths = ["scripts/emmc/**", "scripts/*ufs*", "tools/userspace/**", "docs/emmc-seed.md", "docs/system-volume-audit.md", "docs/logs/emmc-*.json", "docs/logs/emmc-*.log", "docs/logs/system-*.json", "docs/logs/uefi-report-161217.txt", "docs/logs/uefi-report-162200.txt", "docs/logs/uefi-report-163029.txt", "docs/logs/uefi-report-170641.txt"]
 inputs = ["Unisoc sprd,sdhci-r11 eMMC host at physical 0x22200000 (warm-inherited from LK: card selected in TRAN state, RCA 1), eMMC 61079552 sectors (29.125 GiB) with a 70-entry GPT, cache partition at LBA 0xd0a800 size 0x20000 sectors (64 MiB; corrected from the earlier 1 GiB claim), full disk mmcblk0."]
 configuration = ["NativeEmmc (scripts/emmc/NativeEmmc.cpp) is compiled into the kernel by e5_emmc_build.py against the storage ABI derived from the pinned kernelcache.", "v2-v4 probes cover card identification, EXT_CSD, SDMA/ADMA MBR/GPT reads and boot_b/misc readback. v5 publishes the whole disk and IOGUIDPartitionScheme enumerates 70 partitions.", "v7 published a cache window at LBA 0xd0a800 with an incorrect 0x200000-sector length; v8 corrects it to the actual GPT/sysfs length of 0x20000 sectors (64 MiB), bounded by physical card capacity. The 8 MiB test image inside that partition contains its own GPT and an APFS volume E5EMMC; the physical eMMC GPT is unchanged.", "board.toml and the ADT match volume UUID 238A9EDD-6788-4B2E-BA4E-C1F70AE25B64. The current flash #57 baseline uses kernel 260, v9 PID1, aligned ls/cat entry stubs, numeric aliases and a trust cache from the installed signed binaries."]
 procedure = ["Clone the existing test image, preserve its volume UUID, create /dev and install the signed v9 PID1, ls/cat/clock and numeric aliases. Generate the trust cache from the actual installed binaries; see docs/emmc-seed.md.", "Back up and compare the previous 8 MiB cache test image before replacing only that existing test region from Android; verify the entire replacement by readback SHA256.", "Keep kernel/ADT/EFI/configuration fixed, rebuild FAT and rerun mk-boot-payload.py, flash through e5-uefi-cycle.sh and verify the full boot payload by readback before collect.", "Require the expected eMMC window, E5EMMC UUID/mount, INIT-START-v9, console fd0, TIOCGETA/ICANON, raw command exit statuses and SH READY/READ-BLOCK in the same report."]
 findings = ["Physical GPT edits were restored across reboot in earlier tests; the boot-chain mechanism is not isolated. Partition-content writes survive. Current tests leave the physical GPT untouched.", "The v6 second-device/bare-container attempts did not produce a root mount, including the publisher-thread variant. v7 publishes the GPT-wrapped image through the original matched service and mounts it; the separate effects of GPT wrapping and publication were not isolated.", "IOKit reads through doAsyncReadWrite are verified for GPT, APFS metadata and seed executables. This proves the tested read path, not every error/recovery case.", "Flash #54 mounts E5EMMC with old v8; #55 adds v9, real console fd0, ICANON and four standard commands exiting 0. An extra long-argument cat SIGBUS is reproduced before its first trace in #56. #57 fixes the shared static-tool C stack alignment: all five commands exit 0 and the marker file is read. Its original argument pointer is 0x16fdffde8 (8 modulo 16), preserved while the working SP is aligned. SH READY/READ-BLOCK follow with no devfs, AMFI or child exception failure.", "The #55, #56 and #57 root images are byte-identical when read back after their XNU boots. #57's kernel/ADT/EFI/configuration file hashes remain unchanged across the userspace correction."]
 completion = ["Host: SDHCI register, clock, card mode and DMA facts match the board inventory.", "Reads: eMMC capacity, GPT and known blocks are correct; all exported windows stay within their containing partition.", "Root: the configured volume mounts and launchd starts. Persistence: writes survive reboot within the allocated Data region."]
-limits = ["XNU eMMC writes are unsupported. This is a custom minimal APFS seed, not the original OS/SystemOS or a writable Data volume.", "v8 source now reports write protection and rejects error bits in GPT and normal block reads through the shared transfer predicate. Thirteen host error/completion cases and six window boundary/overflow cases pass; hardware acceptance is pending. Android and the raw GPT both confirm the corrected cache extent is 64 MiB.", "Five batch commands and tty setup passed in #57; physical keypad and serial command entry remain separate acceptance items."]
-next_action = ["Build v8 from pinned inputs and repeat the #57 eMMC-root/five-command test with its seed, trust cache, ADT and firmware fixed. Then audit the real OS/SystemOS/Data layout and memory requirements."]
+limits = ["XNU eMMC writes are unsupported. This is a custom minimal APFS seed, not the original OS/SystemOS or a writable Data volume.", "v8 passes thirteen host completion/error and six window-boundary cases; #58 mounts the same root and runs all five commands with the corrected 64 MiB read-only window. Hardware CRC/timeout injection and failed-request recovery remain untested.", "Five batch commands and tty setup passed in #57/#58; physical keypad and serial command entry remain separate acceptance items."]
+next_action = ["Keep #58 as the storage-contract baseline while validating the larger memory request. Prepare original OS/SystemOS and a test Data input locally; choose a storage publication layout that preserves the Android recovery path before installing system windows."]
 
 [[area.evidence]]
 kind = "device"
@@ -142,6 +142,20 @@ result = "Flash #57 accepts E5EMMC mount, v9 PID1, all five raw wait statuses 0,
 kind = "source"
 reference = "scripts/emmc/TransferStatus.h"
 result = "v8 shares one error-first SDHCI transfer predicate across initialization, GPT and normal block reads; the driver reports a write-protected medium and continues rejecting writes. Regression cases cover command/data CRC, timeout, end-bit, ADMA and vendor errors coexisting with completion."
+
+[[area.evidence]]
+kind = "host"
+reference = "docs/logs/emmc-read-contract-host.log"
+command = "xcrun clang++ -std=c++17 -Wall -Wextra -Werror scripts/emmc/tests/transfer-status.cpp -o <test>; <test>"
+revision = "35c8cc87c5743bc627978aa8ad340ac11795a544"
+result = "All thirteen SDHCI completion/error cases and six boundary/overflow cases pass. Replacing the predicate with the previous normal-read rule fails on error summary plus both completion bits."
+
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/uefi-report-170641.txt"
+command = "PAYLOAD=<flash58>/payload/e5-uefi.bin sh tools/e5-uefi-cycle.sh flash; sh tools/e5-uefi-cycle.sh collect (e5-xnu repository)"
+revision = "35c8cc87c5743bc627978aa8ad340ac11795a544"
+result = "Kernel 262/v8 publishes 131072 sectors (64 MiB), mounts E5EMMC and runs all five commands with raw exit status 0; real console/ICANON and READ-BLOCK follow. Kernel alone changed from #57. Full root/payload readbacks, source pins and public-run cleanup are recorded in docs/logs/emmc-flash58.json."
 
 [[area]]
 id = "display"
