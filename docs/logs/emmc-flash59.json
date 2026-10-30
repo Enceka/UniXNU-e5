@@ -1,0 +1,62 @@
+{
+  "flash": 59,
+  "kernel": 262,
+  "kernel_source_revision": "35c8cc87c5743bc627978aa8ad340ac11795a544",
+  "payload_configuration_revision": "eb21516ff36fa81f83bc98b2e41d7851f3c1d050",
+  "owned_memory_bytes": 536870912,
+  "baseline_owned_memory_bytes": 268435456,
+  "adt_change": {
+    "source": "uefi/build/e5-kernel-artifact-260/kernel.macho.adt",
+    "before_sha256": "590b72958116b3aa899a6ecb8b4e0862d2944eab7e9c3ec80e409b13979e0bfc",
+    "after_sha256": "81e6b2912029474560b5ca258ec148bb5e328b9b04d61a23b18798c4b9fcebe0",
+    "size_bytes": 536870912,
+    "preserved_nodes": 20,
+    "changed_property": "/device-tree/chosen/darwinboot-memory-size"
+  },
+  "payload": {
+    "baseline": "uefi/build/baseline-flash58",
+    "baseline_payload_sha256": "17577d13c3f9555d226eb70fdb2af43ce4948af5a3e0fc1743dea528e563344e",
+    "payload_sha256": "dfda6e5aede97f0ce7ea27461e7ac724013565212fec19d47db13f775ad4ef3f",
+    "seed_sha256": "d633984f596c32d0fb3e84a7970dc2898e4cb08201841a809660a4e297f979c5",
+    "trust_cache_sha256": "4ae856c984116bb785dadb4e2b2445296444b475bc1177cc7e94c29b8aabb46e",
+    "preserved_files": [
+      "kernel.macho",
+      "E5BootMenu.efi",
+      "DarwinBoot.efi",
+      "UniXNU.efi",
+      "startup.nsh",
+      "EFI/UniXNU/unixnu.toml"
+    ],
+    "adt": "uefi/build/flash59-memory512/kernel.macho.adt",
+    "adt_sha256": "81e6b2912029474560b5ca258ec148bb5e328b9b04d61a23b18798c4b9fcebe0"
+  },
+  "root_image_sha256": "30a10449cbb80ef69b2fa928e26797a160d1ebfea1819b089a7826e453fe3173",
+  "payload_sha256": "dfda6e5aede97f0ce7ea27461e7ac724013565212fec19d47db13f775ad4ef3f",
+  "root_and_payload_full_readback": true,
+  "post_boot_root_unchanged": true,
+  "raw_command_statuses": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "report": "uefi-report-172018.txt",
+  "device_after_test": {
+    "sys.boot_completed": "1",
+    "ro.boot.slot_suffix": "_a",
+    "slots": [
+      {
+        "priority": 15,
+        "tries": 1,
+        "successful": 1
+      },
+      {
+        "priority": 14,
+        "tries": 1,
+        "successful": 0
+      }
+    ]
+  },
+  "scope": "512 MiB loader handoff and unchanged seed workload pass; high-page stress, DMA coverage and original-userland memory pressure remain untested."
+}

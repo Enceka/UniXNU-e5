@@ -1,0 +1,370 @@
+{
+  "scope": "Host-verified original system inputs and offline layout; original userland has not booted on E5. No system image was installed in Android userdata or on SD. Raw geometry inventory was read-only; the normal boot_b/misc harness stages test payload files in Android /data/local/tmp.",
+  "common_source_revision": "066c8d8315f83749d28bcae2faf3595718646be5",
+  "ipsw": {
+    "profile": "ipados-17.7.11-21H461",
+    "url": "https://updates.cdn-apple.com/2025SpringFCS/fullrestores/122-77166/DCA6CFE8-90E9-4B92-880D-3DE171798E40/iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw",
+    "ipsw_size": 6835124840,
+    "product": "iPad7,1",
+    "build": "21H461",
+    "identity": {
+      "device_class": "j120ap",
+      "restore_behavior": "Erase",
+      "chip_id": "0x8011",
+      "board_id": "0x0C"
+    },
+    "components": [
+      {
+        "component": "OS",
+        "member": "044-76040-038.dmg",
+        "file_bytes": 5157406069,
+        "compressed_bytes": 5157406069,
+        "pinned_sha256": "3f99b859c9728379110b66657c7b15285bcb1925ad8b5726542e2cdcf8b1028d"
+      },
+      {
+        "component": "Cryptex1,SystemOS",
+        "member": "044-76034-038.dmg",
+        "file_bytes": 3303014400,
+        "compressed_bytes": 1321525120,
+        "pinned_sha256": "b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f"
+      },
+      {
+        "component": "StaticTrustCache",
+        "member": "Firmware/044-76040-038.dmg.trustcache",
+        "file_bytes": 59519,
+        "compressed_bytes": 54001,
+        "pinned_sha256": null
+      },
+      {
+        "component": "Cryptex1,SystemTrustCache",
+        "member": "Firmware/044-76034-038.dmg.trustcache",
+        "file_bytes": 1871,
+        "compressed_bytes": 1748,
+        "pinned_sha256": null
+      },
+      {
+        "component": "KernelCache",
+        "member": "kernelcache.release.ipad7",
+        "file_bytes": 16238580,
+        "compressed_bytes": 16214447,
+        "pinned_sha256": null
+      }
+    ]
+  },
+  "original_system": {
+    "component": "OS",
+    "file_bytes": 5157406069,
+    "raw_disk_bytes": 6077580800,
+    "udif_chunk_count": 3814,
+    "volumes": [
+      {
+        "DeviceIdentifier": "disk5",
+        "Content": "GUID_partition_scheme",
+        "VolumeName": "",
+        "Size": 6077580800,
+        "DeviceBlockSize": 512
+      },
+      {
+        "DeviceIdentifier": "disk5s1",
+        "Content": "Apple_APFS",
+        "VolumeName": "",
+        "APFSContainerReference": "disk6",
+        "Size": 6077546496,
+        "DeviceBlockSize": 512
+      },
+      {
+        "DeviceIdentifier": "disk6",
+        "Content": "EF57347C-0000-11AA-AA11-00306543ECAC",
+        "VolumeName": "",
+        "APFSContainerReference": "disk6",
+        "Size": 6077546496,
+        "DeviceBlockSize": 4096
+      },
+      {
+        "DeviceIdentifier": "disk6s1",
+        "Content": "41504653-0000-11AA-AA11-00306543ECAC",
+        "VolumeName": "DawnUpdate21H461.J120J121J207J208OS",
+        "VolumeUUID": "04769D26-2CA0-4825-B443-E2E5F88300F2",
+        "APFSContainerReference": "disk6",
+        "Size": 6077546496,
+        "DeviceBlockSize": 4096
+      }
+    ],
+    "OS": {
+      "volume_uuid": "04769D26-2CA0-4825-B443-E2E5F88300F2",
+      "volume_name": "DawnUpdate21H461.J120J121J207J208OS",
+      "read_only": true,
+      "files": [
+        {
+          "path": "sbin/launchd",
+          "size": 561856,
+          "sha256": "8cec9a3c44a443b08e977ccc5d577850316ad428c575dc01f09b018dbd5b6a25"
+        },
+        {
+          "path": "usr/lib/dyld",
+          "size": 937056,
+          "sha256": "f8df3c58fae6e409db740df22c98aa699aee110b73523541a63f1bd5e23cf705"
+        }
+      ]
+    },
+    "SystemOS": {
+      "volume_uuid": "8846FE78-2910-4297-AF97-D59BB6F8FC16",
+      "volume_name": "DawnUpdate21H461.J120J121J207J208SystemCryptex",
+      "read_only": true,
+      "files": [],
+      "raw_disk_bytes": 3303014400,
+      "top_level": [
+        "System",
+        "usr"
+      ]
+    },
+    "trust_caches": [
+      {
+        "name": "044-76040-038.dmg.trustcache",
+        "bytes": 59519,
+        "sha256": "4563bdbf6ed8f72237d45dbba3ccde432634338f95c10d79d5d4631678a97c7c",
+        "leading_u32": 2078835248
+      },
+      {
+        "name": "044-76034-038.dmg.trustcache",
+        "bytes": 1871,
+        "sha256": "9742f3d566369e6c48f63b3dc0740b06c243d13c6650e25bbf44616e13d6d097",
+        "leading_u32": 1258783280
+      }
+    ]
+  },
+  "signatures": [
+    {
+      "path": "sbin/launchd",
+      "cdhash": "1d52c69747dffc4b1937d241bdbc9cee3b22df18",
+      "in_original_os_trust_cache": true
+    },
+    {
+      "path": "usr/lib/dyld",
+      "cdhash": "b479f90e05545314cb843410c3d98ef84d926710",
+      "in_original_os_trust_cache": true
+    }
+  ],
+  "trust_caches": {
+    "modules": [
+      {
+        "name": "044-76040-038.dmg.trustcache",
+        "version": 2,
+        "entries": 2478,
+        "bytes": 59496,
+        "entry_bytes": 24,
+        "sha256": "da88460e6e513438d5307e5c526f76497a74754476a24da29f239f0c90120fc2"
+      },
+      {
+        "name": "044-76034-038.dmg.trustcache",
+        "version": 2,
+        "entries": 76,
+        "bytes": 1848,
+        "entry_bytes": 24,
+        "sha256": "d121ba89167e03aafd00fa687c30cd8ebc4ccafd10c1408adb2ba3de12403651"
+      }
+    ],
+    "bundle_bytes": 61356,
+    "bundle_sha256": "7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7"
+  },
+  "emmc_geometry": {
+    "source": "Android /dev/block/mmcblk0 first 34 sectors plus matching sysfs geometry",
+    "gpt_sha256": "9c11b27276edb527a24fae171f4ebe1a15c2ba0ce5b10fa0917c703a15d980ed",
+    "header_crc_valid": true,
+    "entries_crc_valid": true,
+    "partitions": [
+      {
+        "name": "cache",
+        "partition": 47,
+        "first_lba": 13674496,
+        "last_lba": 13805567,
+        "sectors": 131072,
+        "bytes": 67108864
+      },
+      {
+        "name": "blackbox",
+        "partition": 48,
+        "first_lba": 13805568,
+        "last_lba": 14829567,
+        "sectors": 1024000,
+        "bytes": 524288000
+      },
+      {
+        "name": "userdata",
+        "partition": 70,
+        "first_lba": 15241216,
+        "last_lba": 61075455,
+        "sectors": 45834240,
+        "bytes": 23467130880
+      }
+    ],
+    "userdata_mount": "/dev/block/by-name/userdata /data f2fs rw,lazytime,seclabel,nosuid,nodev,noatime,background_gc=on,discard,no_heap,user_xattr,inline_xattr,acl,inline_data,inline_dentry,flush_merge,extent_cache,mode=adaptive,active_logs=6,reserve_root=32768,resuid=0,resgid=1065,alloc_mode=default,checkpoint_merge,fsync_mode=nobarrier,discard_unit=block,memory=normal 0 0"
+  },
+  "sd_inventory": {
+    "device": "/dev/block/mmcblk1p1",
+    "host": "mmc1 at 0x22210000",
+    "filesystem": "ext4",
+    "label": "e5-openwrt",
+    "block_size": 4096,
+    "blocks": 3780347,
+    "free_blocks": 3584673,
+    "total_bytes": 15484301312,
+    "free_bytes": 14682820608,
+    "mount_state": "not mounted in the captured /proc/mounts",
+    "scope": "read-only superblock inventory; no SD writes"
+  },
+  "memory": {
+    "adt_sha256": "590b72958116b3aa899a6ecb8b4e0862d2944eab7e9c3ec80e409b13979e0bfc",
+    "chosen": {
+      "dram-base": "0x80000000",
+      "dram-size": "0x80000000",
+      "darwinboot-memory-size": null
+    },
+    "runtime_owned_bytes_from_flash57": 268435456,
+    "runtime_kernel_pa": 3288842240,
+    "runtime_boot_args_pa": 3357130752,
+    "runtime_top": 3357753344,
+    "framebuffer_pa": 3187671040,
+    "verified_owned_bytes_from_flash59": 536870912,
+    "verification_scope": "512 MiB loader handoff and unchanged seed workload pass; high-page stress, DMA coverage and original-userland memory pressure remain untested."
+  },
+  "layout": {
+    "windows": [
+      {
+        "name": "OS",
+        "offset": 1048576,
+        "raw_bytes": 6077580800
+      },
+      {
+        "name": "SystemOS",
+        "offset": 6079643648,
+        "raw_bytes": 3303014400
+      }
+    ],
+    "root_image_bytes": 9382658048,
+    "prospective_data_bytes": 3221225472,
+    "log_reserve_bytes": 1073741824,
+    "root_plus_data_and_reserve": 13677625344,
+    "sd_free_bytes_from_superblock": 14682820608,
+    "android_userdata_bytes": 23467130880,
+    "cache_bytes": 67108864,
+    "current_implementation": "NativeEmmc v8 exposes only the 64 MiB GPT-wrapped cache seed; SHNGROOT/window publication and SD file-extent access are not implemented."
+  },
+  "assembled_root": {
+    "image_bytes": 9382658048,
+    "image_sha256": "fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093",
+    "manifest_sha256": "bc908a6cf66491055077798550660f40128bfe6dce2fdc0db56e6af96511208d",
+    "windows": [
+      {
+        "name": "OS",
+        "offset": 1048576,
+        "size": 6077580800,
+        "sha256": "e5634d04a8ac35f024845f583394e0a35deb26a04cb0c00286a8674e25a9a4f2"
+      },
+      {
+        "name": "SystemOS",
+        "offset": 6079643648,
+        "size": 3303014400,
+        "sha256": "b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f"
+      }
+    ],
+    "userdata_bytes": 23467130880,
+    "source": "local",
+    "hardware_tested": false,
+    "independent_verification": {
+      "result": "PASS",
+      "image_bytes": 9382658048,
+      "image_sha256": "fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093",
+      "common_source_revision": "066c8d8315f83749d28bcae2faf3595718646be5",
+      "checked": "pinned DMGs, identity, full image, header and both window hashes",
+      "hardware_tested": false
+    }
+  },
+  "data_candidate": {
+    "source": {
+      "volume_uuid": "1DB37EE6-CDBE-493F-B292-2EE96C77EF19",
+      "bytes": 33554432,
+      "sha256": "a9cfa4918e0ef37d0cc3d6d136007736b3324cf0e48ea23cc9d25fc1369ef84d",
+      "source_regular_files": 39,
+      "source_regular_bytes": 611715,
+      "guest_mutable": true,
+      "initial_seed_signature_verified": false,
+      "seed": "Original private/var excluding staged_system_apps; symlinks preserved; runtime directories added",
+      "owner_keybag_created": false,
+      "os_inputs_modified": false,
+      "production_storage_qualified": false
+    },
+    "preparation": {
+      "source_seed": "build/e5-owner-data/owner-data-32.cdr",
+      "source_seed_sha256": "a9cfa4918e0ef37d0cc3d6d136007736b3324cf0e48ea23cc9d25fc1369ef84d",
+      "fixture": "build/e5-offline-data/seed-boot.cdr",
+      "fixture_sha256": "646e0159924f8c9d1654d77c6d8b252cb7b68a3abdc696aaeca36f674ad43d5e",
+      "fixture_bytes": 33554432,
+      "directories": [
+        "db",
+        "db/dslocal",
+        "db/dslocal/nodes",
+        "db/dslocal/nodes/Default",
+        "db/dslocal/nodes/Default/users",
+        "db/dslocal/nodes/Default/groups",
+        "db/dslocal/nodes/Default/config",
+        "containers",
+        "containers/Data",
+        "containers/Data/System",
+        "containers/Data/Application",
+        "containers/Shared",
+        "containers/Shared/SystemGroup",
+        "PersonaVolumes",
+        "preboot",
+        "root",
+        "tmp",
+        "Library",
+        "keybags",
+        "keybags/backup",
+        "mobile/Library/Preferences",
+        "mobile/Library/Caches",
+        "mobile/Library/Logs",
+        "mobile/Containers",
+        "mobile/Documents",
+        "mobile/Media",
+        "mobile/tmp"
+      ],
+      "created": [
+        "db/dslocal",
+        "db/dslocal/nodes",
+        "db/dslocal/nodes/Default",
+        "db/dslocal/nodes/Default/users",
+        "db/dslocal/nodes/Default/groups",
+        "db/dslocal/nodes/Default/config",
+        "containers",
+        "containers/Data",
+        "containers/Data/System",
+        "containers/Data/Application",
+        "containers/Shared",
+        "containers/Shared/SystemGroup",
+        "PersonaVolumes",
+        "preboot",
+        "Library",
+        "keybags/backup",
+        "mobile/Containers",
+        "mobile/Documents"
+      ],
+      "added_keys_or_user_records": false,
+      "original_file_symlink_inventory_unchanged": true,
+      "original_file_symlink_count": 40,
+      "volume_uuid": "1DB37EE6-CDBE-493F-B292-2EE96C77EF19",
+      "qemu_only": true
+    },
+    "raw_image_sha256": "646e0159924f8c9d1654d77c6d8b252cb7b68a3abdc696aaeca36f674ad43d5e",
+    "production_storage_qualified": false,
+    "packed_bytes": 1208400,
+    "packed_sha256": "a00d400f094142e3a49d1590113e2fc0920e9a14f4dc0dd03fbaf819bcba32c4",
+    "packed_roundtrip_verified": true
+  },
+  "local_artifacts": {
+    "root_image": "e5-xnu/uefi/build/system-audit/userdata/userdata-root.img",
+    "data_candidate": "e5-xnu/uefi/build/system-audit/data-candidate/data-32m.cdr",
+    "trust_cache": "e5-xnu/uefi/build/system-audit/original-kernel.trustcache",
+    "packed_data_candidate": "e5-xnu/uefi/build/system-audit/data-candidate/data-32m.dbr"
+  }
+}

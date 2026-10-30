@@ -1,16 +1,17 @@
 # E5 eMMC APFS seed acceptance
 
-The current baseline is flash #57 (2026-10-30): all five commands exit 0,
-including the long-argument cat after its static entry alignment fix.
-See [the final report](logs/uefi-report-163029.txt) and
-[exact image/binary hashes](logs/emmc-flash57.json).
+The current baseline is flash #59 (2026-10-30): kernel 262/v8, a correctly
+bounded 64 MiB read-only cache window, a 512 MiB memory handoff and all five
+commands exiting 0. See [the report](logs/uefi-report-172018.txt) and
+[image hashes](logs/emmc-flash59.json). #58 is the same storage baseline
+with a 256 MiB handoff. The earlier #55-#57 controls are retained below.
 
 Flash #55 first starts the custom v9 PID1 from the eMMC test root.
 It does not boot the original iPadOS system or provide writable Data.
 The full report is [uefi-report-161217.txt](logs/uefi-report-161217.txt),
 with [installed binary and image hashes](logs/emmc-flash55.json).
 
-## Layout and result
+## Flash #55 layout and result
 
 NativeEmmc v7, built into kernel 260, uses the original matched IOKit service
 to expose the existing cache partition as a block device window:
@@ -98,11 +99,27 @@ payload SHA256 is
 The full baseline is frozen in `e5-xnu/uefi/build/baseline-flash57/`, and
 the default local payload/FAT/manifest now match it.
 
-Storage writes from XNU remain unsupported. NativeEmmc currently reports
-writable media while rejecting writes, and the normal read loop must reject
-error bits even when completion bits are also set. These contracts need
-correction and failure-path checks before broader storage claims. The
-original OS/SystemOS, Data layout and RAM ownership also remain pending.
+Storage writes from XNU remain unsupported. v8 now reports write protection
+and uses the same error-first transfer predicate for initialization, GPT
+and ordinary block reads. Thirteen host error/completion cases and six
+window boundary/overflow cases pass; the previous normal-read predicate
+fails the error-summary-plus-completion regression case.
+
+Raw GPT and Android sysfs show cache is only **64 MiB** (`0x20000` sectors),
+not the previously exported 1 GiB. v8 corrects that length and checks it
+against physical capacity. Earlier seed writes were limited to the first
+8 MiB. #58 publishes 131072 sectors, mounts the same APFS root and runs the
+five commands with raw status 0. Only the kernel changed from #57.
+
+#59 changes only the typed ADT memory request: the clean sidecar is validated
+before/after and all other properties retain their bytes. The loader reports
+`mem=20000000` and `owned=0x20000000`, then the same root, five zero command
+statuses and canonical tty pass. Both #58/#59 root and boot images match
+full post-boot readback. Hardware error injection/recovery, high-page stress
+and original-userland memory pressure remain separate checks.
+
+The original system is now prepared locally as described in
+[the system-volume audit](system-volume-audit.md); it has not booted on E5.
 
 ## Reproduce the seed update
 
@@ -132,3 +149,6 @@ GPT. The archived #41 RAM seed remains the independent recovery baseline.
 Per-run images, backups, manifests and logs remain in
 `e5-xnu/uefi/build/emmc-v9-k260/`, `flash55-k260-emmc-v9/`, and
 `flash56-k260-cat-probe/`, and `flash57-k260-stack-fix/`.
+The current complete baseline is `e5-xnu/uefi/build/baseline-flash59/`;
+`baseline-flash58/` retains the 256 MiB fallback. Default local payload,
+FAT and manifest match #59.
