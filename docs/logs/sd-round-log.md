@@ -158,3 +158,34 @@ CMD8 retry.
 4. CMD8 retry loop ≤10 x 5ms on failure; intermediate failures log
    `CMD8 try %u st %08x r7 %08x err %08x`; final outcome keeps the
    existing `CMD8 st … r7 …` / `CMD8 fail …` lines. No checker change.
+
+## Round 8 (kernel 270, v8) — timing fixed, CMD8 CRC deterministic
+
+Report: newest dumps/uefi-report-*.txt. Both probes:
+
+- Probe 2 (full): `pmic prot 8000 sdcore pd 0000 vol 00b4 sdio pd 0000
+  vol 00b4` (rails on from probe 1), `lines ready pstate 01f00000 tries 0`
+  — lines were already high, so the >20ms ramp theory is dead. Hotplug
+  persisted, pstate 01f00000 everywhere. CMD0 st 00000001 clk 1107.
+- CMD8: `try 1..9` + final, ALL st 00018001 r7 00000000 err 0001 =
+  command CRC error, identical to the bit. 10/10 deterministic.
+- eMMC regression green; no panic; clean boot to shell.
+
+Decode: a CRC error (not timeout) means the card DID drive CMD in the
+response window; the host clocked in 48 bits and the CRC7 mismatched
+every time. With power, pull-ups, 382kHz clock, double CMD0 and 50ms of
+settle all verified, the remaining suspect is response sampling phase:
+0x208 CMD_DLY_INV/POSRD_DLY_INV (we set both for <=400kHz like the
+vendor) or the actual SDCLK being other than we compute (mux parent).
+
+## v9 (commit b8b0018, kernel 271) — discriminator + matrix
+
+On CMD8 retry exhaustion:
+1. CMD55 (R1, CRC-checked): if it also CRCs → response path globally
+   corrupt (phase/clock), not CMD8-specific. Logged `CMD55 st/r1/err`.
+2. Matrix 3 cfgs x 3 tries: noinv (invert bits off @400k), clk200
+   (invert on @200k), noinv-clk200. Win logs `CMD8 win <cfg>` and init
+   continues under the winning config (ACMD41 → … unchanged).
+3. All fail → `CMD55b` repeat + standard `CMD8 fail` line, return false.
+Standard grammar lines (`CMD8 st … r7 …`, `CMD8 fail …`) preserved; no
+checker change needed.
