@@ -270,3 +270,38 @@ survives; (2) NativeSd cold path pulses the vendor card hw_reset —
 mmc core calls hw_reset during every mmc_power_up). v10 wrote 0x09
 (bit3 asserted forever, never pulsed). Checker (e5-xnu): cold mode
 requires `card rst hh->hh pstate xxxxxxxx` with bit3 released.
+
+## Round 12 / 12b (kernel 274) — DXE abort removed; v12 card-reset pulse negative
+
+Round 12: the E5-SD DXE dump's own ap-ahb gate write (0x20001000) hit an
+UNMAPPED page (BootShim MMIO map is partial) -> translation fault -> hang ->
+slot exhausted. Removed the E5-SD block from E5BringupDxe (rounds 11-12
+documented in the comment); FD rebuilt clean.
+
+Round 12b (same kernel 274, clean FD): v12 vendor hw_reset pulse executed
+(`card rst 08->08 pstate 01f00000`) — no effect: CMD8/CMD55/matrix all
+identical (st 00018001, response register 0, err 0001). First v11 chain
+observation landed: at XNU the chain is mux 1 (ext-26m) d2x 0 d1x 1 ->
+13 MHz source, divider 0907 — clock source again exonerated. CINS (PSTATE
+bit16) still 0 with lines high.
+
+## v13 — card-detect polarity matrix (the DT decode was wrong)
+
+`cd-gpios` raw bytes `00 00 01 8e | 00 00 00 23 | 00 00 00 00`:
+phandle 0x18e = /soc/aon/gpio@2000c0 (eic-sync, sprd,qogirn6lite-eic-sync),
+gpio NUMBER 0x23 = 35 (gpio-339 "cd", reads hi = card present, active-high),
+flags 0x00. Earlier "flags 0x23 active-low" was a misdecode: 0x23 is the pin
+number. So `detect_gpio_polar = flags = 0` -> FALSE -> the vendor
+fast_hotplug_enable() takes the ELSE branch and SETS the aon 0x520 bit21
+detect polarity. Our hotplugValue() CLEARS it — inverted on this board.
+
+With the controller's detect inverted, the card (pin high) reads ABSENT:
+CINS=0 every powered round. The Linux-proven state has CINS=1, and the
+fast-hotplug machinery plausibly gates the DAT/CMD response path while it
+believes no card is inserted — exactly our signature (CC on every command,
+responses never sampled: CRC error + zero response register).
+
+v13 sweeps three aon 0x520 states after CMD0, CMD8 in each: `vendor`
+(polar clear — current, wrong), `pinv` (polar SET — Linux-proven), `none`
+(fast-hotplug off). First state whose CMD8 echoes r7 0x1aa wins and init
+continues under it. Kernel 275, CI run 41080389067.
