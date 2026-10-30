@@ -558,13 +558,13 @@ bool NativeEmmc::start(IOService *provider)
     registerService();
     s_host = this;
     NativeEmmc *part = new NativeEmmc;
-    if (part && part->init()) {
+    if (part && part->init(this)) {
       part->partMode = true;
       part->baseLba = 0xd0a800ull;
       part->cacheSectors = 0x200000ull;
       if (part->attach(this)) {
         if (part->start(this) == false) {
-          part->detach(gIOServicePlane);
+          elog("NativeEmmc: cache window start failed\n");
         } else {
           elog("NativeEmmc: cache window published (%llu sectors @ lba %llx)\n",
                (unsigned long long)part->cacheSectors, (unsigned long long)part->baseLba);
