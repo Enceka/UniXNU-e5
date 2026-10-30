@@ -368,3 +368,32 @@ legacy mode, published read-only; eMMC regression green throughout.
 Follow-ups for later rounds: throughput (SDR50/104 + DLL tuning, vendor
 tuning procedure already captured in /tmp/sdhci-sprd-vendor.c), ext4
 image block mapping, OS/SystemOS hookup.
+
+## v15 — throughput: default-speed chain + multi-block experiment (branch stage2/sd-throughput)
+
+Reads verified end-to-end at v14 (kernel 277, checker PASS on
+dumps/uefi-report-001448.txt). v15 raises the ceiling in two guarded steps:
+
+1. Clock: after the legacy verify passes (chain residue mux 1 ext-26m,
+   1x -> 13MHz source, N=0 bypass -> 6.5MHz effective), switch the sdio0
+   functional chain to Android's own runtime parent: mux 4 (rpll_390m),
+   2x div 0, 1x enable -> 195MHz source, then default speed 24.375MHz
+   (divider N=2, no bypass). The recheck runs under softVerify — a
+   failure restores the ext-26m chain, re-verifies, and keeps the legacy
+   mode; if even that fails the probe fails loud.
+2. Multi-block: readSectors(lba, n<=16) does CMD18 (0x123a, TM 0x33 =
+   multi|count|DMA|read) with the v4 32-bit block count and a manual
+   CMD12 (0x0c1a) stop. Timed loops over 128 sequential sectors
+   (LBA 16..143, inside the ext4 partition): single-block baseline, then
+   8x16-sector CMD18 with first-sector CRC comparison per chunk.
+   multiOk gates 16-sector chunking in doAsyncReadWrite (>=4 blocks
+   remaining); otherwise the production path is byte-identical to v14.
+
+Log grammar added: `chain rpll mux %u d2x %u d1x %u src %uHz`,
+`tp single %u sectors in %llu us`, `tp multi %u sectors in %llu us
+match %c`, plus fail lines `mread fail`, `mread stop fail`,
+`mread mismatch`, `default-speed recheck failed, falling back`.
+Mode string `default-4bit-24MHz` on success; `legacy-4bit-13MHz` on
+fallback. Checker (e5-xnu d8488db) accepts both, requires the rpll line
+(mux 4, src 195000000) and both tp lines in default mode; synthetic
+validation 4/4. Kernel 278 = CI run 41089616546.
