@@ -236,3 +236,37 @@ Live-DT extras recorded: sprd,phy-delay-legacy = <0 0 0 0> (our
 sdr104 7f a3 b2 b2. pinctrl: 642e0000.pinctrl, SD0 pins 121-126
 (CMD/D_0/D_1/CLK/D_2/D_3), SD1 pins 65-70, plus *_MISC sets — all
 MUX UNCLAIMED/GPIO UNCLAIMED under Android.
+
+## Round 11 (kernel 273 + FD rebuild) — DXE abort, host apb gated at UEFI
+
+v11 (commit 8451500): cold path stops rewriting the sdio0 clock chain;
+observes mux 0x280 / 2x-div 0x284 / 1x 0x288 and derives sourceHz
+(E5Sd::sdio0SourceHz). Live Android regmap proved the vendor clk table
+is offset -0xC from silicon: real chain is mux@0x280=4 (rpll 390M),
+2x@0x284=0 (÷1), 1x@0x288=1 → 195 MHz 1x; the LK-era 0x280/84/88
+addresses were right all along, so rounds 1-10 really ran ext-26m
+13 MHz and the chain was never the bug. Linux re-bind keeps the rpll
+chain untouched.
+
+First FD rebuild since baseline-flash59 added an E5-SD residue dump to
+E5BringupDxe (host 0x22210000 caps/dll/clk, clock chain, aon gates).
+Board result: **Synchronous Exception at DXE, FAR 0x22210040** — the
+SD host apb is GATED OFF at UEFI time (Android shutdown clears
+sdio0_eb; nothing in LK→UEFI re-enables it) and a read of gated apb
+aborts with no DXE recovery → boot hang → slot B exhausted → Android.
+No NativeSd run. Lesson: never read potentially-gated MMIO in DXE
+without enabling the gate first. Side discovery: at XNU the host
+emerges from the apb gate as fresh-reset (inherit hc1 00 clk 0000),
+i.e. our XNU starting state differs from Linux's proven warm state by
+a full apb-gate cycle.
+
+## v12 (commit 6d4feba, kernel 274 + FD gate fix)
+
+Two pieces: (1) E5BringupDxe writes the SC set window ap-ahb
+0x20001000 bit0 (sdio0_eb, set-only, non-destructive) + spins on the
+status readback before any 0x22210000 access, so the residue dump
+survives; (2) NativeSd cold path pulses the vendor card hw_reset —
+0x2f bit3 LOW 20us → HIGH, settle 500us (sdhci_sprd_hw_reset; Linux
+mmc core calls hw_reset during every mmc_power_up). v10 wrote 0x09
+(bit3 asserted forever, never pulsed). Checker (e5-xnu): cold mode
+requires `card rst hh->hh pstate xxxxxxxx` with bit3 released.
