@@ -394,6 +394,11 @@ class NativeSd : public IOBlockStorageDevice {
                 r32(0x24), r16(0x32), r32(0x210), r32(0x208));
           return false;
         }
+      } else {
+        // v14: first-try success must print the standard grammar line too
+        // (the checker keys on it); it used to print only in the fail path.
+        sdlog("NativeSd: CMD8 st %08x r7 %08x\n", st, r32(0x10));
+      }
       }
     }
     uint32_t ocr = 0; unsigned tries;
