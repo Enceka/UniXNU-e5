@@ -20,5 +20,10 @@ int main() {
   if (E5Sd::clockDivider(26000000, 1) != 0xffff) return 10;
   if (!E5Sd::readyTran(0x900) || E5Sd::readyTran(0x800) ||
       E5Sd::readyTran(0x00400900)) return 11;
-  puts("PASS: SD response ordering, card capacity, divider ceilings and R1 state");
+  // Fast-hotplug AON 0x520 value: preserve unrelated bits, set protect-en
+  // bit20 and debounce-en bit0, clear detect-polar bit21 and count bits1-8.
+  if (E5Sd::hotplugValue(0) != 0x00100001u) return 12;
+  if (E5Sd::hotplugValue(0x002001feu) != 0x00100001u) return 13;
+  if (E5Sd::hotplugValue(0xffc00000u) != 0xffd00001u) return 14;
+  puts("PASS: SD response ordering, card capacity, divider ceilings, R1 state, hotplug value");
 }

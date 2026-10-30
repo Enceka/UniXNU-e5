@@ -30,4 +30,11 @@ constexpr uint16_t clockDivider(uint32_t source, uint32_t ceiling) {
 constexpr bool readyTran(uint32_t response) {
   return (response & r1Errors) == 0 && (response & 0x1f00u) == 0x0900u;
 }
+
+// AON 0x520 fast-hotplug value from the vendor power-up sequence:
+// protect-en bit20 and debounce-en bit0 set, debounce count bits1-8 = 0,
+// detect-polar bit21 cleared (E5 cd-gpios flags 0x23 -> polar clear).
+constexpr uint32_t hotplugValue(uint32_t cur) {
+  return (cur | 0x00100001u) & ~0x002001feu;
+}
 }
