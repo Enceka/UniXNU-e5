@@ -557,8 +557,8 @@ bool NativeEmmc::start(IOService *provider)
     elog("NativeEmmc: publishing block device (%llu sectors)\n", (unsigned long long)sectors);
     registerService();
     s_host = this;
-    NativeEmmc *part = new NativeEmmc;
-    if (part && part->init(this)) {
+    NativeEmmc *part = OSTypeAlloc(NativeEmmc);
+    if (part && part->init((OSDictionary *)nullptr)) {
       part->partMode = true;
       part->baseLba = 0xd0a800ull;
       part->cacheSectors = 0x200000ull;
