@@ -317,11 +317,39 @@ class NativeSd : public IOBlockStorageDevice {
         sdlog("NativeSd: CMD8 try %u st %08x r7 %08x err %08x\n", ct, st, r32(0x10), r16(0x32));
         IODelay(5000);
       }
-      sdlog("NativeSd: CMD8 st %08x r7 %08x\n", st, r32(0x10));
       if (!commandOk(st) || (r32(0x10) & 0xfff) != 0x1aa) {
-        sdlog("NativeSd: CMD8 fail pstate %08x err %04x dllsts %08x dly %08x\n",
-              r32(0x24), r16(0x32), r32(0x210), r32(0x208));
-        return false;
+        // v9: deterministic CRC — discriminate response-path corruption from a
+        // CMD8-specific issue. CMD55 carries an R1 (CRC-checked) response: if
+        // it also CRCs, the whole response sampling path is off (phase/clock).
+        uint32_t s55 = command(0x371a, 0);
+        sdlog("NativeSd: CMD55 st %08x r1 %08x err %04x\n", s55, r32(0x10), r16(0x32));
+        static const char *const names[3] = {"noinv", "clk200", "noinv-clk200"};
+        const bool invOff[3] = {true, false, true};
+        const uint32_t hz[3] = {400000, 200000, 200000};
+        bool ok8 = false; int win = -1;
+        for (int i = 0; i < 3 && !ok8; i++) {
+          if (invOff[i]) w32(0x208, r32(0x208) & ~((1u << 13) | (1u << 21)));
+          if (!setClock(hz[i])) continue;
+          IODelay(1000);
+          for (unsigned k = 0; k < 3; k++) {
+            st = command(0x081a, 0x1aa);
+            if (commandOk(st) && (r32(0x10) & 0xfff) == 0x1aa) { ok8 = true; win = i; break; }
+            IODelay(2000);
+          }
+          sdlog("NativeSd: CMD8 %s st %08x r7 %08x\n", names[i], st, r32(0x10));
+        }
+        if (ok8) {
+          sdlog("NativeSd: CMD8 win %s\n", names[win]);
+        } else {
+          uint32_t s55b = command(0x371a, 0);
+          sdlog("NativeSd: CMD55b st %08x r1 %08x err %04x\n", s55b, r32(0x10), r16(0x32));
+        }
+        sdlog("NativeSd: CMD8 st %08x r7 %08x\n", st, r32(0x10));
+        if (!commandOk(st) || (r32(0x10) & 0xfff) != 0x1aa) {
+          sdlog("NativeSd: CMD8 fail pstate %08x err %04x dllsts %08x dly %08x\n",
+                r32(0x24), r16(0x32), r32(0x210), r32(0x208));
+          return false;
+        }
       }
     }
     uint32_t ocr = 0; unsigned tries;
