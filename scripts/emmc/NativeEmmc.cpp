@@ -33,6 +33,7 @@
 #include <IOKit/IOLib.h>
 #include <IOKit/storage/IOBlockStorageDevice.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
+#include <kern/thread.h>
 
 #define E5_EMMC_BASE 0x22200000ULL
 #define E5_EMMC_LEN  0x400ULL
@@ -518,6 +519,21 @@ public:
     return kIOReturnSuccess;
   }
 };
+static NativeEmmc *s_pendingPart = nullptr;
+
+static void e5PartPublishThread(void *arg, wait_result_t)
+{
+  NativeEmmc *host = (NativeEmmc *)arg;
+  NativeEmmc *part = s_pendingPart;
+  if (part && part->start(host)) {
+    elog("NativeEmmc: cache window published (%llu sectors @ lba %llx)\n",
+         (unsigned long long)part->cacheSectors, (unsigned long long)part->baseLba);
+  } else {
+    elog("NativeEmmc: cache window start failed\n");
+  }
+  host->release();
+}
+
 OSDefineMetaClassAndStructors(NativeEmmc, IOBlockStorageDevice)
 NativeEmmc *NativeEmmc::s_host = nullptr;
 
@@ -563,11 +579,14 @@ bool NativeEmmc::start(IOService *provider)
       part->baseLba = 0xd0a800ull;
       part->cacheSectors = 0x200000ull;
       if (part->attach(this)) {
-        if (part->start(this) == false) {
-          elog("NativeEmmc: cache window start failed\n");
+        s_pendingPart = part;
+        thread_t th = nullptr;
+        retain();
+        if (kernel_thread_start(e5PartPublishThread, this, &th) != KERN_SUCCESS) {
+          release();
+          elog("NativeEmmc: publisher thread failed\n");
         } else {
-          elog("NativeEmmc: cache window published (%llu sectors @ lba %llx)\n",
-               (unsigned long long)part->cacheSectors, (unsigned long long)part->baseLba);
+          thread_deallocate(th);
         }
       }
     }
