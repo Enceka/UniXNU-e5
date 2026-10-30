@@ -12,9 +12,19 @@ static i64 sys6(i64 n,u64 a,u64 b,u64 c,u64 d,u64 e,u64 f){
 #define open(p,f,m) sys6(5,(u64)(p),(u64)(f),(u64)(m),0,0,0)
 #define read(f,b,n) sys6(3,(u64)(f),(u64)(b),(u64)(n),0,0,0)
 #define write(f,b,n) sys6(4,(u64)(f),(u64)(b),(u64)(n),0,0,0)
+#define close(f) sys6(6,(u64)(f),0,0,0,0,0)
 #define exit(c) sys6(1,(u64)(c),0,0,0,0,0)
+static void up(const char *s){ u64 n=0; while(s[n]) n++; write(229,s,n); }
+static void trace(const char *tag,u64 value){
+    static const char hex[]="0123456789abcdef";
+    char b[18];
+    for(int i=0;i<16;i++) b[i]=hex[(value>>(60-i*4))&15];
+    b[16]='\n'; b[17]=0; up(tag); up(b);
+}
 void e5_main(u64 *initial_sp){
-    // Seed PID1 does not establish stdout/stderr before spawning tools.
+    // Keep probe output on the persistent uplink, independent of stdout.
+    trace("CAT|SP ",(u64)initial_sp);
+    // Also support a PID1 that has not established stdout/stderr.
     i64 console = open("/dev/console", 2, 0);
     if(console >= 0){
         sys6(90, (u64)console, 1, 0, 0, 0, 0);
@@ -23,12 +33,16 @@ void e5_main(u64 *initial_sp){
     }
     u64 sp = (u64)initial_sp;
     i64 argc = *(i64*)sp; char **argv = (char**)(sp+8);
+    trace("CAT|ARGC ",(u64)argc);
     const char *path = argc > 1 ? argv[1] : "/sbin/init.cmd";
+    up("CAT|PATH "); up(path); up("\n");
     i64 fd = open(path, 0, 0);
+    trace("CAT|OPEN ",(u64)fd);
     if(fd < 0) exit(65);
     static char b[2048];
     i64 n, out = 1;
     while((n = read(fd, b, sizeof b)) > 0){
+        trace("CAT|READ ",(u64)n);
         i64 off = 0;
         while(off < n){
             i64 w = write(out, b+off, n-off);
@@ -36,5 +50,8 @@ void e5_main(u64 *initial_sp){
             off += w;
         }
     }
+    trace("CAT|END ",(u64)n);
+    close(fd);
+    if(n < 0) exit(67);
     exit(0);
 }
