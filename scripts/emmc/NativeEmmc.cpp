@@ -392,6 +392,56 @@ public:
   IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
   UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
   char *getVendorString() override { return const_cast<char *>("Unisoc"); }
+  bool scanGpt(uint32_t *d, uint8_t *d8, uint64_t dva) {
+    uint32_t st = sdmaRead512(0x113A, 1, d, dva);
+    cacheInvalidate(d, 512);
+    if ((st & 0x0000FFFFu) == 0x00000001u && d8[0] == 0x45 && d8[1] == 0x46 &&
+        d8[2] == 0x49 && d8[3] == 0x20 && d8[4] == 0x50 && d8[5] == 0x41 &&
+        d8[6] == 0x52 && d8[7] == 0x54) {
+      uint64_t entriesLba = 0;
+      for (uint32_t i = 0; i < 8; i++) entriesLba |= (uint64_t)d8[72 + i] << (8 * i);
+      uint32_t nEntries = d8[80] | (d8[81] << 8) | (d8[82] << 16) | ((uint32_t)d8[83] << 24);
+      uint32_t eSize = d8[84] | (d8[85] << 8) | (d8[86] << 16) | ((uint32_t)d8[87] << 24);
+      elog("NativeEmmc: gpt hdr ok entries %u esize %u at lba %llu",
+           nEntries, eSize, (unsigned long long)entriesLba);
+      if (eSize >= 128 && eSize <= 512) {
+        uint32_t perLba = 512 / eSize;
+        uint32_t count = (nEntries < 128) ? nEntries : 128;
+        for (uint32_t e = 0; e < count; e++) {
+          uint32_t lba = (uint32_t)entriesLba + e / perLba;
+          st = sdmaRead512(0x113A, lba, d, dva);
+          cacheInvalidate(d, 512);
+          if ((st & 0x0000FFFFu) == 0x00000001u) {
+            uint8_t *ent = d8 + (e % perLba) * eSize;
+            uint32_t nz = 0;
+            for (uint32_t i = 0; i < 16; i++) nz |= ent[i];
+            if (nz == 0) continue;
+            uint64_t first = 0, last = 0;
+            for (uint32_t i = 0; i < 8; i++) {
+              first |= (uint64_t)ent[32 + i] << (8 * i);
+              last |= (uint64_t)ent[40 + i] << (8 * i);
+            }
+            uint64_t szMB = ((last - first + 1) * 512ull) >> 20;
+            char name[40]; uint32_t ni = 0;
+            for (uint32_t i = 0; i < 36; i++) {
+              uint16_t c16 = (uint16_t)(ent[56 + 2 * i] | (ent[57 + 2 * i] << 8));
+              if (c16 == 0) break;
+              name[ni++] = (c16 >= 32 && c16 < 127) ? (char)c16 : 46;
+              if (ni >= 38) break;
+            }
+            name[ni] = 0;
+            elog("NativeEmmc: part %u first %llx last %llx szMB %llu type %02x%02x%02x%02x %s",
+                 e, (unsigned long long)first, (unsigned long long)last,
+                 (unsigned long long)szMB, ent[3], ent[2], ent[1], ent[0], name);
+          }
+        }
+      }
+      return true;
+    }
+    elog("NativeEmmc: gpt hdr missing (st %08x sig %02x %02x)", st, d8[0], d8[1]);
+    return false;
+  }
+
   char *getProductString() override { return const_cast<char *>("eMMC 5.1 (sprd,sdhci-r11)"); }
   char *getRevisionString() override { return const_cast<char *>("2"); }
   char *getAdditionalDeviceInfoString() override { return const_cast<char *>("UEFI-validated v4 port"); }
@@ -437,6 +487,7 @@ bool NativeEmmc::start(IOService *provider)
        cardUp ? "Success" : "DeviceError", ocr, rca, (unsigned long long)sectors);
 
   if (cardUp) {
+    scanGpt(d, d8, dva);
     // Quiesce the DMA engine before returning the page to the kernel.
     resetLines();
   }
