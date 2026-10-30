@@ -26,3 +26,22 @@ vmmc=LDO_VDDSDCORE VOL(0x21b0)=0xb4 (3.0V) + PD(0x21ac) 清 bit0 →
 `pmic prot/sdcore pd vol/sdio pd vol`（前）、`pmic after ... pstate`（后）。
 验收 `e5-xnu tools/e5-sd-check.py` 已扩展 LDO 状态检查（pd bit0 清、
 vol==b4）。单元测试：ldoVolUv 3.0V=0xb4、3.3V=0xd2、1.2V=0、3.75V=0xff。
+
+## 2026-10-30 kernel 265 / v3（uefi-report-200141.txt）——内核 panic
+首个 ADI 读触发同步外部中止（ESR 0x96000010，DFSC 0x10 外部中止，
+far = ADI 映射页 + 0x2c = REG_ADI_RD_DATA 读取；x8=ADI 页基址、
+x9=0x42223d0 即 pmicRead(0x23d0) 的 RD_CMD 值），panic 于
+pc 0xfffffff007985440。eMMC 回归因 panic 中断（非 eMMC 自身退化）。
+Android 回退正常（adb ~330s 回来）。根因：**aon 门控 adi_eb**
+（vendor ums9620-clk.c：状态 0x64900008 bit9，SC set 0x64901008，
+clear 0x64902008）。ADI 的 DT 节点没有 clocks —— Linux 从不管理它；
+正常开机 LK 保持它开启，但 Android 的 sprd watchdog 是 ADI 消费者，
+其 shutdown 回调在 `adb reboot` 路径上把 ADI 时钟关掉（与 SD LDO 被
+regulator shutdown 关闭同类）。既有 ap-ahb 0x20001000 bit0（sdio0_eb）
+与 aon 0x6490113c bits2,3 写均为 SC set-only 语义，无副作用。
+
+## v4（kernel 266）
+冷路径在 PMIC 序列前使能 adi_eb：读 0x64900008 → set 0x64901008
+bit9 → 回读校验，拒绝则干净退出（log "adi gate enable refused"，
+不再碰死总线）。adi 映射从 0x40 拓宽到 0x1000（如需读 0xff0 prot
+状态）。验收 checker 增加 adi gate 行（bit9 必须置位）。

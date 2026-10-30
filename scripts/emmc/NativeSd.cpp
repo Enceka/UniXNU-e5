@@ -215,6 +215,18 @@ class NativeSd : public IOBlockStorageDevice {
     }
     if (dmaQuarantined) return false;
     sdlog("NativeSd: cold legacy begin (PMIC LDO enable)\n");
+    { // The aon gate adi_eb (status 0x64900008 bit9, vendor ums9620-clk.c)
+      // is turned off by the sprd watchdog's shutdown path on the Android
+      // reboot into UEFI, and nothing re-enables it (the ADI DT node has no
+      // clocks). Round 3 proved this: the first ADI load external-aborted.
+      // SC gate: set-only write at base+0x1000, status at the base register.
+      uint32_t g0 = aon.get(0x8);
+      aon.put(0x1008, 1u << 9);
+      IODelay(1000);
+      uint32_t g1 = aon.get(0x8);
+      sdlog("NativeSd: adi gate %08x->%08x\n", g0, g1);
+      if (!(g1 & 0x200u)) { sdlog("NativeSd: adi gate enable refused\n"); return false; }
+    }
     { // UMP9620 power controller over ADI (vendor ump9620-regulator.c):
       // write-unlock 0x23d0 = 0x6e7f once, then enable = clear the PD bit0,
       // VOL is linear 10mV from 1.2V -> 3.0V = 0xb4. vmmc first, then vqmmc.
@@ -299,7 +311,7 @@ public:
     if (!IOBlockStorageDevice::start(provider)) return false;
     sdlog("NativeSd: v1 start, independent SDIO0 host\n");
     if (!ahb.open(0x20000000, 0x2000) || !aon.open(0x64900000, 0x2000) ||
-        !clocks.open(0x64920000, 0x1000) || !adi.open(0x400000, 0x40) ||
+        !clocks.open(0x64920000, 0x1000) || !adi.open(0x400000, 0x1000) ||
         !adiSlave.open(0x420000, 0x8000)) { sdlog("NativeSd: clock map failed\n"); return false; }
     ahb.put(0x1000, 1u); aon.put(0x113c, (1u << 2) | (1u << 3));
     IODelay(1000);
