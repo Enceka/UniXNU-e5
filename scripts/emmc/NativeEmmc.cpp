@@ -395,7 +395,7 @@ public:
   bool scanGpt(uint32_t *d, uint8_t *d8, uint64_t dva) {
     uint32_t st = sdmaRead512(0x113A, 1, d, dva);
     cacheInvalidate(d, 512);
-    if ((st & 0x0000FFFFu) == 0x00000001u && d8[0] == 0x45 && d8[1] == 0x46 &&
+    if ((st & 0x00000003u) == 0x00000003u && d8[0] == 0x45 && d8[1] == 0x46 &&
         d8[2] == 0x49 && d8[3] == 0x20 && d8[4] == 0x50 && d8[5] == 0x41 &&
         d8[6] == 0x52 && d8[7] == 0x54) {
       uint64_t entriesLba = 0;
@@ -411,7 +411,7 @@ public:
           uint32_t lba = (uint32_t)entriesLba + e / perLba;
           st = sdmaRead512(0x113A, lba, d, dva);
           cacheInvalidate(d, 512);
-          if ((st & 0x0000FFFFu) == 0x00000001u) {
+          if ((st & 0x00000003u) == 0x00000003u) {
             uint8_t *ent = d8 + (e % perLba) * eSize;
             uint32_t nz = 0;
             for (uint32_t i = 0; i < 16; i++) nz |= ent[i];
