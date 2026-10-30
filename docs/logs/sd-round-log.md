@@ -397,3 +397,34 @@ Mode string `default-4bit-24MHz` on success; `legacy-4bit-13MHz` on
 fallback. Checker (e5-xnu d8488db) accepts both, requires the rpll line
 (mux 4, src 195000000) and both tp lines in default mode; synthetic
 validation 4/4. Kernel 278 = CI run 41089616546.
+
+## Round 16 (kernel 278) — default speed + multi-block: 6x measured, checker PASS
+
+Report dumps/uefi-report-003713.txt (e5-xnu side). Boot green, eMMC
+regression green (E5EMMC mount-complete, INIT-START-v9, 5xEXITH|0,
+SH|READY, READ-BLOCK).
+
+- Legacy cold init green as always (CMD8 r7 1aa first try, ACMD41
+  c0ff8000 tries 35, CMD3 rca 5048, CSD match, 4/4 reference CRCs,
+  repeat 16/16 at legacy).
+- **rpll chain switch engaged**: `chain rpll mux 4 d2x 0 d1x 1 src
+  195000000Hz` — rpll was NOT gated at XNU (the fallback never ran).
+- Default speed (24.375MHz, divider N=2 from the 195MHz source) verify:
+  all 4 reference CRCs + 16 repeats green, `reference 4/4 repeat 16/16
+  mode default-4bit-24MHz`.
+- Timed loops: `tp single 128 sectors in 36207 us` (283us/sector,
+  ~1.77 MiB/s — per-CMD17 overhead dominated) vs **`tp multi 128
+  sectors in 5995 us match y`** (46.8us/sector, ~10.7 MiB/s) — 6.0x,
+  all 8x16-sector CMD18 reads byte-identical to the single-block pass.
+  multiOk=true, so doAsyncReadWrite now serves >=4-block requests in
+  16-sector chunks.
+- `probe Success sectors 30244864 mode default-4bit-24MHz`, publishing
+  read-only SD card.
+- Checker verdict: `PASS: SD 30244864 sectors via default-4bit-24MHz,
+  reference 4/4 CRC match, repeat 16/16; eMMC v8 + E5EMMC mount + shell
+  intact (EXITH 5/5)` (tools/e5-sd-check.py @ e5-xnu d8488db).
+
+Throughput ladder so far: 6.5MHz single-block (v14) -> 24.375MHz
+single-block (1.77 MiB/s) -> 24.375MHz 16-sector CMD18 (10.7 MiB/s).
+Next rungs when needed: SDR50/SDR104 + DLL tuning (vendor
+enable_phy_dll + tuning procedure), larger DMA than one page.
