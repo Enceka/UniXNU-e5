@@ -399,7 +399,6 @@ class NativeSd : public IOBlockStorageDevice {
         // (the checker keys on it); it used to print only in the fail path.
         sdlog("NativeSd: CMD8 st %08x r7 %08x\n", st, r32(0x10));
       }
-      }
     }
     uint32_t ocr = 0; unsigned tries;
     for (tries = 0; tries < 1000; tries++) {
