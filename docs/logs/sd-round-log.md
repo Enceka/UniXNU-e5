@@ -74,3 +74,28 @@ bit9 → 50µs → deassert 0x64902014 bit9，回读 0x14 bit9 必须 0）→
 **adi 功能 mux 强制 index 2**（0x64920034 = (old&~7)|2，RCO 25M 常开源）
 → PMIC LDO 序列（v3/v4）。aon 映射 0x2000→0x3000 以覆盖 0x64902014
 deassert 窗口。checker 增加 adi rst / adi mux 行校验与 stuck 失败标记。
+
+## 2026-10-30 kernel 267 / v5（uefi-report-204701.txt）——第三次同点位 panic，但这次之后找到了真根因
+v5 复位脉冲 + mux 强制全部通过校验（否则会走干净退出），首个 ADI 读仍在外部
+中止（pc 0xfffffff0079854fc，far=ADI 页+0x2c，x9=0x4223d0 = 0x420000+0x23d0，
+kernel build Fri Oct 30 12:38:41 UTC = 新 267）。gate/reset/mux/prot 四条理论
+全部排除后，转向总线拓扑本身。
+
+### 真根因：ADI 基址错了（五轮 panic 同一根因）
+`/soc/aon` 是 simple-bus，**ranges = <0x0 0x64000000 0x1016000>** —— 子节点
+单元地址是**窗口内偏移**，物理地址 = 0x64000000 + 偏移。Android platform
+设备名证实：`64400000.spi`（ADI 控制器）、`641e0000.watchdog`、
+`64580000.apb-bm`、`64a10000.hwspinlock`。而 v3 把 `spi@400000` 的单元地址
+当成了物理地址，映射 0x400000/0x420000 —— 都是不可访问空洞：读外部中止
+（DFSC 0x10），写静默完成。x9=0x4223d0 也与 v3 代码 `0x420000u+off` 完全
+吻合。gate/mux/reset 操作的是 aon syscon（0x64900000，地址正确）所以全部
+"通过"，却与 ADI 本体无关。
+其余旁证：apb-bm@580000（sprd,apb-busmonitor）纯观测单元（记录 hang/match
+事件并中断/panic，不 fence 总线）；clk_summary 里 `adi`/`adi-eb` enable 计数
+为 0 而框架并未真关门 —— 地址正确时无需这些门控。
+
+### v6（commit 738de42，kernel 268）
+adi.open(0x64400000, 0x1000)；adiSlave.open(0x64600000, 0x8000)（slave
+窗口 = 控制器+0x20000，vendor spi-sprd-adi.c channel_offset 0x20000）；
+pmicRead 的 RD_CMD 写**物理从机地址** 0x64600000+off。gate/rst/mux 序列
+保留（无害且 checker 已依赖）。其余不变。
