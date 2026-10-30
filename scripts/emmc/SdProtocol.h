@@ -45,9 +45,15 @@ constexpr bool readyTran(uint32_t response) {
 
 // AON 0x520 fast-hotplug value from the vendor power-up sequence:
 // protect-en bit20 and debounce-en bit0 set, debounce count bits1-8 = 0,
-// detect-polar bit21 cleared (E5 cd-gpios flags 0x23 -> polar clear).
+// detect-polar bit21 SET. E5 cd-gpios = <eic-sync 35 0>: the flags cell is 0
+// (the 0x23 cell is the pin NUMBER), so of_get_named_gpio_flags() reports
+// detect_gpio_polar = false and the vendor fast_hotplug_enable() takes the
+// else branch, SETTING the polarity bit. Round 13 proved it: with bit21 set
+// the card echoes CMD8 immediately; with it clear every response command
+// CRC-fails with a zero response register (fast-hotplug gates the response
+// path while it believes no card is present).
 constexpr uint32_t hotplugValue(uint32_t cur) {
-  return (cur | 0x00100001u) & ~0x002001feu;
+  return (cur | 0x00210001u) & ~0x000001feu;
 }
 
 // UMP9620 linear LDO VOL encoding (vendor ump9620-regulator.c): 10mV steps

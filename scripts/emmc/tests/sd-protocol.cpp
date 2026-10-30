@@ -22,9 +22,9 @@ int main() {
       E5Sd::readyTran(0x00400900)) return 11;
   // Fast-hotplug AON 0x520 value: preserve unrelated bits, set protect-en
   // bit20 and debounce-en bit0, clear detect-polar bit21 and count bits1-8.
-  if (E5Sd::hotplugValue(0) != 0x00100001u) return 12;
-  if (E5Sd::hotplugValue(0x002001feu) != 0x00100001u) return 13;
-  if (E5Sd::hotplugValue(0xffc00000u) != 0xffd00001u) return 14;
+  if (E5Sd::hotplugValue(0) != 0x00210001u) return 12;
+  if (E5Sd::hotplugValue(0x000001feu) != 0x00210001u) return 13;
+  if (E5Sd::hotplugValue(0xffc00000u) != 0xffe10001u) return 14;
   // UMP9620 linear LDO VOL: 1.2V floor, 10mV step -> 3.0V = 0xb4, 3.3V = 0xd2.
   if (E5Sd::ldoVolUv(3000000) != 0xb4u) return 15;
   if (E5Sd::ldoVolUv(3300000) != 0xd2u) return 16;
