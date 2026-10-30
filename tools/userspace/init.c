@@ -1,12 +1,17 @@
+#include <sys/ioctl.h>
+#include <termios.h>
 // E5 XNU init v2 — batch harness: read /sbin/init.cmd, spawn each line, uplink report
 typedef long long i64; typedef unsigned long long u64; typedef unsigned char u8;
 
-static i64 sys6(u64 n,u64 a,u64 b,u64 c,u64 d,u64 e,u64 f){
+static i64 sys6(i64 n,u64 a,u64 b,u64 c,u64 d,u64 e,u64 f){
     register u64 x0 __asm__("x0")=a, x1 __asm__("x1")=b, x2 __asm__("x2")=c,
-                  x3 __asm__("x3")=d, x4 __asm__("x4")=e, x5 __asm__("x5")=f,
-                  x16 __asm__("x16")=n;
-    __asm__ volatile("svc #0x80":"+r"(x0):"r"(x1),"r"(x2),"r"(x3),"r"(x4),"r"(x5),"r"(x16):"memory","cc");
-    return (i64)x0;
+                 x3 __asm__("x3")=d, x4 __asm__("x4")=e, x5 __asm__("x5")=f,
+                 x16 __asm__("x16")=(u64)n;
+    u64 failed;
+    __asm__ volatile("svc #0x80\n\tcset %w[failed], cs"
+        : [failed] "=&r"(failed), "+r"(x0), "+r"(x1)
+        : "r"(x2), "r"(x3), "r"(x4), "r"(x5), "r"(x16) : "memory", "cc");
+    return failed ? -(i64)x0 : (i64)x0;
 }
 #define exit(v)     sys6(1,(u64)(v),0,0,0,0,0)
 #define read(f,b,n) sys6(3,(u64)(f),(u64)(b),(u64)(n),0,0,0)
@@ -29,7 +34,7 @@ static void uplink_dec(const char *tag, i64 v){
     char *e=buf+254; *e=0; u64 u = v<0 ? -(u64)v : (u64)v;
     char b[24]; int i=0;
     do{ b[i++]='0'+(u%10); u/=10; }while(u);
-    while(i) *--e=b[--i];
+    for(int k=0;k<i;k++) *--e=b[k];
     if(v<0) *--e='-';
     char *t=buf;
     // append: tag then number
@@ -41,7 +46,7 @@ static void uplink_dec(const char *tag, i64 v){
 
 static void uplink_hex(const char *tag, u64 v){
     static const char *hxd="0123456789abcdef";
-    char *t=buf; while(*t=*tag++) t++;
+    char *t=buf; while((*t=*tag++)) t++;
     int started=0;
     for(int s=60;s>=0;s-=4){ int d=(v>>s)&15; if(d||started||s==0){ *t++=hxd[d]; started=1; } }
     *t++=0x0a; *t++=0;
@@ -51,7 +56,19 @@ static char cmdbuf[4096];
 static char *lines[64];
 
 int main(void){
-    uplink("INIT-START-v8\n");
+    uplink("INIT-START-v9\n");
+    i64 console = open("/dev/console", 2, 0);
+    uplink_dec("CONSOLE-OPEN ", console);
+    if(console < 0){
+        write(230, "console open failed\n", 20);
+        static u64 park[4];
+        for(;;) sys6(111, (u64)park, 0, 0, 0, 0, 0);
+    }
+    for(int fd=0;fd<3;fd++){
+        i64 r=sys6(90, (u64)console, (u64)fd, 0, 0, 0, 0);
+        if(r < 0){ uplink_dec("CONSOLE-DUP-ERR ", r); exit(7); }
+    }
+    if(console > 2) close(console);
     {   // probe: read /sbin/launchd magic + init.cmd twice
         static const char *hx="0123456789abcdef";
         i64 fdx = open("/sbin/launchd", 0, 0);
@@ -123,7 +140,12 @@ int main(void){
     // The tty does canonical line editing; typed keys are echoed to the
     // panel by the kernel (vcputc) and to serial by the tty echo.
     // Output: fd 230 renders on the panel (kernel e5-fb hook).
-    i64 cfd = open("/dev/console", 0, 0);
+    i64 cfd = 0; // Established before batch execution; inherited by children.
+    struct termios tty;
+    i64 tty_result=sys6(54, (u64)cfd, (u64)TIOCGETA, (u64)&tty, 0, 0, 0);
+    uplink_dec("TTY-GETA ", tty_result);
+    if(tty_result == 0) uplink_dec("TTY-ICANON ", (tty.c_lflag & ICANON) != 0);
+    if(tty_result < 0) cfd=tty_result;
     uplink_dec("CONSOLE-FD ", cfd);
     if(cfd < 0){
         uplink("SH|NO-CONSOLE park\n");
@@ -136,9 +158,15 @@ int main(void){
     write(230, "E5 XNU seed shell\n", 18);
     static char line[256];
     write(230, "E5# ", 4);
+    uplink("SH|READ-BLOCK\n");
     for(;;){
         i64 n = read(cfd, line, 200);
-        if(n <= 0){ uplink_dec("SH|READ-END ", n); continue; }
+        if(n < 0){
+            uplink_dec("SH|READ-ERR ", n);
+            static u64 park[4];
+            for(;;) sys6(111, (u64)park, 0, 0, 0, 0, 0);
+        }
+        if(n == 0) continue;
         while(n > 0 && (line[n-1] == '\n' || line[n-1] == '\r')) n--;
         line[n] = 0;
         if(line[0] == 0) continue;
@@ -157,6 +185,7 @@ int main(void){
         if(r){
             uplink_dec("SH|SPAWN-FAIL ", r);
             write(230, "spawn failed\n", 13);
+            write(230, "E5# ", 4);
             continue;
         }
         i64 st = 0;

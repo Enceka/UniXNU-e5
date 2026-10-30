@@ -1,19 +1,30 @@
 typedef long i64; typedef unsigned long u64;
 static i64 sys6(i64 n,u64 a,u64 b,u64 c,u64 d,u64 e,u64 f){
-    register i64 x0 asm("x0")=(i64)a, x1 asm("x1")=(i64)b, x2 asm("x2")=(i64)c,
-                 x3 asm("x3")=(i64)d, x4 asm("x4")=(i64)e, x5 asm("x5")=(i64)f;
-    asm volatile("mov x16,%0\n svc 0x80\n" ::"r"((i64)n),"r"(x0),"r"(x1),"r"(x2),"r"(x3),"r"(x4),"r"(x5):"x16","memory");
-    register i64 r0 asm("x0"); return r0;
+    register u64 x0 __asm__("x0")=a, x1 __asm__("x1")=b, x2 __asm__("x2")=c,
+                 x3 __asm__("x3")=d, x4 __asm__("x4")=e, x5 __asm__("x5")=f,
+                 x16 __asm__("x16")=(u64)n;
+    u64 failed;
+    __asm__ volatile("svc #0x80\n\tcset %w[failed], cs"
+        : [failed] "=&r"(failed), "+r"(x0), "+r"(x1)
+        : "r"(x2), "r"(x3), "r"(x4), "r"(x5), "r"(x16) : "memory", "cc");
+    return failed ? -(i64)x0 : (i64)x0;
 }
 #define open(p,f,m) sys6(5,(u64)(p),(u64)(f),(u64)(m),0,0,0)
 #define read(f,b,n) sys6(3,(u64)(f),(u64)(b),(u64)(n),0,0,0)
 #define write(f,b,n) sys6(4,(u64)(f),(u64)(b),(u64)(n),0,0,0)
 #define exit(c) sys6(1,(u64)(c),0,0,0,0,0)
-void _start(void){
-    u64 sp; asm("mov %0, sp":"=r"(sp));
+void e5_main(u64 *initial_sp){
+    // Seed PID1 does not establish stdout/stderr before spawning tools.
+    i64 console = open("/dev/console", 2, 0);
+    if(console >= 0){
+        sys6(90, (u64)console, 1, 0, 0, 0, 0);
+        sys6(90, (u64)console, 2, 0, 0, 0, 0);
+        if(console > 2) sys6(6, (u64)console, 0, 0, 0, 0, 0);
+    }
+    u64 sp = (u64)initial_sp;
     i64 argc = *(i64*)sp; char **argv = (char**)(sp+8);
-    if(argc < 2) exit(64);
-    i64 fd = open(argv[1], 0, 0);
+    const char *path = argc > 1 ? argv[1] : "/sbin/init.cmd";
+    i64 fd = open(path, 0, 0);
     if(fd < 0) exit(65);
     static char b[2048];
     i64 n, out = 1;
