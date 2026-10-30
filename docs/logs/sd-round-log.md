@@ -121,3 +121,40 @@ channel_offset=0x20000，窗口 = 0x64400000+0x20000 = **0x64420000**（DT reg
 adiSlave.open(0x64420000, 0x8000)；pmicRead RD_CMD = 0x64420000+off。
 预期：PMIC 写落地（unlock 0x23d0=0x6e7f → VOL 已 0xb4 → PD 清零），
 随后 pstate 出现 CINS/CMD 电平，CMD8 应答 r7=0x1aa。
+
+## Round 7 (kernel 269, v7) — PMIC writes land, card powered, CMD8 CRC
+
+Report: newest dumps/uefi-report-*.txt (after -210905); full job log in the
+session spill. Both probes:
+
+- Probe 1: `pmic prot 8000 sdcore pd 0001 vol 00b4 sdio pd 0001 vol 00b4`
+  → writes OK (no E5SERRSKIP) → `pmic after sdcore pd 0000 vol 00b4 sdio
+  pd 0000 vol 00b4` = both LDOs ENABLED at 3.0V. CMD0 st 00000001 clk 1107.
+  CMD8 st 00018001 r7 00000000, fail line err 0001 = COMMAND CRC ERROR
+  (rounds 1-6 were err 000c timeout) — the bus is alive, something drives CMD.
+- Probe 2 (IOKit rematch): `inherit hc1 00 hc2 3000 clk 0000 power 00
+  reset 08 ps 01f00000` — PSTATE 0x01f00000 = CMD+DAT line levels HIGH =
+  card powered & idling (eMMC host: 0x01F000F0). Rail state persisted
+  (`pmic prot 8000 sdcore pd 0000 vol 00b4`), hotplug/rmldo persisted.
+  CMD0 ok; CMD8 same CRC error.
+- Diagnostic quirk: our `pstate %04x` printed r16(0x24) = low half only,
+  always 0 (line bits are 20-24); the inherit `ps %08x` r32 print showed
+  the truth. Fixed in v8: all pstate prints are r32 %08x.
+
+Decode: card has power + pull-ups and sees our clock, but the CMD8 echo
+CRCs corrupt. Probe 1 fired CMD8 right after the 20ms LDO ramp while lines
+were still low (probe 2, seconds later, shows them high → ramp > 20ms);
+we sent a single CMD0 (Linux mmc_go_idle sends CMD0, 1ms, CMD0) and had no
+CMD8 retry.
+
+## v8 (commit 486fef6, kernel 270) — timing + retries
+
+1. after vqmmc enable: poll r32(0x24) until (& 0x01F00000) != 0, up to
+   1000 x 1ms; log `lines ready pstate %08x tries %u`; continue on timeout.
+2. pmic-after / hotplug / fail-line pstate prints → r32 %08x (checker
+   regex `pstate (\w+)` still matches).
+3. after setClock(400000): IODelay(10ms), double CMD0 (CMD0, 2ms, CMD0),
+   log the second (grammar unchanged).
+4. CMD8 retry loop ≤10 x 5ms on failure; intermediate failures log
+   `CMD8 try %u st %08x r7 %08x err %08x`; final outcome keeps the
+   existing `CMD8 st … r7 …` / `CMD8 fail …` lines. No checker change.
