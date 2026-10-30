@@ -27,6 +27,18 @@ constexpr uint16_t clockDivider(uint32_t source, uint32_t ceiling) {
   return n > 1023 ? 0xffff : (uint16_t)(((n & 0xff) << 8) | ((n & 0x300) >> 2));
 }
 
+// sdio0 aonapb chain (live-verified under Android; the fetched realme
+// ums9620-clk.c table is offset -0xC and does not match this silicon):
+// mux 0x64920280 bits[2:0] parent rates, 2x divider 0x64920284 bits[10:0]
+// with value+1 encoding, 1x selector 0x64920288 bit0 (set = 1x is 2x/2).
+// Android SDR104 idle: mux=4 rpll, d2x=0, d1x=1 -> 195 MHz to the host.
+constexpr uint32_t sdio0SourceHz(uint32_t mux, uint32_t d2x, uint32_t d1x) {
+  const uint32_t parent[6] = {1000000, 26000000, 307200000, 384000000, 390000000, 409600000};
+  if (mux >= 6) return 0;
+  const uint32_t twoX = parent[mux] / (d2x + 1);
+  return d1x ? twoX / 2 : twoX;
+}
+
 constexpr bool readyTran(uint32_t response) {
   return (response & r1Errors) == 0 && (response & 0x1f00u) == 0x0900u;
 }

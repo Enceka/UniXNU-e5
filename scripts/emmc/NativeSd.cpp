@@ -140,8 +140,9 @@ class NativeSd : public IOBlockStorageDevice {
     }
     sdlog("NativeSd: reset timeout %02x\n", r8(0x2f)); return false;
   }
+  uint32_t sourceHz = 26000000;
   bool setClock(uint32_t target) {
-    uint16_t div = E5Sd::clockDivider(26000000, target);
+    uint16_t div = E5Sd::clockDivider(sourceHz, target);
     if (div == 0xffff) return false;
     w16(0x2c, 0); w16(0x2c, div | 1);
     for (unsigned i = 0; i < 10000; i++) {
@@ -306,9 +307,18 @@ class NativeSd : public IOBlockStorageDevice {
       if (r8(0x2f) & 1) { sdlog("NativeSd: host reset stuck\n"); return false; }
     }
     w16(0x2c, 0);
-    clocks.put(0x280, (clocks.get(0x280) & ~7u) | 1u); // ext-26m.
-    clocks.put(0x284, clocks.get(0x284) & ~0x7ffu);
-    clocks.put(0x288, clocks.get(0x288) | 1u); // 1x = 2x/2.
+    // v11: leave the Android-proven sdio0 chain untouched. Live Android
+    // (mmc1 SDR104) shows mux 0x280=4 (rpll-390m), 2x div 0x284=0, 1x 0x288=1
+    // (1x=2x/2 = 195 MHz) and clk_summary agrees; the Linux unbind/rebind
+    // re-init kept this chain and got zero errors. Rounds 7-10 forced
+    // ext-26m/13 MHz instead and every response CRC'd with a zero response
+    // register, so borrow the residue rather than rewriting it, and derive the
+    // host divider from whatever source the chain actually presents.
+    const uint32_t sdMux = clocks.get(0x280) & 7u;
+    const uint32_t sdD2x = clocks.get(0x284) & 0x7ffu;
+    const uint32_t sdD1x = clocks.get(0x288) & 1u;
+    sourceHz = E5Sd::sdio0SourceHz(sdMux, sdD2x, sdD1x);
+    sdlog("NativeSd: sdio0 chain mux %u d2x %u d1x %u src %uHz\n", sdMux, sdD2x, sdD1x, sourceHz);
     w16(0x3e, 0x3000); w8(0x28, 0); w8(0x2e, 0x0e);
     if (!resetLines()) return false;
     w32(0x200, r32(0x200) & ~(1u << 21)); // No DLL below 52 MHz.

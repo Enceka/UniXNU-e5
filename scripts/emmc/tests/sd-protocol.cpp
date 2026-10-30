@@ -30,5 +30,14 @@ int main() {
   if (E5Sd::ldoVolUv(3300000) != 0xd2u) return 16;
   if (E5Sd::ldoVolUv(1200000) != 0u) return 17;
   if (E5Sd::ldoVolUv(3750000) != 0xffu) return 18;
-  puts("PASS: SD response ordering, card capacity, divider ceilings, R1 state, hotplug value, LDO VOL");
+  // sdio0 aonapb chain source: Android SDR104 residue rpll/÷1/1x-half.
+  if (E5Sd::sdio0SourceHz(4, 0, 1) != 195000000u) return 19;
+  if (E5Sd::sdio0SourceHz(1, 0, 1) != 13000000u) return 20;
+  if (E5Sd::sdio0SourceHz(1, 0, 0) != 26000000u) return 21;
+  if (E5Sd::sdio0SourceHz(0, 0, 0) != 1000000u) return 22;
+  if (E5Sd::sdio0SourceHz(2, 3, 1) != 38400000u) return 23;
+  if (E5Sd::sdio0SourceHz(6, 0, 1) != 0u) return 24;
+  // Host divider from a real 195 MHz 1x residue: 400k needs N=122 (0x7a).
+  if (E5Sd::clockDivider(195000000, 400000) != (((122 & 0xff) << 8) | ((122 & 0x300) >> 2))) return 25;
+  puts("PASS: SD response ordering, card capacity, divider ceilings, R1 state, hotplug value, LDO VOL, sdio0 chain source");
 }
