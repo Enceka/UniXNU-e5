@@ -345,6 +345,38 @@ class NativeSd : public IOBlockStorageDevice {
     st = command(0x0000, 0); // mmc_go_idle pulses CMD0 twice.
     sdlog("NativeSd: CMD0 st %08x clk %04x\n", st, r16(0x2c));
     if (!commandOk(st)) return false;
+    { // v13: presence/polarity matrix. The Linux-proven state has PSTATE
+      // bit16 (CINS) SET: the vendor driver never overrides get_cd, so the
+      // sdhci default (PSTATE CINS) is the card detect, and fast_hotplug_enable
+      // only runs when get_cd() is true -- the card inits fine under Android,
+      // so CINS=1 there. Every powered round of ours reads CINS=0
+      // (ps 01f00000 = line bits only). If the fast-hotplug hardware gates the
+      // card bus clock while it believes "no card", that is exactly our
+      // signature: CC on every command, responses never sampled (CRC error +
+      // zero response register). Probe the aon detect plumbing under both
+      // polarities and with fast-hotplug off entirely, CMD8 in each state.
+      struct Cdp { const char* name; uint32_t hp; };
+      const Cdp cdp[3] = {
+        { "vendor", E5Sd::hotplugValue(aon.get(0x520)) },               // polar clr (cd-gpios 0x23)
+        { "pinv",   E5Sd::hotplugValue(aon.get(0x520)) | (1u << 21) },  // polar set
+        { "none",   0u },                                               // hotplug off
+      };
+      int win = -1;
+      for (int i = 0; i < 3; i++) {
+        protPut(aon, 0x520, cdp[i].hp);
+        IODelay(20000);
+        uint32_t ps = r32(0x24);
+        uint32_t c8 = command(0x081a, 0x1aa);
+        sdlog("NativeSd: cdpol %s hp %08x cins %c pstate %08x cmd8 st %08x r7 %08x\n",
+              cdp[i].name, aon.get(0x520), (ps & 0x10000u) ? '1' : '0', ps, c8, r32(0x10));
+        if (win < 0 && (r32(0x10) & 0xfff) == 0x1aa) win = i;
+      }
+      // Adopt the first state in which the card echoed CMD8; otherwise fall
+      // back to the vendor state and let the retry loop below report it.
+      protPut(aon, 0x520, (win >= 0) ? cdp[win].hp : cdp[0].hp);
+      IODelay(20000);
+      if (win >= 0) sdlog("NativeSd: cdpol win %s\n", cdp[win].name);
+    }
     { // CMD8 with retries: a freshly powered card can CRC-flake the echo.
       unsigned ct = 0;
       for (;;) {
