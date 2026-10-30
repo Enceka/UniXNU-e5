@@ -39,5 +39,7 @@ int main() {
   if (E5Sd::sdio0SourceHz(6, 0, 1) != 0u) return 24;
   // Host divider from a real 195 MHz 1x residue: 400k needs N=122 (0x7a).
   if (E5Sd::clockDivider(195000000, 400000) != (((122 & 0xff) << 8) | ((122 & 0x300) >> 2))) return 25;
+  // v15 default speed: 195MHz rpll source, 24.375MHz card clock = 4N, N=2.
+  if (E5Sd::clockDivider(195000000, 24375000) != (2u << 8)) return 26;
   puts("PASS: SD response ordering, card capacity, divider ceilings, R1 state, hotplug value, LDO VOL, sdio0 chain source");
 }
