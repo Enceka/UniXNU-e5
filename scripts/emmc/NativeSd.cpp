@@ -57,9 +57,12 @@ class NativeSd : public IOBlockStorageDevice {
     if (cmd & 0x8000u) reg.put(0xff0, 0x97690001u);   // unlock
   }
 
-  // UMS9620 ADI (qogirn6pro, r5px) master at 0x400000: PMIC register X is
-  // written through the 15-bit slave window at 0x420000+X and read back
-  // through the RD_CMD/RD_DATA pair (vendor spi-sprd-adi.c protocol).
+  // UMS9620 ADI (qogirn6pro, r5px) master at PA 0x64400000 (aon simple-bus
+  // child spi@400000 = 0x64000000 window + offset, per /soc/aon/ranges and
+  // Android's 64400000.spi platform device). PMIC register X is written
+  // through the 15-bit slave window at 0x64600000+X and read back through the
+  // RD_CMD/RD_DATA pair (vendor spi-sprd-adi.c protocol; RD_CMD takes the
+  // physical slave address 0x64600000+X).
   bool adiDrain() {
     for (unsigned i = 0; i < 20000; i++) {
       if (adi.get(0x30) & (1u << 10)) return true; // ARM fifo empty.
@@ -75,7 +78,7 @@ class NativeSd : public IOBlockStorageDevice {
     return false;
   }
   uint32_t pmicRead(uint32_t off) {
-    adi.put(0x28, 0x420000u + off);
+    adi.put(0x28, 0x64600000u + off);
     for (unsigned i = 0; i < 20000; i++) {
       uint32_t v = adi.get(0x2c);
       if (!(v & 0x80000000u)) return v & 0xffffu; // busy cleared.
@@ -335,8 +338,8 @@ public:
     if (!IOBlockStorageDevice::start(provider)) return false;
     sdlog("NativeSd: v1 start, independent SDIO0 host\n");
     if (!ahb.open(0x20000000, 0x2000) || !aon.open(0x64900000, 0x3000) ||
-        !clocks.open(0x64920000, 0x1000) || !adi.open(0x400000, 0x1000) ||
-        !adiSlave.open(0x420000, 0x8000)) { sdlog("NativeSd: clock map failed\n"); return false; }
+        !clocks.open(0x64920000, 0x1000) || !adi.open(0x64400000, 0x1000) ||
+        !adiSlave.open(0x64600000, 0x8000)) { sdlog("NativeSd: clock map failed\n"); return false; }
     ahb.put(0x1000, 1u); aon.put(0x113c, (1u << 2) | (1u << 3));
     IODelay(1000);
     sdlog("NativeSd: gates ahb %08x aon %08x\n", ahb.get(0), aon.get(0x13c));
