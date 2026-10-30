@@ -518,6 +518,67 @@ class NativeSd : public IOBlockStorageDevice {
         }
       }
     }
+    // ext4 read-side walk over the e5-openwrt image (offline-proven chain,
+    // dumps/sd-ext4/): MBR partition @2048 -> sb @2050 -> GDT fs-blk 1 ->
+    // gd0 itable 145 -> root inode 2 @+256 -> extent -> root dir block.
+    // Pure evidence: soft failures log and continue (checker requires them).
+    {
+      const uint32_t partLba = 2048;
+      uint32_t sbLba = partLba + 2;
+      if (readSectors(sbLba, 8)) {
+        uint16_t magic = (uint16_t)(buffer[56] | (buffer[57] << 8));
+        uint32_t logBs = (uint32_t)buffer[24] | ((uint32_t)buffer[25] << 8) |
+                         ((uint32_t)buffer[26] << 16) | ((uint32_t)buffer[27] << 24);
+        uint32_t inodes = (uint32_t)buffer[0] | ((uint32_t)buffer[1] << 8) |
+                          ((uint32_t)buffer[2] << 16) | ((uint32_t)buffer[3] << 24);
+        uint32_t blocks = (uint32_t)buffer[4] | ((uint32_t)buffer[5] << 8) |
+                          ((uint32_t)buffer[6] << 16) | ((uint32_t)buffer[7] << 24);
+        uint32_t ipg = (uint32_t)buffer[40] | ((uint32_t)buffer[41] << 8) |
+                       ((uint32_t)buffer[42] << 16) | ((uint32_t)buffer[43] << 24);
+        if (magic == 0xef53 && logBs == 2 && ipg == 8192) {
+          uint32_t bs = 4096;
+          sdlog("NativeSd: ext4 sb ok inodes %u blocks %u ipg %u\n", inodes, blocks, ipg);
+          // GDT at fs-blk 1 (first_data_block 0): gd0.inode_table @+8.
+          if (readSectors(partLba + 8, 8)) {
+            uint32_t itable = (uint32_t)buffer[8] | ((uint32_t)buffer[9] << 8) |
+                              ((uint32_t)buffer[10] << 16) | ((uint32_t)buffer[11] << 24);
+            sdlog("NativeSd: ext4 gd0 itable %u\n", itable);
+            if (itable > 0) {
+              // Root inode 2 at (2-1)*256 = byte 256 of the itable block.
+              const uint32_t inodeSize = 256; // sb field corrupt; proven stride
+              if (readSectors(partLba + itable * (bs / 512), 8)) {
+                const uint8_t *root = buffer + inodeSize;
+                E5Sd::Ext4Extent ext[4];
+                unsigned ne = E5Sd::ext4ParseExtents(root, inodeSize, ext, 4);
+                if (ne > 0) {
+                  sdlog("NativeSd: ext4 root ext logical %u len %u start %u\n",
+                        ext[0].logical, ext[0].len, ext[0].start);
+                  if (readSectors(partLba + ext[0].start * (bs / 512), 8)) {
+                    uint32_t dirCrc = crc32(buffer);
+                    uint32_t dotInode = 0;
+                    unsigned entries = E5Sd::ext4CountDirents(buffer, bs, &dotInode);
+                    sdlog("NativeSd: ext4 rootdir %u entries dot %u crc %08x\n",
+                          entries, dotInode, dirCrc);
+                  } else {
+                    sdlog("NativeSd: ext4 rootdir read fail\n");
+                  }
+                } else {
+                  sdlog("NativeSd: ext4 root extents bad\n");
+                }
+              } else {
+                sdlog("NativeSd: ext4 itable read fail\n");
+              }
+            }
+          } else {
+            sdlog("NativeSd: ext4 gd read fail\n");
+          }
+        } else {
+          sdlog("NativeSd: ext4 sb mismatch magic %04x logbs %u\n", magic, logBs);
+        }
+      } else {
+        sdlog("NativeSd: ext4 sb read fail\n");
+      }
+    }
     // Timed loops over 128 sequential sectors (LBA 16..143, inside the ext4
     // partition): single-block baseline, then the CMD18 experiment with
     // first-sector CRC comparison per 16-sector chunk.
