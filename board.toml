@@ -3,7 +3,7 @@
 ["board"]
 "name" = "e5"
 "soc" = "UMS9621"
-"description" = "Rongyue E5 e-reader"
+"description" = "Rongyue E5 5G senior bar phone"
 "kit" = "e5"
 "soc_source" = "ums9621"
 "os_profile" = "ipados-17.7.11-21H461"
