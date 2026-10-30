@@ -43,4 +43,4 @@
 [payload.adt]
 owned_memory_size = "0x20000000"
 packed_data_ramdisk = "Payloads/seed.dbr"
-root_match_volume_uuid = "238A9EDD-6788-4B2E-BA4E-C1F70AE25B64"
+root_match_volume_uuid = "04769D26-2CA0-4825-B443-E2E5F88300F2"

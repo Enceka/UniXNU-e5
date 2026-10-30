@@ -252,15 +252,20 @@ class NativeSd : public IOBlockStorageDevice {
     return true;
   }
   bool verify() {
+    // v17: the card now carries the original-system OS disk image raw at
+    // LBA 0 (whole-card install, see docs/system-volume-audit.md). The
+    // four reference sectors come from uefi/build/system-audit/userdata/
+    // os-window.img (sha e5634d04..., byte-identical to what was dd'd):
+    // LBA 0 is the GPT disk's zero block (no protective MBR), LBA 1 the
+    // "EFI PART" header, 2048/2050 land inside the Apple_APFS container.
     const uint32_t lbas[] = {0, 1, 2048, 2050};
-    const uint32_t crcs[] = {0xf9e85b82, 0xb2aa7578, 0xb2aa7578, 0xc1117912};
+    const uint32_t crcs[] = {0xec8ce612, 0x10fb5eed, 0xd2e6e0b2, 0xfba8aad8};
     for (unsigned i = 0; i < 4; i++) {
       if (!readSector(lbas[i])) return false;
       uint32_t crc = crc32(buffer);
       sdlog("NativeSd: reference lba %u st %08x crc %08x\n", lbas[i], r32(0x30), crc);
       if (crc != crcs[i]) return false;
-      if (i == 0 && (buffer[510] != 0x55 || buffer[511] != 0xaa)) return false;
-      if (i == 3 && (buffer[56] != 0x53 || buffer[57] != 0xef)) return false;
+      if (i == 1 && memcmp(buffer, "EFI PART", 8) != 0) return false;
     }
     for (unsigned i = 0; i < 16; i++) {
       unsigned index = (i & 1) ? 3 : 0;
@@ -482,7 +487,7 @@ class NativeSd : public IOBlockStorageDevice {
     st = command(0x031a, 0); rca = r32(0x10) >> 16;
     sdlog("NativeSd: CMD3 st %08x r6 %08x rca %04x\n", st, r32(0x10), rca);
     if (!commandOk(st) || !rca || (r32(0x10) & 0xe000) || !getCsd() || !select()) return false;
-    if (!readSector(0) || crc32(buffer) != 0xf9e85b82u) return false;
+    if (!readSector(0) || crc32(buffer) != 0xec8ce612u) return false;
     st = command(0x371a, (uint32_t)rca << 16);
     if (!commandOk(st) || (r32(0x10) & E5Sd::r1Errors)) return false;
     st = command(0x061a, 2); // ACMD6: 4-bit, volatile bus setting only.
@@ -532,7 +537,10 @@ class NativeSd : public IOBlockStorageDevice {
     // ext4 read-side walk over the e5-openwrt image (offline-proven chain,
     // dumps/sd-ext4/): MBR partition @2048 -> sb @2050 -> GDT fs-blk 1 ->
     // gd0 itable 145 -> root inode 2 @+256 -> extent -> root dir block.
-    // Pure evidence: soft failures log and continue (checker requires them).
+    // v17: the card may instead carry the original-system OS disk image
+    // (whole-card GPT layout). The walk is conditional on the ext4 sb
+    // magic; on an OS-image card one evidence line notes the layout and
+    // the GPT header (already CRC-verified in verify()) is confirmed.
     {
       const uint32_t partLba = 2048;
       uint32_t sbLba = partLba + 2;
@@ -546,9 +554,10 @@ class NativeSd : public IOBlockStorageDevice {
                           ((uint32_t)buffer[6] << 16) | ((uint32_t)buffer[7] << 24);
         uint32_t ipg = (uint32_t)buffer[40] | ((uint32_t)buffer[41] << 8) |
                        ((uint32_t)buffer[42] << 16) | ((uint32_t)buffer[43] << 24);
-        if (magic == 0xef53 && logBs == 2 && ipg == 8192) {
-          uint32_t bs = 4096;
-          sdlog("NativeSd: ext4 sb ok inodes %u blocks %u ipg %u\n", inodes, blocks, ipg);
+        if (magic == 0xef53) {
+          if (logBs == 2 && ipg == 8192) {
+            uint32_t bs = 4096;
+            sdlog("NativeSd: ext4 sb ok inodes %u blocks %u ipg %u\n", inodes, blocks, ipg);
           // GDT at fs-blk 1 (first_data_block 0): gd0.inode_table @+8.
           if (readSectors(partLba + 8, 8)) {
             uint32_t itable = (uint32_t)buffer[8] | ((uint32_t)buffer[9] << 8) |
@@ -583,8 +592,21 @@ class NativeSd : public IOBlockStorageDevice {
           } else {
             sdlog("NativeSd: ext4 gd read fail\n");
           }
+            } else {
+              sdlog("NativeSd: ext4 sb mismatch magic %04x logbs %u\n", magic, logBs);
+            }
         } else {
-          sdlog("NativeSd: ext4 sb mismatch magic %04x logbs %u\n", magic, logBs);
+          // v17: OS-image card — whole-card GPT layout, no ext4 superblock.
+          sdlog("NativeSd: ext4 absent (os image)\n");
+          if (!readSector(1)) {
+            sdlog("NativeSd: gpt read fail\n");
+          } else if (memcmp(buffer, "EFI PART", 8) == 0) {
+            uint32_t entries = (uint32_t)buffer[80] | ((uint32_t)buffer[81] << 8) |
+                               ((uint32_t)buffer[82] << 16) | ((uint32_t)buffer[83] << 24);
+            sdlog("NativeSd: gpt ok entries %u\n", entries);
+          } else {
+            sdlog("NativeSd: gpt absent\n");
+          }
         }
       } else {
         sdlog("NativeSd: ext4 sb read fail\n");
