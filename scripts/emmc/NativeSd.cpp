@@ -5,6 +5,7 @@
 #include <IOKit/IOLib.h>
 #include <IOKit/storage/IOBlockStorageDevice.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
+#include <kern/clock.h>
 #include "TransferStatus.h"
 #include "SdProtocol.h"
 
@@ -38,6 +39,9 @@ class NativeSd : public IOBlockStorageDevice {
   uint64_t physical = 0, sectors = 0;
   uint16_t rca = 0;
   bool prepared = false, cardUp = false, dmaQuarantined = false;
+  // v15: softVerify makes read failures recoverable (chain experiments fall
+  // back instead of tearing the driver down); multiOk gates the CMD18 path.
+  bool softVerify = false, multiOk = false;
   const char *mode = "none";
   uint32_t calls = 0;
 
@@ -97,6 +101,14 @@ class NativeSd : public IOBlockStorageDevice {
   static void cache(void *p, bool clean) {
     uint64_t start = (uint64_t)p;
     for (uint64_t at = start; at < start + 512; at += 64) {
+      if (clean) __asm__ volatile("dc cvac, %0" :: "r"(at) : "memory");
+      else __asm__ volatile("dc ivac, %0" :: "r"(at) : "memory");
+    }
+    __asm__ volatile("dsb sy" ::: "memory");
+  }
+  static void cacheN(void *p, uint32_t bytes, bool clean) {
+    uint64_t start = (uint64_t)p;
+    for (uint64_t at = start; at < start + bytes; at += 64) {
       if (clean) __asm__ volatile("dc cvac, %0" :: "r"(at) : "memory");
       else __asm__ volatile("dc ivac, %0" :: "r"(at) : "memory");
     }
@@ -180,8 +192,50 @@ class NativeSd : public IOBlockStorageDevice {
     uint32_t st = wait(2, 2000000); cache(buffer, false);
     if (!E5Emmc::transferOk(st) || (r32(0x10) & E5Sd::r1Errors)) {
       sdlog("NativeSd: read fail lba %u st %08x r1 %08x ps %08x\n", lba, st, r32(0x10), r32(0x24));
-      cardUp = false;
-      if (!resetLines()) dmaQuarantined = true;
+      if (!softVerify) {
+        cardUp = false;
+        if (!resetLines()) dmaQuarantined = true;
+      } else {
+        resetLines();
+      }
+      return false;
+    }
+    return true;
+  }
+  // v15: multi-block CMD18 read of n sectors (n <= 16, the 8192B DMA page).
+  // Unproven on this host (the eMMC path is single-block only), so callers
+  // treat failure as evidence, not as a driver fault: softVerify guards the
+  // error paths exactly like readSector.
+  bool readSectors(uint32_t lba, uint32_t n) {
+    if (n == 0 || n > 16) return false;
+    if (!idle(3)) return false;
+    for (uint32_t i = 0; i < 32u * n; i++) ((uint32_t *)buffer)[i] = 0xcafebabe;
+    cacheN(buffer, n * 512, true); cacheN(buffer, n * 512, false);
+    w8(0x28, r8(0x28) & (uint8_t)~0x18); // SDMA, retaining bus width.
+    w32(0x30, 0xffffffffu); w16(0x04, 512); w32(0x00, n);
+    w32(0x58, (uint32_t)physical); w32(0x5c, 0);
+    w32(0x08, lba); w32(0x0c, 0x123a0033u); // CMD18, multi|count|DMA|read.
+    uint32_t st = wait(2, 2000000u + 100000u * n); cacheN(buffer, n * 512, false);
+    if (!E5Emmc::transferOk(st) || (r32(0x10) & E5Sd::r1Errors)) {
+      sdlog("NativeSd: mread fail lba %u n %u st %08x r1 %08x ps %08x\n",
+            lba, n, st, r32(0x10), r32(0x24));
+      if (!softVerify) {
+        cardUp = false;
+        if (!resetLines()) dmaQuarantined = true;
+      } else {
+        resetLines();
+      }
+      return false;
+    }
+    uint32_t s12 = command(0x0c1a, 0); // CMD12 stop, R1.
+    if (!commandOk(s12) || !idle(3)) {
+      sdlog("NativeSd: mread stop fail lba %u st %08x s12 %08x\n", lba, st, s12);
+      if (!softVerify) {
+        cardUp = false;
+        if (!resetLines()) dmaQuarantined = true;
+      } else {
+        resetLines();
+      }
       return false;
     }
     return true;
@@ -426,7 +480,82 @@ class NativeSd : public IOBlockStorageDevice {
     // Linux clears the <=400kHz CMD/POSRD delay-invert bits above 400kHz.
     w32(0x208, r32(0x208) & ~((1u << 13) | (1u << 21)));
     w32(0x250, r32(0x250) | 0x03000000u);
-    mode = "legacy-4bit-13MHz"; return verify();
+    mode = "legacy-4bit-13MHz";
+    if (!verify()) return false;
+    // v15: raise throughput. Switch the sdio0 functional chain to rpll
+    // (Android's own runtime state: mux 4 = rpll_390m, 2x div 0 -> 390MHz,
+    // 1x enable -> 195MHz) and run default speed (24.375MHz card clock,
+    // divider N=2). Any recheck failure falls back to the proven ext-26m
+    // chain; softVerify keeps the experiment non-fatal.
+    softVerify = true;
+    {
+      w16(0x2c, 0); // SDCLK off while the chain moves.
+      clocks.put(0x280, (clocks.get(0x280) & ~7u) | 4u);
+      clocks.put(0x284, 0);
+      clocks.put(0x288, 1);
+      IODelay(1000);
+      uint32_t rm = clocks.get(0x280) & 7, rd2 = clocks.get(0x284) & 0x7ff, rd1 = clocks.get(0x288) & 1;
+      uint32_t src2 = E5Sd::sdio0SourceHz(rm, rd2, rd1);
+      sdlog("NativeSd: chain rpll mux %u d2x %u d1x %u src %uHz\n", rm, rd2, rd1, src2);
+      if (src2 == 195000000u) {
+        sourceHz = src2; // setClock reads sourceHz for the divider.
+        if (setClock(24375000u)) {
+          mode = "default-4bit-24MHz";
+          if (!verify()) {
+            sdlog("NativeSd: default-speed recheck failed, falling back\n");
+            mode = "legacy-4bit-13MHz";
+            w16(0x2c, 0);
+            clocks.put(0x280, (clocks.get(0x280) & ~7u) | 1u);
+            clocks.put(0x284, 0);
+            clocks.put(0x288, 1);
+            IODelay(1000);
+            sourceHz = E5Sd::sdio0SourceHz(1, 0, 1);
+            if (!setClock(13000000) || !verify()) {
+              softVerify = false;
+              return false; // even the proven legacy state is gone; fail loud.
+            }
+          }
+        }
+      }
+    }
+    // Timed loops over 128 sequential sectors (LBA 16..143, inside the ext4
+    // partition): single-block baseline, then the CMD18 experiment with
+    // first-sector CRC comparison per 16-sector chunk.
+    {
+      const uint32_t base = 16, total = 128;
+      uint64_t t0, t1, ns;
+      clock_get_uptime(&t0);
+      for (uint32_t i = 0; i < total; i++) {
+        if (!readSector(base + i)) { softVerify = false; return false; }
+      }
+      clock_get_uptime(&t1);
+      absolutetime_to_nanoseconds(t1 - t0, &ns);
+      sdlog("NativeSd: tp single %u sectors in %llu us\n", total, (unsigned long long)(ns / 1000));
+      uint32_t want[8]; bool ok = true;
+      for (uint32_t c = 0; c < 8; c++) {
+        if (!readSector(base + c * 16)) { ok = false; break; }
+        want[c] = crc32(buffer);
+      }
+      if (ok) {
+        clock_get_uptime(&t0);
+        for (uint32_t c = 0; c < 8 && ok; c++) {
+          if (!readSectors(base + c * 16, 16)) { ok = false; break; }
+          if (crc32(buffer) != want[c]) {
+            sdlog("NativeSd: mread mismatch lba %u\n", base + c * 16);
+            ok = false;
+          }
+        }
+        clock_get_uptime(&t1);
+        absolutetime_to_nanoseconds(t1 - t0, &ns);
+        sdlog("NativeSd: tp multi %u sectors in %llu us match %c\n",
+              total, (unsigned long long)(ns / 1000), ok ? 'y' : 'n');
+        multiOk = ok;
+      } else {
+        sdlog("NativeSd: tp multi skipped\n");
+      }
+    }
+    softVerify = false;
+    return true;
   }
 
 public:
@@ -503,8 +632,19 @@ public:
     if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
     if (calls++ < 3) sdlog("NativeSd: rw %llu blocks at %llu\n", (unsigned long long)count, (unsigned long long)block);
     while (done < count * 512) {
-      if (!readSector((uint32_t)(block + done / 512)) || data->writeBytes(done, buffer, 512) != 512) break;
-      done += 512;
+      uint32_t left = (uint32_t)((count * 512 - done) / 512);
+      uint32_t n = 1;
+      if (multiOk && left >= 4) n = left > 16 ? 16 : left;
+      bool ok;
+      if (n > 1) {
+        ok = readSectors((uint32_t)(block + done / 512), n) &&
+             data->writeBytes(done, buffer, n * 512) == n * 512;
+      } else {
+        ok = readSector((uint32_t)(block + done / 512)) &&
+             data->writeBytes(done, buffer, 512) == 512;
+      }
+      if (!ok) break;
+      done += n * 512;
     }
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
