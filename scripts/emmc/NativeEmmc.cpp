@@ -89,6 +89,10 @@ class NativeEmmc : public IOBlockStorageDevice {
   uint8_t  extCsd[512] = {0};
   uint64_t sectors = 0;
   bool cardUp = false;
+  bool partMode = false;
+  uint64_t baseLba = 0;
+  uint64_t cacheSectors = 0x200000ull;
+  static NativeEmmc *s_host;
 
   inline uint8_t  r8 (uint32_t o) const { return *(volatile uint8_t  *)((uint8_t *)regs + o); }
   inline uint16_t r16(uint32_t o) const { return *(volatile uint16_t *)((uint8_t *)regs + o); }
@@ -469,7 +473,7 @@ public:
   char *getAdditionalDeviceInfoString() override { return const_cast<char *>("UEFI-validated v4 port"); }
   IOReturn reportBlockSize(UInt64 *value) override { *value = 512; return kIOReturnSuccess; }
   IOReturn reportEjectability(bool *value) override { *value = false; return kIOReturnSuccess; }
-  IOReturn reportMaxValidBlock(UInt64 *value) override { *value = sectors ? sectors - 1 : 0; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *value) override { UInt64 n = partMode ? cacheSectors : sectors; *value = n ? n - 1 : 0; return kIOReturnSuccess; }
   IOReturn reportMediaState(bool *present, bool *changed) override { *present = cardUp; if (changed) *changed = false; return kIOReturnSuccess; }
   IOReturn reportRemovability(bool *value) override { *value = false; return kIOReturnSuccess; }
   IOReturn reportWriteProtection(bool *value) override { *value = false; return kIOReturnSuccess; }
@@ -479,25 +483,27 @@ public:
   IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
   IOReturn doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block, UInt64 count,
                                    IOStorageAttributes *, IOStorageCompletion *completion) override {
+    NativeEmmc *h = partMode ? s_host : this;
     if (buffer == nullptr || completion == nullptr || completion->action == nullptr || count == 0)
       return kIOReturnBadArgument;
     if (buffer->getDirection() != kIODirectionIn) return kIOReturnNotWritable;
-    if (cardUp == false || ioLock == nullptr || dmaD == nullptr) return kIOReturnNotReady;
-    if (block > sectors || count > sectors - block) return kIOReturnBadArgument;
+    if (h->cardUp == false || h->ioLock == nullptr || h->dmaD == nullptr) return kIOReturnNotReady;
+    UInt64 maxSec = partMode ? cacheSectors : sectors;
+    if (block > maxSec || count > maxSec - block) return kIOReturnBadArgument;
     UInt64 total = count * 512;
     if (buffer->getLength() < total) return kIOReturnBadArgument;
     UInt64 done = 0;
     static uint32_t s_calls = 0, s_fails = 0;
     bool trace = __sync_bool_compare_and_swap(&s_calls, s_calls, s_calls + 1) && s_calls <= 3;
-    if (trace) elog("NativeEmmc: rw call %llu blocks @%llu dir %d len %llu\n",
+    if (trace) elog("NativeEmmc: rw%s call %llu blocks @%llu dir %d len %llu\n", partMode ? "P" : "",
                     (unsigned long long)count, (unsigned long long)block,
                     (int)buffer->getDirection(), (unsigned long long)buffer->getLength());
-    IOLockLock(ioLock);
+    IOLockLock(h->ioLock);
     while (done + 512 <= total) {
-      uint32_t st = sdmaRead512(0x113A, (uint32_t)(block + done / 512), dmaD, dmaPhys);
-      cacheInvalidate(dmaD, 512);
+      uint32_t st = h->sdmaRead512(0x113A, (uint32_t)(baseLba + block + done / 512), h->dmaD, h->dmaPhys);
+      cacheInvalidate(h->dmaD, 512);
       if ((st & 0x00000003u) == 0x00000003u &&
-          buffer->writeBytes(done, dmaD8, 512) == 512) {
+          buffer->writeBytes(done, h->dmaD8, 512) == 512) {
         done += 512;
       } else {
         if (s_fails < 3) elog("NativeEmmc: rw fail @blk %llu st %08x done %llu\n",
@@ -506,17 +512,19 @@ public:
         break;
       }
     }
-    IOLockUnlock(ioLock);
+    IOLockUnlock(h->ioLock);
     completion->action(completion->target, completion->parameter,
                        done == total ? kIOReturnSuccess : kIOReturnIOError, done);
     return kIOReturnSuccess;
   }
 };
 OSDefineMetaClassAndStructors(NativeEmmc, IOBlockStorageDevice)
+NativeEmmc *NativeEmmc::s_host = nullptr;
 
 bool NativeEmmc::start(IOService *provider)
 {
   if (!IOBlockStorageDevice::start(provider)) return false;
+  if (partMode) { registerService(); return true; }
   md = IOMemoryDescriptor::withAddressRange(E5_EMMC_BASE, E5_EMMC_LEN, kIODirectionNone, nullptr);
   if (!md) { elog("NativeEmmc: no memory descriptor\n"); return true; }
   map = md->map();
@@ -548,6 +556,21 @@ bool NativeEmmc::start(IOService *provider)
     // v5: keep regs/DMA page alive; the read path runs in doAsyncReadWrite.
     elog("NativeEmmc: publishing block device (%llu sectors)\n", (unsigned long long)sectors);
     registerService();
+    s_host = this;
+    NativeEmmc *part = new NativeEmmc;
+    if (part && part->init()) {
+      part->partMode = true;
+      part->baseLba = 0xd0a800ull;
+      part->cacheSectors = 0x200000ull;
+      if (part->attach(this)) {
+        if (part->start(this) == false) {
+          part->detach(gIOServicePlane);
+        } else {
+          elog("NativeEmmc: cache window published (%llu sectors @ lba %llx)\n",
+               (unsigned long long)part->cacheSectors, (unsigned long long)part->baseLba);
+        }
+      }
+    }
     return true;
   }
   resetLines();
