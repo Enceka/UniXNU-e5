@@ -392,6 +392,21 @@ public:
   IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
   UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
   char *getVendorString() override { return const_cast<char *>("Unisoc"); }
+  void verifyReadback(uint32_t *d, uint8_t *d8, uint64_t dva) {
+    const uint32_t bases[2] = {0x17E800u, 0x21000u};
+    const uint32_t offs[2] = {8u, 0u};
+    const char *tags[2] = {"bootb", "misc"};
+    for (uint32_t i = 0; i < 2; i++) {
+      for (uint32_t b = 0; b < 2; b++) {
+        uint32_t st = sdmaRead512(0x113A, bases[i] + offs[i] + b, d, dva);
+        cacheInvalidate(d, 512);
+        elog("NativeEmmc: verify %s blk %u words %08x %08x %08x %08x crc %08x",
+             tags[i], b, d[0], d[1], d[2], d[3], crc32(d8, 512));
+      }
+    }
+  }
+
+
   bool scanGpt(uint32_t *d, uint8_t *d8, uint64_t dva) {
     uint32_t st = sdmaRead512(0x113A, 1, d, dva);
     cacheInvalidate(d, 512);
@@ -488,6 +503,7 @@ bool NativeEmmc::start(IOService *provider)
 
   if (cardUp) {
     scanGpt(d, d8, dva);
+    verifyReadback(d, d8, dva);
     // Quiesce the DMA engine before returning the page to the kernel.
     resetLines();
   }
