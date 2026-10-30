@@ -448,3 +448,24 @@ SdProtocol.h (unit-tested against the golden bytes, cases 27-31), driver walk
 after the speed-mode verify via readSectors (CMD18 multi), soft-guarded.
 Checker (e5-xnu d2a363e) requires the four ext4 evidence lines with the
 golden values. CI kernel 279 dispatched (run 41143425911).
+
+## Round 17 (kernel 279, v16 ext4 walk) — walk proven, CRC scope bug
+
+Report: docs/logs/uefi-report-073110.txt. Boot green, eMMC regression green.
+Walk evidence (all four lines first board appearance):
+
+- `ext4 sb ok inodes 950272 blocks 3780347 ipg 8192` (golden)
+- `ext4 gd0 itable 145` (golden)
+- `ext4 root ext logical 0 len 1 start 4241` (golden)
+- `ext4 rootdir 22 entries dot 2 crc c564f66b` — entries/dot golden; CRC
+  mismatch: c564f66b = crc32 of the first 512 bytes only (the sector-sized
+  crc32 helper), while the golden 70633ae6 covers the whole 4096-byte
+  directory block (verified offline: crc32(rootdir.bin[:512]) = c564f66b,
+  crc32(rootdir.bin) = 70633ae6).
+
+tp single 128 sectors 32565 us; tp multi 128 sectors 4955 us match y.
+Checker FAIL: "ext4 rootdir CRC mismatch: c564f66b" (expected).
+
+Fix (e1e38d7): added crc32n(p, bytes) and CRC bs bytes at the rootdir site;
+reference and checker unchanged (they were right). Round 18 (kernel 280)
+re-runs the same walk for the PASS record.
