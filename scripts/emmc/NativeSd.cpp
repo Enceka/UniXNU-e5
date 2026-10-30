@@ -291,6 +291,20 @@ class NativeSd : public IOBlockStorageDevice {
       sdlog("NativeSd: hotplug %08x->%08x rmldo %08x->%08x prot %08x pstate %08x\n",
             hp0, aon.get(0x520), rm0, aon.get(0xba0), aon.get(0xff0), r32(0x24));
     }
+    { // sdhci core init always does SDHCI_RESET_ALL (sdhci_init) and the
+      // vendor probe sets DLL backup mode (sdhci_sprd_init_config:
+      // 0x28c |= DLL_BAK|DLL_VAL, bits 0,1). We skipped both; the controller
+      // carried SDR104-era sampler state across the warm reboot (round 9:
+      // Linux re-inits the card warm with zero errors, we CRC every response).
+      uint8_t hr0 = r8(0x2f);
+      w8(0x2f, 0x09); // RESET_ALL (bit0, self-clears) | Unisoc card-hw-reset bit3.
+      unsigned hr;
+      for (hr = 0; hr < 1000 && (r8(0x2f) & 1); hr++) IODelay(10);
+      IODelay(1000);
+      w32(0x28c, r32(0x28c) | 0x3u); // Vendor DLL backup mode.
+      sdlog("NativeSd: host reset %02x->%02x deb %08x\n", hr0, r8(0x2f), r32(0x28c));
+      if (r8(0x2f) & 1) { sdlog("NativeSd: host reset stuck\n"); return false; }
+    }
     w16(0x2c, 0);
     clocks.put(0x280, (clocks.get(0x280) & ~7u) | 1u); // ext-26m.
     clocks.put(0x284, clocks.get(0x284) & ~0x7ffu);
