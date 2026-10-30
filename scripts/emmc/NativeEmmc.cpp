@@ -487,6 +487,11 @@ public:
     UInt64 total = count * 512;
     if (buffer->getLength() < total) return kIOReturnBadArgument;
     UInt64 done = 0;
+    static uint32_t s_calls = 0, s_fails = 0;
+    bool trace = __sync_bool_compare_and_swap(&s_calls, s_calls, s_calls + 1) && s_calls <= 3;
+    if (trace) elog("NativeEmmc: rw call %llu blocks @%llu dir %d len %llu\n",
+                    (unsigned long long)count, (unsigned long long)block,
+                    (int)buffer->getDirection(), (unsigned long long)buffer->getLength());
     IOLockLock(ioLock);
     while (done + 512 <= total) {
       uint32_t st = sdmaRead512(0x113A, (uint32_t)(block + done / 512), dmaD, dmaPhys);
@@ -495,6 +500,9 @@ public:
           buffer->writeBytes(done, dmaD8, 512) == 512) {
         done += 512;
       } else {
+        if (s_fails < 3) elog("NativeEmmc: rw fail @blk %llu st %08x done %llu\n",
+                              (unsigned long long)(block + done / 512), st, (unsigned long long)done);
+        s_fails++;
         break;
       }
     }
