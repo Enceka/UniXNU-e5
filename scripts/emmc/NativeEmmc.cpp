@@ -75,6 +75,13 @@ static void elog(const char *fmt, ...) {
 class NativeEmmc : public IOBlockStorageDevice {
   OSDeclareDefaultStructors(NativeEmmc)
   volatile uint32_t *regs = nullptr;
+  IOLock *ioLock = nullptr;
+  IOBufferMemoryDescriptor *bmd = nullptr;
+  IOMemoryMap *map = nullptr;
+  IOMemoryDescriptor *mdesc = nullptr;
+  uint32_t *dmaD = nullptr;
+  uint8_t *dmaD8 = nullptr;
+  uint64_t dmaPhys = 0;
   uint16_t rca = 0;
   uint32_t ocr = 0;
   uint32_t cid[4] = {0, 0, 0, 0};
@@ -470,23 +477,48 @@ public:
   IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
   IOReturn getWriteCacheState(bool *value) override { *value = false; return kIOReturnSuccess; }
   IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
-  IOReturn doAsyncReadWrite(IOMemoryDescriptor *, UInt64, UInt64, IOStorageAttributes *, IOStorageCompletion *) override { return kIOReturnUnsupported; }
+  IOReturn doAsyncReadWrite(IOMemoryDescriptor *buffer, UInt64 block, UInt64 count,
+                                   IOStorageAttributes *, IOStorageCompletion *completion) override {
+    if (buffer == nullptr || completion == nullptr || completion->action == nullptr || count == 0)
+      return kIOReturnBadArgument;
+    if (buffer->getDirection() != kIODirectionIn) return kIOReturnNotWritable;
+    if (cardUp == false || ioLock == nullptr || dmaD == nullptr) return kIOReturnNotReady;
+    if (block > sectors || count > sectors - block) return kIOReturnBadArgument;
+    UInt64 total = count * 512;
+    if (buffer->getLength() < total) return kIOReturnBadArgument;
+    UInt64 done = 0;
+    IOLockLock(ioLock);
+    while (done + 512 <= total) {
+      uint32_t st = sdmaRead512(0x113A, (uint32_t)(block + done / 512), dmaD, dmaPhys);
+      cacheInvalidate(dmaD, 512);
+      if ((st & 0x00000003u) == 0x00000003u &&
+          buffer->writeBytes(done, dmaD8, 512) == 512) {
+        done += 512;
+      } else {
+        break;
+      }
+    }
+    IOLockUnlock(ioLock);
+    completion->action(completion->target, completion->parameter,
+                       done == total ? kIOReturnSuccess : kIOReturnIOError, done);
+    return kIOReturnSuccess;
+  }
 };
 OSDefineMetaClassAndStructors(NativeEmmc, IOBlockStorageDevice)
 
 bool NativeEmmc::start(IOService *provider)
 {
   if (!IOBlockStorageDevice::start(provider)) return false;
-  IOMemoryDescriptor *md = IOMemoryDescriptor::withAddressRange(E5_EMMC_BASE, E5_EMMC_LEN, kIODirectionNone, nullptr);
+  md = IOMemoryDescriptor::withAddressRange(E5_EMMC_BASE, E5_EMMC_LEN, kIODirectionNone, nullptr);
   if (!md) { elog("NativeEmmc: no memory descriptor\n"); return true; }
-  IOMemoryMap *map = md->map();
+  map = md->map();
   if (!map) { md->release(); elog("NativeEmmc: map failed\n"); return true; }
   regs = (volatile uint32_t *)map->getVirtualAddress();
   elog("NativeEmmc: regs mapped at %p\n", (void *)regs);
 
   // One physically-contiguous page below 4 GiB: receive buffer at +0, the
   // ADMA2 descriptor at +512, mirroring the UEFI probe's DMA page layout.
-  IOBufferMemoryDescriptor *bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+  bmd = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
       kernel_task,
       (IOOptionBits)kIODirectionInOut | (IOOptionBits)kIOMemoryPhysicallyContiguous,
       8192, 0xFFFFE000ull);
@@ -495,6 +527,7 @@ bool NativeEmmc::start(IOService *provider)
   uint32_t *d = (uint32_t *)bmd->getBytesNoCopy();
   uint8_t *d8 = (uint8_t *)d;
   uint64_t dva = bmd->getPhysicalAddress();
+  dmaD = d; dmaD8 = d8; dmaPhys = dva; ioLock = IOLockAlloc();
   elog("NativeEmmc: dma page %08llx\n", (unsigned long long)dva);
 
   cardUp = identifyAndRead(d, d8, dva);
@@ -504,9 +537,12 @@ bool NativeEmmc::start(IOService *provider)
   if (cardUp) {
     scanGpt(d, d8, dva);
     verifyReadback(d, d8, dva);
-    // Quiesce the DMA engine before returning the page to the kernel.
-    resetLines();
+    // v5: keep regs/DMA page alive; the read path runs in doAsyncReadWrite.
+    elog("NativeEmmc: publishing block device (%llu sectors)\n", (unsigned long long)sectors);
+    registerService();
+    return true;
   }
+  resetLines();
   bmd->complete();
   bmd->release();
   map->release();
