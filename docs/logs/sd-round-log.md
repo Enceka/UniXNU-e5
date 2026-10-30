@@ -469,3 +469,22 @@ Checker FAIL: "ext4 rootdir CRC mismatch: c564f66b" (expected).
 Fix (e1e38d7): added crc32n(p, bytes) and CRC bs bytes at the rootdir site;
 reference and checker unchanged (they were right). Round 18 (kernel 280)
 re-runs the same walk for the PASS record.
+
+## Round 18 (kernel 280, v16 + whole-block CRC) — FULL PASS, ext4 round closed
+
+Report: docs/logs/uefi-report-074725.txt. Boot green, eMMC regression green.
+
+- `ext4 sb ok inodes 950272 blocks 3780347 ipg 8192` (golden)
+- `ext4 gd0 itable 145` (golden)
+- `ext4 root ext logical 0 len 1 start 4241` (golden)
+- `ext4 rootdir 22 entries dot 2 crc 70633ae6` (golden — whole-block CRC fix e1e38d7 verified)
+- tp single 128 sectors 36134 us; tp multi 128 sectors 7285 us match y
+- probe Success default-4bit-24MHz; publishing read-only SD card 30244864 sectors
+
+Checker (tools/e5-sd-check.py, e5-xnu d2a363e): PASS exit 0 —
+"SD 30244864 sectors via default-4bit-24MHz, reference 4/4 CRC match,
+repeat 16/16; eMMC v8 + E5EMMC mount + shell intact (EXITH 5/5)".
+
+The ext4-mapping round objective is met: XNU natively walks the card's
+ext4 (superblock → group descriptor → root inode extent tree → root
+directory) and verifies content against the Android-side golden captures.
