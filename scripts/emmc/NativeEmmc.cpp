@@ -94,6 +94,7 @@ class NativeEmmc : public IOBlockStorageDevice {
   uint64_t baseLba = 0;
   uint64_t cacheSectors = 0x200000ull;
   static NativeEmmc *s_host;
+  static void e5PartPublishThread(void *arg, wait_result_t w);
 
   inline uint8_t  r8 (uint32_t o) const { return *(volatile uint8_t  *)((uint8_t *)regs + o); }
   inline uint16_t r16(uint32_t o) const { return *(volatile uint16_t *)((uint8_t *)regs + o); }
@@ -521,7 +522,7 @@ public:
 };
 static NativeEmmc *s_pendingPart = nullptr;
 
-static void e5PartPublishThread(void *arg, wait_result_t)
+void NativeEmmc::e5PartPublishThread(void *arg, wait_result_t)
 {
   NativeEmmc *host = (NativeEmmc *)arg;
   NativeEmmc *part = s_pendingPart;
