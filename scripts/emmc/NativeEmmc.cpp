@@ -78,7 +78,7 @@ class NativeEmmc : public IOBlockStorageDevice {
   IOLock *ioLock = nullptr;
   IOBufferMemoryDescriptor *bmd = nullptr;
   IOMemoryMap *map = nullptr;
-  IOMemoryDescriptor *mdesc = nullptr;
+  IOMemoryDescriptor *md = nullptr;
   uint32_t *dmaD = nullptr;
   uint8_t *dmaD8 = nullptr;
   uint64_t dmaPhys = 0;
