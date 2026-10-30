@@ -305,3 +305,35 @@ v13 sweeps three aon 0x520 states after CMD0, CMD8 in each: `vendor`
 (polar clear — current, wrong), `pinv` (polar SET — Linux-proven), `none`
 (fast-hotplug off). First state whose CMD8 echoes r7 0x1aa wins and init
 continues under it. Kernel 275, CI run 41080389067.
+
+## Round 13 (kernel 275) — SUCCESS: the card is read natively
+
+The polarity theory held. With aon 0x520 bit21 SET (`cdpol pinv` state)
+CMD8 echoed immediately: `cdpol pinv hp 00300001 cins 0 pstate 01f00000
+cmd8 st 00000001 r7 000001aa`. The `cdpol none` probe that followed also
+echoed — the effect of the corrected polarity is sticky in the controller
+(and PSTATE CINS itself never moved; the gate was the fast-hotplug detect,
+not the CINS status bit). The matrix adopted `pinv` and the full legacy
+init completed for the first time:
+
+    ACMD41 st 00000001 ocr c0ff8000 tries 35
+    CMD3 st 00000001 r6 50480500 rca 5048        (same RCA as Android)
+    CSD 400e0032 5b590000 735f7f80 0a400000 sectors 30244864
+    selected st 00000001 r1 00000900 rca 5048
+    reference lba 0/1/2048/2050 st 00000003 crc f9e85b82/b2aa7578/b2aa7578/c1117912
+    reference 4/4 repeat 16/16 mode legacy-4bit-13MHz
+    probe Success sectors 30244864 mode legacy-4bit-13MHz
+    publishing read-only SD card 30244864 sectors
+
+XNU probed the published media (three rw-1-block reads at LBA 0 from the
+IOMedia stack) and the eMMC regression stayed fully green. Report
+archived: e5-xnu dumps/uefi-report-233919.txt.
+
+## v14 — final form (commit 104bf6e, kernel 276)
+
+hotplugValue() now encodes the vendor else-branch directly:
+`(cur | 0x00210001u) & ~0x000001feu` (polarity bit21 SET). The cdpol
+matrix is removed; the standard `CMD8 st %08x r7 %08x` retry-loop grammar
+returns. Unit tests cases 12-14 updated (hotplugValue(0) == 0x00210001).
+Checker (e5-xnu) v14: the hotplug line must show bit21 set. Round 14 =
+the clean-driver confirmation boot.
