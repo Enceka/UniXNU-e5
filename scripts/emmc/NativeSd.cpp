@@ -306,6 +306,19 @@ class NativeSd : public IOBlockStorageDevice {
       sdlog("NativeSd: host reset %02x->%02x deb %08x\n", hr0, r8(0x2f), r32(0x28c));
       if (r8(0x2f) & 1) { sdlog("NativeSd: host reset stuck\n"); return false; }
     }
+    { // v12: vendor sdhci_sprd_hw_reset -- the ONLY other 0x2f bit the vendor
+      // code drives. Linux mmc core calls hw_reset during every mmc_power_up
+      // (mmc_hw_reset_for_init); the vendor writeb workaround says clearing
+      // bit3 by mistake breaks the card, and v10 proved the opposite extreme
+      // (bit3 held set forever, never pulsed) still CRCs every response. Pulse
+      // the card reset properly: low 10-20us, release, settle 300-500us.
+      uint8_t cb = r8(0x2f);
+      w8(0x2f, cb & ~(uint8_t)0x08); // assert card reset (active low)
+      IODelay(20);
+      w8(0x2f, cb | 0x08); // release
+      IODelay(500);
+      sdlog("NativeSd: card rst %02x->%02x pstate %08x\n", cb, r8(0x2f), r32(0x24));
+    }
     w16(0x2c, 0);
     // v11: leave the Android-proven sdio0 chain untouched. Live Android
     // (mmc1 SDR104) shows mux 0x280=4 (rpll-390m), 2x div 0x284=0, 1x 0x288=1
