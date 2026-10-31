@@ -31,7 +31,7 @@
  
  #include <sys/proc.h>
  #include <sys/user.h>
-@@ -126,6 +128,24 @@ handle_ux_exception(thread_t                    thread,
+@@ -126,6 +128,46 @@ handle_ux_exception(thread_t                    thread,
  		return KERN_FAILURE;
  	}
  
@@ -44,9 +44,31 @@
 +		arm_saved_state_t *e5ss = find_user_regs(thread);
 +		if (e5ss != NULL && is_saved_state64(e5ss)) {
 +			arm_saved_state64_t *e5s = saved_state64(e5ss);
-+			printf("E5EXC pid %d (%s) exc %d code %llu sub %llu lr %llx fp %llx x16 %llx x17 %llx\n",
++			printf("E5EXC pid %d (%s) exc %d code %llu sub %llu lr %llx fp %llx x16 %llx x17 %llx",
 +			    proc_pid(p), p->p_comm, exception, code, subcode,
 +			    e5s->lr, e5s->fp, e5s->x[16], e5s->x[17]);
++			/* E5: walk the user frame-pointer chain for up to 6
++			 * return addresses - independent code anchors that pin
++			 * the shared-cache slide offline.
++			 */
++			{
++				user_addr_t e5fp = e5s->fp;
++				uint64_t e5ret[6];
++				unsigned e5n = 0;
++				while (e5n < 6) {
++					uint64_t e5pair[2] = {0, 0};
++					if (copyin(e5fp, (char *)e5pair, sizeof(e5pair)) != 0)
++						break;
++					if (e5pair[0] <= e5fp || (e5pair[0] - e5fp) > 0x100000U)
++						break;
++					e5ret[e5n++] = e5pair[1];
++					e5fp = (user_addr_t)e5pair[0];
++				}
++				printf(" fr");
++				for (unsigned e5k = 0; e5k < e5n; e5k++)
++					printf(" %llx", e5ret[e5k]);
++			}
++			printf("\n");
 +		} else {
 +			printf("E5EXC pid %d (%s) exc %d code %llu sub %llu\n",
 +			    proc_pid(p), p->p_comm, exception, code, subcode);
