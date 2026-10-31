@@ -22,17 +22,35 @@
 
 --- a/bsd/uxkern/ux_exception.c
 +++ b/bsd/uxkern/ux_exception.c
-@@ -126,6 +126,15 @@ handle_ux_exception(thread_t                    thread,
+@@ -37,6 +37,8 @@
+ #include <mach/boolean.h>
+ #include <mach/exception.h>
+ #include <mach/kern_return.h>
++#include <arm/thread.h>
++#include <mach/arm/thread_status.h>
+ 
+ #include <sys/proc.h>
+ #include <sys/user.h>
+@@ -126,6 +128,24 @@ handle_ux_exception(thread_t                    thread,
  		return KERN_FAILURE;
  	}
  
-+	/* E5: log the mach exception (with the faulting subcode/PC) before it
-+	 * becomes a bare signal, so trap sites can be symbolicated offline.
++	/* E5: log the mach exception (with the faulting subcode/PC and the
++	 * trap frame's lr/fp/x16/x17) before it becomes a bare signal, so
++	 * trap sites can be symbolicated offline.
 +	 */
 +	if (exception == EXC_BAD_ACCESS || exception == EXC_BAD_INSTRUCTION ||
 +	    exception == EXC_BREAKPOINT) {
-+		printf("E5EXC pid %d (%s) exc %d code %llu sub %llu\n",
-+		    proc_pid(p), p->p_comm, exception, code, subcode);
++		arm_saved_state_t *e5ss = find_user_regs(thread);
++		if (e5ss != NULL && is_saved_state64(e5ss)) {
++			arm_saved_state64_t *e5s = saved_state64(e5ss);
++			printf("E5EXC pid %d (%s) exc %d code %llu sub %llu lr %llx fp %llx x16 %llx x17 %llx\n",
++			    proc_pid(p), p->p_comm, exception, code, subcode,
++			    e5s->lr, e5s->fp, e5s->x[16], e5s->x[17]);
++		} else {
++			printf("E5EXC pid %d (%s) exc %d code %llu sub %llu\n",
++			    proc_pid(p), p->p_comm, exception, code, subcode);
++		}
 +	}
 + 
  	/* Translate exception and code to signal type */
