@@ -585,3 +585,38 @@ Working theory: macOS attached this image as a disk of exactly image size
 larger media — structurally ambiguous. An iOS-17.7-vintage kext may validate the
 backup-header position against the media size. v20 sizes the published media to
 altLBA+1 (11870275 sectors) making the GPT fully self-consistent.
+
+## Round 29 — SystemOS window boots through the dyld cache header (kernel 291, v17+bootargs)
+
+Payload 153050629843…: kernel 291 (e625e12), original trust modules, unixnu.toml args
+`… e5-systemos e5-systemos-boot`. SystemOS window staged first via
+tools/e5-systemos-media.py (3,302,814,400 B window at card LBA 12582912, full readback
+sha b4908cde…, OS GPT + APFS metadata verified unchanged, backup + restore commands recorded).
+
+Boot evidence (dumps/uefi-report-113123.txt, archived docs/logs/uefi-report-29.txt):
+- NativeSd cold path fully green on the OS image (all reference CRCs, both speed modes,
+  GPT ent16/ent8 golden, tp single 27328 us / multi 5040 us match y).
+- `SystemOS superblock crc c034a6f0 match y` → `publishing SystemOS read-only 6451200
+  sectors at 12582912` → kernel reads through the window → disk3 → SystemCryptex volume
+  8846FE78 mounted as disk5s1 → `E5SystemOS: mount /dev/disk5s1 read-only union enter` →
+  `mounted uuid 8846FE78… read-only union` → `original arm64 dyld cache header verified` →
+  `development startup dyld_flags 0x8` → launchd exec → two benign
+  `check_np vm_shared_region_start_address() failed` prints (empty shared region is the
+  normal first-process state) → dyld began mapping the original cache
+  (`rw 2048 blocks at 1279`, a 1 MiB window read) — console stops exactly there; no panic
+  record; both slot-B tries ended identically; Android fallback clean.
+- Root device chain confirmed: BSD root disk4s1 = SD GPT slice → APFS → DawnUpdate OS volume;
+  eMMC regression green all round.
+
+Checker: `tools/e5-system-boot-check.py --stage cache` PASS (manifest-29.json +
+readback-29.json archived). Remaining stall: dyld cache mapping never completes and the
+map-syscall return log (in kernel since 291) never printed.
+
+## v22 — stall triangulation (ab2a625)
+
+- NativeSd doAsyncReadWrite: `rw done n/n at lba` trace for every count>=8 read — decides
+  whether the 1 MiB cache read finishes inside the driver or the stall is above it.
+- e5-systemos-startup.patch: `_shared_region_map_and_slide` entry log for pid 1 — decides
+  whether dyld uses the shared-region syscall at all versus a private mmap fallback.
+  vm_unix.c section regenerated with exact stock-xnu-10063.141.1 headers (verified to apply
+  cleanly to the pristine file); kern_exec section unchanged.
