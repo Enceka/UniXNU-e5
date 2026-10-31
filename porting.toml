@@ -21,11 +21,13 @@ next_action = ["Keep source and payload inputs pinned per experiment; change one
 
 [[area.evidence]]
 kind = "source"
+revision = "9ddd546"
 reference = "board.toml"
 result = "Configuration and archives described in this section"
 
 [[area.evidence]]
 kind = "source"
+revision = "24098c2"
 reference = "docs/keypad-control.md"
 result = "Fixed-seed controls and two-instruction MMIO correction supersede the earlier kernel-layout and e5-key-token failure claims."
 
@@ -92,6 +94,7 @@ next_action = ["Instrument XNU CPU_START paths per core and record which of the 
 
 [[area.evidence]]
 kind = "source"
+revision = "9f8f5d1"
 reference = "feeds.toml"
 result = "Pinned UMS9621 SoC tree supplies CPU/PSCI/GIC declarations; enabled-core and IPI acceptance remains unmeasured."
 
@@ -110,6 +113,7 @@ next_action = ["Use #59 as the current seed baseline and retain #58 as the 256 M
 
 [[area.evidence]]
 kind = "source"
+revision = "e86e97a"
 reference = "dts/e5.dts"
 result = "Device memory declaration: physical 0x80000000, size 0x80000000; full handoff and DMA ownership audit remains pending."
 
@@ -176,6 +180,7 @@ result = "Flash #55, kernel 260: cache window -> disk3s1/E5EMMC UUID 238A9EDD ->
 
 [[area.evidence]]
 kind = "source"
+revision = "5697037"
 reference = "tools/userspace/cat.c"
 result = "Persistent startup/argument/read checkpoints for the additional SIGBUS investigation; failed reads now return a nonzero exit code."
 
@@ -188,6 +193,7 @@ result = "Flash #57 accepts E5EMMC mount, v9 PID1, all five raw wait statuses 0,
 
 [[area.evidence]]
 kind = "source"
+revision = "35c8cc8"
 reference = "scripts/emmc/TransferStatus.h"
 result = "v8 shares one error-first SDHCI transfer predicate across initialization, GPT and normal block reads; the driver reports a write-protected medium and continues rejecting writes. Regression cases cover command/data CRC, timeout, end-bit, ADMA and vendor errors coexisting with completion."
 
@@ -227,6 +233,7 @@ result = "Round 24: the actual prelinked IOGUIDPartitionScheme computes c07a08b6
 
 [[area.evidence]]
 kind = "source"
+revision = "ab2a625"
 reference = "scripts/emmc/NativeSd.cpp"
 result = "v22 restores the original OS LBA1 golden CRC 10fb5eed. GPT acceptance now requires its header CRC and a streaming CRC over all 16384 entry bytes, with actual/expected evidence; invalid metadata fails initialization. This prevents magic-only gpt-ok and independent sector/chunk checks from hiding a mismatched declared table CRC. Source-built kernel 289 passes full SD-root acceptance in round 27."
 
@@ -239,6 +246,7 @@ result = "Round 25 after SD GPT restoration: full entries CRC fa7a560c matches, 
 
 [[area.evidence]]
 kind = "source"
+revision = "bf349e4"
 reference = "docs/sd-os-root.md"
 result = "The actual prelinked AppleAPFSContainerScheme::probe calls a media filter before opening/reading: absent an earlier exception, Ejectable=true or Removable=true returns probe failure. NativeSd originally reported both true; NativeEmmc reports both false. v21's fixed-card properties address this filter but were masked by its invalid GPT edit. The actual eMMC recovery image is GPT-wrapped; earlier statements confusing it with the separate DBRDISK1 RAM seed are withdrawn."
 
@@ -251,6 +259,7 @@ result = "Round 26 executes the original SD-root /sbin/launchd far enough to pri
 
 [[area.evidence]]
 kind = "source"
+revision = "54347d4"
 reference = "patches/xnu/e5-ram-console-tee.patch"
 result = "Expand the XNU-only trace window from offsets 0x4f00..0x7f00 (12 KiB) to 0x1f00..0x7f00 (24 KiB), preserving the same pstore zone and end address. Sample NativeSd requests after the first twelve. Round 27 confirms that the full GPT/root evidence survives alongside libignition and panic output; the strict SD checker passes."
 
@@ -331,11 +340,13 @@ next_action = ["At the seed prompt, enter 1 plus confirm and 2 plus confirm usin
 
 [[area.evidence]]
 kind = "source"
+revision = "331ec89"
 reference = "patches/xnu/e5-keys2.patch"
 result = "Serial poll hook, corrected AON/GPIO physical addresses and matrix-key-to-cons_cinput implementation."
 
 [[area.evidence]]
 kind = "source"
+revision = "24098c2"
 reference = "docs/keypad-control.md"
 result = "Control-experiment conclusions, real v9 tty acceptance and pending physical input checks."
 
@@ -375,11 +386,13 @@ result = "Read-only stock-Android inventory: sprd_wlan_combo/wcn_bsp bindings, S
 
 [[area.evidence]]
 kind = "source"
+revision = "24098c2"
 reference = "docs/network-bringup.md"
 result = "Board wiring, vendor module metadata and staged Unisoc SDIO/WCN/SC2355 plan; Ath12kWifi is not applicable to this hardware."
 
 [[area.evidence]]
 kind = "source"
+revision = "24098c2"
 reference = "docs/logs/android-wcn-source-candidate.json"
 result = "Pinned candidate source files and hashes for SC2355 SDIO, command/event handling, board configuration, command versions and WCN boot. Channel definitions and XPE selection agree with the observed interfaces; exact equivalence to the dirty vendor modules is not claimed."
 
@@ -426,11 +439,13 @@ next_action = ["Automate the seed-to-payload chain into one script with a single
 
 [[area.evidence]]
 kind = "source"
+revision = "41815da"
 reference = "patches/xnu/series"
 result = "Device patch series order: e5-ram-console-tee through e5-emmc-personality, e5-fbconsole, e5-keys (validated content)."
 
 [[area.evidence]]
 kind = "source"
+revision = "9ddd546"
 reference = "docs/e5tw-host-validation.md"
 result = "PASS: all 81 ordered patches; five exact pre-tee blob hashes; 24 writer/reader cases plus boundary and invalid-header checks; ARM64 byte stores; two rejected regression controls; EDK2 reader build exit 0. CI compilation and board validation are pending."
 
@@ -463,11 +478,13 @@ next_action = ["Add a boot-counter prefix to every uplink tag so multi-boot resi
 
 [[area.evidence]]
 kind = "source"
+revision = "54347d4"
 reference = "patches/xnu/e5-ram-console-tee.patch"
 result = "Persistent kernel log transport implementation; existing device reports contain the E5UL/E5FB checkpoints."
 
 [[area.evidence]]
 kind = "source"
+revision = "9ddd546"
 reference = "docs/e5tw-host-validation.md"
 result = "PASS: all 81 ordered patches; five exact pre-tee blob hashes; 24 writer/reader cases plus boundary and invalid-header checks; ARM64 byte stores; two rejected regression controls; EDK2 reader build exit 0. CI compilation and board validation are pending."
 
