@@ -42,10 +42,6 @@ class NativeSd : public IOBlockStorageDevice {
   // v15: softVerify makes read failures recoverable (chain experiments fall
   // back instead of tearing the driver down); multiOk gates the CMD18 path.
   bool softVerify = false, multiOk = false;
-  // v20: on the OS-image card the published media is sized to the GPT
-  // (altLBA+1) so the header describes the media exactly, as it did when
-  // macOS attached os-window.img as a disk of precisely image size.
-  uint32_t mediaSectors = 0;
   const char *mode = "none";
   uint32_t calls = 0;
 
@@ -263,7 +259,7 @@ class NativeSd : public IOBlockStorageDevice {
     // LBA 0 is the GPT disk's zero block (no protective MBR), LBA 1 the
     // "EFI PART" header, 2048/2050 land inside the Apple_APFS container.
     const uint32_t lbas[] = {0, 1, 2048, 2050};
-    const uint32_t crcs[] = {0xec8ce612, 0x10fb5eed, 0xd2e6e0b2, 0xfba8aad8};
+    const uint32_t crcs[] = {0xec8ce612, 0x34f70098, 0xd2e6e0b2, 0xfba8aad8};
     for (unsigned i = 0; i < 4; i++) {
       if (!readSector(lbas[i])) return false;
       uint32_t crc = crc32(buffer);
@@ -608,18 +604,15 @@ class NativeSd : public IOBlockStorageDevice {
             uint32_t entries = (uint32_t)buffer[80] | ((uint32_t)buffer[81] << 8) |
                                ((uint32_t)buffer[82] << 16) | ((uint32_t)buffer[83] << 24);
             sdlog("NativeSd: gpt ok entries %u\n", entries);
-            // GPT backup header lives at the media's last block; publishing
-            // the media at exactly altLBA+1 makes the header self-consistent
-            // with the media (a container-of-14GiB card with a 5.66GiB GPT
-            // is structurally ambiguous for the kernel's scheme).
+            // v21: card GPT patched to mirror the kernel-ACCEPTED eMMC
+            // window GPT (entry0 last=altLba-40, name "disk image"); the
+            // altLba is only logged now — full-card publishing is restored
+            // (the proven eMMC case has media larger than its GPT).
             uint64_t altLba = (uint64_t)buffer[32] | ((uint64_t)buffer[33] << 8) |
                 ((uint64_t)buffer[34] << 16) | ((uint64_t)buffer[35] << 24) |
                 ((uint64_t)buffer[36] << 32) | ((uint64_t)buffer[37] << 40);
-            if (altLba > 2050 && altLba + 1 < sectors) {
-              mediaSectors = (uint32_t)altLba + 1;
-              sdlog("NativeSd: gpt media %u sectors (altLba %llu card %u)\n",
-                    mediaSectors, (unsigned long long)altLba, sectors);
-            }
+            sdlog("NativeSd: gpt altLba %llu card %u\n",
+                  (unsigned long long)altLba, sectors);
             // v18: replicate the kernel scheme's entries read (16-sector
             // chunks at LBA 2/18) and cross-check with 8-sector proven-path
             // reads. Golden from os-window.img: chunk CRCs 3a740ceb/d8f49994,
@@ -722,7 +715,7 @@ public:
           (unsigned long long)sectors, mode);
     if (!cardUp) return false;
     sdlog("NativeSd: publishing read-only SD card %llu sectors\n",
-          (unsigned long long)(mediaSectors ? mediaSectors : sectors));
+          (unsigned long long)sectors);
     registerService(); return true;
   }
   void stop(IOService *provider) override {
@@ -755,13 +748,11 @@ public:
   IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
   UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
   IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
-  IOReturn reportMaxValidBlock(UInt64 *n) override {
-    uint32_t ms = mediaSectors ? mediaSectors : sectors;
-    *n = ms ? ms - 1 : 0;
-    return kIOReturnSuccess;
-  }
-  IOReturn reportEjectability(bool *b) override { *b = true; return kIOReturnSuccess; }
-  IOReturn reportRemovability(bool *b) override { *b = true; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *n) override { *n = sectors ? sectors - 1 : 0; return kIOReturnSuccess; }
+  // v21: non-removable media, matching the kernel-accepted NativeEmmc
+  // media properties (removable/ejectable media change the IOKit paths).
+  IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
   IOReturn reportMediaState(bool *p, bool *c) override { *p = cardUp; if (c) *c = false; return kIOReturnSuccess; }
   IOReturn reportWriteProtection(bool *b) override { *b = true; return kIOReturnSuccess; }
   IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
@@ -772,8 +763,7 @@ public:
       IOStorageAttributes *, IOStorageCompletion *completion) override {
     if (!data || !completion || !completion->action || !count) return kIOReturnBadArgument;
     if (data->getDirection() != kIODirectionIn) return kIOReturnNotWritable;
-    uint32_t ms = mediaSectors ? mediaSectors : sectors;
-    if (!lock || block >= ms || count > ms - block || data->getLength() < count * 512)
+    if (!lock || block >= sectors || count > sectors - block || data->getLength() < count * 512)
       return kIOReturnBadArgument;
     UInt64 done = 0; IOLockLock(lock);
     if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
