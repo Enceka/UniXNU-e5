@@ -63,32 +63,30 @@
  	console_write_unbuffered(c);
  
  	debug_putc(c);
---- ser/osfmk/kern/debug.c	2026-10-31 14:16:05
-+++ serb/osfmk/kern/debug.c	2026-10-31 14:16:24
-@@ -497,6 +497,44 @@
+--- ser/osfmk/kern/debug.c	2026-10-31 14:20:22
++++ serb/osfmk/kern/debug.c	2026-10-31 14:20:36
+@@ -498,6 +498,42 @@
  	debug_buf_base = (char *)gPanicBase + sizeof(struct embedded_panic_header);
  	debug_buf_ptr = debug_buf_base;
  	debug_buf_size = gPanicSize - sizeof(struct embedded_panic_header);
 +
 +	/*
-+	 * E5: dump the previous boot's console flight ring from PRAM, then
-+	 * arm this boot's recorder (see the writer in osfmk/kern/printf.c).
-+	 * The ring lives outside the panic-pram window at 0x9F000000 that
-+	 * the debug ring below reuses every boot.
++	 * E5 console flight recorder (see e5-console-flight.patch): dump the
++	 * previous boot's ring tail from PRAM, consume it, then arm this boot.
 +	 */
 +	{
 +		extern int e5flight_armed;
 +		vm_offset_t e5fb = ml_io_map_wcomb(0x9F020000ULL, 0x4020ULL);
 +		if (e5fb) {
 +			volatile uint32_t * e5fh = (volatile uint32_t *)e5fb;
-+			if (e5fh[0] == 0x4C463545u && e5fh[1] > 0) {    /* "E5FL" */
++			if (e5fh[0] == 0x4C463545u && e5fh[1] > 0) {
 +				uint32_t e5total = e5fh[1];
 +				uint32_t e5len = e5total > 768u ? 768u : e5total;
 +				uint32_t e5start = (e5total - e5len) & 0x3FFFu;
 +				volatile unsigned char * e5ring = (volatile unsigned char *)e5fb + 0x20;
 +				char e5line[65];
 +				uint32_t e5fill = 0, e5seen = 0;
-+				printf("E5-FLIGHT-PREV: total %u bytes, tail %u:\n", e5total, e5len);
++				printf("E5-FLIGHT-PREV: total %u bytes, tail %u\n", e5total, e5len);
 +				while (e5seen < e5len) {
 +					unsigned char e5ch = e5ring[(e5start + e5seen++) & 0x3FFFu];
 +					e5line[e5fill++] = (e5ch >= 0x20 && e5ch < 0x7F) ? e5ch : '.';
@@ -103,10 +101,10 @@
 +					printf("E5-FLIGHT-PREV: %s\n", e5line);
 +				}
 +			}
-+			e5fh[0] = 0;    /* consume: a later reboot must not re-dump */
++			e5fh[0] = 0;
 +		}
 +		e5flight_armed = 1;
 +	}
  
  #if CONFIG_EXT_PANICLOG
- 	ext_paniclog_init();
+ 	{ extern void e5_trace_tag(const char*); e5_trace_tag("E5DL2\n"); }
