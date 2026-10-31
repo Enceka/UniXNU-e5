@@ -72,7 +72,7 @@ def check(image, expected_uuid, expected_size):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('image', type=Path, help='complete 32 MiB raw Data window or readback')
+    parser.add_argument('image', type=Path, help='complete raw Data window or readback matching the header size')
     parser.add_argument('--window-header', type=Path, default=Path(__file__).with_name('SystemOSWindow.h'))
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()

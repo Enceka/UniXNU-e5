@@ -7,9 +7,9 @@ namespace {
 int dataWindowChecks() {
   using namespace E5Data;
   // The Data window begins exactly where the SystemOS window ends and holds
-  // a 32 MiB container; the card has 30244864 sectors total.
+  // a 128 MiB container; the card has 30244864 sectors total.
   if (base != E5SystemOS::base + E5SystemOS::sectors) return 11;
-  if (sectors * 512 != 33554432ULL) return 12;
+  if (sectors * 512 != 134217728ULL) return 12;
   if (!fits(30244864) || fits(base + sectors - 1)) return 13;
   if (!contains(0, sectors) || contains(sectors, 1)) return 14;
   return 0;

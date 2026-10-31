@@ -21,6 +21,8 @@ static void sdlog(const char *fmt, ...) {
 
 /* kern_exec.c stash: -999 unreached, -1 absent, -2 copyout, -3 in mount, >=0 errno, 100 ok. */
 extern "C" int e5_data_mount_state;
+extern "C" int e5_tzinit_wait_status;
+extern "C" int e5_tzinit_pid;
 
 // Repeat publication and UUID-lookup checkpoints in sampled late reads:
 // launchd's EROFS output can overwrite the entire early console ring.
@@ -739,8 +741,8 @@ class NativeSd : public IOBlockStorageDevice {
   }
 
 public:
-  // Load the 32 MiB Data container image from the card into a caller buffer,
-  // 16 sectors per multi-block read (the DMA page limit). ~3.3 s at the
+  // Load the Data container image from the card into a caller buffer,
+  // 16 sectors per multi-block read (the DMA page limit). ~13 s at the
   // proven 24 MHz 4-bit throughput; runs once, before the device publishes.
   bool fillDataImage(char *destination) {
     for (uint64_t off = 0; off < E5Data::sectors; off += 16) {
@@ -904,13 +906,16 @@ public:
     // per-read lines (470+) flooded the 32 KB ramoops ring and erased the
     // boot's own history. Keep the first few plus every 128th, with the
     // running count so progress stays measurable.
-    if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0))
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d p=%s x=%08x q=%s\n",
+    if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0)) {
+      int tzstatus = __atomic_load_n(&e5_tzinit_wait_status, __ATOMIC_ACQUIRE);
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d p=%s x=%08x q=%s t=%d:%x\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&dataPublication, __ATOMIC_ACQUIRE),
             __atomic_load_n(&dataDetail, __ATOMIC_RELAXED),
-            __atomic_load_n(&dataLookup, __ATOMIC_RELAXED));
+            __atomic_load_n(&dataLookup, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_tzinit_pid, __ATOMIC_RELAXED), (unsigned)tzstatus);
+    }
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
         done == count * 512 ? kIOReturnSuccess : kIOReturnIOError, done);
@@ -1001,7 +1006,7 @@ extern "C" int e5_systemos_device(char *path, size_t size, int *major, int *mino
   return ok ? 1 : 0;
 }
 
-// The system's one writable dataset: a 32 MiB APFS container copied from the
+// The system's one writable dataset: a 128 MiB APFS container copied from the
 // card into a RAM buffer and served read-write. The kernel startup patch
 // mounts the volume at /private/var before launchd starts (tzinit and the
 // data-protection boot tasks need a writable dataset; the OS volume is

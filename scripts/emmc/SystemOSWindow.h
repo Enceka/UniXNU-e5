@@ -19,12 +19,12 @@ inline bool fits(uint64_t cardSectors) {
 }
 
 namespace E5Data {
-// A writable RAM-backed copy of a 32 MiB APFS container image holding the
+// A writable RAM-backed copy of a 128 MiB APFS container image holding the
 // Data-role volume, read from the card right after the SystemOS window and
 // published as read-write media. The kernel startup patch mounts it at
 // /private/var so tzinit and later boot tasks find a writable dataset.
 static constexpr uint64_t base = 19034112; // in 512-byte sectors.
-static constexpr uint64_t sectors = 65536; // 32 MiB.
+static constexpr uint64_t sectors = 262144; // 128 MiB; round 62 exhausted 32 MiB.
 // Verified against the installed container's checksummed APSB objects and
 // diskutil's read-only attachment. The earlier B5A22774 UUID was stale.
 static constexpr const char *uuid = "30ADC749-351F-4FFF-998A-20E1B683859F";

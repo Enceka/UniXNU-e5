@@ -1,0 +1,72 @@
+diff --git a/bsd/kern/kern_exec.c b/bsd/kern/kern_exec.c
+index 0ec2111..cde8d4d 100644
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -8249,11 +8249,26 @@ e5_systemos_prepare(proc_t p, user_addr_t scratch)
+ 				if (!derror) {
+ 					vnode_t droot = NULLVP;
+ 					if (!vnode_lookup("/private/var", 0, &droot, ctx)) {
++						struct vnode_attr owner;
++						VATTR_INIT(&owner);
++						VATTR_SET(&owner, va_uid, 0);
++						VATTR_SET(&owner, va_gid, 0);
++						VATTR_SET(&owner, va_mode, 0755);
++						int owner_error = vnode_setattr(droot, &owner, ctx);
++						if (!owner_error) {
++							VATTR_INIT(&owner);
++							VATTR_WANTED(&owner, va_uid);
++							VATTR_WANTED(&owner, va_gid);
++							owner_error = vnode_getattr(droot, &owner, ctx);
++							if (!owner_error && (owner.va_uid != 0 || owner.va_gid != 0))
++								owner_error = EINVAL;
++						}
++						printf("E5SystemOS: data root owner 0:0 result %d\n", owner_error);
+ 						printf("E5SystemOS: data mounted flags %llx fstype %s\n",
+ 						    (unsigned long long)vfs_flags(vnode_mount(droot)),
+ 						    vfs_statfs(vnode_mount(droot))->f_fstypename);
+ 						vnode_put(droot);
+-						e5_data_mount_state = 100;
++						e5_data_mount_state = owner_error ? owner_error : 100;
+ 					}
+ 				}
+ 			}
+diff --git a/bsd/kern/kern_exit.c b/bsd/kern/kern_exit.c
+index 760c339..8755328 100644
+--- a/bsd/kern/kern_exit.c
++++ b/bsd/kern/kern_exit.c
+@@ -1478,6 +1478,24 @@ exit(proc_t p, struct exit_args *uap, int *retval)
+  * to zombie, and unlink proc from allproc and parent's lists.  Save exit
+  * status and rusage for wait().  Check for child processes and orphan them.
+  */
++#if DEVELOPMENT || DEBUG
++/* Retain the committed wait status after console traffic wraps the boot log. */
++int e5_tzinit_wait_status = -1;
++int e5_tzinit_pid = -1;
++
++static void
++e5_record_boot_exit(proc_t p, int rv)
++{
++	if (PE_parse_boot_argn("e5-systemos-boot", NULL, 0) &&
++	    strcmp(p->p_comm, "tzinit") == 0) {
++		__atomic_store_n(&e5_tzinit_pid, proc_getpid(p), __ATOMIC_RELAXED);
++		__atomic_store_n(&e5_tzinit_wait_status, rv, __ATOMIC_RELEASE);
++		printf("E5BootTask: tzinit pid %d wait 0x%x exit %d signal %d\n",
++		    proc_getpid(p), rv, WEXITSTATUS(rv), WTERMSIG(rv));
++	}
++}
++#endif
++
+ int
+ exit1(proc_t p, int rv, int *retval)
+ {
+@@ -1613,6 +1631,10 @@ exit_with_reason(proc_t p, int rv, int *retval, boolean_t thread_can_terminate,
+ 	proc_transend(p, 1);
+ 	proc_unlock(p);
+ 
++#if DEVELOPMENT || DEBUG
++	/* This thread has committed P_LEXIT and p_xstat above. */
++	e5_record_boot_exit(p, rv);
++#endif
+ 	proc_prepareexit(p, rv, perf_notify);
+ 
+ 	/* Last thread to terminate will call proc_exit() */
