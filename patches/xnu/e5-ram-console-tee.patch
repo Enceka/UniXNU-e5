@@ -41,10 +41,10 @@ index 7187c15..cc4f62c 100644
  	if (debug_boot_arg) {
  		patch_low_glo();
 diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
-index 715c545..aba4a0a 100644
+index 715c545..b4c692e 100644
 --- a/osfmk/console/serial_console.c
 +++ b/osfmk/console/serial_console.c
-@@ -249,9 +249,120 @@ get_cons_ops_index(void)
+@@ -249,9 +249,142 @@ get_cons_ops_index(void)
   * @param poll Whether or not this call should poll instead of going to sleep
   *             waiting for an interrupt when the hardware device isn't ready
   */
@@ -92,22 +92,22 @@ index 715c545..aba4a0a 100644
 +void
 +e5_kputc(char c)
 +{
-+volatile char *base;
++volatile unsigned char *base;
 +volatile char *p;
 +
 +if (c == '\n') {
 +e5_kputc('\r');
 +}
 +if ((e5_prz_phase == 1) && (e5_prz_win != NULL)) {
-+base = (volatile char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF);
++base = (volatile unsigned char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF);
 +} else {
 +/*
 + * Bootstrap V=P identity mapping (VA == PA) installed by start.s
 + * covers the persistent zone until arm_vm_init() replaces the tables.
 + */
-+base = (volatile char *)(E5_PRZ_PA + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF);
++base = (volatile unsigned char *)(E5_PRZ_PA + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF);
 +}
-+p = base + E5_PRZ_HDR_SIZE + e5_prz_pos;
++p = (volatile char *)(base + E5_PRZ_HDR_SIZE + e5_prz_pos);
 +*p = c;
 +if (e5_prz_phase == 0) {
 +__asm__ volatile ("dc cvac, %0" :: "r" ((void *) p) : "memory");
@@ -115,20 +115,24 @@ index 715c545..aba4a0a 100644
 +if (++e5_prz_pos >= E5_PRZ_RING_SIZE) {
 +e5_prz_pos = 0;
 +}
-+/*
-+ * Track the ring position in the window header so the BootShim rescue
-+ * can locate the most recent console bytes (death/panic text) after a
-+ * watchdog reset, without any kernel state surviving.
++/* Publish each byte before its next-write position, including a short panic
++ * after the last 64-byte boundary. The window starts at PA 0xFFF81F1B;
++ * uint32_t accesses here would fault on the phase-1 Device mapping.
++ * Header ABI: "E5TW", then a little-endian u32 position; ring at +8.
 + */
-+if ((e5_prz_pos & 63UL) == 0) {
-+volatile unsigned int *h = (volatile unsigned int *)base;
-+h[0] = 0x57453545u; /* "E5TW" */
-+h[1] = (unsigned int)e5_prz_pos;
++__asm__ volatile ("dsb sy" ::: "memory");
++base[4] = (unsigned char)e5_prz_pos;
++base[5] = (unsigned char)(e5_prz_pos >> 8);
++base[6] = (unsigned char)(e5_prz_pos >> 16);
++base[7] = (unsigned char)(e5_prz_pos >> 24);
++base[0] = 'E';
++base[1] = '5';
++base[2] = 'T';
++base[3] = 'W';
 +if (e5_prz_phase == 0) {
-+__asm__ volatile ("dc cvac, %0" :: "r" ((void *) &h[0]) : "memory");
-+__asm__ volatile ("dc cvac, %0" :: "r" ((void *) &h[1]) : "memory");
++__asm__ volatile ("dc cvac, %0" :: "r" ((void *)base) : "memory");
 +}
-+}
++__asm__ volatile ("dsb sy" ::: "memory");
 +}
 +
 +static void

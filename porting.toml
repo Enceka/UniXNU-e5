@@ -398,7 +398,7 @@ paths = ["patches/**", "tools/**", "payload/**"]
 inputs = ["kernel.macho from CI, hardware.dtb, ADT with root volume UUID, packed APFS seed ramdisk, trust cache (cdhash list), E5BootMenu, DarwinBoot, UniXNU.efi and startup.nsh on a 56 MiB FAT payload."]
 configuration = ["make-e5-payload.py assembles the payload FAT; mk-boot-payload.py wraps BootShim plus SILICIUM_UEFI.fd plus payload into the 62,926,860-byte boot image flashed to boot_b at LBA 8.", "The trust cache must be rebuilt whenever any seed binary is rebuilt (ad-hoc cdhashes change every build).", "The ADT root volume UUID and board.toml root_match_volume_uuid must track the APFS seed container UUID."]
 procedure = ["Build seed binaries with the iphoneos SDK, ad-hoc codesign, collect cdhashes with codesign -dvvv, build the trust cache, pack the seed, assemble the payload, wrap the boot image and flash."]
-findings = ["Payload FAT layout and boot image size are stable across rounds; the packed ramdisk size varies with the seed contents and shifts the staging window without breaking boot.", "A stale trust cache produces an AMFI unsuitable-CT-policy panic for PID 1; rebuilding the cache fixed it (flash 7 to 8).", "Flashes #55-#57 preserve kernel/ADT/EFI/configuration file hashes while replacing the trust cache for the actual signed eMMC-root binaries. Root and boot payload are fully read back before reboot; the static-tool entry correction changes ls/cat signatures and requires rebuilding both numeric aliases and the cache. #58 preserves every file except the kernel and matches the earlier kernel-only repacker byte-for-byte. #59 replaces only the ADT memory property, validated over the entire sidecar. Original-system input assembly and independent full-image/window verification are implemented in e5-xnu/tools/e5-system-root.py."]
+findings = ["Payload FAT layout and boot image size are stable across rounds; the packed ramdisk size varies with the seed contents and shifts the staging window without breaking boot.", "A stale trust cache produces an AMFI unsuitable-CT-policy panic for PID 1; rebuilding the cache fixed it (flash 7 to 8).", "Flashes #55-#57 preserve kernel/ADT/EFI/configuration file hashes while replacing the trust cache for the actual signed eMMC-root binaries. Root and boot payload are fully read back before reboot; the static-tool entry correction changes ls/cat signatures and requires rebuilding both numeric aliases and the cache. #58 preserves every file except the kernel and matches the earlier kernel-only repacker byte-for-byte. #59 replaces only the ADT memory property, validated over the entire sidecar. Original-system input assembly and independent full-image/window verification are implemented in e5-xnu/tools/e5-system-root.py.", "The E5TW repair reproduces CI 305 from UniXNU 066c8d8315f83749d28bcae2faf3595718646be5 plus the pinned arch/SoC/OS series: all five incoming tee blob hashes match, and all 81 patches apply without recount or fuzz. Patches are exported from staged source with git diff. This is host validation; the repaired kernel still needs CI compilation and a board run."]
 completion = ["Kernel and prelink succeed, payload contains all declared inputs, and the boot image matches the bootloader format and size limit."]
 limits = ["The boot image is built on the host and flashed from Android; no on-device packaging yet."]
 next_action = ["Automate the seed-to-payload chain into one script with a single UUID hand-off to reduce manual ADT patching."]
@@ -408,6 +408,11 @@ kind = "source"
 reference = "patches/xnu/series"
 result = "Device patch series order: e5-ram-console-tee through e5-emmc-personality, e5-fbconsole, e5-keys (validated content)."
 
+[[area.evidence]]
+kind = "source"
+reference = "docs/e5tw-host-validation.md"
+result = "PASS: all 81 ordered patches; five exact pre-tee blob hashes; 24 writer/reader cases plus boundary and invalid-header checks; ARM64 byte stores; two rejected regression controls; EDK2 reader build exit 0. CI compilation and board validation are pending."
+
 [[area]]
 id = "diagnostics"
 status = "implemented"
@@ -416,7 +421,7 @@ paths = ["tools/userspace/**", "patches/xnu/e5-ram-console-tee.patch", "patches/
 inputs = ["Persistent pstore ramoops zones (dmesg-ramoops-0..5, console-ramoops-0) surviving the watchdog reboot into Android; e5-uplink fd 229 write mirror; E5FB rendered-text mirror; E5KINIT register read-back."]
 configuration = ["tools/e5-uefi-cycle.sh collect pulls the pstore zones into dumps/uefi-report-HHMMSS.txt after each flash cycle.", "The E5UL uplink lines are written from the seed shell through the kernel write hook with the E5UL prefix and reach the persistent ring."]
 procedure = ["Flash, wait for the watchdog reboot into Android, then collect and grep the report for the E5 markers."]
-findings = ["dmesg-ramoops-0 is a circular ring holding multiple boots; per-build markers (INIT-START-vN) are required to separate fresh output from residue.", "Kernel printf stays buffered without timer interrupts; the e5_panic_print tee path is what reliably reaches pstore.", "Raw wait status matters: #55/#56 print EXIT 0 for a child killed by SIGBUS, but EXITH is 0x0a. Cat startup traces locate the failure before C entry; #57 aligns the C stack while preserving the original argc/argv pointer and all five commands exit 0. Read errors in cat now return exit 67 instead of silently reporting success."]
+findings = ["dmesg-ramoops-0 is a circular ring holding multiple boots; per-build markers (INIT-START-vN) are required to separate fresh output from residue.", "Kernel printf stays buffered without timer interrupts; the e5_panic_print tee path is what reliably reaches pstore.", "Raw wait status matters: #55/#56 print EXIT 0 for a child killed by SIGBUS, but EXITH is 0x0a. Cat startup traces locate the failure before C entry; #57 aligns the C stack while preserving the original argc/argv pointer and all five commands exit 0. Read errors in cat now return exit 67 instead of silently reporting success.", "The E5TW tee header at unaligned PA 0xFFF81F1B uses volatile byte stores and publishes the next-write position for every character. Its literal magic is 0x57543545, matched by the UEFI reader. Actual writer/reader tests retain the last 4 KiB across multiple ring wraps and short final panic text; ARM64 instruction checks reject unaligned word stores. The EDK2 reader module builds; hardware panic capture remains pending."]
 completion = ["Each claimed milestone has a reproducible command, a matching source or image revision and an accessible result."]
 limits = ["Reports concatenate several boots; ring rotation can wipe early markers during log floods."]
 next_action = ["Add a boot-counter prefix to every uplink tag so multi-boot residue is unambiguous."]
@@ -425,3 +430,8 @@ next_action = ["Add a boot-counter prefix to every uplink tag so multi-boot resi
 kind = "source"
 reference = "patches/xnu/e5-ram-console-tee.patch"
 result = "Persistent kernel log transport implementation; existing device reports contain the E5UL/E5FB checkpoints."
+
+[[area.evidence]]
+kind = "source"
+reference = "docs/e5tw-host-validation.md"
+result = "PASS: all 81 ordered patches; five exact pre-tee blob hashes; 24 writer/reader cases plus boundary and invalid-header checks; ARM64 byte stores; two rejected regression controls; EDK2 reader build exit 0. CI compilation and board validation are pending."
