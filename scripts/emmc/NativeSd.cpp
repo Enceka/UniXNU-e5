@@ -604,6 +604,37 @@ class NativeSd : public IOBlockStorageDevice {
             uint32_t entries = (uint32_t)buffer[80] | ((uint32_t)buffer[81] << 8) |
                                ((uint32_t)buffer[82] << 16) | ((uint32_t)buffer[83] << 24);
             sdlog("NativeSd: gpt ok entries %u\n", entries);
+            // v18: replicate the kernel scheme's entries read (16-sector
+            // chunks at LBA 2/18) and cross-check with 8-sector proven-path
+            // reads. Golden from os-window.img: chunk CRCs 3a740ceb/d8f49994,
+            // quarter CRCs 0c87a44e + c71c0011 x3, p0 type 7c3457ef first 34
+            // count 11870208. Tells corrupt-16-chunk apart from a scheme
+            // rejection that is not data.
+            {
+              bool e0 = readSectors(2, 16);
+              uint32_t c0 = e0 ? crc32n(buffer, 8192) : 0;
+              uint32_t t0 = (uint32_t)buffer[0] | ((uint32_t)buffer[1] << 8) |
+                            ((uint32_t)buffer[2] << 16) | ((uint32_t)buffer[3] << 24);
+              uint32_t f0 = (uint32_t)buffer[32] | ((uint32_t)buffer[33] << 8) |
+                            ((uint32_t)buffer[34] << 16) | ((uint32_t)buffer[35] << 24);
+              uint32_t n0 = ((uint32_t)buffer[40] | ((uint32_t)buffer[41] << 8) |
+                             ((uint32_t)buffer[42] << 16) | ((uint32_t)buffer[43] << 24)) - f0 + 1;
+              bool e1 = readSectors(18, 16);
+              uint32_t c1 = e1 ? crc32n(buffer, 8192) : 0;
+              sdlog("NativeSd: gpt ent16 h0 %c crc %08x h1 %c crc %08x "
+                    "p0 type %08x first %u count %u\n",
+                    e0 ? 'y' : 'n', c0, e1 ? 'y' : 'n', c1, t0, f0, n0);
+              uint32_t qs[4] = {0, 0, 0, 0};
+              char qf[5] = "nnnn";
+              for (uint32_t q = 0; q < 4; q++) {
+                if (readSectors(2 + q * 8, 8)) {
+                  qs[q] = crc32n(buffer, 4096);
+                  qf[q] = 'y';
+                }
+              }
+              sdlog("NativeSd: gpt ent8 %c%c%c%c crc %08x %08x %08x %08x\n",
+                    qf[0], qf[1], qf[2], qf[3], qs[0], qs[1], qs[2], qs[3]);
+            }
           } else {
             sdlog("NativeSd: gpt absent\n");
           }
@@ -728,7 +759,9 @@ public:
     while (done < count * 512) {
       uint32_t left = (uint32_t)((count * 512 - done) / 512);
       uint32_t n = 1;
-      if (multiOk && left >= 4) n = left > 16 ? 16 : left;
+      // v18: serve kernel reads in 8-sector chunks — the size proven golden
+      // by the ext4 walk (16-sector chunks stay available for diagnostics).
+      if (multiOk && left >= 4) n = left > 8 ? 8 : left;
       bool ok;
       if (n > 1) {
         ok = readSectors((uint32_t)(block + done / 512), n) &&
