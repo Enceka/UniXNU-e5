@@ -833,6 +833,12 @@ public:
     }
     if (wbShort) sdlog("NativeSd: rw wb short %llu at %llu\n", (unsigned long long)wbShort, (unsigned long long)block);
     if (done != count * 512) sdlog("NativeSd: rw incomplete %llu/%llu blocks at %llu\n", (unsigned long long)(done / 512), (unsigned long long)count, (unsigned long long)block);
+    // v22: large-read completion trace — round 29's console ended exactly at a
+    // 2048-block dyld cache read with no further output; this line decides
+    // whether such reads finish inside the driver or the stall is above us.
+    if (count >= 8)
+      sdlog("NativeSd: rw done %llu/%llu at %llu\n", (unsigned long long)(done / 512),
+            (unsigned long long)count, (unsigned long long)block);
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
         done == count * 512 ? kIOReturnSuccess : kIOReturnIOError, done);

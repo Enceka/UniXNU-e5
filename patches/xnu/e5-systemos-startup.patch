@@ -97,7 +97,23 @@
  	int cache_error = native_owner_cache_prepare(p, (user_addr_t)scratch_addr, &init_envp);
 --- a/bsd/vm/vm_unix.c
 +++ b/bsd/vm/vm_unix.c
-@@ -3077,6 +3077,13 @@
+@@ -2721,6 +2721,15 @@
+ 	struct vnode                    *rdir_vp = NULL;
+ 	struct vm_shared_region         *shared_region = NULL;
+ 
++#if DEVELOPMENT || DEBUG
++	/* Round 29: console stopped during pid 1's first cache mapping read; log
++	 * entry so the next round separates syscall entry from the setup, map_file
++	 * and return stages when the stall recurs. */
++	if (proc_getpid(p) == 1 && PE_parse_boot_argn("e5-systemos-boot", NULL, 0)) {
++		printf("E5SystemOS: dyld map enter files %u mappings %u\n", files_count, mappings_count);
++	}
++#endif
++
+ 	/*
+ 	 * Get a reference to the current proc's root dir.
+ 	 * Need this to prevent racing with chroot.
+@@ -3004,6 +3013,13 @@
  
  	kr = _shared_region_map_and_slide(p, files_count, shared_files, mappings_count, mappings);
  done:
@@ -111,7 +127,7 @@
  	kfree_data(shared_files, files_count * sizeof(shared_files[0]));
  	kfree_data(mappings, mappings_count * sizeof(mappings[0]));
  	return kr;
-@@ -4285,4 +4292,3 @@
+@@ -4212,4 +4228,3 @@
  extern int fbdp_no_panic;
  SYSCTL_INT(_vm, OID_AUTO, fbdp_no_panic, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_ANYBODY, &fbdp_no_panic, 0, "");
  #endif /* MACH_ASSERT */
