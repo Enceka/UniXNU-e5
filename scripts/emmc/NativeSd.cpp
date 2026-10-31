@@ -757,8 +757,9 @@ public:
     if (PE_parse_boot_argn("e5-systemos-boot", nullptr, 0)) {
       // Nothing in XNU pets the UMP9620 watchdog, so system bring-up dies at
       // its (short) wall mid-launchd with no panic. Extend the window to
-      // 600 s via the PMIC ADI (sprd_wdt.c register map, WDT base 0x40) so
-      // the boot can outlive it and still self-recover if it hangs.
+      // 1800 s via the PMIC ADI (sprd_wdt.c register map, WDT base 0x40) so
+      // the boot can outlive it and still self-recover if it hangs. Round 33 ran
+      // the full 600 s with launchd mid-boot-tasks; more window, more system.
       uint32_t ctrl = pmicRead(0x48), cntHi = pmicRead(0x5c), cntLo = pmicRead(0x58);
       sdlog("NativeSd: wdt ctrl %04x cnt %04x%04x\n", ctrl, cntHi, cntLo);
       if (ctrl & 0x0002u) { // CNT_EN: the watchdog is counting.
@@ -769,12 +770,12 @@ public:
         }
         if (i < 2000) {
           pmicWrite(0x60, 0xe551); // LOCK: unlock key.
-          pmicWrite(0x44, 0x012c); // LOAD_HIGH = 600*32768 >> 16.
+          pmicWrite(0x44, 0x0384); // LOAD_HIGH = 1800*32768 >> 16.
           pmicWrite(0x40, 0x0000); // LOAD_LOW.
           pmicWrite(0x70, 0x0000); // IRQ_LOAD_HIGH (pretimeout off).
           pmicWrite(0x6c, 0x0000); // IRQ_LOAD_LOW.
           pmicWrite(0x60, 0x0000); // LOCK: locked.
-          sdlog("NativeSd: wdt extended 600s ctrl %04x\n", pmicRead(0x48));
+          sdlog("NativeSd: wdt extended 1800s ctrl %04x\n", pmicRead(0x48));
         } else sdlog("NativeSd: wdt load busy\n");
       } else sdlog("NativeSd: wdt not counting\n");
     }
