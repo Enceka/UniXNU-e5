@@ -19,6 +19,9 @@ static void sdlog(const char *fmt, ...) {
   vsnprintf(text, sizeof(text), fmt, ap); va_end(ap); e5_panic_print(text);
 }
 
+/* kern_exec.c stash: -999 unreached, -1 absent, -2 copyout, -3 in mount, >=0 errno, 100 ok. */
+extern "C" int e5_data_mount_state;
+
 class NativeSd;
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
@@ -1104,6 +1107,3 @@ extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
   return ok ? 1 : 0;
 }
 
-
-/* kern_exec.c stash: -999 unreached, -1 absent, -2 copyout, -3 in mount, >=0 errno, 100 ok. */
-extern "C" int e5_data_mount_state;
