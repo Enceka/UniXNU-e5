@@ -755,7 +755,8 @@ public:
       return kIOReturnBadArgument;
     UInt64 done = 0; IOLockLock(lock);
     if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
-    if (calls++ < 3) sdlog("NativeSd: rw %llu blocks at %llu\n", (unsigned long long)count, (unsigned long long)block);
+    if (calls++ <= 12 || count > 4) sdlog("NativeSd: rw %llu blocks at %llu\n", (unsigned long long)count, (unsigned long long)block);
+    UInt64 wbShort = 0;
     while (done < count * 512) {
       uint32_t left = (uint32_t)((count * 512 - done) / 512);
       uint32_t n = 1;
@@ -764,15 +765,17 @@ public:
       if (multiOk && left >= 4) n = left > 8 ? 8 : left;
       bool ok;
       if (n > 1) {
-        ok = readSectors((uint32_t)(block + done / 512), n) &&
-             data->writeBytes(done, buffer, n * 512) == n * 512;
+        ok = readSectors((uint32_t)(block + done / 512), n);
+        if (ok && data->writeBytes(done, buffer, n * 512) != n * 512) { wbShort = done; ok = false; }
       } else {
-        ok = readSector((uint32_t)(block + done / 512)) &&
-             data->writeBytes(done, buffer, 512) == 512;
+        ok = readSector((uint32_t)(block + done / 512));
+        if (ok && data->writeBytes(done, buffer, 512) != 512) { wbShort = done; ok = false; }
       }
       if (!ok) break;
       done += n * 512;
     }
+    if (wbShort) sdlog("NativeSd: rw wb short %llu at %llu\n", (unsigned long long)wbShort, (unsigned long long)block);
+    if (done != count * 512) sdlog("NativeSd: rw incomplete %llu/%llu blocks at %llu\n", (unsigned long long)(done / 512), (unsigned long long)count, (unsigned long long)block);
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
         done == count * 512 ? kIOReturnSuccess : kIOReturnIOError, done);
