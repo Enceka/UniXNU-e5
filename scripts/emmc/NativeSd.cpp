@@ -769,7 +769,7 @@ public:
         }
         if (i < 2000) {
           pmicWrite(0x60, 0xe551); // LOCK: unlock key.
-          pmicWrite(0x44, 0x0005); // LOAD_HIGH = 240*32768 >> 16.
+          pmicWrite(0x44, 0x0078); // LOAD_HIGH = 240*32768 >> 16 (0x780000>>16).
           pmicWrite(0x40, 0x0000); // LOAD_LOW.
           pmicWrite(0x70, 0x0000); // IRQ_LOAD_HIGH (pretimeout off).
           pmicWrite(0x6c, 0x0000); // IRQ_LOAD_LOW.
