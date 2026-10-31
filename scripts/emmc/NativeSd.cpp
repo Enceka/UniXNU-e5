@@ -598,7 +598,7 @@ class NativeSd : public IOBlockStorageDevice {
           } else if (memcmp(buffer, "EFI PART", 8) == 0) {
             uint32_t entries = (uint32_t)buffer[80] | ((uint32_t)buffer[81] << 8) |
                                ((uint32_t)buffer[82] << 16) | ((uint32_t)buffer[83] << 24);
-            // v22: validate the complete GPT, rather than calling the magic
+            // v22: validate both GPT checksums, rather than calling the magic
             // alone "gpt ok". The v21 card patch left a valid header whose
             // declared table CRC did not match the actual 16 KiB entries.
             // The original image was restored from its verified backup.
@@ -772,8 +772,8 @@ public:
   UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
   IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
   IOReturn reportMaxValidBlock(UInt64 *n) override { *n = sectors ? sectors - 1 : 0; return kIOReturnSuccess; }
-  // v21: non-removable media, matching the kernel-accepted NativeEmmc
-  // media properties (removable/ejectable media change the IOKit paths).
+  // Fixed boot card: iPadOS APFS filters ejectable/removable media before
+  // reading the partition. This bring-up driver does not support hot removal.
   IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
   IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
   IOReturn reportMediaState(bool *p, bool *c) override { *p = cardUp; if (c) *c = false; return kIOReturnSuccess; }
@@ -790,7 +790,11 @@ public:
       return kIOReturnBadArgument;
     UInt64 done = 0; IOLockLock(lock);
     if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
-    if (calls++ <= 12 || count > 4) sdlog("NativeSd: rw %llu blocks at %llu\n", (unsigned long long)count, (unsigned long long)block);
+    // Keep the GPT/first APFS requests, then sample progress. Logging every
+    // multi-block read overwrites the 32 KiB persistent ring during OS boot.
+    uint32_t call = ++calls;
+    if (call <= 12 || (call & (call - 1)) == 0)
+      sdlog("NativeSd: rw %llu blocks at %llu\n", (unsigned long long)count, (unsigned long long)block);
     UInt64 wbShort = 0;
     while (done < count * 512) {
       uint32_t left = (uint32_t)((count * 512 - done) / 512);

@@ -1,0 +1,10 @@
+{
+  "build_number": 286,
+  "public_run": 41158247423,
+  "device_revision": "e99d359",
+  "kernel_sha256": "410dbc2f8270c9886765876a25085ce027692f21057c90093c0c05bc3b05337c",
+  "public_run_deleted": true,
+  "private_relay_run": 41158941209,
+  "private_relay_result": "failure",
+  "artifacts_saved_locally": true
+}

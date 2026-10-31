@@ -1,0 +1,14 @@
+{
+  "kernel": "e5-kernel-artifact-285/kernel.macho",
+  "kernel_sha256": "76130c8ba37112b7012ae2f9a9c6cbd0d15dd4f51bc6ab90d7147d6bb519260c",
+  "apfs_probe": "0xfffffff0056825cc",
+  "filter_call": "0xfffffff005682684",
+  "filter_function": "0xfffffff00566be34",
+  "reject_branch": "0xfffffff005682688",
+  "ejectable_property": "0xfffffff0045bb662",
+  "removable_property": "0xfffffff0045bb66c",
+  "proof": "probe calls the filter before opening or reading media; absent bypasses, a true Ejectable or Removable property returns 1 and probe returns null",
+  "restored_gpt_report": "dumps/uefi-report-100622.txt",
+  "restored_gpt_accepted": true,
+  "apfs_mount_verified": false
+}

@@ -197,6 +197,23 @@ result = "v22 restores the original OS LBA1 golden CRC 10fb5eed. GPT acceptance 
 
 [[area.evidence]]
 kind = "device"
+reference = "docs/logs/uefi-report-100622.txt"
+revision = "ef0c4ce (kernel 283 with register-preserving GPT scanner trace)"
+result = "Round 25 after SD GPT restoration: full entries CRC fa7a560c matches, partition-used=1, corrupt=0, invalid=0 and instantiateMediaObject returns a non-null IOMedia. No reads at partition LBA 34 follow, and root wait still times out. Thus the original GPT was accepted; absence of APFS reads was insufficient evidence of GPT rejection."
+
+[[area.evidence]]
+kind = "source"
+reference = "docs/sd-os-root.md"
+result = "The actual prelinked AppleAPFSContainerScheme::probe calls a media filter before opening/reading: absent an earlier exception, Ejectable=true or Removable=true returns probe failure. NativeSd originally reported both true; NativeEmmc reports both false. v21's fixed-card properties address this filter but were masked by its invalid GPT edit. The actual eMMC recovery image is GPT-wrapped; earlier statements confusing it with the separate DBRDISK1 RAM seed are withdrawn."
+
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/uefi-report-102035.txt"
+revision = "e99d359 (source-built kernel 286)"
+result = "Round 26 executes the original SD-root /sbin/launchd far enough to print libignition hello from launchd.1. It then fails Preboot lookup with entitlement error 1 and reports missing /usr/lib/libSystem.B.dylib / no dyld cache; this is beyond the former root-wait panic. Unbounded multi-block request logging overwrote the probe/mount records, so the strict report checker cannot qualify this truncated report. Sampled request logging is prepared for the next acceptance round."
+
+[[area.evidence]]
+kind = "device"
 reference = "docs/logs/uefi-report-001448.txt"
 command = "PAYLOAD=<sd-v1>/e5-uefi.bin sh tools/e5-uefi-cycle.sh run; python3 tools/e5-sd-check.py <report> (e5-xnu repository)"
 revision = "ace8448e68ba2f1f4b4ae0393e18b7635703e39a"
