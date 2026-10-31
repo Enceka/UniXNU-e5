@@ -126,12 +126,7 @@ class NativeSd : public IOBlockStorageDevice {
     // Same polynomial over an arbitrary length; used for the ext4 directory
     // block whose golden reference (docs/logs/sd-ext4/rootdir.bin) is the
     // whole 4096-byte block, not its first sector.
-    uint32_t crc = 0xffffffffu;
-    for (uint32_t i = 0; i < bytes; i++) {
-      crc ^= p[i];
-      for (unsigned bit = 0; bit < 8; bit++) crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
-    }
-    return ~crc;
+    return ~E5Sd::crc32Update(0xffffffffu, p, bytes);
   }
   bool idle(uint32_t mask) {
     for (unsigned i = 0; i < 10000; i++) {
@@ -256,10 +251,10 @@ class NativeSd : public IOBlockStorageDevice {
     // LBA 0 (whole-card install, see docs/system-volume-audit.md). The
     // four reference sectors come from uefi/build/system-audit/userdata/
     // os-window.img (sha e5634d04..., byte-identical to what was dd'd):
-    // LBA 0 is the GPT disk's zero block (no protective MBR), LBA 1 the
+    // LBA 0 is the protective MBR, LBA 1 the
     // "EFI PART" header, 2048/2050 land inside the Apple_APFS container.
     const uint32_t lbas[] = {0, 1, 2048, 2050};
-    const uint32_t crcs[] = {0xec8ce612, 0x34f70098, 0xd2e6e0b2, 0xfba8aad8};
+    const uint32_t crcs[] = {0xec8ce612, 0x10fb5eed, 0xd2e6e0b2, 0xfba8aad8};
     for (unsigned i = 0; i < 4; i++) {
       if (!readSector(lbas[i])) return false;
       uint32_t crc = crc32(buffer);
@@ -599,20 +594,37 @@ class NativeSd : public IOBlockStorageDevice {
           // v17: OS-image card — whole-card GPT layout, no ext4 superblock.
           sdlog("NativeSd: ext4 absent (os image)\n");
           if (!readSector(1)) {
-            sdlog("NativeSd: gpt read fail\n");
+            sdlog("NativeSd: gpt read fail\n"); return false;
           } else if (memcmp(buffer, "EFI PART", 8) == 0) {
             uint32_t entries = (uint32_t)buffer[80] | ((uint32_t)buffer[81] << 8) |
                                ((uint32_t)buffer[82] << 16) | ((uint32_t)buffer[83] << 24);
-            sdlog("NativeSd: gpt ok entries %u\n", entries);
-            // v21: card GPT patched to mirror the kernel-ACCEPTED eMMC
-            // window GPT (entry0 last=altLba-40, name "disk image"); the
-            // altLba is only logged now — full-card publishing is restored
-            // (the proven eMMC case has media larger than its GPT).
+            // v22: validate the complete GPT, rather than calling the magic
+            // alone "gpt ok". The v21 card patch left a valid header whose
+            // declared table CRC did not match the actual 16 KiB entries.
+            // The original image was restored from its verified backup.
+            uint32_t entrySize = (uint32_t)buffer[84] | ((uint32_t)buffer[85] << 8) |
+                                 ((uint32_t)buffer[86] << 16) | ((uint32_t)buffer[87] << 24);
+            uint32_t headerSize = (uint32_t)buffer[12] | ((uint32_t)buffer[13] << 8) |
+                                  ((uint32_t)buffer[14] << 16) | ((uint32_t)buffer[15] << 24);
+            uint32_t headerCrc = (uint32_t)buffer[16] | ((uint32_t)buffer[17] << 8) |
+                                 ((uint32_t)buffer[18] << 16) | ((uint32_t)buffer[19] << 24);
+            uint32_t entriesCrc = (uint32_t)buffer[88] | ((uint32_t)buffer[89] << 8) |
+                                  ((uint32_t)buffer[90] << 16) | ((uint32_t)buffer[91] << 24);
+            uint64_t tableLba = 0;
+            for (unsigned i = 0; i < 8; i++) tableLba |= (uint64_t)buffer[72 + i] << (8 * i);
+            if (entries != 128 || entrySize != 128 || headerSize != 92 || tableLba != 2) {
+              sdlog("NativeSd: gpt geometry bad\n"); return false;
+            }
+            memset(buffer + 16, 0, 4);
+            uint32_t actualHeaderCrc = crc32n(buffer, headerSize);
+            sdlog("NativeSd: gpt header crc %08x expected %08x match %c\n",
+                  actualHeaderCrc, headerCrc, actualHeaderCrc == headerCrc ? 'y' : 'n');
+            if (actualHeaderCrc != headerCrc) return false;
             uint64_t altLba = (uint64_t)buffer[32] | ((uint64_t)buffer[33] << 8) |
                 ((uint64_t)buffer[34] << 16) | ((uint64_t)buffer[35] << 24) |
                 ((uint64_t)buffer[36] << 32) | ((uint64_t)buffer[37] << 40);
             sdlog("NativeSd: gpt altLba %llu card %u\n",
-                  (unsigned long long)altLba, sectors);
+                  (unsigned long long)altLba, (unsigned)sectors);
             // v18: replicate the kernel scheme's entries read (16-sector
             // chunks at LBA 2/18) and cross-check with 8-sector proven-path
             // reads. Golden from os-window.img: chunk CRCs 3a740ceb/d8f49994,
@@ -634,18 +646,29 @@ class NativeSd : public IOBlockStorageDevice {
                     "p0 type %08x first %u count %u\n",
                     e0 ? 'y' : 'n', c0, e1 ? 'y' : 'n', c1, t0, f0, n0);
               uint32_t qs[4] = {0, 0, 0, 0};
+              uint32_t tableState = 0xffffffffu;
+              bool tableOk = true;
               char qf[5] = "nnnn";
               for (uint32_t q = 0; q < 4; q++) {
                 if (readSectors(2 + q * 8, 8)) {
                   qs[q] = crc32n(buffer, 4096);
+                  tableState = E5Sd::crc32Update(tableState, buffer, 4096);
                   qf[q] = 'y';
+                } else {
+                  tableOk = false;
                 }
               }
               sdlog("NativeSd: gpt ent8 %c%c%c%c crc %08x %08x %08x %08x\n",
                     qf[0], qf[1], qf[2], qf[3], qs[0], qs[1], qs[2], qs[3]);
+              uint32_t actualEntriesCrc = ~tableState;
+              tableOk = tableOk && actualEntriesCrc == entriesCrc;
+              sdlog("NativeSd: gpt entries crc %08x expected %08x match %c\n",
+                    actualEntriesCrc, entriesCrc, tableOk ? 'y' : 'n');
+              if (!tableOk) return false;
             }
+            sdlog("NativeSd: gpt ok entries %u\n", entries);
           } else {
-            sdlog("NativeSd: gpt absent\n");
+            sdlog("NativeSd: gpt absent\n"); return false;
           }
         }
       } else {

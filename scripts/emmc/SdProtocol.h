@@ -5,6 +5,17 @@
 namespace E5Sd {
 constexpr uint32_t r1Errors = 0xfdffe008u;
 
+// Reflected CRC-32 state: start at ~0u, stream every byte, complement once.
+// In particular, GPT checks the entire entry array, not individual sectors.
+inline uint32_t crc32Update(uint32_t state, const uint8_t *data, uint32_t size) {
+  for (uint32_t i = 0; i < size; i++) {
+    state ^= data[i];
+    for (unsigned bit = 0; bit < 8; bit++)
+      state = (state >> 1) ^ (0xedb88320u & (0u - (state & 1u)));
+  }
+  return state;
+}
+
 inline void response136(const uint32_t raw[4], uint32_t result[4]) {
   for (unsigned i = 0; i < 4; i++)
     result[i] = (raw[3 - i] << 8) | (i == 3 ? 0u : raw[2 - i] >> 24);

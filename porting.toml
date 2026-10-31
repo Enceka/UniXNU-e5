@@ -186,6 +186,17 @@ result = "NativeSd read-only SD service: cold power/clock/detect bring-up, legac
 
 [[area.evidence]]
 kind = "device"
+reference = "docs/logs/uefi-report-095849.txt"
+revision = "3d0e2be (kernel 285 with register-preserving GPT scanner trace)"
+result = "Round 24: the actual prelinked IOGUIDPartitionScheme computes c07a08b6 over the SD table, compares against f77abceb declared by the v21 header, and exits scan at the CRC check. The same boot accepts the eMMC table CRC d9ec7402 and creates its partition. Restored only SD LBA 1..33 from the valid backup, verified card readback and unchanged backup/APFS superblock. The restored host image matches the original OS SHA256 e5634d04a8ac35f024845f583394e0a35deb26a04cb0c00286a8674e25a9a4f2; an original-layout traced boot is pending."
+
+[[area.evidence]]
+kind = "source"
+reference = "scripts/emmc/NativeSd.cpp"
+result = "v22 restores the original OS LBA1 golden CRC 10fb5eed. GPT acceptance now requires its header CRC and a streaming CRC over all 16384 entry bytes, with actual/expected evidence; invalid metadata fails initialization. This prevents magic-only gpt-ok and independent sector/chunk checks from hiding a mismatched declared table CRC. Source-built board validation is pending."
+
+[[area.evidence]]
+kind = "device"
 reference = "docs/logs/uefi-report-001448.txt"
 command = "PAYLOAD=<sd-v1>/e5-uefi.bin sh tools/e5-uefi-cycle.sh run; python3 tools/e5-sd-check.py <report> (e5-xnu repository)"
 revision = "ace8448e68ba2f1f4b4ae0393e18b7635703e39a"
