@@ -774,7 +774,7 @@ public:
           pmicWrite(0x70, 0x0000); // IRQ_LOAD_HIGH (pretimeout off).
           pmicWrite(0x6c, 0x0000); // IRQ_LOAD_LOW.
           pmicWrite(0x60, 0x0000); // LOCK: locked.
-          sdlog("NativeSd: wdt extended 240s ctrl %04x\n", pmicRead(0x48));
+          sdlog("NativeSd: wdt extended 600s ctrl %04x\n", pmicRead(0x48));
         } else sdlog("NativeSd: wdt load busy\n");
       } else sdlog("NativeSd: wdt not counting\n");
     }
