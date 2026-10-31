@@ -1015,7 +1015,7 @@ public:
       // Serve reads (and flush-style no-direction requests) from the image.
       data->writeBytes(0, base, bytes);
     }
-    (completion->action)(completion->target, completion->param, kIOReturnSuccess, bytes);
+    completion->action(completion->target, completion->parameter, kIOReturnSuccess, bytes);
     return kIOReturnSuccess;
   }
   void free() override {
