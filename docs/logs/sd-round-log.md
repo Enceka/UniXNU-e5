@@ -521,3 +521,35 @@ fields, then four 8-sector reads with CRCs (golden chunks 3a740ceb/d8f49994,
 quarters 0c87a44e + c71c0011 x3) — so the next round distinguishes corrupt
 16-chunk data from a scheme rejection that is not data, and if the 8-sector
 chunking is the fix the boot may proceed straight to the volume mount.
+
+## Round 20 (kernel 282, v18 diagnostics) — GPT data path exonerated, no slice
+
+Board round on the OS-image card. v18's instrumentation proved the GPT
+entries the driver returns are byte-perfect at every granularity:
+
+- `gpt ent16 h0 y crc 3a740ceb h1 y crc d8f49994 p0 type 7c3457ef first 34 count 11870208`
+- `gpt ent8 yyyy crc 0c87a44e c71c0011 c71c0011 c71c0011`
+
+Yet the kernel storage stack still stopped after `rw 1@0 / rw 1@1 /
+rw 32@2` (the IOGUIDPartitionScheme probe reads), published no slice,
+and the root wait for volume 04769D26 timed out into the usual
+IOKitBSDInit panic. Serving the 32-block entries read in 8-sector
+chunks changed nothing — chunk size is irrelevant.
+
+Two decisive corrections came out of the offline analysis:
+
+1. seed.dbr is not a GPT disk (`DBRDISK1` wrapper, LBA1 zero) — the
+   E5EMMC container attaches to whole media without any partition
+   scheme, so this system has NEVER successfully attached a GPT.
+2. The os-window.img protective MBR is real (audit doc wrong again).
+
+The IOGUIDPartitionScheme source (IOStorageFamily oss mirror) passes
+on paper for our media on every check (PMBR, header CRC, entries CRC,
+partition-in-media), so v19 (ef0c4ce) instruments the kernel-facing
+path instead: the rw log now covers the first 12 calls plus every call
+>4 blocks, writeBytes short writes and incomplete requests are logged
+explicitly. The next round reveals whether reads continue past the
+entries read (GPT published, failure in the APFS container probe) or
+stop dead (scheme rejection).
+
+Report: docs/logs/uefi-report-083900.txt.
