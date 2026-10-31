@@ -693,3 +693,36 @@ Report: docs/logs/uefi-report-33.txt (= e5-xnu dumps/uefi-report-124030.txt).
 
 v26 (2fd3d42): watchdog window 600 s → 1800 s to see how far launchd takes
 the system in 30 min.
+
+## Round 39-52 (kernel 302/303): console-rescue tooling + the wdt math bug
+
+Rounds 39-43 built the panic-capture ladder (all superseded by the BootShim
+rescue): E5-PRAM-TAIL anchor scan (0x9F000000 holds no text on this kernel),
+serial-lib snapshot (per-module statics captured UEFI text, not XNU), header-
+position reads (stale UEFI pos). Round 42's zero-length loop hung BootShim
+yellow (subs wraps on 0); fixed. Round 44 landed the WORKING rescue: BootShim
+copies the tee window (0xFFF81F1B, 24 KiB) to DRAM scratch (E5PC magic at
+0xC5000FF8, data +8) and E5BringupDxe prints it (E5-PREV-CONSOLE lines).
+
+Round 45 mirrored the rescue into the pmsg prz (0xFFF90400) hoping ylog would
+carry it out - that write hung the whole chain at a BLACK screen (LK faults on
+the rewritten pmsg header; manual power cycle needed). Reverted; never write
+pmsg from BootShim.
+
+Rounds 46-52 all showed ~75 s cycles and the console stopping at
+dev_init disk6s1 - suspected the FD print at first, but bisect round 51
+(print disabled) died identically, and /tmp/r39-41.log proved rounds 39-41
+( pre-rescue FD) were ALSO 75 s. Root cause: the v27 wdt change wrote
+LOAD_HIGH=0x0005 for "240 s" - but 240*32768=0x780000 needs 0x78. 0x0005 is a
+10 SECOND window. Every kernel-302 boot hit a 10 s watchdog wall at disk6s1
+dev_init; the FD was never at fault. (600 s=0x12C and 1800 s=0x384 were
+correct; only the 240 s conversion was wrong.)
+
+Round 52 (kernel 303, 0x78=240 s): cycle 310 s, launchd silently working
+(rw done #256+, SystemOS pager serving) - and the reason rounds 33-37 showed
+launchd boot-task prints while 36+ showed none: `-v` was dropped from the
+boot args at round 35. Silent != dead.
+
+Next (r53+): kernel 304 = -v restored + wdt 600 s (v25-proven 0x12C). If the
+rounds-34/35-class panic reproduces, its text lands in the rescue window; if
+not, launchd gets 10 minutes to bring the system up.
