@@ -1,0 +1,18 @@
+{
+  "record": "e5-xnu/uefi/build/e5tw-validation/board-r1/dmesg-ramoops-0.bin",
+  "record_sha256": "c36c336f31f3a9fd2102b8838485fd4e445f233cc61385a9ae23f90d2d41c315",
+  "offset": 7936,
+  "position": 16307,
+  "ring_bytes": 24568,
+  "panic": "panic(cpu 0 caller 0xfffffff0079e9860): mount[3] exited -- no exit reason available -- (signal 0, exit status 66 )",
+  "kernel_uuid": "F6A3666A-8868-3E30-BC01-5D1A69866445",
+  "ci_run_number": 306,
+  "device_revision": "54347d444c71064ba254a8cb9abd787264cd007a",
+  "firmware_revision": "b6949f4",
+  "payload_sha256": "c0d3329116d9d57efe6d44bce6edf5ac1c22b9457b6348898367571c1d1ec375",
+  "full_readback_verified": true,
+  "android_boot_id": "06d92d70-7aac-4e6c-90ff-bf3f01001aa3",
+  "android_slot": "_a",
+  "report": "e5-xnu/dumps/uefi-report-194630.txt",
+  "cause": "mount-phase-1: missing /chosen/boot-manifest-hash; mount exits 66; critical-process panic"
+}

@@ -1,0 +1,492 @@
+m.apple.xpc.launchd|1970-01-01 00:07:13.175342 (usermanagerd) <Notice>: Doing boot task
+
+NativeSd: rw done #14848 8/8 at 12835104
+
+NativeSd: rw done #14976 8/8 at 12825032
+
+NativeSd: rw done #15104 8/8 at 12826208
+
+NativeSd: rw done #15232 8/8 at 12833088
+
+NativeSd: rw done #15360 8/8 at 12837416
+
+NativeSd: rw done #15488 8/8 at 18248120
+
+E5FB|****** DEVICE HAS EPHEMERAL DATA VOLUME, SKIP INIT ****
+****** DEVICE HAS EPHEMERAL DATA VOLUME, SKIP INIT ****
+
+E5FB|com.apple.xpc.launchd|1970-01-01 00:07:13.741054 (dirs_cleaner) <Notice>: Doing boot task
+com.apple.xpc.launchd|1970-01-01 00:07:13.741054 (dirs_cleaner) <Notice>: Doing boot task
+
+Couldn't build index for com.apple.dirs_cleaner: Not eligible for acceleration
+
+E5FB|get_tmp_path: (bad path: /, NULL, ...) failed with errno=22: Invalid argument
+get_tmp_path: (bad path: /, NULL, ...) failed with errno=22: Invalid argument
+
+E5FB|dc_prep_temp_dir: mkdir(/private/var/dirs_cleaner/, 0700) failed with errno=30: Read-only file system
+dc_prep_temp_dir: mkdir(/private/var/dirs_cleaner/, 0700) failed with errno=30: Read-only file system
+
+E5FB|get_tmp_path: (bad path: /, NULL, ...) failed with errno=22: Invalid argument
+get_tmp_path: (bad path: /, NULL, ...) failed with errno=22: Invalid argument
+
+E5FB|dc_prep_temp_dir: mkdir(/private/var/dirs_cleaner/, 0700) failed with errno=30: Read-only file system
+dc_prep_temp_dir: mkdir(/private/var/dirs_cleaner/, 0700) failed with errno=30: Read-only file system
+
+E5FB|get_tmp_path: realpath: (/var/mobile/tmp, NULL, ...) failed with errno=2: No such file or directory
+get_tmp_path: realpath: (/var/mobile/tmp, NULL, ...) failed with errno=2: No such file or directory
+
+E5FB|dc_prep_temp_dir: mkdir(/private/var/dirs_cleaner/, 0700) failed with errno=30: Read-only file system
+dc_prep_temp_dir: mkdir(/private/var/dirs_cleaner/, 0700) failed with errno=30: Read-only file system
+
+E5FB|dc_reset: /var/mobile/tmp: No such file or directory
+dc_reset: /var/mobile/tmp: No such file or directory
+
+E5FB|com.apple.xpc.launchd|1970-01-01 00:07:13.906764 <Error>: Could not bind to system logger socket: error = 30: Read-only file system
+com.apple.xpc.launchd|1970-01-01 00:07:13.906764 <Error>: Could not bind to system logger socket: error = 30: Read-only file system
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+Couldn't build index for com.apple.init_featureflags: Not eligible for acceleration
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11286100199] [INFO] [Subsystem: launchd] [Event: exclaves-boot] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11286706149] [INFO] [Subsystem: launchd] [Event: fsck] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11287297614] [INFO] [Subsystem: launchd] [Event: mount-phase-1] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11288033884] [INFO] [Subsystem: launchd] [Event: data-protection] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11288636386] [INFO] [Subsystem: launchd] [Event: finish-obliteration] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11289241669] [INFO] [Subsystem: launchd] [Event: detect-installed-roots] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11291040343] [INFO] [Subsystem: launchd] [Event: commit-boot-mode] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11292070521] [INFO] [Subsystem: launchd] [Event: restore-datapartition] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11292675756] [INFO] [Subsystem: launchd] [Event: restore-datapartition] optional boot task not present
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11293283094] [INFO] [Subsystem: launchd] [Event: mount-phase-2] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11293902442] [INFO] [Subsystem: launchd] [Event: init-with-data-volume] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11294509602] [INFO] [Subsystem: launchd] [Event: fixup-mobile-tmp] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11295106565] [ERROR] [Subsystem: launchd] [Event: fixup-mobile-tmp] could not set create /private/var/mobile/tmp: Read-only file system
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11295779131] [INFO] [Subsystem: launchd] [Event: fixup-mobile-tmp] Finished boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11296391888] [INFO] [Subsystem: launchd] [Event: MSUEarlyBootTask] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11297109469] [INFO] [Subsystem: launchd] [Event: fips] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+NativeSd: rw done #15616 8/8 at 12859448
+
+[System Event] [11297707233] [INFO] [Subsystem: launchd] [Event: keybag] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11298317849] [INFO] [Subsystem: launchd] [Event: usermanagerd] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+[System Event] [11298906421] [INFO] [Subsystem: launchd] [Event: dirs_cleaner] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|com.apple.xpc.launchd|1970-01-01 00:07:13.907477 <Notice>: launchd logging initialized. name: com.apple.xpc.launchd pid: 1
+com.apple.xpc.launchd|1970-01-01 00:07:13.907477 <Notice>: launchd logging initialized. name: com.apple.xpc.launchd pid: 1
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|com.apple.xpc.launchd|1970-01-01 00:07:13.907491 (xpcroleaccountd) <Notice>: Doing boot task
+com.apple.xpc.launchd|1970-01-01 00:07:13.907491 (xpcroleaccountd) <Notice>: Doing boot task
+
+[System Event] [11301276592] [INFO] [Subsystem: launchd] [Event: xpcroleaccountd] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|com.apple.xpc.launchd|1970-01-01 00:07:14.686293 <Notice>: Flushed 31 logs [limit: 20]
+com.apple.xpc.launchd|1970-01-01 00:07:14.686293 <Notice>: Flushed 31 logs [limit: 20]
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+E5FB|com.apple.xpc.launchd|1970-01-01 00:07:13.969379 (init_featureflags) <Notice>: Doing boot task
+com.apple.xpc.launchd|1970-01-01 00:07:13.969379 (init_featureflags) <Notice>: Doing boot task
+
+[System Event] [11303097893] [INFO] [Subsystem: launchd] [Event: init_featureflags] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+NativeSd: rw done #15744 8/8 at 12891552
+
+NativeSd: rw done #15872 8/8 at 12672792
+
+NativeSd: rw done #16000 64/64 at 12703408
+
+NativeSd: rw done #16128 8/8 at 13185728
+
+NativeSd: rw done #16256 8/8 at 12678488
+
+NativeSd: rw 8 blocks at 12892328
+
+NativeSd: rw done #16384 8/8 at 15698824
+
+NativeSd: rw done #16512 8/8 at 15989400
+
+NativeSd: rw done #16640 8/8 at 16062920
+
+NativeSd: rw done #16768 8/8 at 12853624
+
+NativeSd: rw done #16896 8/8 at 16085888
+
+NativeSd: rw done #17024 8/8 at 12886936
+
+NativeSd: rw done #17152 8/8 at 16169032
+
+NativeSd: rw done #17280 8/8 at 13302944
+
+NativeSd: rw done #17408 8/8 at 15990936
+
+NativeSd: rw done #17536 8/8 at 12900872
+
+NativeSd: rw done #17664 8/8 at 15990840
+
+NativeSd: rw done #17792 8/8 at 12900768
+
+NativeSd: rw done #17920 8/8 at 15992744
+
+NativeSd: rw done #18048 8/8 at 13783264
+
+NativeSd: rw done #18176 8/8 at 13355056
+
+NativeSd: rw done #18304 8/8 at 12932680
+
+NativeSd: rw done #18432 8/8 at 15777976
+
+NativeSd: rw done #18560 8/8 at 14407384
+
+NativeSd: rw done #18688 8/8 at 16993144
+
+NativeSd: rw done #18816 8/8 at 15811576
+
+NativeSd: rw done #18944 8/8 at 14077688
+
+NativeSd: rw done #19072 8/8 at 13404144
+
+NativeSd: rw done #19200 8/8 at 13232144
+
+NativeSd: rw done #19328 8/8 at 13780160
+
+NativeSd: rw done #19456 8/8 at 16024608
+
+NativeSd: rw done #19584 8/8 at 16318200
+
+NativeSd: rw done #19712 8/8 at 16386864
+
+NativeSd: rw done #19840 8/8 at 16195320
+
+NativeSd: rw done #19968 8/8 at 12681008
+
+NativeSd: rw done #20096 8/8 at 17649168
+
+NativeSd: rw done #20224 8/8 at 16390592
+
+NativeSd: rw done #20352 8/8 at 16077928
+
+NativeSd: rw done #20480 8/8 at 16069592
+
+NativeSd: rw done #20608 8/8 at 16262408
+
+NativeSd: rw done #20736 8/8 at 15376120
+
+NativeSd: rw done #20864 8/8 at 16072688
+
+NativeSd: rw done #20992 8/8 at 16069384
+
+NativeSd: rw done #21120 8/8 at 14244752
+
+NativeSd: rw done #21248 8/8 at 16194936
+
+NativeSd: rw done #21376 8/8 at 16066488
+
+NativeSd: rw done #21504 8/8 at 16073152
+
+NativeSd: rw done #21632 8/8 at 12934928
+
+NativeSd: rw done #21760 8/8 at 13658768
+
+NativeSd: rw done #21888 8/8 at 16033024
+
+NativeSd: rw done #22016 8/8 at 16001488
+
+NativeSd: rw done #22144 8/8 at 18092888
+
+NativeSd: rw done #22272 8/8 at 16069376
+
+NativeSd: rw done #22400 8/8 at 16016392
+
+NativeSd: rw done #22528 8/8 at 14428224
+
+NativeSd: rw done #22656 8/8 at 16255904
+
+NativeSd: rw done #22784 8/8 at 16397152
+
+NativeSd: rw done #22912 8/8 at 16411368
+
+NativeSd: rw done #23040 8/8 at 13657728
+
+NativeSd: rw done #23168 8/8 at 16021352
+
+NativeSd: rw done #23296 8/8 at 12888712
+
+E5FB|init_featureflags: Failed to create or configure directory /Library/Preferences/FeatureFlags: Error Domain=NSCocoaErrorDomain Code=642 "You can‚Äôt save the file ‚ÄúFeatureFlags‚Äù because the volume is read only
+init_featureflags: Failed to create or configure directory /Library/Preferences/FeatureFlags: Error Domain=NSCocoaErrorDomain Code=642 "You canb\x00\x1aC\x04C4t save the file b\x00\x1aC\x04C:FeatureFlagsb\x00\x1aC\x04C9 because the volume is read only." UserInfo={NSFilePath=/Library/Preferences/FeatureFlags, NSUnderlyingError=0x100d08730 {Error Domain=NSPOSIXErrorDomain Code=30 "Read-only file system"}}
+
+NativeSd: rw done #23424 8/8 at 15378104
+
+NativeSd: rw done #23552 8/8 at 13698656
+
+E5FB|com.apple.xpc.launchd|1970-01-01 00:07:21.002257 (auearlyboot) <Notice>: Doing boot task
+com.apple.xpc.launchd|1970-01-01 00:07:21.002257 (auearlyboot) <Notice>: Doing boot task
+
+[System Event] [11466521120] [INFO] [Subsystem: launchd] [Event: auearlyboot] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+NativeSd: rw done #23680 8/8 at 14547440
+
+E5FB|auearlyboot: Failed to enter sandbox
+auearlyboot: Failed to enter sandbox
+
+E5FB|com.apple.xpc.launchd|1970-01-01 00:07:21.202232 (tzinit) <Notice>: Doing boot task
+com.apple.xpc.launchd|1970-01-01 00:07:21.202232 (tzinit) <Notice>: Doing boot task
+
+[System Event] [11471727504] [INFO] [Subsystem: launchd] [Event: tzinit] Doing boot task
+
+E5FB|launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+launchd.log: fopen(/private/var/log/com.apple.xpc.launchd/launchd.log): 30
+
+Couldn't build index for com.apple.tzinit: Not eligible for acceleration
+
+NativeSd: rw done #23808 8/8 at 15696144
+
+E5FB|tzinit:
+tzinit: E5FB|Unable to locate data; resetting to system partition
+Unable to locate data; resetting to system partitionE5FB|:
+: E5FB|No such file or directory
+No such file or directory
+
+E5FB|tzinit:
+tzinit: E5FB|Last resort force_system_dataset() failed
+Last resort force_system_dataset() failedE5FB|:
+: E5FB|Read-only file system
+Read-only file system
+
+pid 17 exited -- no exit reason available -- (signal 0, exit 30)
+
+coredump (tzinit, pid 17): writing core to /private/var/cores/tzinit.core
+
+coredump (tzinit, pid 17): failed to open core dump file /private/var/cores/tzinit.core: error 2
+
+coredump (tzinit, pid 17): core dump failed: error 2
+
+Failed to generate core file for pid: 17: error 2, took 0.019 seconds
+
+panic(cpu 0 caller 0xfffffff0079e9860): tzinit[17] exited -- no exit reason available -- (signal 0, exit status 30 )
+
+Debugger message: panic
+
+Memory ID: 0x0
+
+OS release type: User
+
+OS version: 21H461
+
+Kernel version: Darwin Kernel Version 23.6.0: Sat Oct 31 11:29:59 UTC 2026; runner:ios-obj/DEVELOPMENT_ARM64_BCM2837
+
+KernelCache UUID: 0C7A73E10D6787590C091885B884F79A
+
+Kernel UUID: F6A3666A-8868-3E30-BC01-5D1A69866445
+
+Boot session UUID: 20F7FD8F-0582-4955-93AB-350EC9DEE361
+
+iBoot version:
+
+iBoot Stage 2 version:
+
+secure boot?: YES
+
+roots installed: 0
+
+Paniclog version: 14
+
+Kernel text base:  0xfffffff007004000
+
+mach_absolute_time: 0x2ac2354dc
+
+Epoch Time:        sec       usec
+
+  Boot    : 0x0000001b 0x00072e90
+
+  Sleep   : 0x00000000 0x00000000
+
+  Wake    : 0x00000000 0x00000000
+
+  Calendar: 0x000001b9 0x0007008c
+
+Zone info:
+
+  Zone map: 0xfffffff036800000 - 0xfffffff636800000
+
+  . PGZ   : 0xfffffff036800000 - 0xfffffff0368df000
+
+  . VM    : 0xfffffff0368df000 - 0xfffffff11cf23000
+
+  . RO    : 0xfffffff11cf23000 - 0xfffffff169be4000
+
+  . GEN0  : 0xfffffff169be4000 - 0xfffffff250229000
+
+  . GEN1  : 0xfffffff250229000 - 0xfffffff33686e000
+
+  . GEN2  : 0xfffffff33686e000 - 0xfffffff41ceb3000
+
+  . GEN3  : 0xfffffff41ceb3000 - 0xfffffff5034f8000
+
+  . DATA  : 0xfffffff5034f8000 - 0xfffffff636800000
+
+  Metadata: 0xfffffff63b092000 - 0xfffffff641092000
+
+  Bitmaps : 0xfffffff641094000 - 0xfffffff6411e0000
+
+  Extra   : 0 - 0
+
+TPIDRx_ELy = {1: 0xfffffff41ce38388  0: 0x0000000000000000  0ro: 0x00000001fbb30e20 }
+
+CORE 0 is the one that panicked. Check the full backtrace for details.
+
+Compressor Info: 0% of compressed pages limit (OK) and 0% of segments limit (OK) with 0 swapfiles and OK swap space
+
+Panicked task 0xfffffff2502c9230: 95 pages, 1 threads: pid 17: tzinit
+
+Panicked thread: 0xfffffff41ce38388, backtrace: 0xfffffffbebe57410, tid: 253
+
+		  lr: 0xfffffff00727d198  fp: 0xfffffffbebe574a0
+
+		  lr: 0xfffffff007406260  fp: 0xfffffffbebe574c0
+
+		  lr: 0xfffffff0073f8110  fp: 0xfffffffbebe57510
+
+		  lr: 0xfffffff0079c8a1c  fp: 0xfffffffbebe57600
+
+		  lr: 0xfffffff0073f75d8  fp: 0xfffffffbebe57610
+
+		  lr: 0xfffffff00727c7a4  fp: 0xfffffffbebe57ae0
+
+		  lr: 0xfffffff00727d89c  fp: 0xfffffffbebe57b60
+
+		  lr: 0xfffffff007992304  fp: 0xfffffffbebe57b80
+
+		  lr: 0xfffffff0079e9860  fp: 0xfffffffbebe57bd0
+
+		  lr: 0xfffffff0076ea74c  fp: 0xfffffffbebe57d10
+
+		  lr: 0xfffffff0076e9d60  fp: 0xfffffffbebe57da0
+
+		  lr: 0xfffffff0076e9b90  fp: 0xfffffffbebe57db0
+
+		  lr: 0xfffffff0078369d8  fp: 0xfffffffbebe57e20
+
+		  lr: 0xfffffff0079c8aa8  fp: 0xfffffffbebe57f10
+
+		  lr: 0xfffffff0073f75d8  fp: 0xfffffffbebe57f20
+
+		  lr: 0xfffffff0073f75a0  fp: 0x0000000000000000
+
+** Stackshot Incomplete ** Bytes Filled 240 **
+
+Please go to https://panic.apple.com to report this panic
