@@ -726,3 +726,12 @@ boot args at round 35. Silent != dead.
 Next (r53+): kernel 304 = -v restored + wdt 600 s (v25-proven 0x12C). If the
 rounds-34/35-class panic reproduces, its text lands in the rescue window; if
 not, launchd gets 10 minutes to bring the system up.
+
+## Rounds 66-69 (kernels 318-321): SB/LA crash-loop symbolicated
+
+E5CRASH/E5EXC kernel prints + offline dyld-cache symbolication
+(tools/e5-trap-solve.py). SpringBoard traps in FBSDisplayMonitor
+_initWithBookendObserver:transformer: (FrontBoardServices) — display stack
+absent on this board. liveactivitiesd traps in SessionSyncEngine (same
+family). All other subsystems healthy (Data RW, 250K+ I/O, no panics,
+600s stable). See e5-xnu docs/bringup-plan.md rounds 66-69 entry.
