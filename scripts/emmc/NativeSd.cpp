@@ -21,6 +21,7 @@ static void sdlog(const char *fmt, ...) {
 
 class NativeSd;
 static bool publishSystemOS(NativeSd *host);
+static bool publishData(NativeSd *host);
 
 class NativeSd : public IOBlockStorageDevice {
   OSDeclareDefaultStructors(NativeSd)
@@ -724,6 +725,16 @@ class NativeSd : public IOBlockStorageDevice {
   }
 
 public:
+  // Load the 32 MiB Data container image from the card into a caller buffer,
+  // 16 sectors per multi-block read (the DMA page limit). ~3.3 s at the
+  // proven 24 MHz 4-bit throughput; runs once, before the device publishes.
+  bool fillDataImage(char *destination) {
+    for (uint64_t off = 0; off < E5Data::sectors; off += 16) {
+      if (!readSectors((uint32_t)(E5Data::base + off), 16)) return false;
+      memcpy(destination + off * 512, buffer, 16 * 512);
+    }
+    return true;
+  }
   bool start(IOService *provider) override {
     if (!IOBlockStorageDevice::start(provider)) return false;
     sdlog("NativeSd: v1 start, independent SDIO0 host\n");
@@ -782,6 +793,12 @@ public:
           (unsigned long long)sectors);
     registerService();
     if (systemOS && !publishSystemOS(this)) sdlog("NativeSd: SystemOS publication failed\n");
+    if (systemOS && E5Data::fits(sectors) && readSectors((uint32_t)E5Data::base, 8) &&
+        !memcmp(buffer + 32, "NXSB", 4)) {
+      if (!publishData(this)) sdlog("NativeSd: data publication failed\n");
+    } else if (systemOS) {
+      sdlog("NativeSd: data window NXSB refused\n");
+    }
     return true;
   }
   void stop(IOService *provider) override {
@@ -950,6 +967,112 @@ extern "C" int e5_systemos_device(char *path, size_t size, int *major, int *mino
     snprintf(path, size, "/dev/%s", name->getCStringNoCopy());
     *major = (int)maj->unsigned32BitValue(); *minor = (int)min->unsigned32BitValue();
     sdlog("NativeSd: SystemOS volume %s device %s\n", E5SystemOS::uuid, path);
+  }
+  volume->release();
+  return ok ? 1 : 0;
+}
+
+// The system's one writable dataset: a 32 MiB APFS container copied from the
+// card into a RAM buffer and served read-write. The kernel startup patch
+// mounts the volume at /private/var before launchd starts (tzinit and the
+// data-protection boot tasks need a writable dataset; the OS volume is
+// read-only). The RAM copy is volatile by design: nothing writes the card.
+class E5DataDevice : public IOBlockStorageDevice {
+  OSDeclareDefaultStructors(E5DataDevice)
+public:
+  IOBufferMemoryDescriptor *image = nullptr;
+  char *getVendorString() override { return const_cast<char *>("E5"); }
+  char *getProductString() override { return const_cast<char *>("Data ramdisk window"); }
+  char *getRevisionString() override { return const_cast<char *>("1"); }
+  char *getAdditionalDeviceInfoString() override { return const_cast<char *>(E5Data::uuid); }
+  IOReturn doEjectMedia() override { return kIOReturnUnsupported; }
+  IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
+  UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
+  IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *n) override { *n = E5Data::sectors - 1; return kIOReturnSuccess; }
+  IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportMediaState(bool *present, bool *changed) override {
+    NativeSd *host = OSDynamicCast(NativeSd, getProvider());
+    if (!host) return kIOReturnNotReady;
+    return host->reportMediaState(present, changed);
+  }
+  IOReturn reportWriteProtection(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
+  IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
+  IOReturn getWriteCacheState(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
+  IOReturn doAsyncReadWrite(IOMemoryDescriptor *data, UInt64 block, UInt64 count,
+      IOStorageAttributes *attributes, IOStorageCompletion *completion) override {
+    (void)attributes;
+    if (!data || !completion || !completion->action) return kIOReturnBadArgument;
+    if (!image || !E5Data::contains(block, count)) return kIOReturnBadArgument;
+    UInt64 bytes = count * 512;
+    char *base = (char *)image->getBytesNoCopy() + block * 512;
+    if (data->getDirection() == kIODirectionOut) {
+      data->readBytes(0, base, bytes);
+    } else {
+      // Serve reads (and flush-style no-direction requests) from the image.
+      data->writeBytes(0, base, bytes);
+    }
+    (completion->action)(completion->target, completion->param, kIOReturnSuccess, bytes);
+    return kIOReturnSuccess;
+  }
+  void free() override {
+    if (image) image->release();
+    IOBlockStorageDevice::free();
+  }
+};
+OSDefineMetaClassAndStructors(E5DataDevice, IOBlockStorageDevice)
+
+static bool publishData(NativeSd *host) {
+  E5DataDevice *device = new E5DataDevice;
+  if (!device) return false;
+  if (!device->init(nullptr)) { device->release(); return false; }
+  device->image = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+      kernel_task, kIODirectionInOut, E5Data::sectors * 512, 0x0000000FFFFFFFFFull);
+  if (!device->image || !host->fillDataImage((char *)device->image->getBytesNoCopy())) {
+    sdlog("NativeSd: data image load failed\n");
+    if (device->image) device->image->release();
+    device->image = nullptr;
+    device->release();
+    return false;
+  }
+  if (!device->attach(host)) { device->release(); return false; }
+  if (!device->start(host)) { device->detach(host); device->release(); return false; }
+  sdlog("NativeSd: publishing Data read-write %llu sectors at %llu\n",
+        (unsigned long long)E5Data::sectors, (unsigned long long)E5Data::base);
+  device->registerService();
+  device->release();
+  return true;
+}
+
+// Select the Data volume by its actual UUID, never by enumeration order.
+extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
+  OSDictionary *match = IOService::serviceMatching("IOMedia");
+  OSDictionary *properties = OSDictionary::withCapacity(1);
+  OSString *uuid = OSString::withCString(E5Data::uuid);
+  if (!match || !properties || !uuid) {
+    if (match) match->release();
+    if (properties) properties->release();
+    if (uuid) uuid->release();
+    return 0;
+  }
+  bool ready = properties->setObject("UUID", uuid) && match->setObject(gIOPropertyMatchKey, properties);
+  properties->release(); uuid->release();
+  if (!ready) { match->release(); return 0; }
+  IOService *volume = IOService::waitForMatchingService(match, 30ULL * 1000000000ULL);
+  match->release();
+  if (!volume) return 0;
+  OSString *name = OSDynamicCast(OSString, volume->getProperty("BSD Name"));
+  OSNumber *maj = OSDynamicCast(OSNumber, volume->getProperty("BSD Major"));
+  OSNumber *min = OSDynamicCast(OSNumber, volume->getProperty("BSD Minor"));
+  bool ok = name && maj && min && size > strlen(name->getCStringNoCopy()) + 5 &&
+      maj->unsigned64BitValue() <= 255 && min->unsigned64BitValue() <= 0xffffff;
+  if (ok) {
+    snprintf(path, size, "/dev/%s", name->getCStringNoCopy());
+    *major = (int)maj->unsigned32BitValue(); *minor = (int)min->unsigned32BitValue();
+    sdlog("NativeSd: Data volume %s device %s\n", E5Data::uuid, path);
   }
   volume->release();
   return ok ? 1 : 0;

@@ -1,11 +1,12 @@
 --- a/bsd/kern/kern_exec.c
 +++ b/bsd/kern/kern_exec.c
-@@ -8142,6 +8142,81 @@
+@@ -8142,6 +8142,126 @@
  	"/sbin/launchd",
  };
  
 +#if DEVELOPMENT || DEBUG
 +extern int e5_systemos_device(char *, size_t, int *, int *);
++extern int e5_data_device(char *, size_t, int *, int *);
 +extern void commpage_update_dyld_flags(uint64_t);
 +
 +/* Explicit bring-up mode for the two unchanged IPSW images. This is separate
@@ -71,6 +72,50 @@
 +		commpage_update_dyld_flags(dyld_flags);
 +		printf("E5SystemOS: development startup dyld_flags 0x%llx\n", dyld_flags);
 +	}
++	/* Writable Data dataset: the OS volume is sealed read-only and tzinit
++	 * exits 30 without a writable /private/var. The card's Data window
++	 * publishes a scratch APFS container; mount it read-write here so the
++	 * launchd data-protection tasks find it. Failure is diagnostic only. */
++	{
++		char data_path[64] = {0};
++		int dmajor = 0, dminor = 0;
++		if (e5_data_device(data_path, sizeof(data_path), &dmajor, &dminor)) {
++			user64_addr_t dspec = scratch + 0x560;
++			uint8_t dpayload[0x150] = {0};
++			uint64_t dflags = 0;
++			uint16_t dmode = 1;
++			memcpy(dpayload, &dspec, sizeof(dspec));
++			memcpy(dpayload + 8, &dflags, sizeof(dflags));
++			memcpy(dpayload + 16, &dmode, sizeof(dmode));
++			memcpy(dpayload + 0x144, &anonymous_owner, sizeof(anonymous_owner));
++			memcpy(dpayload + 0x148, &anonymous_owner, sizeof(anonymous_owner));
++			struct mount_args drequest = {.type = scratch + 0x100, .path = scratch + 0x520,
++			    .flags = 0, .data = scratch + 0x600};
++			int32_t dresult = 0;
++			int derror = copyout("apfs", drequest.type, 5) ||
++			    copyout("/private/var", drequest.path, 13) ||
++			    copyout(data_path, dspec, strlen(data_path) + 1) ||
++			    copyout(dpayload, drequest.data, sizeof(dpayload)) ? EINVAL : 0;
++			if (derror) {
++				printf("E5SystemOS: data mount copyout failed\n");
++			} else {
++				printf("E5SystemOS: data mount %s read-write enter\n", data_path);
++				derror = mount(p, &drequest, &dresult);
++				printf("E5SystemOS: data mount result %d\n", derror);
++				if (!derror) {
++					vnode_t droot = NULLVP;
++					if (!vnode_lookup("/private/var", 0, &droot, ctx)) {
++						printf("E5SystemOS: data mounted flags %llx fstype %s\n",
++						    (unsigned long long)vfs_flags(vnode_mount(droot)),
++						    vfs_statfs(vnode_mount(droot))->f_fstypename);
++						vnode_put(droot);
++					}
++				}
++			}
++		} else {
++			printf("E5SystemOS: data volume device absent\n");
++		}
++	}
 +out:
 +	if (cache) vnode_put(cache);
 +	vnode_put(mounted_root);
@@ -82,7 +127,7 @@
  /*
   * load_init_program
   *
-@@ -8183,6 +8258,12 @@
+@@ -8183,6 +8303,12 @@
  
  	(void) mach_vm_allocate_kernel(map, &scratch_addr, map_page_size, VM_FLAGS_ANYWHERE, VM_KERN_MEMORY_NONE);
  	user_addr_t init_envp = USER_ADDR_NULL;
