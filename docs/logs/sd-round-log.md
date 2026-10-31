@@ -488,3 +488,241 @@ repeat 16/16; eMMC v8 + E5EMMC mount + shell intact (EXITH 5/5)".
 The ext4-mapping round objective is met: XNU natively walks the card's
 ext4 (superblock → group descriptor → root inode extent tree → root
 directory) and verifies content against the Android-side golden captures.
+
+## Round 19 (kernel 281, v17) — SD carries the OS disk; GPT probe reads, no slice, root wait panic
+
+Kernel 281 (v17) booted with the whole-card OS image (os-window.img raw at
+LBA 0, readback-verified against the local file at 5 LBAs). NativeSd probe:
+all four new reference CRCs golden (LBA0 ec8ce612, LBA1 10fb5eed, LBA2048
+d2e6e0b2, LBA2050 fba8aad8), `ext4 absent (os image)`, `gpt ok entries 128`,
+probe Success default-4bit-24MHz, tp single 128/26433us, tp multi 128/5014us
+match y. The kernel then waited for root volume UUID 04769D26 (new ADT dict
+present) and the storage stack probed the SD media: reads at LBA 0, LBA 1,
+and one 16KB entries read (32 blocks at LBA 2, served as two 16-sector CMD18
+chunks) — then NO slice was ever published, no further SD reads happened,
+the wait timed out and the kernel panicked "Failed to mount root device
+@IOKitBSDInit.cpp:984". The E5EMMC seed container mounted normally in the
+same boot (its own 32-block entries read succeeded through per-512 reads),
+which exonerates the kext (IOStorageFamily 2.1 prelinked from the iphoneos
+17.7 SDK) and the arbitration path.
+
+Offline analysis of os-window.img: the GPT is fully self-consistent — header
+CRC d9e4279c, entries CRC fa7a560c, p0 Apple_APFS (7c3457ef-…) spans LBA
+34..11870241, exactly the header's usable range 34..11870241, backup header
+at 11870274 = image end. So the rejection is not the image. Prime suspect:
+the 16-sector CMD18 chunk path, which only ever had first-sector CRC
+verification (tp self-test), while the 8-sector path is proven end-to-end
+golden by the ext4 walk.
+
+v18 (78ccbbf): doAsyncReadWrite serves kernel reads in 8-sector chunks (16
+kept for diagnostics); after `gpt ok entries` the driver replicates the
+scheme's read pattern — two 16-sector chunks (LBA 2/18) with CRC + p0
+fields, then four 8-sector reads with CRCs (golden chunks 3a740ceb/d8f49994,
+quarters 0c87a44e + c71c0011 x3) — so the next round distinguishes corrupt
+16-chunk data from a scheme rejection that is not data, and if the 8-sector
+chunking is the fix the boot may proceed straight to the volume mount.
+
+## Round 20 (kernel 282, v18 diagnostics) — GPT data path exonerated, no slice
+
+Board round on the OS-image card. v18's instrumentation proved the GPT
+entries the driver returns are byte-perfect at every granularity:
+
+- `gpt ent16 h0 y crc 3a740ceb h1 y crc d8f49994 p0 type 7c3457ef first 34 count 11870208`
+- `gpt ent8 yyyy crc 0c87a44e c71c0011 c71c0011 c71c0011`
+
+Yet the kernel storage stack still stopped after `rw 1@0 / rw 1@1 /
+rw 32@2` (the IOGUIDPartitionScheme probe reads), published no slice,
+and the root wait for volume 04769D26 timed out into the usual
+IOKitBSDInit panic. Serving the 32-block entries read in 8-sector
+chunks changed nothing — chunk size is irrelevant.
+
+Two decisive corrections came out of the offline analysis:
+
+1. seed.dbr is not a GPT disk (`DBRDISK1` wrapper, LBA1 zero) — the
+   E5EMMC container attaches to whole media without any partition
+   scheme, so this system has NEVER successfully attached a GPT.
+2. The os-window.img protective MBR is real (audit doc wrong again).
+
+The IOGUIDPartitionScheme source (IOStorageFamily oss mirror) passes
+on paper for our media on every check (PMBR, header CRC, entries CRC,
+partition-in-media), so v19 (ef0c4ce) instruments the kernel-facing
+path instead: the rw log now covers the first 12 calls plus every call
+>4 blocks, writeBytes short writes and incomplete requests are logged
+explicitly. The next round reveals whether reads continue past the
+entries read (GPT published, failure in the APFS container probe) or
+stop dead (scheme rejection).
+
+Report: docs/logs/uefi-report-083900.txt.
+
+## Round 20 (kernel 282, v18) — GPT data proven golden on board, boot unchanged
+
+v18 diagnostics ran during probe: `gpt ent16 h0 y crc 3a740ceb h1 y crc d8f49994
+p0 type 7c3457ef first 34 count 11870208` and `gpt ent8 yyyy crc 0c87a44e c71c0011
+c71c0011 c71c0011` — both 16-sector chunks, all four 8-sector quarters, and the
+parsed partition-0 fields are byte-perfect at driver level. Kernel-side the boot was
+identical to round 19 (rw 1@0/1@1/32@2 then silence → root-wait panic), so the
+8-sector-chunk mitigation did not matter: chunk size is irrelevant, data is golden.
+
+Revelations while re-auditing: seed.dbr is NOT a GPT disk (LBA0 "DBRDISK1" wrapper,
+LBA1 zeros) — E5EMMC's container attached to the WHOLE media via
+AppleAPFSContainerScheme; there had never been a successful GPT attach on this
+system. os-window.img LBA0 has a proper protective MBR (55aa, entry0 0xEE) — the
+system-volume-audit doc's "LBA0 all-zero" was wrong (it also misrecorded altLBA).
+Fetched IOGUIDPartitionScheme.cpp (apple-oss-distributions/IOStorageFamily) and
+verified every scan() check passes for our image on paper.
+
+## Round 21 (kernel 283, v19) — full kernel-read visibility; media-size theory
+
+With v19 logging (first 12 rw calls + all >4-block calls + wb-short/incomplete
+lines): reads `1@0, 1@1` (GPT PMBR+header), then the root-wait dict, then `32@2`
+(GPT entries), then `1@0, 1@0, 1@1` (FDisk + Apple partition scheme probes), then
+NOTHING. No wb-short, no incomplete — the 32-block entries request was fully
+delivered. No reads at LBA 34+ → no slice was ever published; rejection happens
+inside the kext's scan() despite byte-golden, fully delivered data.
+
+Working theory: macOS attached this image as a disk of exactly image size
+(altLBA 11870274 == last block); our 14.4GiB card presents the same GPT on a much
+larger media — structurally ambiguous. An iOS-17.7-vintage kext may validate the
+backup-header position against the media size. v20 sizes the published media to
+altLBA+1 (11870275 sectors) making the GPT fully self-consistent.
+
+## Round 29 — SystemOS window boots through the dyld cache header (kernel 291, v17+bootargs)
+
+Payload 153050629843…: kernel 291 (e625e12), original trust modules, unixnu.toml args
+`… e5-systemos e5-systemos-boot`. SystemOS window staged first via
+tools/e5-systemos-media.py (3,302,814,400 B window at card LBA 12582912, full readback
+sha b4908cde…, OS GPT + APFS metadata verified unchanged, backup + restore commands recorded).
+
+Boot evidence (dumps/uefi-report-113123.txt, archived docs/logs/uefi-report-29.txt):
+- NativeSd cold path fully green on the OS image (all reference CRCs, both speed modes,
+  GPT ent16/ent8 golden, tp single 27328 us / multi 5040 us match y).
+- `SystemOS superblock crc c034a6f0 match y` → `publishing SystemOS read-only 6451200
+  sectors at 12582912` → kernel reads through the window → disk3 → SystemCryptex volume
+  8846FE78 mounted as disk5s1 → `E5SystemOS: mount /dev/disk5s1 read-only union enter` →
+  `mounted uuid 8846FE78… read-only union` → `original arm64 dyld cache header verified` →
+  `development startup dyld_flags 0x8` → launchd exec → two benign
+  `check_np vm_shared_region_start_address() failed` prints (empty shared region is the
+  normal first-process state) → dyld began mapping the original cache
+  (`rw 2048 blocks at 1279`, a 1 MiB window read) — console stops exactly there; no panic
+  record; both slot-B tries ended identically; Android fallback clean.
+- Root device chain confirmed: BSD root disk4s1 = SD GPT slice → APFS → DawnUpdate OS volume;
+  eMMC regression green all round.
+
+Checker: `tools/e5-system-boot-check.py --stage cache` PASS (manifest-29.json +
+readback-29.json archived). Remaining stall: dyld cache mapping never completes and the
+map-syscall return log (in kernel since 291) never printed.
+
+## v22 — stall triangulation (ab2a625)
+
+- NativeSd doAsyncReadWrite: `rw done n/n at lba` trace for every count>=8 read — decides
+  whether the 1 MiB cache read finishes inside the driver or the stall is above it.
+- e5-systemos-startup.patch: `_shared_region_map_and_slide` entry log for pid 1 — decides
+  whether dyld uses the shared-region syscall at all versus a private mmap fallback.
+  vm_unix.c section regenerated with exact stock-xnu-10063.141.1 headers (verified to apply
+  cleanly to the pristine file); kern_exec section unchanged.
+
+## Round 30 (kernel 292, v22 read-completion tracing) — cache mapping WORKS, log flood
+
+Result: PROGRESS, instrumentation backfired. After the round-29 stall point
+(`rw 2048 blocks at 1279`), the boot now served HUNDREDS of completed large
+reads through the SystemOS window: `rw done 2048/2048` x470+ advancing from
+card LBA 16128656 to 16578816 (~2.2 GB of the original dyld cache) plus
+interleaved 8-sector metadata reads near the container tail. No
+`rw incomplete` or `rw wb short` anywhere — the driver delivered every
+request. The dyld cache mapping machinery itself works.
+
+Cost: 470+ log lines flooded the 32 KB ramoops ring; the ring rolled over
+into the second boot's UEFI markers, erasing the `dyld map enter` evidence,
+everything the kernel printed after the reads began, and the reset cause.
+Try 1 rebooted with no panic record; try 2 booted clean and fell back to
+Android. The eager ~2 GB read is most plausibly code-signature validation
+hashing the whole cache file at map time (1 MiB read batching).
+
+v23 (this branch, next round): throttle the trace (first 4 + every 128th
+`rw done #%u ...`), and boot with `cs_enforcement_disable=1` (standard XNU
+boot-arg, string present in the kernel) — if the eager read is CS hashing,
+the flood should collapse and launchd should proceed. Report archived at
+docs/logs/uefi-report-30.txt (ring-rolled; evidence lives in the job spill).
+Checker: FAIL "no NativeSd v1 probe" — same flood artifact, not a driver
+regression.
+
+## Round 31 (kernel 293, v23 + cs_enforcement_disable=1) — AMFI arg panic
+
+Result: instant kernel panic on the new boot-arg: `panic(cpu 0 caller
+0xfffffff004ac9834): "can't has cs_enforcement_disable"
+@AppleMobileFileIntegrity.cpp:5261`. AMFI's boot-arg sanity check refuses
+cs_enforcement_disable outright on this kernel — my theory that the eager
+2 GB cache read is CS validation cannot be tested this way.
+
+Positives: (1) the throttled v23 logging left room for a FULL panic report
+in the ramoops ring — panic capture works when the ring isn't flooded;
+(2) the panic report structure is complete (kernel UUID 824671AF-77DC-3440-
+A874-5512C17021BC, panicked task pid 0, tid 101, 18-frame backtrace,
+stackshot truncated at 2400 bytes).
+
+Fix: boot-arg reverted (payload 798aacb2…, kernel 293 unchanged);
+round 32 re-runs round 30's configuration WITH throttled logging so the
+post-read-flood behavior and any panic string finally become visible.
+Report archived at docs/logs/uefi-report-31.txt.
+
+## Round 33 (kernel 294, v25 watchdog 600s) — SYSTEM BOOT BREAKTHROUGH
+
+Report: docs/logs/uefi-report-33.txt (= e5-xnu dumps/uefi-report-124030.txt).
+
+- `NativeSd: wdt ctrl 000a cnt 0084cf41` → UMP9620 WDT was ARMMED and counting
+  (~265 s left at probe; CTRL 0x0a = INT_EN|CNT_EN|RST_EN). Extension landed:
+  `wdt extended 600s ctrl 000a`.
+- With the wall removed the boot ran the FULL 600 s window, both tries:
+  - root mount from SD GPT slice (disk4s1 DawnUpdate21H461, mount-complete)
+  - SystemOS union mount + original dyld cache header + dyld_flags 0x8
+  - **`E5SystemOS: dyld map enter files 54 mappings 62` → `result 0`** — the
+    original shared cache (54 files) mapped through the syscall successfully
+  - **launchd ALIVE on the E5FB console**: "hello, launchd", Darwin
+    Bootstrapper 7.0.0, boot tasks exclaves-boot → fsck (skipped: not booting
+    main/diagnostic OS) → mount-phase-1; "Services Available = TRUE"
+  - soft fails all expected w/o Preboot/Data: no fstab, no boot-manifest-hash,
+    data volume missing-but-not-required, root snapshot "Need authenticator"
+  - SD served >1 GB of 1 MiB reads (`rw done #1024 2048/2048 …`) — code
+    signature validation paging the cache and service binaries
+- No panic at any point; both tries consumed the whole window then the
+  extended watchdog fired → next try → Android. Cycle script itself timed out
+  at 475 s waiting for adb ("device never came back" = boot outlived it);
+  report pulled with a manual wait loop.
+- Checker stage-cache FAIL on this report = ring-coverage artifact (probe
+  start lines rolled out; 6×32 KB zones fully consumed by boot output).
+
+v26 (2fd3d42): watchdog window 600 s → 1800 s to see how far launchd takes
+the system in 30 min.
+
+## Round 39-52 (kernel 302/303): console-rescue tooling + the wdt math bug
+
+Rounds 39-43 built the panic-capture ladder (all superseded by the BootShim
+rescue): E5-PRAM-TAIL anchor scan (0x9F000000 holds no text on this kernel),
+serial-lib snapshot (per-module statics captured UEFI text, not XNU), header-
+position reads (stale UEFI pos). Round 42's zero-length loop hung BootShim
+yellow (subs wraps on 0); fixed. Round 44 landed the WORKING rescue: BootShim
+copies the tee window (0xFFF81F1B, 24 KiB) to DRAM scratch (E5PC magic at
+0xC5000FF8, data +8) and E5BringupDxe prints it (E5-PREV-CONSOLE lines).
+
+Round 45 mirrored the rescue into the pmsg prz (0xFFF90400) hoping ylog would
+carry it out - that write hung the whole chain at a BLACK screen (LK faults on
+the rewritten pmsg header; manual power cycle needed). Reverted; never write
+pmsg from BootShim.
+
+Rounds 46-52 all showed ~75 s cycles and the console stopping at
+dev_init disk6s1 - suspected the FD print at first, but bisect round 51
+(print disabled) died identically, and /tmp/r39-41.log proved rounds 39-41
+( pre-rescue FD) were ALSO 75 s. Root cause: the v27 wdt change wrote
+LOAD_HIGH=0x0005 for "240 s" - but 240*32768=0x780000 needs 0x78. 0x0005 is a
+10 SECOND window. Every kernel-302 boot hit a 10 s watchdog wall at disk6s1
+dev_init; the FD was never at fault. (600 s=0x12C and 1800 s=0x384 were
+correct; only the 240 s conversion was wrong.)
+
+Round 52 (kernel 303, 0x78=240 s): cycle 310 s, launchd silently working
+(rw done #256+, SystemOS pager serving) - and the reason rounds 33-37 showed
+launchd boot-task prints while 36+ showed none: `-v` was dropped from the
+boot args at round 35. Silent != dead.
+
+Next (r53+): kernel 304 = -v restored + wdt 600 s (v25-proven 0x12C). If the
+rounds-34/35-class panic reproduces, its text lands in the rescue window; if
+not, launchd gets 10 minutes to bring the system up.

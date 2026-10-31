@@ -1,0 +1,12 @@
+{
+  "round": 26,
+  "report": "uefi-report-102035.txt",
+  "kernel_build": 286,
+  "payload_readback": "PASS",
+  "payload_bytes": 62926860,
+  "payload_sha256": "b7bc7ea5864721e638290503bdfd22ea8956db237269c09a290e5bfcd8162c6c",
+  "sd_primary_unchanged": true,
+  "original_launchd_libignition_executed": true,
+  "full_probe_log_retained": false,
+  "next_failure": "Preboot lookup entitlement error; libSystem.B.dylib missing with no dyld cache"
+}

@@ -1,0 +1,16 @@
+{
+  "device": "/dev/block/mmcblk1",
+  "card_sectors": 30244864,
+  "changed_lbas": [
+    1,
+    2
+  ],
+  "readback": "PASS",
+  "backup_unchanged": true,
+  "apfs_superblock_unchanged": true,
+  "before_sha256": "dd0e64f2952160b46f96fe71d16cc9b6494f3b73867448f50bc9b080cca59737",
+  "after_sha256": "6a2c1c8feed5cea3220ff1fe43808e12475906629b1274fd305226b5b925d35e",
+  "write_lba_first": 1,
+  "write_lba_last": 33,
+  "write_sectors": 33
+}

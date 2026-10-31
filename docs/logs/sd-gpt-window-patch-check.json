@@ -1,0 +1,9 @@
+{
+  "result": "PASS",
+  "xnu": "10063.141.1",
+  "prerequisite": "OS zzz-boot-progress.patch",
+  "patch": "/Volumes/Projects/unixnu-e5-repos/e5-device/patches/xnu/e5-ram-console-tee.patch",
+  "window_offset": "0x1f00",
+  "window_size": "0x6000",
+  "window_end": "0x7f00"
+}

@@ -6,14 +6,26 @@
 #include <IOKit/storage/IOBlockStorageDevice.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <kern/clock.h>
+#include <pexpert/pexpert.h>
+#include <libkern/c++/OSNumber.h>
+#include <libkern/c++/OSString.h>
 #include "TransferStatus.h"
 #include "SdProtocol.h"
+#include "SystemOSWindow.h"
 
 extern "C" void e5_panic_print(const char *);
 static void sdlog(const char *fmt, ...) {
   char text[192]; va_list ap; va_start(ap, fmt);
   vsnprintf(text, sizeof(text), fmt, ap); va_end(ap); e5_panic_print(text);
 }
+
+/* kern_exec.c stash: -999 unreached, -1 absent, -2 copyout, -3 in mount, >=0 errno, 100 ok. */
+extern "C" int e5_data_mount_state;
+
+class NativeSd;
+static bool publishSystemOS(NativeSd *host);
+class E5DataDevice;
+static bool publishData(E5DataDevice *device, NativeSd *host);
 
 class NativeSd : public IOBlockStorageDevice {
   OSDeclareDefaultStructors(NativeSd)
@@ -44,6 +56,7 @@ class NativeSd : public IOBlockStorageDevice {
   bool softVerify = false, multiOk = false;
   const char *mode = "none";
   uint32_t calls = 0;
+  uint32_t bigReads = 0;
 
   uint8_t r8(uint32_t o) const { return host.bytes[o]; }
   uint16_t r16(uint32_t o) const { return *(volatile uint16_t *)(host.bytes + o); }
@@ -126,12 +139,7 @@ class NativeSd : public IOBlockStorageDevice {
     // Same polynomial over an arbitrary length; used for the ext4 directory
     // block whose golden reference (docs/logs/sd-ext4/rootdir.bin) is the
     // whole 4096-byte block, not its first sector.
-    uint32_t crc = 0xffffffffu;
-    for (uint32_t i = 0; i < bytes; i++) {
-      crc ^= p[i];
-      for (unsigned bit = 0; bit < 8; bit++) crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1u)));
-    }
-    return ~crc;
+    return ~E5Sd::crc32Update(0xffffffffu, p, bytes);
   }
   bool idle(uint32_t mask) {
     for (unsigned i = 0; i < 10000; i++) {
@@ -252,15 +260,20 @@ class NativeSd : public IOBlockStorageDevice {
     return true;
   }
   bool verify() {
+    // v17: the card now carries the original-system OS disk image raw at
+    // LBA 0 (whole-card install, see docs/system-volume-audit.md). The
+    // four reference sectors come from uefi/build/system-audit/userdata/
+    // os-window.img (sha e5634d04..., byte-identical to what was dd'd):
+    // LBA 0 is the protective MBR, LBA 1 the
+    // "EFI PART" header, 2048/2050 land inside the Apple_APFS container.
     const uint32_t lbas[] = {0, 1, 2048, 2050};
-    const uint32_t crcs[] = {0xf9e85b82, 0xb2aa7578, 0xb2aa7578, 0xc1117912};
+    const uint32_t crcs[] = {0xec8ce612, 0x10fb5eed, 0xd2e6e0b2, 0xfba8aad8};
     for (unsigned i = 0; i < 4; i++) {
       if (!readSector(lbas[i])) return false;
       uint32_t crc = crc32(buffer);
       sdlog("NativeSd: reference lba %u st %08x crc %08x\n", lbas[i], r32(0x30), crc);
       if (crc != crcs[i]) return false;
-      if (i == 0 && (buffer[510] != 0x55 || buffer[511] != 0xaa)) return false;
-      if (i == 3 && (buffer[56] != 0x53 || buffer[57] != 0xef)) return false;
+      if (i == 1 && memcmp(buffer, "EFI PART", 8) != 0) return false;
     }
     for (unsigned i = 0; i < 16; i++) {
       unsigned index = (i & 1) ? 3 : 0;
@@ -482,7 +495,7 @@ class NativeSd : public IOBlockStorageDevice {
     st = command(0x031a, 0); rca = r32(0x10) >> 16;
     sdlog("NativeSd: CMD3 st %08x r6 %08x rca %04x\n", st, r32(0x10), rca);
     if (!commandOk(st) || !rca || (r32(0x10) & 0xe000) || !getCsd() || !select()) return false;
-    if (!readSector(0) || crc32(buffer) != 0xf9e85b82u) return false;
+    if (!readSector(0) || crc32(buffer) != 0xec8ce612u) return false;
     st = command(0x371a, (uint32_t)rca << 16);
     if (!commandOk(st) || (r32(0x10) & E5Sd::r1Errors)) return false;
     st = command(0x061a, 2); // ACMD6: 4-bit, volatile bus setting only.
@@ -532,7 +545,10 @@ class NativeSd : public IOBlockStorageDevice {
     // ext4 read-side walk over the e5-openwrt image (offline-proven chain,
     // dumps/sd-ext4/): MBR partition @2048 -> sb @2050 -> GDT fs-blk 1 ->
     // gd0 itable 145 -> root inode 2 @+256 -> extent -> root dir block.
-    // Pure evidence: soft failures log and continue (checker requires them).
+    // v17: the card may instead carry the original-system OS disk image
+    // (whole-card GPT layout). The walk is conditional on the ext4 sb
+    // magic; on an OS-image card one evidence line notes the layout and
+    // the GPT header (already CRC-verified in verify()) is confirmed.
     {
       const uint32_t partLba = 2048;
       uint32_t sbLba = partLba + 2;
@@ -546,9 +562,10 @@ class NativeSd : public IOBlockStorageDevice {
                           ((uint32_t)buffer[6] << 16) | ((uint32_t)buffer[7] << 24);
         uint32_t ipg = (uint32_t)buffer[40] | ((uint32_t)buffer[41] << 8) |
                        ((uint32_t)buffer[42] << 16) | ((uint32_t)buffer[43] << 24);
-        if (magic == 0xef53 && logBs == 2 && ipg == 8192) {
-          uint32_t bs = 4096;
-          sdlog("NativeSd: ext4 sb ok inodes %u blocks %u ipg %u\n", inodes, blocks, ipg);
+        if (magic == 0xef53) {
+          if (logBs == 2 && ipg == 8192) {
+            uint32_t bs = 4096;
+            sdlog("NativeSd: ext4 sb ok inodes %u blocks %u ipg %u\n", inodes, blocks, ipg);
           // GDT at fs-blk 1 (first_data_block 0): gd0.inode_table @+8.
           if (readSectors(partLba + 8, 8)) {
             uint32_t itable = (uint32_t)buffer[8] | ((uint32_t)buffer[9] << 8) |
@@ -583,8 +600,89 @@ class NativeSd : public IOBlockStorageDevice {
           } else {
             sdlog("NativeSd: ext4 gd read fail\n");
           }
+            } else {
+              sdlog("NativeSd: ext4 sb mismatch magic %04x logbs %u\n", magic, logBs);
+            }
         } else {
-          sdlog("NativeSd: ext4 sb mismatch magic %04x logbs %u\n", magic, logBs);
+          // v17: OS-image card — whole-card GPT layout, no ext4 superblock.
+          sdlog("NativeSd: ext4 absent (os image)\n");
+          if (!readSector(1)) {
+            sdlog("NativeSd: gpt read fail\n"); return false;
+          } else if (memcmp(buffer, "EFI PART", 8) == 0) {
+            uint32_t entries = (uint32_t)buffer[80] | ((uint32_t)buffer[81] << 8) |
+                               ((uint32_t)buffer[82] << 16) | ((uint32_t)buffer[83] << 24);
+            // v22: validate both GPT checksums, rather than calling the magic
+            // alone "gpt ok". The v21 card patch left a valid header whose
+            // declared table CRC did not match the actual 16 KiB entries.
+            // The original image was restored from its verified backup.
+            uint32_t entrySize = (uint32_t)buffer[84] | ((uint32_t)buffer[85] << 8) |
+                                 ((uint32_t)buffer[86] << 16) | ((uint32_t)buffer[87] << 24);
+            uint32_t headerSize = (uint32_t)buffer[12] | ((uint32_t)buffer[13] << 8) |
+                                  ((uint32_t)buffer[14] << 16) | ((uint32_t)buffer[15] << 24);
+            uint32_t headerCrc = (uint32_t)buffer[16] | ((uint32_t)buffer[17] << 8) |
+                                 ((uint32_t)buffer[18] << 16) | ((uint32_t)buffer[19] << 24);
+            uint32_t entriesCrc = (uint32_t)buffer[88] | ((uint32_t)buffer[89] << 8) |
+                                  ((uint32_t)buffer[90] << 16) | ((uint32_t)buffer[91] << 24);
+            uint64_t tableLba = 0;
+            for (unsigned i = 0; i < 8; i++) tableLba |= (uint64_t)buffer[72 + i] << (8 * i);
+            if (entries != 128 || entrySize != 128 || headerSize != 92 || tableLba != 2) {
+              sdlog("NativeSd: gpt geometry bad\n"); return false;
+            }
+            memset(buffer + 16, 0, 4);
+            uint32_t actualHeaderCrc = crc32n(buffer, headerSize);
+            sdlog("NativeSd: gpt header crc %08x expected %08x match %c\n",
+                  actualHeaderCrc, headerCrc, actualHeaderCrc == headerCrc ? 'y' : 'n');
+            if (actualHeaderCrc != headerCrc) return false;
+            uint64_t altLba = (uint64_t)buffer[32] | ((uint64_t)buffer[33] << 8) |
+                ((uint64_t)buffer[34] << 16) | ((uint64_t)buffer[35] << 24) |
+                ((uint64_t)buffer[36] << 32) | ((uint64_t)buffer[37] << 40);
+            sdlog("NativeSd: gpt altLba %llu card %u\n",
+                  (unsigned long long)altLba, (unsigned)sectors);
+            // v18: replicate the kernel scheme's entries read (16-sector
+            // chunks at LBA 2/18) and cross-check with 8-sector proven-path
+            // reads. Golden from os-window.img: chunk CRCs 3a740ceb/d8f49994,
+            // quarter CRCs 0c87a44e + c71c0011 x3, p0 type 7c3457ef first 34
+            // count 11870208. Tells corrupt-16-chunk apart from a scheme
+            // rejection that is not data.
+            {
+              bool e0 = readSectors(2, 16);
+              uint32_t c0 = e0 ? crc32n(buffer, 8192) : 0;
+              uint32_t t0 = (uint32_t)buffer[0] | ((uint32_t)buffer[1] << 8) |
+                            ((uint32_t)buffer[2] << 16) | ((uint32_t)buffer[3] << 24);
+              uint32_t f0 = (uint32_t)buffer[32] | ((uint32_t)buffer[33] << 8) |
+                            ((uint32_t)buffer[34] << 16) | ((uint32_t)buffer[35] << 24);
+              uint32_t n0 = ((uint32_t)buffer[40] | ((uint32_t)buffer[41] << 8) |
+                             ((uint32_t)buffer[42] << 16) | ((uint32_t)buffer[43] << 24)) - f0 + 1;
+              bool e1 = readSectors(18, 16);
+              uint32_t c1 = e1 ? crc32n(buffer, 8192) : 0;
+              sdlog("NativeSd: gpt ent16 h0 %c crc %08x h1 %c crc %08x "
+                    "p0 type %08x first %u count %u\n",
+                    e0 ? 'y' : 'n', c0, e1 ? 'y' : 'n', c1, t0, f0, n0);
+              uint32_t qs[4] = {0, 0, 0, 0};
+              uint32_t tableState = 0xffffffffu;
+              bool tableOk = true;
+              char qf[5] = "nnnn";
+              for (uint32_t q = 0; q < 4; q++) {
+                if (readSectors(2 + q * 8, 8)) {
+                  qs[q] = crc32n(buffer, 4096);
+                  tableState = E5Sd::crc32Update(tableState, buffer, 4096);
+                  qf[q] = 'y';
+                } else {
+                  tableOk = false;
+                }
+              }
+              sdlog("NativeSd: gpt ent8 %c%c%c%c crc %08x %08x %08x %08x\n",
+                    qf[0], qf[1], qf[2], qf[3], qs[0], qs[1], qs[2], qs[3]);
+              uint32_t actualEntriesCrc = ~tableState;
+              tableOk = tableOk && actualEntriesCrc == entriesCrc;
+              sdlog("NativeSd: gpt entries crc %08x expected %08x match %c\n",
+                    actualEntriesCrc, entriesCrc, tableOk ? 'y' : 'n');
+              if (!tableOk) return false;
+            }
+            sdlog("NativeSd: gpt ok entries %u\n", entries);
+          } else {
+            sdlog("NativeSd: gpt absent\n"); return false;
+          }
         }
       } else {
         sdlog("NativeSd: ext4 sb read fail\n");
@@ -631,6 +729,16 @@ class NativeSd : public IOBlockStorageDevice {
   }
 
 public:
+  // Load the 32 MiB Data container image from the card into a caller buffer,
+  // 16 sectors per multi-block read (the DMA page limit). ~3.3 s at the
+  // proven 24 MHz 4-bit throughput; runs once, before the device publishes.
+  bool fillDataImage(char *destination) {
+    for (uint64_t off = 0; off < E5Data::sectors; off += 16) {
+      if (!readSectors((uint32_t)(E5Data::base + off), 16)) return false;
+      memcpy(destination + off * 512, buffer, 16 * 512);
+    }
+    return true;
+  }
   bool start(IOService *provider) override {
     if (!IOBlockStorageDevice::start(provider)) return false;
     sdlog("NativeSd: v1 start, independent SDIO0 host\n");
@@ -652,9 +760,59 @@ public:
     sdlog("NativeSd: probe %s sectors %llu mode %s\n", cardUp ? "Success" : "Failed",
           (unsigned long long)sectors, mode);
     if (!cardUp) return false;
-    sdlog("NativeSd: publishing read-only SD card %llu sectors\n", (unsigned long long)sectors);
-    registerService(); return true;
+    bool systemOS = PE_parse_boot_argn("e5-systemos", nullptr, 0);
+    if (systemOS) {
+      if (!E5SystemOS::fits(sectors) || !readSectors(E5SystemOS::base, 8) ||
+          memcmp(buffer + 32, "NXSB", 4) ||
+          crc32n(buffer, 4096) != E5SystemOS::superblockCrc) {
+        sdlog("NativeSd: SystemOS superblock refused\n"); return false;
+      }
+      sdlog("NativeSd: SystemOS superblock crc %08x match y\n", E5SystemOS::superblockCrc);
+    }
+    if (PE_parse_boot_argn("e5-systemos-boot", nullptr, 0)) {
+      // Nothing in XNU pets the UMP9620 watchdog, so system bring-up dies at
+      // its wall mid-launchd with no panic. Rounds 33-37 proved the window
+      // mechanics; the on-screen panic arrives early, so a short window
+      // (240 s) cycles evidence fast while still outliving the seed boots.
+      uint32_t ctrl = pmicRead(0x48), cntHi = pmicRead(0x5c), cntLo = pmicRead(0x58);
+      sdlog("NativeSd: wdt ctrl %04x cnt %04x%04x\n", ctrl, cntHi, cntLo);
+      if (ctrl & 0x0002u) { // CNT_EN: the watchdog is counting.
+        unsigned i = 0;
+        for (; i < 2000; i++) {
+          if (!(pmicRead(0x50) & 0x0010u)) break; // LD_BUSY cleared.
+          IODelay(10);
+        }
+        if (i < 2000) {
+          pmicWrite(0x60, 0xe551); // LOCK: unlock key.
+          pmicWrite(0x44, 0x012c); // LOAD_HIGH = 600*32768 >> 16 (0x12CC000>>16).
+          pmicWrite(0x40, 0x0000); // LOAD_LOW.
+          pmicWrite(0x70, 0x0000); // IRQ_LOAD_HIGH (pretimeout off).
+          pmicWrite(0x6c, 0x0000); // IRQ_LOAD_LOW.
+          pmicWrite(0x60, 0x0000); // LOCK: locked.
+          sdlog("NativeSd: wdt extended 600s ctrl %04x\n", pmicRead(0x48));
+        } else sdlog("NativeSd: wdt load busy\n");
+      } else sdlog("NativeSd: wdt not counting\n");
+    }
+    // Round 55/56 root-attach regression: reading the Data window AFTER
+    // registerService() raced the IOKit scheme probes (kernel 308 never
+    // attached root; kernel 309 with the read gated off restored the 306
+    // behavior). All card reads for the Data image now happen BEFORE
+    // registerService(), the same no-reader window the SystemOS superblock
+    // check uses; only the registry publication stays after it.
+    E5DataDevice *dataDevice = nullptr;
+    if (systemOS && PE_parse_boot_argn("e5-data", nullptr, 0)) {
+      dataDevice = prepareDataDevice();
+      if (!dataDevice) sdlog("NativeSd: data window NXSB refused\n");
+    }
+    sdlog("NativeSd: publishing read-only SD card %llu sectors\n",
+          (unsigned long long)sectors);
+    registerService();
+    if (systemOS && !publishSystemOS(this)) sdlog("NativeSd: SystemOS publication failed\n");
+    if (dataDevice && !publishData(dataDevice, this))
+      sdlog("NativeSd: data publication failed\n");
+    return true;
   }
+  E5DataDevice *prepareDataDevice();
   void stop(IOService *provider) override {
     if (lock) IOLockLock(lock);
     cardUp = false;
@@ -686,8 +844,10 @@ public:
   UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
   IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
   IOReturn reportMaxValidBlock(UInt64 *n) override { *n = sectors ? sectors - 1 : 0; return kIOReturnSuccess; }
-  IOReturn reportEjectability(bool *b) override { *b = true; return kIOReturnSuccess; }
-  IOReturn reportRemovability(bool *b) override { *b = true; return kIOReturnSuccess; }
+  // Fixed boot card: iPadOS APFS filters ejectable/removable media before
+  // reading the partition. This bring-up driver does not support hot removal.
+  IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
   IOReturn reportMediaState(bool *p, bool *c) override { *p = cardUp; if (c) *c = false; return kIOReturnSuccess; }
   IOReturn reportWriteProtection(bool *b) override { *b = true; return kIOReturnSuccess; }
   IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
@@ -702,22 +862,38 @@ public:
       return kIOReturnBadArgument;
     UInt64 done = 0; IOLockLock(lock);
     if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
-    if (calls++ < 3) sdlog("NativeSd: rw %llu blocks at %llu\n", (unsigned long long)count, (unsigned long long)block);
+    // Keep the GPT/first APFS requests, then sample progress. Logging every
+    // multi-block read overwrites the persistent trace window during OS boot.
+    uint32_t call = ++calls;
+    if (call <= 12 || (call & (call - 1)) == 0)
+      sdlog("NativeSd: rw %llu blocks at %llu\n", (unsigned long long)count, (unsigned long long)block);
+    UInt64 wbShort = 0;
     while (done < count * 512) {
       uint32_t left = (uint32_t)((count * 512 - done) / 512);
       uint32_t n = 1;
-      if (multiOk && left >= 4) n = left > 16 ? 16 : left;
+      // v18: serve kernel reads in 8-sector chunks — the size proven golden
+      // by the ext4 walk (16-sector chunks stay available for diagnostics).
+      if (multiOk && left >= 4) n = left > 8 ? 8 : left;
       bool ok;
       if (n > 1) {
-        ok = readSectors((uint32_t)(block + done / 512), n) &&
-             data->writeBytes(done, buffer, n * 512) == n * 512;
+        ok = readSectors((uint32_t)(block + done / 512), n);
+        if (ok && data->writeBytes(done, buffer, n * 512) != n * 512) { wbShort = done; ok = false; }
       } else {
-        ok = readSector((uint32_t)(block + done / 512)) &&
-             data->writeBytes(done, buffer, 512) == 512;
+        ok = readSector((uint32_t)(block + done / 512));
+        if (ok && data->writeBytes(done, buffer, 512) != 512) { wbShort = done; ok = false; }
       }
       if (!ok) break;
       done += n * 512;
     }
+    if (wbShort) sdlog("NativeSd: rw wb short %llu at %llu\n", (unsigned long long)wbShort, (unsigned long long)block);
+    if (done != count * 512) sdlog("NativeSd: rw incomplete %llu/%llu blocks at %llu\n", (unsigned long long)(done / 512), (unsigned long long)count, (unsigned long long)block);
+    // v23: large-read completion trace, THROTTLED — round 30's unthrottled
+    // per-read lines (470+) flooded the 32 KB ramoops ring and erased the
+    // boot's own history. Keep the first few plus every 128th, with the
+    // running count so progress stays measurable.
+    if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0))
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d\n", bigReads, (unsigned long long)(done / 512),
+            (unsigned long long)count, (unsigned long long)block, e5_data_mount_state);
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
         done == count * 512 ? kIOReturnSuccess : kIOReturnIOError, done);
@@ -725,3 +901,209 @@ public:
   }
 };
 OSDefineMetaClassAndStructors(NativeSd, IOBlockStorageDevice)
+
+// A second storage device shares the host's lock, DMA buffer and error handling.
+// Its offsets never enter the original OS image or the physical card's GPT.
+class E5SystemOSDevice : public IOBlockStorageDevice {
+  OSDeclareDefaultStructors(E5SystemOSDevice)
+public:
+  char *getVendorString() override { return const_cast<char *>("E5"); }
+  char *getProductString() override { return const_cast<char *>("SystemOS read-only window"); }
+  char *getRevisionString() override { return const_cast<char *>("1"); }
+  char *getAdditionalDeviceInfoString() override { return const_cast<char *>(E5SystemOS::uuid); }
+  IOReturn doEjectMedia() override { return kIOReturnUnsupported; }
+  IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
+  UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
+  IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *n) override { *n = E5SystemOS::sectors - 1; return kIOReturnSuccess; }
+  IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportMediaState(bool *p, bool *c) override {
+    NativeSd *host = OSDynamicCast(NativeSd, getProvider());
+    if (!host) return kIOReturnNotReady;
+    return host->reportMediaState(p, c);
+  }
+  IOReturn reportWriteProtection(bool *b) override { *b = true; return kIOReturnSuccess; }
+  IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
+  IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
+  IOReturn getWriteCacheState(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
+  IOReturn doAsyncReadWrite(IOMemoryDescriptor *data, UInt64 block, UInt64 count,
+      IOStorageAttributes *attributes, IOStorageCompletion *completion) override {
+    if (!data || !completion || !completion->action) return kIOReturnBadArgument;
+    if (data->getDirection() != kIODirectionIn) return kIOReturnNotWritable;
+    if (!E5SystemOS::contains(block, count)) return kIOReturnBadArgument;
+    NativeSd *host = OSDynamicCast(NativeSd, getProvider());
+    if (!host) return kIOReturnNotReady;
+    return host->doAsyncReadWrite(data, E5SystemOS::base + block, count, attributes, completion);
+  }
+};
+OSDefineMetaClassAndStructors(E5SystemOSDevice, IOBlockStorageDevice)
+
+static bool publishSystemOS(NativeSd *host) {
+  E5SystemOSDevice *window = new E5SystemOSDevice;
+  if (!window) return false;
+  if (!window->init(nullptr)) { window->release(); return false; }
+  if (!window->attach(host)) { window->release(); return false; }
+  if (!window->start(host)) { window->detach(host); window->release(); return false; }
+  sdlog("NativeSd: publishing SystemOS read-only %llu sectors at %llu\n",
+        (unsigned long long)E5SystemOS::sectors, (unsigned long long)E5SystemOS::base);
+  window->registerService();
+  window->release();
+  return true;
+}
+
+// Select the APFS volume by its actual UUID, never by enumeration order.
+extern "C" int e5_systemos_device(char *path, size_t size, int *major, int *minor) {
+  OSDictionary *match = IOService::serviceMatching("IOMedia");
+  OSDictionary *properties = OSDictionary::withCapacity(1);
+  OSString *uuid = OSString::withCString(E5SystemOS::uuid);
+  if (!match || !properties || !uuid) {
+    if (match) match->release();
+    if (properties) properties->release();
+    if (uuid) uuid->release();
+    return 0;
+  }
+  bool ready = properties->setObject("UUID", uuid) && match->setObject(gIOPropertyMatchKey, properties);
+  properties->release(); uuid->release();
+  if (!ready) { match->release(); return 0; }
+  IOService *volume = IOService::waitForMatchingService(match, 30ULL * 1000000000ULL);
+  match->release();
+  if (!volume) return 0;
+  OSString *name = OSDynamicCast(OSString, volume->getProperty("BSD Name"));
+  OSNumber *maj = OSDynamicCast(OSNumber, volume->getProperty("BSD Major"));
+  OSNumber *min = OSDynamicCast(OSNumber, volume->getProperty("BSD Minor"));
+  bool ok = name && maj && min && size > strlen(name->getCStringNoCopy()) + 5 &&
+      maj->unsigned64BitValue() <= 255 && min->unsigned64BitValue() <= 0xffffff;
+  if (ok) {
+    snprintf(path, size, "/dev/%s", name->getCStringNoCopy());
+    *major = (int)maj->unsigned32BitValue(); *minor = (int)min->unsigned32BitValue();
+    sdlog("NativeSd: SystemOS volume %s device %s\n", E5SystemOS::uuid, path);
+  }
+  volume->release();
+  return ok ? 1 : 0;
+}
+
+// The system's one writable dataset: a 32 MiB APFS container copied from the
+// card into a RAM buffer and served read-write. The kernel startup patch
+// mounts the volume at /private/var before launchd starts (tzinit and the
+// data-protection boot tasks need a writable dataset; the OS volume is
+// read-only). The RAM copy is volatile by design: nothing writes the card.
+class E5DataDevice : public IOBlockStorageDevice {
+  OSDeclareDefaultStructors(E5DataDevice)
+public:
+  IOBufferMemoryDescriptor *image = nullptr;
+  char *getVendorString() override { return const_cast<char *>("E5"); }
+  char *getProductString() override { return const_cast<char *>("Data ramdisk window"); }
+  char *getRevisionString() override { return const_cast<char *>("1"); }
+  char *getAdditionalDeviceInfoString() override { return const_cast<char *>(E5Data::uuid); }
+  IOReturn doEjectMedia() override { return kIOReturnUnsupported; }
+  IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
+  UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
+  IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *n) override { *n = E5Data::sectors - 1; return kIOReturnSuccess; }
+  IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportMediaState(bool *present, bool *changed) override {
+    NativeSd *host = OSDynamicCast(NativeSd, getProvider());
+    if (!host) return kIOReturnNotReady;
+    return host->reportMediaState(present, changed);
+  }
+  IOReturn reportWriteProtection(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
+  IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
+  IOReturn getWriteCacheState(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
+  IOReturn doAsyncReadWrite(IOMemoryDescriptor *data, UInt64 block, UInt64 count,
+      IOStorageAttributes *attributes, IOStorageCompletion *completion) override {
+    (void)attributes;
+    if (!data || !completion || !completion->action) return kIOReturnBadArgument;
+    if (!image || !E5Data::contains(block, count)) return kIOReturnBadArgument;
+    UInt64 bytes = count * 512;
+    char *base = (char *)image->getBytesNoCopy() + block * 512;
+    if (data->getDirection() == kIODirectionOut) {
+      data->readBytes(0, base, bytes);
+    } else {
+      // Serve reads (and flush-style no-direction requests) from the image.
+      data->writeBytes(0, base, bytes);
+    }
+    completion->action(completion->target, completion->parameter, kIOReturnSuccess, bytes);
+    return kIOReturnSuccess;
+  }
+  void free() override {
+    if (image) image->release();
+    IOBlockStorageDevice::free();
+  }
+};
+OSDefineMetaClassAndStructors(E5DataDevice, IOBlockStorageDevice)
+  // Probe-time Data preparation: gate on the raw-container superblock and
+  // load the whole image while no IOKit consumer can race the host.
+
+E5DataDevice *NativeSd::prepareDataDevice() {
+    if (!E5Data::fits(sectors)) return nullptr;
+    if (!readSectors((uint32_t)E5Data::base, 8)) {
+      sdlog("NativeSd: data window read failed\n");
+      return nullptr;
+    }
+    if (memcmp(buffer + 32, "NXSB", 4)) {
+      uint32_t a = *(uint32_t *)(buffer + 32), b = *(uint32_t *)(buffer + 36);
+      sdlog("NativeSd: data window not NXSB (%08x %08x)\n", a, b);
+      return nullptr;
+    }
+    E5DataDevice *device = new E5DataDevice;
+    if (!device) return nullptr;
+    if (!device->init(nullptr)) { device->release(); return nullptr; }
+    device->image = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+        kernel_task, kIODirectionInOut, E5Data::sectors * 512, 0x0000000FFFFFFFFFull);
+    if (!device->image || !fillDataImage((char *)device->image->getBytesNoCopy())) {
+      sdlog("NativeSd: data image load failed\n");
+      if (device->image) device->image->release();
+      device->image = nullptr;
+      device->release();
+      return nullptr;
+    }
+    return device;
+  }
+
+
+static bool publishData(E5DataDevice *device, NativeSd *host) {
+  if (!device->attach(host)) { device->release(); return false; }
+  if (!device->start(host)) { device->detach(host); device->release(); return false; }
+  sdlog("NativeSd: publishing Data read-write %llu sectors at %llu\n",
+        (unsigned long long)E5Data::sectors, (unsigned long long)E5Data::base);
+  device->registerService();
+  device->release();
+  return true;
+}
+
+// Select the Data volume by its actual UUID, never by enumeration order.
+extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
+  OSDictionary *match = IOService::serviceMatching("IOMedia");
+  OSDictionary *properties = OSDictionary::withCapacity(1);
+  OSString *uuid = OSString::withCString(E5Data::uuid);
+  if (!match || !properties || !uuid) {
+    if (match) match->release();
+    if (properties) properties->release();
+    if (uuid) uuid->release();
+    return 0;
+  }
+  bool ready = properties->setObject("UUID", uuid) && match->setObject(gIOPropertyMatchKey, properties);
+  properties->release(); uuid->release();
+  if (!ready) { match->release(); return 0; }
+  IOService *volume = IOService::waitForMatchingService(match, 30ULL * 1000000000ULL);
+  match->release();
+  if (!volume) return 0;
+  OSString *name = OSDynamicCast(OSString, volume->getProperty("BSD Name"));
+  OSNumber *maj = OSDynamicCast(OSNumber, volume->getProperty("BSD Major"));
+  OSNumber *min = OSDynamicCast(OSNumber, volume->getProperty("BSD Minor"));
+  bool ok = name && maj && min && size > strlen(name->getCStringNoCopy()) + 5 &&
+      maj->unsigned64BitValue() <= 255 && min->unsigned64BitValue() <= 0xffffff;
+  if (ok) {
+    snprintf(path, size, "/dev/%s", name->getCStringNoCopy());
+    *major = (int)maj->unsigned32BitValue(); *minor = (int)min->unsigned32BitValue();
+    sdlog("NativeSd: Data volume %s device %s\n", E5Data::uuid, path);
+  }
+  volume->release();
+  return ok ? 1 : 0;
+}
+

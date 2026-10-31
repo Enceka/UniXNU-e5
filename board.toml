@@ -43,4 +43,10 @@
 [payload.adt]
 owned_memory_size = "0x20000000"
 packed_data_ramdisk = "Payloads/seed.dbr"
-root_match_volume_uuid = "238A9EDD-6788-4B2E-BA4E-C1F70AE25B64"
+root_match_volume_uuid = "04769D26-2CA0-4825-B443-E2E5F88300F2"
+
+# Development namespace for the verified 21H461 OS/SystemOS image pair.
+# Recompute with e5-xnu/uefi/tools/set-e5-boot-manifest.py if either changes.
+[adt.chosen.bytes]
+boot-manifest-hash = "9c4e12788051dccdc1667e61f9bf2e10c6467360ae8b26edd34016c862f39ee373187181aa308e137345c334b1207f5c"
+owner-boot-manifest-domain = "45352e4272696e6775702e496d6167655365742e763100"

@@ -1,0 +1,44 @@
+{
+  "record": "e5-xnu/uefi/build/e5tw-validation/board-r2/dmesg-ramoops-0.bin",
+  "record_sha256": "139e5ec63ec71d18faa2049ad7496d629b3c93868457e411f04ccc5ba758ed04",
+  "offset": 7936,
+  "position": 19018,
+  "ring_bytes": 24568,
+  "panic": "panic(cpu 0 caller 0xfffffff0079e9860): tzinit[17] exited -- no exit reason available -- (signal 0, exit status 30 )",
+  "kernel_uuid": "F6A3666A-8868-3E30-BC01-5D1A69866445",
+  "ci_run_number": 306,
+  "kernel_revision": "54347d444c71064ba254a8cb9abd787264cd007a",
+  "adt_tool_repository": "Enceka/e5-xnu",
+  "adt_tool_revision": "9547b0c7525d2080ffcfdffc11a6cb6f55ba9e30",
+  "payload_sha256": "ea82675bae2de666a1c8846d4b971c9e40bd3d7a1ec99c56ed36ca6da72ad4a8",
+  "full_readback_verified": true,
+  "android_boot_id": "0606012d-6cbd-42b1-b968-53022bbc9df6",
+  "android_slot": "_a",
+  "report": "e5-xnu/dumps/uefi-report-200430.txt",
+  "boot_session_uuid": "20F7FD8F-0582-4955-93AB-350EC9DEE361",
+  "observed_boot_tasks": [
+    "mount-phase-1",
+    "data-protection",
+    "mount-phase-2",
+    "init-with-data-volume",
+    "fips",
+    "keybag",
+    "usermanagerd",
+    "tzinit"
+  ],
+  "mount_exit_66_resolved": true,
+  "current_blocker": "tzinit cannot locate writable Data and its system-partition fallback returns EROFS (exit 30)",
+  "boot_manifest": {
+    "domain": "E5.Bringup.ImageSet.v1",
+    "boot_manifest_hash": "9c4e12788051dccdc1667e61f9bf2e10c6467360ae8b26edd34016c862f39ee373187181aa308e137345c334b1207f5c",
+    "os_image_sha256": "e5634d04a8ac35f024845f583394e0a35deb26a04cb0c00286a8674e25a9a4f2",
+    "systemos_image_sha256": "b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f",
+    "before_sha256": "81f81441f2673b1a02c8ed7238d6d69a1641799565b5f00e5dca9f1b793ce67b",
+    "after_sha256": "a003018eed7f6130de628655b707f6e8ccc5c92c76f752b72f094a0e2e114bac",
+    "changed_properties": [
+      "/device-tree/chosen/boot-manifest-hash",
+      "/device-tree/chosen/owner-boot-manifest-domain"
+    ]
+  },
+  "display_normalization": "Only tripled panic characters collapsed; control bytes escaped and trailing spaces removed in archived text; raw pstore retained locally"
+}
