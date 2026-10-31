@@ -21,7 +21,8 @@ static void sdlog(const char *fmt, ...) {
 
 class NativeSd;
 static bool publishSystemOS(NativeSd *host);
-static bool publishData(NativeSd *host);
+class E5DataDevice;
+static bool publishData(E5DataDevice *device, NativeSd *host);
 
 class NativeSd : public IOBlockStorageDevice {
   OSDeclareDefaultStructors(NativeSd)
@@ -789,25 +790,26 @@ public:
         } else sdlog("NativeSd: wdt load busy\n");
       } else sdlog("NativeSd: wdt not counting\n");
     }
+    // Round 55/56 root-attach regression: reading the Data window AFTER
+    // registerService() raced the IOKit scheme probes (kernel 308 never
+    // attached root; kernel 309 with the read gated off restored the 306
+    // behavior). All card reads for the Data image now happen BEFORE
+    // registerService(), the same no-reader window the SystemOS superblock
+    // check uses; only the registry publication stays after it.
+    E5DataDevice *dataDevice = nullptr;
+    if (systemOS && PE_parse_boot_argn("e5-data", nullptr, 0)) {
+      dataDevice = prepareDataDevice();
+      if (!dataDevice) sdlog("NativeSd: data window NXSB refused\n");
+    }
     sdlog("NativeSd: publishing read-only SD card %llu sectors\n",
           (unsigned long long)sectors);
     registerService();
     if (systemOS && !publishSystemOS(this)) sdlog("NativeSd: SystemOS publication failed\n");
-    // Round 55 bisect: with the Data probe below, no boot attached the root
-    // media (zero scheme reads, "Still waiting for root device" panic), while
-    // kernel 306 attached root every time. The whole Data path now waits for
-    // an explicit e5-data boot arg; without it the driver is exactly the 306
-    // behavior.
-    if (systemOS && PE_parse_boot_argn("e5-data", nullptr, 0)) {
-      if (E5Data::fits(sectors) && readSectors((uint32_t)E5Data::base, 8) &&
-          !memcmp(buffer + 32, "NXSB", 4)) {
-        if (!publishData(this)) sdlog("NativeSd: data publication failed\n");
-      } else {
-        sdlog("NativeSd: data window NXSB refused\n");
-      }
-    }
+    if (dataDevice && !publishData(dataDevice, this))
+      sdlog("NativeSd: data publication failed\n");
     return true;
   }
+  E5DataDevice *prepareDataDevice();
   void stop(IOService *provider) override {
     if (lock) IOLockLock(lock);
     cardUp = false;
@@ -1031,20 +1033,37 @@ public:
   }
 };
 OSDefineMetaClassAndStructors(E5DataDevice, IOBlockStorageDevice)
+  // Probe-time Data preparation: gate on the raw-container superblock and
+  // load the whole image while no IOKit consumer can race the host.
 
-static bool publishData(NativeSd *host) {
-  E5DataDevice *device = new E5DataDevice;
-  if (!device) return false;
-  if (!device->init(nullptr)) { device->release(); return false; }
-  device->image = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
-      kernel_task, kIODirectionInOut, E5Data::sectors * 512, 0x0000000FFFFFFFFFull);
-  if (!device->image || !host->fillDataImage((char *)device->image->getBytesNoCopy())) {
-    sdlog("NativeSd: data image load failed\n");
-    if (device->image) device->image->release();
-    device->image = nullptr;
-    device->release();
-    return false;
+E5DataDevice *NativeSd::prepareDataDevice() {
+    if (!E5Data::fits(sectors)) return nullptr;
+    if (!readSectors((uint32_t)E5Data::base, 8)) {
+      sdlog("NativeSd: data window read failed\n");
+      return nullptr;
+    }
+    if (memcmp(buffer + 32, "NXSB", 4)) {
+      uint32_t a = *(uint32_t *)(buffer + 32), b = *(uint32_t *)(buffer + 36);
+      sdlog("NativeSd: data window not NXSB (%08x %08x)\n", a, b);
+      return nullptr;
+    }
+    E5DataDevice *device = new E5DataDevice;
+    if (!device) return nullptr;
+    if (!device->init(nullptr)) { device->release(); return nullptr; }
+    device->image = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+        kernel_task, kIODirectionInOut, E5Data::sectors * 512, 0x0000000FFFFFFFFFull);
+    if (!device->image || !fillDataImage((char *)device->image->getBytesNoCopy())) {
+      sdlog("NativeSd: data image load failed\n");
+      if (device->image) device->image->release();
+      device->image = nullptr;
+      device->release();
+      return nullptr;
+    }
+    return device;
   }
+
+
+static bool publishData(E5DataDevice *device, NativeSd *host) {
   if (!device->attach(host)) { device->release(); return false; }
   if (!device->start(host)) { device->detach(host); device->release(); return false; }
   sdlog("NativeSd: publishing Data read-write %llu sectors at %llu\n",
