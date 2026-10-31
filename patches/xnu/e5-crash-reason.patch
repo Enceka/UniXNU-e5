@@ -1,0 +1,21 @@
+--- a/bsd/kern/kern_exit.c
++++ b/bsd/kern/kern_exit.c
+@@ -2025,6 +2025,18 @@
+ 		(void)sys_perf_notify(self, proc_getpid(p));
+ 	}
+ 
++
++	/* E5: surface the exit reason of every crashing process on the console.
++	 * Userland crash reports live on the volatile Data volume and are lost
++	 * on reset; the kernel is the only durable witness.  SpringBoard and
++	 * liveactivitiesd crash-loop with nothing but "Too many corpses" today.
++	 */
++	if (create_corpse == TRUE && PROC_HAS_EXITREASON(p)) {
++		printf("E5CRASH pid %d (%s) sig %d: reason ns %u code %llu flags %llu\n",
++		    proc_getpid(p), p->p_comm, p->p_xsig,
++		    p->p_exit_reason->osr_namespace, p->p_exit_reason->osr_code,
++		    p->p_exit_reason->osr_flags);
++	}
+ 
+ 	/* stash the usage into corpse data if making_corpse == true */
+ 	if (create_corpse == TRUE) {
