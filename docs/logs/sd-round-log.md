@@ -664,3 +664,32 @@ Fix: boot-arg reverted (payload 798aacb2…, kernel 293 unchanged);
 round 32 re-runs round 30's configuration WITH throttled logging so the
 post-read-flood behavior and any panic string finally become visible.
 Report archived at docs/logs/uefi-report-31.txt.
+
+## Round 33 (kernel 294, v25 watchdog 600s) — SYSTEM BOOT BREAKTHROUGH
+
+Report: docs/logs/uefi-report-33.txt (= e5-xnu dumps/uefi-report-124030.txt).
+
+- `NativeSd: wdt ctrl 000a cnt 0084cf41` → UMP9620 WDT was ARMMED and counting
+  (~265 s left at probe; CTRL 0x0a = INT_EN|CNT_EN|RST_EN). Extension landed:
+  `wdt extended 600s ctrl 000a`.
+- With the wall removed the boot ran the FULL 600 s window, both tries:
+  - root mount from SD GPT slice (disk4s1 DawnUpdate21H461, mount-complete)
+  - SystemOS union mount + original dyld cache header + dyld_flags 0x8
+  - **`E5SystemOS: dyld map enter files 54 mappings 62` → `result 0`** — the
+    original shared cache (54 files) mapped through the syscall successfully
+  - **launchd ALIVE on the E5FB console**: "hello, launchd", Darwin
+    Bootstrapper 7.0.0, boot tasks exclaves-boot → fsck (skipped: not booting
+    main/diagnostic OS) → mount-phase-1; "Services Available = TRUE"
+  - soft fails all expected w/o Preboot/Data: no fstab, no boot-manifest-hash,
+    data volume missing-but-not-required, root snapshot "Need authenticator"
+  - SD served >1 GB of 1 MiB reads (`rw done #1024 2048/2048 …`) — code
+    signature validation paging the cache and service binaries
+- No panic at any point; both tries consumed the whole window then the
+  extended watchdog fired → next try → Android. Cycle script itself timed out
+  at 475 s waiting for adb ("device never came back" = boot outlived it);
+  report pulled with a manual wait loop.
+- Checker stage-cache FAIL on this report = ring-coverage artifact (probe
+  start lines rolled out; 6×32 KB zones fully consumed by boot output).
+
+v26 (2fd3d42): watchdog window 600 s → 1800 s to see how far launchd takes
+the system in 30 min.
