@@ -645,3 +645,22 @@ the flood should collapse and launchd should proceed. Report archived at
 docs/logs/uefi-report-30.txt (ring-rolled; evidence lives in the job spill).
 Checker: FAIL "no NativeSd v1 probe" — same flood artifact, not a driver
 regression.
+
+## Round 31 (kernel 293, v23 + cs_enforcement_disable=1) — AMFI arg panic
+
+Result: instant kernel panic on the new boot-arg: `panic(cpu 0 caller
+0xfffffff004ac9834): "can't has cs_enforcement_disable"
+@AppleMobileFileIntegrity.cpp:5261`. AMFI's boot-arg sanity check refuses
+cs_enforcement_disable outright on this kernel — my theory that the eager
+2 GB cache read is CS validation cannot be tested this way.
+
+Positives: (1) the throttled v23 logging left room for a FULL panic report
+in the ramoops ring — panic capture works when the ring isn't flooded;
+(2) the panic report structure is complete (kernel UUID 824671AF-77DC-3440-
+A874-5512C17021BC, panicked task pid 0, tid 101, 18-frame backtrace,
+stackshot truncated at 2400 bytes).
+
+Fix: boot-arg reverted (payload 798aacb2…, kernel 293 unchanged);
+round 32 re-runs round 30's configuration WITH throttled logging so the
+post-read-flood behavior and any panic string finally become visible.
+Report archived at docs/logs/uefi-report-31.txt.
