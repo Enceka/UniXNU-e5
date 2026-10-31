@@ -58,6 +58,8 @@ index 715c545..aba4a0a 100644
 +#define E5_PRZ_DATA_OFF  27UL
 +#define E5_PRZ_WIN_OFF   0x1F00UL
 +#define E5_PRZ_WIN_SIZE  0x6000UL
++#define E5_PRZ_HDR_SIZE  8UL
++#define E5_PRZ_RING_SIZE (E5_PRZ_WIN_SIZE - E5_PRZ_HDR_SIZE)
 +
 +extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
 +
@@ -90,26 +92,42 @@ index 715c545..aba4a0a 100644
 +void
 +e5_kputc(char c)
 +{
++volatile char *base;
 +volatile char *p;
 +
 +if (c == '\n') {
 +e5_kputc('\r');
 +}
 +if ((e5_prz_phase == 1) && (e5_prz_win != NULL)) {
-+p = (volatile char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
++base = (volatile char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF);
 +} else {
 +/*
 + * Bootstrap V=P identity mapping (VA == PA) installed by start.s
 + * covers the persistent zone until arm_vm_init() replaces the tables.
 + */
-+p = (volatile char *)(E5_PRZ_PA + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF + e5_prz_pos);
++base = (volatile char *)(E5_PRZ_PA + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF);
 +}
++p = base + E5_PRZ_HDR_SIZE + e5_prz_pos;
 +*p = c;
 +if (e5_prz_phase == 0) {
 +__asm__ volatile ("dc cvac, %0" :: "r" ((void *) p) : "memory");
 +}
-+if (++e5_prz_pos >= E5_PRZ_WIN_SIZE) {
++if (++e5_prz_pos >= E5_PRZ_RING_SIZE) {
 +e5_prz_pos = 0;
++}
++/*
++ * Track the ring position in the window header so the BootShim rescue
++ * can locate the most recent console bytes (death/panic text) after a
++ * watchdog reset, without any kernel state surviving.
++ */
++if ((e5_prz_pos & 63UL) == 0) {
++volatile unsigned int *h = (volatile unsigned int *)base;
++h[0] = 0x57453545u; /* "E5TW" */
++h[1] = (unsigned int)e5_prz_pos;
++if (e5_prz_phase == 0) {
++__asm__ volatile ("dc cvac, %0" :: "r" ((void *) &h[0]) : "memory");
++__asm__ volatile ("dc cvac, %0" :: "r" ((void *) &h[1]) : "memory");
++}
 +}
 +}
 +
