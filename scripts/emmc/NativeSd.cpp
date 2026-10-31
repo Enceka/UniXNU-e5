@@ -889,8 +889,8 @@ public:
     // boot's own history. Keep the first few plus every 128th, with the
     // running count so progress stays measurable.
     if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0))
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu\n", bigReads, (unsigned long long)(done / 512),
-            (unsigned long long)count, (unsigned long long)block);
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d\n", bigReads, (unsigned long long)(done / 512),
+            (unsigned long long)count, (unsigned long long)block, e5_data_mount_state);
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
         done == count * 512 ? kIOReturnSuccess : kIOReturnIOError, done);
@@ -1103,3 +1103,7 @@ extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
   volume->release();
   return ok ? 1 : 0;
 }
+
+
+/* kern_exec.c stash: -999 unreached, -1 absent, -2 copyout, -3 in mount, >=0 errno, 100 ok. */
+extern "C" int e5_data_mount_state;
