@@ -8,11 +8,13 @@ with a removable battery (Unisoc UMS9621 / Qogirn6Lite, 2x Cortex-A76 +
 Current state: `ArmDTPlatform` device-tree platform expert with `ArmCpu`
 (GICv3 + generic timer), a RAM block device for the seed volume, the
 `NativeEmmc` driver (read-only eMMC block service, GPT and APFS seed root),
-kernel framebuffer console output and the seed shell. Original OS/SystemOS
-and writable Data remain pending. Wi-Fi uses Unisoc Marlin3 Lite/SC2355 SDIO;
+kernel framebuffer console output and the seed shell. The original OS on SD
+now reaches launchd/libignition; Preboot, SystemOS/dyld-cache attachment and
+writable Data remain pending. Wi-Fi uses Unisoc Marlin3 Lite/SC2355 SDIO;
 its Android inputs are inventoried, while XNU driver work remains planned.
 The authoritative progress and evidence are in [porting.toml](porting.toml),
-with [Wi-Fi inputs](docs/network-bringup.md) and [eMMC seed results](docs/emmc-seed.md).
+with [Wi-Fi inputs](docs/network-bringup.md), [eMMC seed results](docs/emmc-seed.md)
+and [SD OS root results](docs/sd-os-root.md).
 The kernel is reached
 through the board's own UEFI firmware (see `Enceka/e5-xnu`, DarwinBoot
 loader).

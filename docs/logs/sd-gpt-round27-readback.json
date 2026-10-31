@@ -1,0 +1,15 @@
+{
+  "round": 27,
+  "kernel_build": 289,
+  "source_revision": "012c1e33250c853697c6275376947dbdb34841b7",
+  "report": "uefi-report-104606.txt",
+  "full_sd_acceptance": "PASS: SD 30244864 sectors via default-4bit-24MHz, reference 4/4 CRC match, repeat 16/16, GPT ok; OS volume mounted from SD, launchd attempted",
+  "payload_readback": "PASS",
+  "payload_bytes": 62926860,
+  "payload_sha256": "9c685162a2a5efe9ee43b7a52f49083a24fb45353e0f19a495b158e8bb8e20d4",
+  "sd_primary_backup_and_apfs_superblock_unchanged": true,
+  "os_volume_uuid": "04769D26-2CA0-4825-B443-E2E5F88300F2",
+  "original_launchd_libignition_executed": true,
+  "next_failure": "Preboot lookup entitlement error; libSystem.B.dylib missing with no dyld cache",
+  "complete_os_boot": false
+}

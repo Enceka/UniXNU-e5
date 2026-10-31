@@ -60,6 +60,29 @@ Round 26, source-built kernel 286, executes the original launchd/libignition
 and prints `hello from launchd.1`. Preboot lookup then fails with entitlement
 error 1, followed by missing `/usr/lib/libSystem.B.dylib` and no dyld cache.
 This is beyond GPT/root-device discovery. The 12 KiB XNU trace window lost
-the earlier probe/mount records, so full checker acceptance is pending a
-repeat with sampled request logging and a 24 KiB window. The window still
-ends at the same offset inside the existing pstore zone.
+the earlier probe/mount records. Request sampling and a 24 KiB window retain
+these records in the repeat below. The window still ends at the same offset
+inside the existing pstore zone.
+
+## Board acceptance: round 27 PASS
+
+Source revision `012c1e33250c853697c6275376947dbdb34841b7`, CI kernel 289,
+unmodified source-built executable. The
+[report](logs/uefi-report-104606.txt) retains:
+
+- Header CRC `d9e4279c` and complete entries CRC `fa7a560c`, both matching.
+- Four reference sectors, sixteen repeats, default-speed mode and the eMMC
+  v8 service regression marker.
+- `mount-complete volume DawnUpdate21H461.J120J121J207J208OS` on `disk3s1`.
+- `/sbin/launchd` loading and `hello from launchd.1` in libignition.
+
+`python3 tools/e5-sd-check.py dumps/uefi-report-104606.txt` in e5-xnu returns
+[PASS](logs/sd-gpt-round27-check.log). The complete boot payload matches device
+readback SHA256 `9c685162a2a5efe9ee43b7a52f49083a24fb45353e0f19a495b158e8bb8e20d4`;
+SD primary/backup GPT and the APFS superblock remain unchanged
+([record](logs/sd-gpt-round27-readback.json)). Android slot A recovers normally.
+
+This qualifies SD root mounting and original launchd/libignition execution.
+Complete iPadOS boot remains blocked by Preboot entitlement/role lookup and
+SystemOS/cryptex/dyld-cache integration. No writable Data or original-system
+service acceptance is claimed.

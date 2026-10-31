@@ -1,0 +1,10 @@
+{
+  "result": "PASS",
+  "kernel_build": 289,
+  "source_revision": "012c1e33250c853697c6275376947dbdb34841b7",
+  "data_offset_plus_window_offset": "0x1f1b",
+  "wrap_comparison": "((pos + 1) >> 13) > 2",
+  "window_bytes": 24576,
+  "window_end": "0x7f00",
+  "instruction_paths_checked": 3
+}
