@@ -120,15 +120,24 @@ limits = ["XNU eMMC/SD writes remain unsupported. The eMMC recovery volume is a 
 next_action = ["SD-root acceptance is complete in round 27. Qualify original trust/entitlement handling, a Preboot volume, SystemOS/cryptex and dyld cache mounting before progressing to original userland services and persistent Data. Keep the eMMC seed and Android/adb recovery available."]
 
 [[area.evidence]]
+kind = "device"
+reference = "docs/logs/system-trust-round28.json"
+revision = "012c1e33250c853697c6275376947dbdb34841b7"
+command = "PAYLOAD=<system-boot-tc>/e5-uefi.bin sh tools/e5-uefi-cycle.sh run; python3 tools/e5-system-boot-check.py <report> --manifest <repack-manifest> --readback <readback> --stage trust (e5-xnu repository)"
+result = "Round 28 keeps kernel 289, OS/ADT/seed/EFI/config fixed and replaces only the seed trust bundle with the two unchanged original modules. Both launchd/dyld AMFI failures disappear. Original launchd reaches the real APFS get-dev-by-role query, which reports missing role 0x10/ENOENT=2 rather than entitlement EPERM=1. Full payload readback matches 1c8bc778ea8d70f93d0fe4bf88f64beeb976e6c6c2c22c4bae9d12a5ebde3a43; SD-root checker passes, Android A recovers. Preboot provisioning and SystemOS/cache loading remain open."
+
+[[area.evidence]]
 kind = "source"
 reference = "docs/systemos-boot.md"
+revision = "c2dec644784bf357b6e35b8d0519afba56092568"
 result = "Implement opt-in read-only SystemOS SD window and DEVELOPMENT/DEBUG-only native union startup. Select the APFS volume by UUID, check the mounted device/root graph and original cache header before setting dyld skipIgnition. This does not provision native Preboot or persistent Data; board acceptance is pending."
 
 [[area.evidence]]
 kind = "host"
 reference = "scripts/emmc/tests/systemos-window.cpp"
+revision = "c2dec644784bf357b6e35b8d0519afba56092568"
 command = "xcrun clang++ -std=c++17 -Wall -Wextra -Werror scripts/emmc/tests/systemos-window.cpp -o <test>; <test>"
-result = "PASS: exact SystemOS size, card fit, separation from the original OS disk, final sector and overflow/out-of-range refusals. The complete pinned arch/soc/os/device patch series applies in a clean XNU 10063.141.1 tree, and the new startup patch passes reverse-check. Runtime mounting and cache loading remain pending."
+result = "PASS: exact SystemOS size, card fit, separation from the original OS disk, final sector and overflow/out-of-range refusals. The complete pinned arch/soc/os/device patch series applies in a clean XNU 10063.141.1 tree, and the new startup patch passes reverse-check. CI build 290 reached the storage archive but found a missing init(nullptr) parameter on the new device. Correct that call and check matching-dictionary allocation results and device-number ranges. Runtime mounting and cache loading remain pending."
 
 [[area.evidence]]
 kind = "device"
@@ -198,7 +207,8 @@ result = "NativeSd read-only SD service: cold power/clock/detect bring-up, legac
 [[area.evidence]]
 kind = "device"
 reference = "docs/logs/uefi-report-095849.txt"
-revision = "3d0e2be (kernel 285 with register-preserving GPT scanner trace)"
+command = "PAYLOAD=<round-payload> sh tools/e5-uefi-cycle.sh run (e5-xnu repository); inspect the APFS/GPT trace in the report"
+revision = "3d0e2bef5e9038f399879284be9d228b2d380db2"
 result = "Round 24: the actual prelinked IOGUIDPartitionScheme computes c07a08b6 over the SD table, compares against f77abceb declared by the v21 header, and exits scan at the CRC check. The same boot accepts the eMMC table CRC d9ec7402 and creates its partition. Restored only SD LBA 1..33 from the valid backup, verified card readback and unchanged backup/APFS superblock. The restored host image matches the original OS SHA256 e5634d04a8ac35f024845f583394e0a35deb26a04cb0c00286a8674e25a9a4f2; an original-layout traced boot is pending."
 
 [[area.evidence]]
@@ -209,7 +219,8 @@ result = "v22 restores the original OS LBA1 golden CRC 10fb5eed. GPT acceptance 
 [[area.evidence]]
 kind = "device"
 reference = "docs/logs/uefi-report-100622.txt"
-revision = "ef0c4ce (kernel 283 with register-preserving GPT scanner trace)"
+command = "PAYLOAD=<round-payload> sh tools/e5-uefi-cycle.sh run (e5-xnu repository); inspect the APFS/GPT trace in the report"
+revision = "ef0c4ce53954981981db00c26dfdd2284e43251f"
 result = "Round 25 after SD GPT restoration: full entries CRC fa7a560c matches, partition-used=1, corrupt=0, invalid=0 and instantiateMediaObject returns a non-null IOMedia. No reads at partition LBA 34 follow, and root wait still times out. Thus the original GPT was accepted; absence of APFS reads was insufficient evidence of GPT rejection."
 
 [[area.evidence]]
@@ -220,7 +231,8 @@ result = "The actual prelinked AppleAPFSContainerScheme::probe calls a media fil
 [[area.evidence]]
 kind = "device"
 reference = "docs/logs/uefi-report-102035.txt"
-revision = "e99d359 (source-built kernel 286)"
+command = "PAYLOAD=<round-payload> sh tools/e5-uefi-cycle.sh run (e5-xnu repository); inspect the APFS/GPT trace in the report"
+revision = "e99d3597a0c74666f74c78256b17aa38be629234"
 result = "Round 26 executes the original SD-root /sbin/launchd far enough to print libignition hello from launchd.1. It then fails Preboot lookup with entitlement error 1 and reports missing /usr/lib/libSystem.B.dylib / no dyld cache; this is beyond the former root-wait panic. Unbounded multi-block request logging overwrote the probe/mount records, so the strict report checker cannot qualify this truncated report. Sampled request logging is prepared for the next acceptance round."
 
 [[area.evidence]]
@@ -246,7 +258,7 @@ result = "Kernel 277 round 15: clean cold boot, CMD8 r7 0x1aa first try, ACMD41/
 kind = "device"
 reference = "docs/logs/uefi-report-003713.txt"
 command = "PAYLOAD=<sd-v1>/e5-uefi.bin sh tools/e5-uefi-cycle.sh run; python3 tools/e5-sd-check.py <report> (e5-xnu repository)"
-revision = "36bfdc9 (merge of stage2/sd-throughput, kernel 278)"
+revision = "36bfdc9fc3c881300f83d7118449146426d6892f"
 result = "Round 16: sdio0 chain observed then switched to rpll (src 195 MHz), default-speed re-verify green, tp single 128 sectors 36207 us vs tp multi 5995 us match y (6.0x), probe Success mode default-4bit-24MHz. tools/e5-sd-check.py PASS."
 
 [[area.evidence]]

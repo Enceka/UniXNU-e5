@@ -882,7 +882,7 @@ OSDefineMetaClassAndStructors(E5SystemOSDevice, IOBlockStorageDevice)
 static bool publishSystemOS(NativeSd *host) {
   E5SystemOSDevice *window = new E5SystemOSDevice;
   if (!window) return false;
-  if (!window->init()) { window->release(); return false; }
+  if (!window->init(nullptr)) { window->release(); return false; }
   if (!window->attach(host)) { window->release(); return false; }
   if (!window->start(host)) { window->detach(host); window->release(); return false; }
   sdlog("NativeSd: publishing SystemOS read-only %llu sectors at %llu\n",
@@ -903,19 +903,20 @@ extern "C" int e5_systemos_device(char *path, size_t size, int *major, int *mino
     if (uuid) uuid->release();
     return 0;
   }
-  properties->setObject("UUID", uuid);
-  match->setObject(gIOPropertyMatchKey, properties);
+  bool ready = properties->setObject("UUID", uuid) && match->setObject(gIOPropertyMatchKey, properties);
   properties->release(); uuid->release();
+  if (!ready) { match->release(); return 0; }
   IOService *volume = IOService::waitForMatchingService(match, 30ULL * 1000000000ULL);
   match->release();
   if (!volume) return 0;
   OSString *name = OSDynamicCast(OSString, volume->getProperty("BSD Name"));
   OSNumber *maj = OSDynamicCast(OSNumber, volume->getProperty("BSD Major"));
   OSNumber *min = OSDynamicCast(OSNumber, volume->getProperty("BSD Minor"));
-  bool ok = name && maj && min && size > strlen(name->getCStringNoCopy()) + 5;
+  bool ok = name && maj && min && size > strlen(name->getCStringNoCopy()) + 5 &&
+      maj->unsigned64BitValue() <= 255 && min->unsigned64BitValue() <= 0xffffff;
   if (ok) {
     snprintf(path, size, "/dev/%s", name->getCStringNoCopy());
-    *major = maj->unsigned32BitValue(); *minor = min->unsigned32BitValue();
+    *major = (int)maj->unsigned32BitValue(); *minor = (int)min->unsigned32BitValue();
     sdlog("NativeSd: SystemOS volume %s device %s\n", E5SystemOS::uuid, path);
   }
   volume->release();

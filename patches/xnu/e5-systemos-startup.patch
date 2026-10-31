@@ -95,3 +95,24 @@
  #if defined(XNU_OWNER_CACHE_MOUNT) && XNU_OWNER_CACHE_MOUNT
  	boot_progress_stage("SystemOS mount enter");
  	int cache_error = native_owner_cache_prepare(p, (user_addr_t)scratch_addr, &init_envp);
+--- a/bsd/vm/vm_unix.c
++++ b/bsd/vm/vm_unix.c
+@@ -3077,6 +3077,13 @@
+ 
+ 	kr = _shared_region_map_and_slide(p, files_count, shared_files, mappings_count, mappings);
+ done:
++#if DEVELOPMENT || DEBUG
++	/* Preserve the syscall's actual result; a mounted cache header alone does
++	 * not establish that dyld mapped the original cache and its subcaches. */
++	if (proc_getpid(p) == 1 && PE_parse_boot_argn("e5-systemos-boot", NULL, 0)) {
++		printf("E5SystemOS: dyld map files %u mappings %u result %d\n", files_count, mappings_count, kr);
++	}
++#endif
+ 	kfree_data(shared_files, files_count * sizeof(shared_files[0]));
+ 	kfree_data(mappings, mappings_count * sizeof(mappings[0]));
+ 	return kr;
+@@ -4285,4 +4292,3 @@
+ extern int fbdp_no_panic;
+ SYSCTL_INT(_vm, OID_AUTO, fbdp_no_panic, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_ANYBODY, &fbdp_no_panic, 0, "");
+ #endif /* MACH_ASSERT */
+-
