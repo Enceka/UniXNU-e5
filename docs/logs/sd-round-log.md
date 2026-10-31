@@ -735,3 +735,17 @@ _initWithBookendObserver:transformer: (FrontBoardServices) — display stack
 absent on this board. liveactivitiesd traps in SessionSyncEngine (same
 family). All other subsystems healthy (Data RW, 250K+ I/O, no panics,
 600s stable). See e5-xnu docs/bringup-plan.md rounds 66-69 entry.
+
+## Rounds 70-71 (2026-11-01): headless services milestone
+- r70 (kernel 321 + v2 image: disabled.plist {SB,LA,wdt}): SB pid 127 / LA pid 126 still
+  crash-looped identically to r69 (same trap PCs) — the disable did not take.
+- Root cause: `db/com.apple.xpc.launchd/disabled.migrated` marker (inherited from the
+  seed) tells launchd the legacy disabled.plist was already consumed → entries ignored.
+- v3 image (sha256 fe0619f0…): removed disabled.migrated, kept disabled.plist,
+  added disabled.501.501.plist (session domain). Card LBA 19034112, readback md5 c20f2009.
+- r71 RESULT: E5EXC=0 E5CRASH=0 SpringBoard=0 liveactivitiesd=0 "Too many corpses"=0
+  across BOTH tries (x=53bd815c live + x=dcc29052 rescued). System runs the full 600s
+  window cleanly: rw #246k+, APFS flush, audiomxd/bluetoothd/MobileGestalt alive.
+  HEADLESS SERVICES BOOT ACHIEVED (display stack absent by design; SB+LA disabled).
+- Next frontier: display stack (FBSDisplayMonitor abort root-caused r69) — needs
+  IOMobileFramebuffer-class IOKit node or gpu-addon assets (user decision).
