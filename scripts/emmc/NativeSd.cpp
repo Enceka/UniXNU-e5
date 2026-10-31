@@ -6,14 +6,21 @@
 #include <IOKit/storage/IOBlockStorageDevice.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <kern/clock.h>
+#include <pexpert/pexpert.h>
+#include <libkern/c++/OSNumber.h>
+#include <libkern/c++/OSString.h>
 #include "TransferStatus.h"
 #include "SdProtocol.h"
+#include "SystemOSWindow.h"
 
 extern "C" void e5_panic_print(const char *);
 static void sdlog(const char *fmt, ...) {
   char text[192]; va_list ap; va_start(ap, fmt);
   vsnprintf(text, sizeof(text), fmt, ap); va_end(ap); e5_panic_print(text);
 }
+
+class NativeSd;
+static bool publishSystemOS(NativeSd *host);
 
 class NativeSd : public IOBlockStorageDevice {
   OSDeclareDefaultStructors(NativeSd)
@@ -737,9 +744,20 @@ public:
     sdlog("NativeSd: probe %s sectors %llu mode %s\n", cardUp ? "Success" : "Failed",
           (unsigned long long)sectors, mode);
     if (!cardUp) return false;
+    bool systemOS = PE_parse_boot_argn("e5-systemos", nullptr, 0);
+    if (systemOS) {
+      if (!E5SystemOS::fits(sectors) || !readSectors(E5SystemOS::base, 8) ||
+          memcmp(buffer + 32, "NXSB", 4) ||
+          crc32n(buffer, 4096) != E5SystemOS::superblockCrc) {
+        sdlog("NativeSd: SystemOS superblock refused\n"); return false;
+      }
+      sdlog("NativeSd: SystemOS superblock crc %08x match y\n", E5SystemOS::superblockCrc);
+    }
     sdlog("NativeSd: publishing read-only SD card %llu sectors\n",
           (unsigned long long)sectors);
-    registerService(); return true;
+    registerService();
+    if (systemOS && !publishSystemOS(this)) sdlog("NativeSd: SystemOS publication failed\n");
+    return true;
   }
   void stop(IOService *provider) override {
     if (lock) IOLockLock(lock);
@@ -822,3 +840,84 @@ public:
   }
 };
 OSDefineMetaClassAndStructors(NativeSd, IOBlockStorageDevice)
+
+// A second storage device shares the host's lock, DMA buffer and error handling.
+// Its offsets never enter the original OS image or the physical card's GPT.
+class E5SystemOSDevice : public IOBlockStorageDevice {
+  OSDeclareDefaultStructors(E5SystemOSDevice)
+public:
+  char *getVendorString() override { return const_cast<char *>("E5"); }
+  char *getProductString() override { return const_cast<char *>("SystemOS read-only window"); }
+  char *getRevisionString() override { return const_cast<char *>("1"); }
+  char *getAdditionalDeviceInfoString() override { return const_cast<char *>(E5SystemOS::uuid); }
+  IOReturn doEjectMedia() override { return kIOReturnUnsupported; }
+  IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
+  UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
+  IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *n) override { *n = E5SystemOS::sectors - 1; return kIOReturnSuccess; }
+  IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportMediaState(bool *p, bool *c) override {
+    NativeSd *host = OSDynamicCast(NativeSd, getProvider());
+    if (!host) return kIOReturnNotReady;
+    return host->reportMediaState(p, c);
+  }
+  IOReturn reportWriteProtection(bool *b) override { *b = true; return kIOReturnSuccess; }
+  IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
+  IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
+  IOReturn getWriteCacheState(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
+  IOReturn doAsyncReadWrite(IOMemoryDescriptor *data, UInt64 block, UInt64 count,
+      IOStorageAttributes *attributes, IOStorageCompletion *completion) override {
+    if (!data || !completion || !completion->action) return kIOReturnBadArgument;
+    if (data->getDirection() != kIODirectionIn) return kIOReturnNotWritable;
+    if (!E5SystemOS::contains(block, count)) return kIOReturnBadArgument;
+    NativeSd *host = OSDynamicCast(NativeSd, getProvider());
+    if (!host) return kIOReturnNotReady;
+    return host->doAsyncReadWrite(data, E5SystemOS::base + block, count, attributes, completion);
+  }
+};
+OSDefineMetaClassAndStructors(E5SystemOSDevice, IOBlockStorageDevice)
+
+static bool publishSystemOS(NativeSd *host) {
+  E5SystemOSDevice *window = new E5SystemOSDevice;
+  if (!window) return false;
+  if (!window->init()) { window->release(); return false; }
+  if (!window->attach(host)) { window->release(); return false; }
+  if (!window->start(host)) { window->detach(host); window->release(); return false; }
+  sdlog("NativeSd: publishing SystemOS read-only %llu sectors at %llu\n",
+        (unsigned long long)E5SystemOS::sectors, (unsigned long long)E5SystemOS::base);
+  window->registerService();
+  window->release();
+  return true;
+}
+
+// Select the APFS volume by its actual UUID, never by enumeration order.
+extern "C" int e5_systemos_device(char *path, size_t size, int *major, int *minor) {
+  OSDictionary *match = IOService::serviceMatching("IOMedia");
+  OSDictionary *properties = OSDictionary::withCapacity(1);
+  OSString *uuid = OSString::withCString(E5SystemOS::uuid);
+  if (!match || !properties || !uuid) {
+    if (match) match->release();
+    if (properties) properties->release();
+    if (uuid) uuid->release();
+    return 0;
+  }
+  properties->setObject("UUID", uuid);
+  match->setObject(gIOPropertyMatchKey, properties);
+  properties->release(); uuid->release();
+  IOService *volume = IOService::waitForMatchingService(match, 30ULL * 1000000000ULL);
+  match->release();
+  if (!volume) return 0;
+  OSString *name = OSDynamicCast(OSString, volume->getProperty("BSD Name"));
+  OSNumber *maj = OSDynamicCast(OSNumber, volume->getProperty("BSD Major"));
+  OSNumber *min = OSDynamicCast(OSNumber, volume->getProperty("BSD Minor"));
+  bool ok = name && maj && min && size > strlen(name->getCStringNoCopy()) + 5;
+  if (ok) {
+    snprintf(path, size, "/dev/%s", name->getCStringNoCopy());
+    *major = maj->unsigned32BitValue(); *minor = min->unsigned32BitValue();
+    sdlog("NativeSd: SystemOS volume %s device %s\n", E5SystemOS::uuid, path);
+  }
+  volume->release();
+  return ok ? 1 : 0;
+}

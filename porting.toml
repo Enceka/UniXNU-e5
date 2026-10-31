@@ -120,6 +120,17 @@ limits = ["XNU eMMC/SD writes remain unsupported. The eMMC recovery volume is a 
 next_action = ["SD-root acceptance is complete in round 27. Qualify original trust/entitlement handling, a Preboot volume, SystemOS/cryptex and dyld cache mounting before progressing to original userland services and persistent Data. Keep the eMMC seed and Android/adb recovery available."]
 
 [[area.evidence]]
+kind = "source"
+reference = "docs/systemos-boot.md"
+result = "Implement opt-in read-only SystemOS SD window and DEVELOPMENT/DEBUG-only native union startup. Select the APFS volume by UUID, check the mounted device/root graph and original cache header before setting dyld skipIgnition. This does not provision native Preboot or persistent Data; board acceptance is pending."
+
+[[area.evidence]]
+kind = "host"
+reference = "scripts/emmc/tests/systemos-window.cpp"
+command = "xcrun clang++ -std=c++17 -Wall -Wextra -Werror scripts/emmc/tests/systemos-window.cpp -o <test>; <test>"
+result = "PASS: exact SystemOS size, card fit, separation from the original OS disk, final sector and overflow/out-of-range refusals. The complete pinned arch/soc/os/device patch series applies in a clean XNU 10063.141.1 tree, and the new startup patch passes reverse-check. Runtime mounting and cache loading remain pending."
+
+[[area.evidence]]
 kind = "device"
 reference = "docs/logs/uefi-report-113124.txt"
 command = "sh tools/e5-uefi-cycle.sh flash; sh tools/e5-uefi-cycle.sh collect (e5-xnu repository)"

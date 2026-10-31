@@ -1,0 +1,97 @@
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -8142,6 +8142,81 @@
+ 	"/sbin/launchd",
+ };
+ 
++#if DEVELOPMENT || DEBUG
++extern int e5_systemos_device(char *, size_t, int *, int *);
++extern void commpage_update_dyld_flags(uint64_t);
++
++/* Explicit bring-up mode for the two unchanged IPSW images. This is separate
++ * from native libignition/Preboot provisioning and from owner-root enforcement.
++ * Use the existing development root-auth opt-out; never enable by default. */
++static int
++e5_systemos_prepare(proc_t p, user_addr_t scratch)
++{
++#if !CONFIG_UNION_MOUNTS
++	return ENOTSUP;
++#else
++	if (!PE_parse_boot_argn("e5-systemos", NULL, 0) ||
++	    !PE_parse_boot_argn("e5-rootauth-off", NULL, 0)) return EPERM;
++	char device_path[64] = {0};
++	int major = 0, minor = 0, error = 0;
++	int32_t result = 0;
++	vnode_t original_root = rootvnode, mounted_root = NULLVP, cache = NULLVP;
++	vfs_context_t ctx = vfs_context_current();
++	if (!e5_systemos_device(device_path, sizeof(device_path), &major, &minor)) return ENOENT;
++	if (!(vfs_flags(vnode_mount(original_root)) & MNT_RDONLY)) return EROFS;
++	user64_addr_t spec = scratch + 0x160;
++	uint8_t payload[0x150] = {0};
++	uint64_t flags = MNT_RDONLY;
++	uint16_t mode = 1;
++	uint32_t anonymous_owner = 99;
++	memcpy(payload, &spec, sizeof(spec));
++	memcpy(payload + 8, &flags, sizeof(flags));
++	memcpy(payload + 16, &mode, sizeof(mode));
++	memcpy(payload + 0x144, &anonymous_owner, sizeof(anonymous_owner));
++	memcpy(payload + 0x148, &anonymous_owner, sizeof(anonymous_owner));
++	struct mount_args request = {.type = scratch + 0x100, .path = scratch + 0x120,
++	    .flags = MNT_RDONLY | MNT_UNION, .data = scratch + 0x200};
++	if ((error = copyout("apfs", request.type, 5)) ||
++	    (error = copyout("/", request.path, 2)) ||
++	    (error = copyout(device_path, spec, strlen(device_path) + 1)) ||
++	    (error = copyout(payload, request.data, sizeof(payload)))) return error;
++	printf("E5SystemOS: mount %s read-only union enter\n", device_path);
++	if ((error = mount(p, &request, &result))) return error;
++	if ((error = vnode_lookup("/", 0, &mounted_root, ctx))) return error;
++	mount_t mp = vnode_mount(mounted_root);
++	vnode_t device = vfs_devvp(mp);
++	dev_t actual = device ? vnode_specrdev(device) : NODEV;
++	if (device) vnode_put(device);
++	if (actual != makedev(major, minor) || rootvnode != mounted_root ||
++	    mounted_root == original_root || vnode_mountedhere(original_root) != mp ||
++	    (vfs_flags(mp) & (MNT_RDONLY | MNT_UNION)) != (MNT_RDONLY | MNT_UNION) ||
++	    strcmp(vfs_statfs(mp)->f_fstypename, "apfs")) {
++		error = EINVAL;
++		goto out;
++	}
++	printf("E5SystemOS: mounted uuid 8846FE78-2910-4297-AF97-D59BB6F8FC16 read-only union\n");
++	error = vnode_lookup("/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64", 0, &cache, ctx);
++	if (error) goto out;
++	char magic[16];
++	int resid = 0;
++	error = vn_rdwr(UIO_READ, cache, magic, sizeof(magic), 0, UIO_SYSSPACE, IO_NOAUTH,
++	    vfs_context_ucred(ctx), &resid, p);
++	if (!error && (resid || vnode_mount(cache) != mp || memcmp(magic, "dyld_v1   arm64\0", 16))) error = EINVAL;
++	if (!error) {
++		printf("E5SystemOS: original arm64 dyld cache header verified\n");
++		/* dyld's original bit 3 omits ignition after this explicit mount. */
++		dyld_flags |= UINT64_C(8);
++		commpage_update_dyld_flags(dyld_flags);
++		printf("E5SystemOS: development startup dyld_flags 0x%llx\n", dyld_flags);
++	}
++out:
++	if (cache) vnode_put(cache);
++	vnode_put(mounted_root);
++	return error;
++#endif
++}
++#endif
++
+ /*
+  * load_init_program
+  *
+@@ -8183,6 +8258,12 @@
+ 
+ 	(void) mach_vm_allocate_kernel(map, &scratch_addr, map_page_size, VM_FLAGS_ANYWHERE, VM_KERN_MEMORY_NONE);
+ 	user_addr_t init_envp = USER_ADDR_NULL;
++#if DEVELOPMENT || DEBUG
++	if (PE_parse_boot_argn("e5-systemos-boot", NULL, 0)) {
++		int systemos_error = e5_systemos_prepare(p, (user_addr_t)scratch_addr);
++		if (systemos_error) panic("E5SystemOS: preparation failed: %d", systemos_error);
++	}
++#endif
+ #if defined(XNU_OWNER_CACHE_MOUNT) && XNU_OWNER_CACHE_MOUNT
+ 	boot_progress_stage("SystemOS mount enter");
+ 	int cache_error = native_owner_cache_prepare(p, (user_addr_t)scratch_addr, &init_envp);
