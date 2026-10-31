@@ -240,9 +240,9 @@ Kernel UUID: D79DCFE4-737E-3041-A570-388C447577D9
 
 Boot session UUID: 0F694D5F-2702-4CF9-92A1-03DEE2684327
 
-iBoot version: 
+iBoot version:
 
-iBoot Stage 2 version: 
+iBoot Stage 2 version:
 
 secure boot?: YES
 
@@ -345,4 +345,3 @@ Panicked thread: 0xfffffff7cc01dea0, backtrace: 0xfffffff44498f2f0, tid: 448
 ** Stackshot Incomplete ** Bytes Filled 240 **
 
 Please go to https://panic.apple.com to report this panic
-

@@ -62,5 +62,6 @@
   "core_creation_seconds": 0.086,
   "sd_data_sha256_after": "07ac5f9889cc4a8257749e14bbb6aebdf54717d6856640161db9c14e67c40596",
   "sd_data_unchanged": true,
-  "result": "PASS: Data/root ownership/tzinit exit zero. Core creation fails immediately, removing core-induced ENOSPC. watchdogd SIGTRAP remains; its original assertion text/user PC is not in the console, so a physical connection-branch attribution is not claimed."
+  "result": "PASS: Data/root ownership/tzinit exit zero. Core creation fails immediately, removing core-induced ENOSPC. watchdogd SIGTRAP remains; its original assertion text/user PC is not in the console, so a physical connection-branch attribution is not claimed.",
+  "archived_readable_console_normalization": "Trailing line whitespace and final blank lines trimmed only; original pstore, ordered binary ring and decoder output remain preserved locally with the recorded raw checksum."
 }

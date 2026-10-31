@@ -76,15 +76,15 @@ NativeSd: rw done #224384 8/8 at 14119328 d=100 p=published x=ab20a450 q=ready t
 
 NativeSd: rw done #224512 8/8 at 16747584 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|Dec 31 16:10:13  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+E5FB|Dec 31 16:10:13  audiomxd[95] <Error>: failed to open connection to AppleKeyStore
 NativeSd: rw done #224640 8/8 at 13424120 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #224768 8/8 at 14145552 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer 
+E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer
 NativeSd: rw done #224896 8/8 at 13232040 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|could not find BT_DEVICE_ADDRESS env variable 
+E5FB|could not find BT_DEVICE_ADDRESS env variable
 NativeSd: rw done #225024 8/8 at 15109848 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #225152 8/8 at 13428240 d=100 p=published x=ab20a450 q=ready t=17:0
@@ -97,9 +97,9 @@ NativeSd: rw done #225536 8/8 at 12763648 d=100 p=published x=ab20a450 q=ready t
 
 NativeSd: rw done #225664 8/8 at 12720152 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|marconi-bt: Unable to match bluetooth service in device tree. 
-E5FB|marconi-bt: Not a valid MAC address (all 00s). 
-E5FB|bluetooth: Unable to match bluetooth service in device tree. 
+E5FB|marconi-bt: Unable to match bluetooth service in device tree.
+E5FB|marconi-bt: Not a valid MAC address (all 00s).
+E5FB|bluetooth: Unable to match bluetooth service in device tree.
 NativeSd: rw done #225792 8/8 at 16961384 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #225920 8/8 at 15302544 d=100 p=published x=ab20a450 q=ready t=17:0
@@ -110,7 +110,7 @@ NativeSd: rw done #226176 8/8 at 12838240 d=100 p=published x=ab20a450 q=ready t
 
 NativeSd: rw done #226304 8/8 at 12694672 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|bluetooth: Not a valid MAC address (all 00s). 
+E5FB|bluetooth: Not a valid MAC address (all 00s).
 E5FB|FindLocalMacAddress did not find bootargs for random address generation
 NativeSd: rw done #226432 8/8 at 12722192 d=100 p=published x=ab20a450 q=ready t=17:0
 
@@ -138,10 +138,10 @@ NativeSd: rw done #227712 8/8 at 15377560 d=100 p=published x=ab20a450 q=ready t
 
 NativeSd: rw done #227840 8/8 at 16128752 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|com.apple.server.bluetooth: Not a valid MAC address (all 00s). 
-E5FB|bluetoothd: 
-E5FB|No bluetooth on this device. 
-E5FB| 
+E5FB|com.apple.server.bluetooth: Not a valid MAC address (all 00s).
+E5FB|bluetoothd:
+E5FB|No bluetooth on this device.
+E5FB|
 NativeSd: rw done #227968 8/8 at 15370800 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #228096 8/8 at 18174832 d=100 p=published x=ab20a450 q=ready t=17:0
@@ -236,12 +236,12 @@ NativeSd: rw done #233600 8/8 at 12683496 d=100 p=published x=ab20a450 q=ready t
 
 NativeSd: rw done #233728 8/8 at 12838184 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|Dec 31 16:10:21  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+E5FB|Dec 31 16:10:21  audiomxd[95] <Error>: failed to open connection to AppleKeyStore
 NativeSd: rw done #233856 8/8 at 15388224 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #233984 8/8 at 15414032 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|Dec 31 16:10:21  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+E5FB|Dec 31 16:10:21  audiomxd[95] <Error>: failed to open connection to AppleKeyStore
 Process[122] crashed: SpringBoard. Too NativeSd: rw done #234112 8/8 at 15388592 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #234240 8/8 at 16530384 d=100 p=published x=ab20a450 q=ready t=17:0
@@ -264,7 +264,7 @@ NativeSd: rw done #235136 8/8 at 15311152 d=100 p=published x=ab20a450 q=ready t
 
 NativeSd: rw done #235264 8/8 at 16393560 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|Dec 31 16:10:22  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+E5FB|Dec 31 16:10:22  audiomxd[95] <Error>: failed to open connection to AppleKeyStore
 NativeSd: rw done #235392 8/8 at 16393512 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #235520 8/8 at 13062096 d=100 p=published x=ab20a450 q=ready t=17:0
@@ -399,8 +399,8 @@ NativeSd: rw done #243584 8/8 at 15979432 d=100 p=published x=ab20a450 q=ready t
 
 NativeSd: rw done #243712 8/8 at 16037432 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|Dec 31 16:10:29  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
-E5FB|Dec 31 16:10:29  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+E5FB|Dec 31 16:10:29  audiomxd[95] <Error>: failed to open connection to AppleKeyStore
+E5FB|Dec 31 16:10:29  audiomxd[95] <Error>: failed to open connection to AppleKeyStore
 NativeSd: rw done #243840 8/8 at 16395720 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #243968 8/8 at 14817408 d=100 p=published x=ab20a450 q=ready t=17:0
@@ -479,16 +479,16 @@ NativeSd: rw done #248192 8/8 at 9437322 d=100 p=published x=ab20a450 q=ready t=
 
 NativeSd: rw done #248320 8/8 at 16166936 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer 
+E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer
 NativeSd: rw done #248448 8/8 at 883978 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #248576 8/8 at 13896240 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|could not find BT_DEVICE_ADDRESS env variable 
-E5FB|marconi-bt: Unable to match bluetooth service in device tree. 
-E5FB|marconi-bt: Not a valid MAC address (all 00s). 
-E5FB|bluetooth: Unable to match bluetooth service in device tree. 
-E5FB|bluetooth: Not a valid MAC address (all 00s). 
+E5FB|could not find BT_DEVICE_ADDRESS env variable
+E5FB|marconi-bt: Unable to match bluetooth service in device tree.
+E5FB|marconi-bt: Not a valid MAC address (all 00s).
+E5FB|bluetooth: Unable to match bluetooth service in device tree.
+E5FB|bluetooth: Not a valid MAC address (all 00s).
 E5FB|FindLocalMacAddress did not find bootargs for random address generation
 NativeSd: rw done #248704 8/8 at 12631912 d=100 p=published x=ab20a450 q=ready t=17:0
 
@@ -498,10 +498,10 @@ NativeSd: rw done #248960 8/8 at 13831544 d=100 p=published x=ab20a450 q=ready t
 
 NativeSd: rw done #249088 8/8 at 13896248 d=100 p=published x=ab20a450 q=ready t=17:0
 
-E5FB|com.apple.server.bluetooth: Not a valid MAC address (all 00s). 
-E5FB|bluetoothd: 
-E5FB|No bluetooth on this device. 
-E5FB| 
+E5FB|com.apple.server.bluetooth: Not a valid MAC address (all 00s).
+E5FB|bluetoothd:
+E5FB|No bluetooth on this device.
+E5FB|
 NativeSd: rw done #249216 8/8 at 12887232 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #249344 8/8 at 15991352 d=100 p=published x=ab20a450 q=ready t=17:0
@@ -537,4 +537,3 @@ NativeSd: rw done #251136 8/8 at 12826656 d=100 p=published x=ab20a450 q=ready t
 NativeSd: rw done #251264 8/8 at 14562992 d=100 p=published x=ab20a450 q=ready t=17:0
 
 NativeSd: rw done #251392 8/8 at 15296208 d=100 p=published x=ab20a450 q=ready t=17:0
-

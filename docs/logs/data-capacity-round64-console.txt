@@ -206,7 +206,7 @@ NativeSd: rw done #149120 8/8 at 12835120 d=100 p=published x=cf5e5d1b q=ready t
 
 NativeSd: rw done #149248 8/8 at 13074200 d=100 p=published x=cf5e5d1b q=ready t=17:0
 
-E5FB|Dec 31 16:09:12  mediaserverd[29] <Warning>: HDR: using non-parametric tone curve 
+E5FB|Dec 31 16:09:12  mediaserverd[29] <Warning>: HDR: using non-parametric tone curve
 NativeSd: rw done #149376 8/8 at 15698040 d=100 p=published x=cf5e5d1b q=ready t=17:0
 
 NativeSd: rw done #149504 8/8 at 17340184 d=100 p=published x=cf5e5d1b q=ready t=17:0
@@ -215,7 +215,7 @@ NativeSd: rw done #149632 8/8 at 12894096 d=100 p=published x=cf5e5d1b q=ready t
 
 NativeSd: rw done #149760 8/8 at 12713632 d=100 p=published x=cf5e5d1b q=ready t=17:0
 
-E5FB|Dec 31 16:09:12  mediaserverd[29] <Warning>: HDR (OpenGL) - total execution time: 0.08s + 0.40s = 0.48s 
+E5FB|Dec 31 16:09:12  mediaserverd[29] <Warning>: HDR (OpenGL) - total execution time: 0.08s + 0.40s = 0.48s
 NativeSd: rw done #149888 8/8 at 15218456 d=100 p=published x=cf5e5d1b q=ready t=17:0
 
 NativeSd: rw done #150016 8/8 at 13728384 d=100 p=published x=cf5e5d1b q=ready t=17:0
@@ -350,9 +350,9 @@ Kernel UUID: D79DCFE4-737E-3041-A570-388C447577D9
 
 Boot session UUID: DD2B84EF-8BB0-4128-8068-1946DDBBC348
 
-iBoot version: 
+iBoot version:
 
-iBoot Stage 2 version: 
+iBoot Stage 2 version:
 
 secure boot?: YES
 
@@ -455,4 +455,3 @@ Panicked thread: 0xfffffff4330eec90, backtrace: 0xfffffff20bdf32f0, tid: 469
 ** Stackshot Incomplete ** Bytes Filled 240 **
 
 Please go to https://panic.apple.com to report this panic
-

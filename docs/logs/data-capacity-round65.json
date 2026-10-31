@@ -81,5 +81,6 @@
     "liveactivitiesd crashes; too many corpses"
   ],
   "result": "PASS: SD original-system development boot with 128 MiB volatile RW Data, root ownership and direct tzinit exit zero. No captured panic or ENOSPC over the hardware watchdog test window with only watchdogd disabled by standard launchd policy. Full UI, persistent Data, SEP and native watchdog support remain unqualified.",
-  "media_and_guest_owner_tool_revision": "d8342d69697f61458c6908f7a4e47edc75e41c41"
+  "media_and_guest_owner_tool_revision": "d8342d69697f61458c6908f7a4e47edc75e41c41",
+  "archived_readable_console_normalization": "Trailing line whitespace and final blank lines trimmed only; original pstore, ordered binary ring and decoder output remain preserved locally with the recorded raw checksum."
 }

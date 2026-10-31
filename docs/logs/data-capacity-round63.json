@@ -71,5 +71,6 @@
     "e046a643-5153-488f-b2f3-5b0c48270f75"
   ],
   "new_blocker": "watchdogd[95] SIGTRAP (OS_REASON_SIGNAL=2, signal=5). Its 127455232-byte core exhausts 128 MiB Data and overwrites the original error. Native watchdog cause remains to be captured in R64.",
-  "result": "PASS: original tzinit exits 0, Data root normalization and 128 MiB RW mount. Later critical watchdogd crash; no full-system success claim."
+  "result": "PASS: original tzinit exits 0, Data root normalization and 128 MiB RW mount. Later critical watchdogd crash; no full-system success claim.",
+  "archived_readable_console_normalization": "Trailing line whitespace and final blank lines trimmed only; original pstore, ordered binary ring and decoder output remain preserved locally with the recorded raw checksum."
 }
