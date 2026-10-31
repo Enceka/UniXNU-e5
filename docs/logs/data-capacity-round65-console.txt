@@ -1,0 +1,540 @@
+ p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #219776 8/8 at 5014874 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #219904 8/8 at 12873552 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #220032 8/8 at 13082264 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #220160 8/8 at 13188664 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #220288 8/8 at 13184704 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #220416 8/8 at 5344410 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #220544 8/8 at 13188368 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #220672 8/8 at 13393680 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #220800 8/8 at 14408680 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #220928 8/8 at 13232952 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #221056 8/8 at 16689616 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #221184 8/8 at 14549088 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #221312 8/8 at 14424304 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #221440 8/8 at 14419000 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #221568 8/8 at 14420824 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #221696 8/8 at 13280432 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #221824 8/8 at 16024456 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #221952 8/8 at 16190568 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #222080 8/8 at 18766128 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #222208 8/8 at 16168536 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #222336 8/8 at 16069176 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #222464 8/8 at 16262256 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #222592 8/8 at 14245224 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #222720 8/8 at 16070536 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #222848 8/8 at 14427472 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #222976 8/8 at 12694112 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #223104 8/8 at 16601472 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #223232 8/8 at 12723000 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #223360 8/8 at 13434264 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #223488 8/8 at 14244344 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #223616 8/8 at 14042968 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #223744 8/8 at 16016664 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #223872 8/8 at 15008432 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #224000 8/8 at 15010040 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #224128 8/8 at 12697952 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #224256 8/8 at 14042888 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #224384 8/8 at 14119328 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #224512 8/8 at 16747584 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|Dec 31 16:10:13  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+NativeSd: rw done #224640 8/8 at 13424120 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #224768 8/8 at 14145552 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer 
+NativeSd: rw done #224896 8/8 at 13232040 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|could not find BT_DEVICE_ADDRESS env variable 
+NativeSd: rw done #225024 8/8 at 15109848 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #225152 8/8 at 13428240 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #225280 8/8 at 12827832 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #225408 8/8 at 12698400 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #225536 8/8 at 12763648 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #225664 8/8 at 12720152 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|marconi-bt: Unable to match bluetooth service in device tree. 
+E5FB|marconi-bt: Not a valid MAC address (all 00s). 
+E5FB|bluetooth: Unable to match bluetooth service in device tree. 
+NativeSd: rw done #225792 8/8 at 16961384 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #225920 8/8 at 15302544 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #226048 8/8 at 12700512 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #226176 8/8 at 12838240 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #226304 8/8 at 12694672 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|bluetooth: Not a valid MAC address (all 00s). 
+E5FB|FindLocalMacAddress did not find bootargs for random address generation
+NativeSd: rw done #226432 8/8 at 12722192 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #226560 8/8 at 12713072 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #226688 8/8 at 14161832 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #226816 8/8 at 12744512 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #226944 8/8 at 12701640 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #227072 8/8 at 12786672 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #227200 8/8 at 12698592 d=100 p=published x=ab20a450 q=ready t=17:0
+
+Process[119] crashed: liveactivitiesd. Too many corpses being created.
+
+NativeSd: rw done #227328 8/8 at 12893024 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #227456 8/8 at 18828400 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #227584 8/8 at 14540496 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #227712 8/8 at 15377560 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #227840 8/8 at 16128752 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|com.apple.server.bluetooth: Not a valid MAC address (all 00s). 
+E5FB|bluetoothd: 
+E5FB|No bluetooth on this device. 
+E5FB| 
+NativeSd: rw done #227968 8/8 at 15370800 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #228096 8/8 at 18174832 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #228224 8/8 at 13636896 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #228352 8/8 at 15357152 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #228480 8/8 at 16324056 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #228608 8/8 at 16388832 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #228736 8/8 at 18056224 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #228864 8/8 at 18013368 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #228992 8/8 at 16228336 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #229120 8/8 at 16072576 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #229248 8/8 at 12675320 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #229376 8/8 at 16189440 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #229504 8/8 at 16033816 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #229632 8/8 at 16320352 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #229760 8/8 at 15502480 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #229888 8/8 at 739026 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #230016 8/8 at 16131704 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #230144 8/8 at 15514792 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #230272 8/8 at 15216912 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #230400 8/8 at 13404328 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #230528 8/8 at 16856160 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #230656 8/8 at 13250528 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #230784 8/8 at 16165072 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #230912 8/8 at 12823344 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #231040 8/8 at 12830624 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #231168 8/8 at 12833984 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #231296 8/8 at 16695864 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #231424 8/8 at 13845808 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #231552 8/8 at 12678656 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #231680 8/8 at 9762130 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #231808 8/8 at 13250712 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #231936 8/8 at 13250792 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #232064 8/8 at 15991264 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #232192 64/64 at 16064816 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #232320 8/8 at 13846344 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #232448 8/8 at 13846536 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #232576 8/8 at 14981720 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #232704 8/8 at 16262376 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #232832 8/8 at 13185368 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #232960 8/8 at 13845104 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #233088 8/8 at 13844888 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #233216 8/8 at 13843440 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #233344 8/8 at 13239312 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #233472 8/8 at 16144640 d=100 p=published x=ab20a450 q=ready t=17:0
+
+tx_flush:1338: disk5 xid 53 tx stats: # 40 owait 0 0us finish 35 bar2 26 f 5 enter 625 fq 4 269 102us close 15us prep 536us flush 688us
+
+NativeSd: rw done #233600 8/8 at 12683496 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #233728 8/8 at 12838184 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|Dec 31 16:10:21  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+NativeSd: rw done #233856 8/8 at 15388224 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #233984 8/8 at 15414032 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|Dec 31 16:10:21  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+Process[122] crashed: SpringBoard. Too NativeSd: rw done #234112 8/8 at 15388592 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #234240 8/8 at 16530384 d=100 p=published x=ab20a450 q=ready t=17:0
+
+many corpses being created.
+
+NativeSd: rw done #234368 8/8 at 13248416 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #234496 8/8 at 12850664 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #234624 8/8 at 16362504 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #234752 8/8 at 15303232 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #234880 8/8 at 13176664 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #235008 8/8 at 12828168 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #235136 8/8 at 15311152 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #235264 8/8 at 16393560 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|Dec 31 16:10:22  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+NativeSd: rw done #235392 8/8 at 16393512 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #235520 8/8 at 13062096 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #235648 8/8 at 15310992 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #235776 8/8 at 12968464 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #235904 8/8 at 12961152 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #236032 8/8 at 12999840 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #236160 8/8 at 12961616 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #236288 8/8 at 16246560 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #236416 8/8 at 12998920 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #236544 8/8 at 16246624 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #236672 8/8 at 13644616 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #236800 8/8 at 12996736 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #236928 8/8 at 17417456 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #237056 8/8 at 16246536 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #237184 8/8 at 13136944 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #237312 8/8 at 13239536 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #237440 8/8 at 13009136 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #237568 8/8 at 13009784 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #237696 8/8 at 13454440 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #237824 8/8 at 16035616 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #237952 8/8 at 12714848 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #238080 8/8 at 15994896 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #238208 8/8 at 12827608 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #238336 8/8 at 12997616 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #238464 8/8 at 12946336 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #238592 8/8 at 862978 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #238720 8/8 at 12959064 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #238848 8/8 at 13158528 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #238976 8/8 at 12850400 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #239104 8/8 at 13238824 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #239232 8/8 at 740850 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #239360 8/8 at 16006904 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #239488 8/8 at 16000104 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #239616 8/8 at 14078464 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #239744 8/8 at 13843368 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #239872 8/8 at 13843264 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #240000 8/8 at 13003088 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #240128 8/8 at 15993856 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #240256 8/8 at 13844488 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #240384 8/8 at 13845440 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #240512 8/8 at 15992936 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #240640 8/8 at 857730 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #240768 8/8 at 13691704 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #240896 8/8 at 12893432 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #241024 8/8 at 12716120 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #241152 8/8 at 12717056 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #241280 8/8 at 16530680 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #241408 8/8 at 12697400 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #241536 8/8 at 13278560 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #241664 8/8 at 13184688 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #241792 8/8 at 16531344 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #241920 8/8 at 12717312 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #242048 8/8 at 12721664 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #242176 8/8 at 13847488 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #242304 8/8 at 16107648 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #242432 8/8 at 13012032 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #242560 8/8 at 16248720 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #242688 8/8 at 12967152 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #242816 8/8 at 18001856 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #242944 64/64 at 18235392 d=100 p=published x=ab20a450 q=ready t=17:0
+
+Process[123] crashed: SpringBoard. Too many corpses being created.
+
+NativeSd: rw done #243072 8/8 at 16252128 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #243200 8/8 at 15980104 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #243328 8/8 at 12857984 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #243456 8/8 at 16036712 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #243584 8/8 at 15979432 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #243712 8/8 at 16037432 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|Dec 31 16:10:29  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+E5FB|Dec 31 16:10:29  audiomxd[95] <Error>: failed to open connection to AppleKeyStore 
+NativeSd: rw done #243840 8/8 at 16395720 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #243968 8/8 at 14817408 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #244096 8/8 at 14816568 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #244224 8/8 at 13306064 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #244352 8/8 at 14415880 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #244480 8/8 at 12966448 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #244608 8/8 at 16708592 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #244736 8/8 at 12680664 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #244864 8/8 at 16391176 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #244992 8/8 at 12830960 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #245120 8/8 at 12830608 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #245248 8/8 at 12832184 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #245376 8/8 at 15994016 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #245504 8/8 at 16056320 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #245632 8/8 at 12825312 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #245760 8/8 at 16021648 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #245888 8/8 at 12703768 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #246016 8/8 at 12900992 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #246144 8/8 at 18826200 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #246272 8/8 at 15354560 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #246400 8/8 at 16051088 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #246528 8/8 at 14478024 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #246656 8/8 at 16125400 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #246784 8/8 at 16597208 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #246912 8/8 at 16217520 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #247040 8/8 at 16596304 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #247168 8/8 at 12682360 d=100 p=published x=ab20a450 q=ready t=17:0
+
+Process[125] crashed: liveactivitiesd. Too many corpses being created.
+
+NativeSd: rw done #247296 8/8 at 16596320 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #247424 8/8 at 12823312 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #247552 8/8 at 12825080 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #247680 8/8 at 12824384 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #247808 8/8 at 12839024 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #247936 8/8 at 12893232 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #248064 8/8 at 16039904 d=100 p=published x=ab20a450 q=ready t=17:0
+
+static IOReturn AppleMobileFileIntegrityUserClient::isCdhashInTrustCache(OSObject *, void *, IOExternalMethodArguments *): Process 94 is checking if a cdhash is in the trust cache
+
+static IOReturn AppleMobileFileIntegrityUserClient::isCdhashInTrustCache(OSObject *, void *, IOExternalMethodArguments *): Returning IOReturn 0x0 to process 94
+
+NativeSd: rw done #248192 8/8 at 9437322 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #248320 8/8 at 16166936 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer 
+NativeSd: rw done #248448 8/8 at 883978 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #248576 8/8 at 13896240 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|could not find BT_DEVICE_ADDRESS env variable 
+E5FB|marconi-bt: Unable to match bluetooth service in device tree. 
+E5FB|marconi-bt: Not a valid MAC address (all 00s). 
+E5FB|bluetooth: Unable to match bluetooth service in device tree. 
+E5FB|bluetooth: Not a valid MAC address (all 00s). 
+E5FB|FindLocalMacAddress did not find bootargs for random address generation
+NativeSd: rw done #248704 8/8 at 12631912 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #248832 8/8 at 12827176 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #248960 8/8 at 13831544 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #249088 8/8 at 13896248 d=100 p=published x=ab20a450 q=ready t=17:0
+
+E5FB|com.apple.server.bluetooth: Not a valid MAC address (all 00s). 
+E5FB|bluetoothd: 
+E5FB|No bluetooth on this device. 
+E5FB| 
+NativeSd: rw done #249216 8/8 at 12887232 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #249344 8/8 at 15991352 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #249472 8/8 at 12846384 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #249600 8/8 at 13898048 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #249728 8/8 at 15993832 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #249856 8/8 at 12887056 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #249984 8/8 at 13232192 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #250112 8/8 at 16293824 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #250240 8/8 at 16596808 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #250368 8/8 at 17675672 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #250496 8/8 at 11166426 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #250624 8/8 at 12831808 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #250752 8/8 at 16391144 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #250880 8/8 at 15992064 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #251008 8/8 at 13891256 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #251136 8/8 at 12826656 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #251264 8/8 at 14562992 d=100 p=published x=ab20a450 q=ready t=17:0
+
+NativeSd: rw done #251392 8/8 at 15296208 d=100 p=published x=ab20a450 q=ready t=17:0
+

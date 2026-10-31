@@ -1,0 +1,66 @@
+{
+  "round": 64,
+  "kernel_source_revision": "519a72775fad6b6fd71c1ffbb2b68e41c4838d2e",
+  "inputs": {
+    "changed_files": [],
+    "other_eight_files_unchanged": true,
+    "firmware_prefix_unchanged": true,
+    "kernel_uuid": "D79DCFE4-737E-3041-A570-388C447577D9",
+    "kernel_sha256": "ec520cfe0b5cc96f0da68d0864abf7402b5883d289ac93bc13c16b0b112e1f81",
+    "payload_sha256": "a402895963b3f0c4c244aa9d6a594838f47123de5a5923b41c9390a9c3be796a",
+    "payload_bytes": 62926860,
+    "data_bytes": 134217728,
+    "data_uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+    "data_sha256": "07ac5f9889cc4a8257749e14bbb6aebdf54717d6856640161db9c14e67c40596",
+    "data_change": "cores -> /dev/null; original empty directory retained as cores.disabled"
+  },
+  "cycle": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-r64/board-r64/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "a402895963b3f0c4c244aa9d6a594838f47123de5a5923b41c9390a9c3be796a",
+    "stage": "complete",
+    "updated_at": "2026-10-31T17:26:12.599505+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-012611.txt"
+    ]
+  },
+  "console": {
+    "record": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-r64/board-r64/dmesg-ramoops-0.bin",
+    "record_sha256": "e2eefde9c3f657f11235ef0bac1e6cd03cf3679df305c3dfe9479e3f02b1282e",
+    "offset": 7936,
+    "position": 931,
+    "ring_bytes": 24568,
+    "panic": "panic(cpu 0 caller 0xfffffff0079ea834):  watchdogd[95] exited -- exit reason namespace 2 subcode 0x5 description: none",
+    "kernel_uuid": "D79DCFE4-737E-3041-A570-388C447577D9"
+  },
+  "tzinit_exit_zero": true,
+  "tzinit_pid": 17,
+  "checkpoint_count": 158,
+  "checkpoint_first": [
+    "136192",
+    "100",
+    "published",
+    "cf5e5d1b",
+    "ready",
+    "17",
+    "0"
+  ],
+  "checkpoint_last": [
+    "156288",
+    "100",
+    "published",
+    "cf5e5d1b",
+    "ready",
+    "17",
+    "0"
+  ],
+  "enospc_in_retained_ring": false,
+  "core_creation_error": 20,
+  "core_creation_seconds": 0.086,
+  "sd_data_sha256_after": "07ac5f9889cc4a8257749e14bbb6aebdf54717d6856640161db9c14e67c40596",
+  "sd_data_unchanged": true,
+  "result": "PASS: Data/root ownership/tzinit exit zero. Core creation fails immediately, removing core-induced ENOSPC. watchdogd SIGTRAP remains; its original assertion text/user PC is not in the console, so a physical connection-branch attribution is not claimed."
+}

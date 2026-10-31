@@ -1,0 +1,458 @@
+#136064 8/8 at 16082056 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #136192 8/8 at 12900352 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #136320 8/8 at 15992032 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #136448 8/8 at 15993408 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #136576 8/8 at 15992464 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #136704 8/8 at 12845224 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #136832 8/8 at 16006608 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #136960 8/8 at 16006968 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #137088 8/8 at 18749360 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #137216 8/8 at 16281032 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #137344 8/8 at 12819440 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #137472 8/8 at 12821832 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #137600 40/40 at 18297808 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #137728 8/8 at 13428288 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #137856 8/8 at 12844256 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #137984 8/8 at 14042168 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #138112 8/8 at 12847120 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #138240 8/8 at 15990712 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #138368 8/8 at 16391880 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #138496 8/8 at 16410472 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #138624 8/8 at 14117688 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #138752 8/8 at 13665712 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #138880 8/8 at 13897376 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #139008 64/64 at 16003472 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #139136 32/32 at 1943026 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #139264 8/8 at 17969384 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #139392 8/8 at 15468168 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #139520 8/8 at 16397624 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #139648 8/8 at 14408016 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #139776 8/8 at 15991224 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #139904 8/8 at 16056016 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #140032 8/8 at 14411536 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #140160 8/8 at 18248328 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #140288 8/8 at 12845416 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #140416 8/8 at 15993536 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #140544 8/8 at 16039152 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #140672 8/8 at 16015472 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #140800 8/8 at 16015824 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #140928 8/8 at 16398408 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #141056 8/8 at 17609040 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #141184 8/8 at 12829664 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #141312 8/8 at 13253440 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #141440 8/8 at 13666520 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #141568 8/8 at 13307072 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #141696 8/8 at 13737800 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #141824 8/8 at 13896984 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #141952 8/8 at 15992152 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #142080 8/8 at 13870000 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #142208 8/8 at 14255000 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #142336 8/8 at 18067896 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #142464 8/8 at 13903160 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #142592 8/8 at 16323696 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #142720 8/8 at 13910504 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #142848 8/8 at 12739128 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #142976 8/8 at 13657168 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #143104 8/8 at 15853696 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #143232 8/8 at 17906664 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #143360 8/8 at 12859456 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #143488 8/8 at 13670072 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #143616 8/8 at 12875904 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #143744 8/8 at 14476968 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #143872 8/8 at 16387392 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #144000 8/8 at 18170168 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #144128 8/8 at 13903008 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #144256 8/8 at 14254144 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #144384 8/8 at 13902608 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #144512 8/8 at 13859648 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #144640 8/8 at 16425728 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #144768 8/8 at 14520384 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #144896 8/8 at 16025648 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #145024 8/8 at 14291408 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #145152 8/8 at 16399360 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #145280 8/8 at 16400632 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #145408 8/8 at 15094368 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #145536 8/8 at 16010648 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #145664 8/8 at 17977544 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #145792 8/8 at 14847016 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #145920 8/8 at 16290936 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #146048 8/8 at 16327456 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #146176 8/8 at 14520144 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #146304 8/8 at 13933216 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #146432 8/8 at 12670896 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #146560 8/8 at 13233992 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #146688 8/8 at 12820184 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #146816 8/8 at 12899312 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #146944 8/8 at 13302976 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #147072 8/8 at 15993896 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #147200 8/8 at 15993504 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #147328 8/8 at 12857464 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #147456 8/8 at 16018504 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #147584 8/8 at 12818144 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #147712 8/8 at 12878488 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #147840 8/8 at 13355184 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #147968 8/8 at 13184624 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #148096 8/8 at 12858048 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #148224 8/8 at 16122608 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #148352 8/8 at 16006976 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #148480 8/8 at 12721968 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #148608 8/8 at 12887048 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #148736 8/8 at 12887464 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #148864 8/8 at 13136936 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #148992 8/8 at 12831744 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #149120 8/8 at 12835120 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #149248 8/8 at 13074200 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+E5FB|Dec 31 16:09:12  mediaserverd[29] <Warning>: HDR: using non-parametric tone curve 
+NativeSd: rw done #149376 8/8 at 15698040 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #149504 8/8 at 17340184 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #149632 8/8 at 12894096 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #149760 8/8 at 12713632 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+E5FB|Dec 31 16:09:12  mediaserverd[29] <Warning>: HDR (OpenGL) - total execution time: 0.08s + 0.40s = 0.48s 
+NativeSd: rw done #149888 8/8 at 15218456 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #150016 8/8 at 13728384 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #150144 8/8 at 13445048 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #150272 8/8 at 13838864 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #150400 8/8 at 17956768 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #150528 8/8 at 16046072 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #150656 8/8 at 14672904 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #150784 8/8 at 12846448 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #150912 8/8 at 12890664 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #151040 8/8 at 12838336 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #151168 8/8 at 16327528 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #151296 8/8 at 12828184 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #151424 8/8 at 13665944 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #151552 8/8 at 12824024 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #151680 8/8 at 17785832 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #151808 8/8 at 12830248 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #151936 8/8 at 12834504 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #152064 8/8 at 12831352 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #152192 8/8 at 17604696 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #152320 8/8 at 12837400 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #152448 8/8 at 12838680 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #152576 8/8 at 14255304 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #152704 8/8 at 14980824 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #152832 8/8 at 16006856 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #152960 8/8 at 13156000 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #153088 8/8 at 14253584 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #153216 8/8 at 16046856 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #153344 8/8 at 12821584 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+MobileGestaltHel[99] triggered unnest of range 0x1f3400000->0x1f3600000 of DYLD shared region in VM map 0x1843a5b1f016578f. While not abnormal for debuggers, this increases system memory footprint until the target exits.
+
+MobileGestaltHel[99] triggered unnest of range 0x1f3600000->0x1f8a00000 of DYLD shared region in VM map 0x1843a5b1f016578f. While not abnormal for debuggers, this increases system memory footprint until the target exits.
+
+NativeSd: rw done #153472 8/8 at 12844528 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #153600 8/8 at 13292688 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #153728 8/8 at 16266032 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #153856 8/8 at 12819840 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #153984 8/8 at 12818648 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #154112 8/8 at 12761928 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #154240 8/8 at 12712104 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #154368 8/8 at 12823096 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #154496 8/8 at 12699248 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #154624 8/8 at 12698272 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #154752 8/8 at 16897736 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #154880 8/8 at 12804000 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #155008 8/8 at 12702912 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #155136 8/8 at 12711632 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #155264 8/8 at 12707200 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #155392 64/64 at 12790960 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #155520 8/8 at 12722536 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #155648 8/8 at 12818608 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #155776 8/8 at 12694368 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #155904 8/8 at 12838184 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #156032 8/8 at 12729320 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+NativeSd: rw done #156160 8/8 at 12710896 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+pid 95 exited -- exit reason namespace 2 subcode 0x5, description none
+
+coredump (watchdogd, pid 95): writing core to /private/var/cores/watchdogd.core
+
+NativeSd: rw done #156288 8/8 at 18051840 d=100 p=published x=cf5e5d1b q=ready t=17:0
+
+coredump (watchdogd, pid 95): failed to open core dump file /private/var/cores/watchdogd.core: error 20
+
+coredump (watchdogd, pid 95): core dump failed: error 20
+
+Failed to generate core file for pid: 95: error 20, took 0.086 seconds
+
+panic(cpu 0 caller 0xfffffff0079ea834):  watchdogd[95] exited -- exit reason namespace 2 subcode 0x5 description: none
+
+Debugger message: panic
+
+Memory ID: 0x0
+
+OS release type: User
+
+OS version: 21H461
+
+Kernel version: Darwin Kernel Version 23.6.0: Sat Oct 31 16:55:49 UTC 2026; runner:ios-obj/DEVELOPMENT_ARM64_BCM2837
+
+KernelCache UUID: A54DD360E842F5D98C75EBF3F392B3F5
+
+Kernel UUID: D79DCFE4-737E-3041-A570-388C447577D9
+
+Boot session UUID: DD2B84EF-8BB0-4128-8068-1946DDBBC348
+
+iBoot version: 
+
+iBoot Stage 2 version: 
+
+secure boot?: YES
+
+roots installed: 0
+
+Paniclog version: 14
+
+Kernel text base:  0xfffffff007004000
+
+mach_absolute_time: 0x3607b0894
+
+Epoch Time:        sec       usec
+
+  Boot    : 0x00000021 0x0002081f
+
+  Sleep   : 0x00000000 0x00000000
+
+  Wake    : 0x00000000 0x00000000
+
+  Calendar: 0x0000022d 0x000ca9d8
+
+Zone info:
+
+  Zone map: 0xfffffff219a65000 - 0xfffffff819a65000
+
+  . PGZ   : 0xfffffff219a65000 - 0xfffffff219b44000
+
+  . VM    : 0xfffffff219b44000 - 0xfffffff300188000
+
+  . RO    : 0xfffffff300188000 - 0xfffffff34ce49000
+
+  . GEN0  : 0xfffffff34ce49000 - 0xfffffff43348e000
+
+  . GEN1  : 0xfffffff43348e000 - 0xfffffff519ad3000
+
+  . GEN2  : 0xfffffff519ad3000 - 0xfffffff600118000
+
+  . GEN3  : 0xfffffff600118000 - 0xfffffff6e675d000
+
+  . DATA  : 0xfffffff6e675d000 - 0xfffffff819a65000
+
+  Metadata: 0xfffffff81fa75000 - 0xfffffff825a75000
+
+  Bitmaps : 0xfffffff825a78000 - 0xfffffff825bc4000
+
+  Extra   : 0 - 0
+
+TPIDRx_ELy = {1: 0xfffffff4330eec90  0: 0x0000000000000000  0ro: 0x0000000201a90e20 }
+
+CORE 0 is the one that panicked. Check the full backtrace for details.
+
+Compressor Info: 0% of compressed pages limit (OK) and 0% of segments limit (OK) with 0 swapfiles and OK swap space
+
+Panicked task 0xfffffff519a8e670: 165 pages, 2 threads: pid 95: watchdogd
+
+Panicked thread: 0xfffffff4330eec90, backtrace: 0xfffffff20bdf32f0, tid: 469
+
+		  lr: 0xfffffff00727d198  fp: 0xfffffff20bdf3380
+
+		  lr: 0xfffffff007406260  fp: 0xfffffff20bdf33a0
+
+		  lr: 0xfffffff0073f8110  fp: 0xfffffff20bdf33f0
+
+		  lr: 0xfffffff0079c9a44  fp: 0xfffffff20bdf34e0
+
+		  lr: 0xfffffff0073f75d8  fp: 0xfffffff20bdf34f0
+
+		  lr: 0xfffffff00727c7a4  fp: 0xfffffff20bdf39c0
+
+		  lr: 0xfffffff00727d89c  fp: 0xfffffff20bdf3a40
+
+		  lr: 0xfffffff00799332c  fp: 0xfffffff20bdf3a60
+
+		  lr: 0xfffffff0079ea834  fp: 0xfffffff20bdf3ac0
+
+		  lr: 0xfffffff0076eaaf8  fp: 0xfffffff20bdf3c00
+
+		  lr: 0xfffffff0076ea0f8  fp: 0xfffffff20bdf3c90
+
+		  lr: 0xfffffff007703c0c  fp: 0xfffffff20bdf3ce0
+
+		  lr: 0xfffffff007703f44  fp: 0xfffffff20bdf3d20
+
+		  lr: 0xfffffff0072719ec  fp: 0xfffffff20bdf3d80
+
+		  lr: 0xfffffff0073f79fc  fp: 0xfffffff20bdf3d90
+
+		  lr: 0xfffffff0073f7b98  fp: 0xfffffff20bdf3db0
+
+		  lr: 0xfffffff0072810c8  fp: 0xfffffff20bdf3e00
+
+		  lr: 0xfffffff0073f8220  fp: 0xfffffff20bdf3e20
+
+		  lr: 0xfffffff0079ca178  fp: 0xfffffff20bdf3f10
+
+		  lr: 0xfffffff0073f75d8  fp: 0xfffffff20bdf3f20
+
+		  lr: 0xfffffff0073f75a0  fp: 0x0000000000000000
+
+** Stackshot Incomplete ** Bytes Filled 240 **
+
+Please go to https://panic.apple.com to report this panic
+

@@ -1,0 +1,85 @@
+{
+  "round": 65,
+  "kernel_source_revision": "519a72775fad6b6fd71c1ffbb2b68e41c4838d2e",
+  "inputs": {
+    "changed_files": [],
+    "other_eight_files_unchanged": true,
+    "firmware_prefix_unchanged": true,
+    "kernel_uuid": "D79DCFE4-737E-3041-A570-388C447577D9",
+    "kernel_sha256": "ec520cfe0b5cc96f0da68d0864abf7402b5883d289ac93bc13c16b0b112e1f81",
+    "payload_sha256": "a402895963b3f0c4c244aa9d6a594838f47123de5a5923b41c9390a9c3be796a",
+    "payload_bytes": 62926860,
+    "data_bytes": 134217728,
+    "data_uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+    "data_sha256": "c1744ab42d3baac3baaf50742afbf64fc51159d13620a2f5fef4e2655fe4ec47",
+    "data_change": "Root-owned launchd disabled.plist disables com.apple.watchdogd only; migration marker present; core redirection retained"
+  },
+  "cycle": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-policy-r65/board-r65/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "a402895963b3f0c4c244aa9d6a594838f47123de5a5923b41c9390a9c3be796a",
+    "stage": "complete",
+    "updated_at": "2026-10-31T17:39:37.771249+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-013936.txt"
+    ]
+  },
+  "console": {
+    "record": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-policy-r65/board-r65/dmesg-ramoops-0.bin",
+    "record_sha256": "7e50979472e2e29847b180c569a1616c8063e684078e3f6b61ae018956cd7cf9",
+    "offset": 7936,
+    "position": 11665,
+    "ring_bytes": 24568,
+    "panic": null,
+    "kernel_uuid": null
+  },
+  "checkpoint_count": 248,
+  "checkpoint_first": [
+    "219776",
+    "100",
+    "published",
+    "ab20a450",
+    "ready",
+    "17",
+    "0"
+  ],
+  "checkpoint_last": [
+    "251392",
+    "100",
+    "published",
+    "ab20a450",
+    "ready",
+    "17",
+    "0"
+  ],
+  "tzinit_exit_zero": true,
+  "tzinit_pid": 17,
+  "data_root_owner_verified": true,
+  "sd_data_sha256_after": "c1744ab42d3baac3baaf50742afbf64fc51159d13620a2f5fef4e2655fe4ec47",
+  "sd_data_unchanged": true,
+  "android_boot_ids": [
+    "870607da-627e-4ac6-b50d-ce462b40e0ae",
+    "0822763e-2a15-45f2-a3f7-97f20645c346"
+  ],
+  "android_slot": "_a",
+  "android_boot_completed": true,
+  "enospc_in_retained_ring": false,
+  "panic_in_retained_ring": false,
+  "policy": {
+    "com.apple.watchdogd": true
+  },
+  "policy_files_uid": 0,
+  "policy_files_gid": 0,
+  "policy_files_mode": "0644",
+  "policy_qualification": "Temporary development override; native IOWatchdog support is not provided. Physical original watchdogd fault PC was not captured.",
+  "late_limits": [
+    "audiomxd cannot connect to AppleKeyStore",
+    "Bluetooth has no matching device-tree service/address",
+    "liveactivitiesd crashes; too many corpses"
+  ],
+  "result": "PASS: SD original-system development boot with 128 MiB volatile RW Data, root ownership and direct tzinit exit zero. No captured panic or ENOSPC over the hardware watchdog test window with only watchdogd disabled by standard launchd policy. Full UI, persistent Data, SEP and native watchdog support remain unqualified.",
+  "media_and_guest_owner_tool_revision": "d8342d69697f61458c6908f7a4e47edc75e41c41"
+}

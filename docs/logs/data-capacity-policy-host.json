@@ -1,0 +1,222 @@
+{
+  "e5_xnu_tool_revision": "d8342d69697f61458c6908f7a4e47edc75e41c41",
+  "launchd_original_instruction_check": {
+    "launchd_sha256": "8cec9a3c44a443b08e977ccc5d577850316ad428c575dc01f09b018dbd5b6a25",
+    "policy_sha256": "26c43c536355280d4b221503605b8bf2ff1f2112ab5a400ca6d62416d650dd5b",
+    "cases": [
+      {
+        "label": "com.apple.watchdogd",
+        "file_uid": 0,
+        "disabled": true,
+        "events": [
+          "existing migration marker",
+          "/private/var/db/com.apple.xpc.launchd/disabled.plist"
+        ]
+      },
+      {
+        "label": "com.apple.watchdogd",
+        "file_uid": 502,
+        "disabled": false,
+        "events": [
+          "existing migration marker",
+          "/private/var/db/com.apple.xpc.launchd/disabled.plist"
+        ]
+      },
+      {
+        "label": "com.apple.other",
+        "file_uid": 0,
+        "disabled": false,
+        "events": [
+          "existing migration marker",
+          "/private/var/db/com.apple.xpc.launchd/disabled.plist"
+        ]
+      }
+    ],
+    "filesystem_and_libxpc_APIs_substituted": true,
+    "hardware_policy_accepted": false
+  },
+  "watchdogd_original_instruction_check": {
+    "watchdogd_sha256": "ded4c688e1c2add74acf3e7f9eea5fe2c2c569180ce81492221877944d913a01",
+    "cases": [
+      {
+        "case": "physical_missing",
+        "service": 0,
+        "vmm": 0,
+        "open_error": 0,
+        "events": [
+          "failed to discover watchdog KEXT service",
+          "connect_to_kext() unexpectedly failed - unable to lookup watchdog KEXT service"
+        ],
+        "outcome": "brk",
+        "pc": "0x10000ab0c",
+        "message": "connect_to_kext() unexpectedly failed - unable to lookup watchdog KEXT service"
+      },
+      {
+        "case": "virtual_missing",
+        "service": 0,
+        "vmm": 1,
+        "open_error": 0,
+        "events": [
+          "failed to discover watchdog KEXT service",
+          "detected virtual machine environment and no watchdog KEXT found, exiting..."
+        ],
+        "outcome": "exit",
+        "status": 0
+      },
+      {
+        "case": "service_open_error",
+        "service": 99,
+        "vmm": 0,
+        "open_error": 3758097095,
+        "events": [
+          "IOServiceOpen failed with error : 0xe00002c7"
+        ],
+        "outcome": "brk",
+        "pc": "0x10000ab54",
+        "message": "IOServiceOpen failed with error : 0xe00002c7"
+      },
+      {
+        "case": "service_connected",
+        "service": 99,
+        "vmm": 0,
+        "open_error": 0,
+        "events": [
+          "connected to watchdog KEXT"
+        ],
+        "outcome": "connected"
+      }
+    ],
+    "external_APIs_stubbed": true,
+    "hardware_fault_PC_observed": false,
+    "physical_root_cause_proven": false
+  },
+  "guest_ownership_and_checksums": {
+    "targets": {
+      "2": {
+        "path": "/",
+        "uid": 501,
+        "gid": 20,
+        "mode": 16877
+      },
+      "249": {
+        "path": "db/com.apple.xpc.launchd/disabled.plist",
+        "uid": 501,
+        "gid": 20,
+        "mode": 33188
+      },
+      "250": {
+        "path": "db/com.apple.xpc.launchd/disabled.migrated",
+        "uid": 501,
+        "gid": 20,
+        "mode": 33188
+      }
+    },
+    "changes": [
+      {
+        "block_offset": 659456,
+        "inode": 2,
+        "path": "/",
+        "old_uid": 501,
+        "old_gid": 20,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 684032,
+        "inode": 2,
+        "path": "/",
+        "old_uid": 501,
+        "old_gid": 20,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 1445888,
+        "inode": 2,
+        "path": "/",
+        "old_uid": 501,
+        "old_gid": 20,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 1531904,
+        "inode": 2,
+        "path": "/",
+        "old_uid": 501,
+        "old_gid": 20,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 2949120,
+        "inode": 2,
+        "path": "/",
+        "old_uid": 501,
+        "old_gid": 20,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 3002368,
+        "inode": 2,
+        "path": "/",
+        "old_uid": 501,
+        "old_gid": 20,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 3067904,
+        "inode": 249,
+        "path": "db/com.apple.xpc.launchd/disabled.plist",
+        "old_uid": 99,
+        "old_gid": 99,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 3067904,
+        "inode": 250,
+        "path": "db/com.apple.xpc.launchd/disabled.migrated",
+        "old_uid": 99,
+        "old_gid": 99,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 3076096,
+        "inode": 2,
+        "path": "/",
+        "old_uid": 501,
+        "old_gid": 20,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 3092480,
+        "inode": 249,
+        "path": "db/com.apple.xpc.launchd/disabled.plist",
+        "old_uid": 99,
+        "old_gid": 99,
+        "new_uid": 0,
+        "new_gid": 0
+      },
+      {
+        "block_offset": 3092480,
+        "inode": 250,
+        "path": "db/com.apple.xpc.launchd/disabled.migrated",
+        "old_uid": 99,
+        "old_gid": 99,
+        "new_uid": 0,
+        "new_gid": 0
+      }
+    ],
+    "sha256": "c1744ab42d3baac3baaf50742afbf64fc51159d13620a2f5fef4e2655fe4ec47",
+    "note": "Guest APFS inode ownership in an independent image copy; only uid/gid and containing node Fletcher64 change."
+  },
+  "independent_host_mount_owner_verification": true,
+  "replayed_image_matches_staged_bytes": true,
+  "source_image_read_only": true,
+  "native_watchdog_support_qualified": false
+}

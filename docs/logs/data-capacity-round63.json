@@ -1,0 +1,75 @@
+{
+  "round": 63,
+  "source_revision": "519a72775fad6b6fd71c1ffbb2b68e41c4838d2e",
+  "ci": {
+    "device_revision": "519a72775fad6b6fd71c1ffbb2b68e41c4838d2e",
+    "unixnu_revision": "066c8d8315f83749d28bcae2faf3595718646be5",
+    "dispatched_at": "2026-10-31T16:51:28.532179+00:00",
+    "run_id": 41221685284,
+    "run_number": 315,
+    "html_url": "https://github.com/Enceka/unixnu-e5-kernel-builder/actions/runs/41221685284",
+    "conclusion": "success",
+    "artifact_directory": "/Volumes/Projects/e5-xnu/uefi/build/e5-kernel-artifact-315-data-capacity",
+    "artifacts_saved_locally": true,
+    "kernel_sha256": "ec520cfe0b5cc96f0da68d0864abf7402b5883d289ac93bc13c16b0b112e1f81",
+    "public_run_deleted": true
+  },
+  "inputs": {
+    "changed_files": [
+      "kernel.macho"
+    ],
+    "other_eight_files_unchanged": true,
+    "firmware_prefix_unchanged": true,
+    "kernel_uuid": "D79DCFE4-737E-3041-A570-388C447577D9",
+    "kernel_sha256": "ec520cfe0b5cc96f0da68d0864abf7402b5883d289ac93bc13c16b0b112e1f81",
+    "payload_sha256": "a402895963b3f0c4c244aa9d6a594838f47123de5a5923b41c9390a9c3be796a",
+    "payload_bytes": 62926860,
+    "data_bytes": 134217728,
+    "data_uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+    "data_sha256": "5f63bfbc8e4342cb2bfd1dab8d1c8c14e4b6c514ec367cffd086792150d9616b"
+  },
+  "cycle": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/data-capacity-r63/board-r63/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "a402895963b3f0c4c244aa9d6a594838f47123de5a5923b41c9390a9c3be796a",
+    "stage": "complete",
+    "updated_at": "2026-10-31T17:10:03.504768+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-011002.txt"
+    ]
+  },
+  "console": {
+    "record": "/Volumes/Projects/e5-xnu/uefi/build/data-capacity-r63/board-r63/dmesg-ramoops-0.bin",
+    "record_sha256": "873b7839446bc5ed1220ec881686d35d4e99a3deeccfd68078766f24c3bbef87",
+    "offset": 7936,
+    "position": 2725,
+    "ring_bytes": 24568,
+    "panic": "panic(cpu 0 caller 0xfffffff0079ea834):  watchdogd[95] exited -- exit reason namespace 2 subcode 0x5 description: none",
+    "kernel_uuid": "D79DCFE4-737E-3041-A570-388C447577D9"
+  },
+  "tzinit_exit_zero": true,
+  "tzinit_pid": 17,
+  "late_checkpoint_rows": [
+    [
+      "155648",
+      "100",
+      "published",
+      "bb83a697",
+      "ready",
+      "17",
+      "0"
+    ]
+  ],
+  "data_root_owner_verified": true,
+  "data_card_sha256_after": "5f63bfbc8e4342cb2bfd1dab8d1c8c14e4b6c514ec367cffd086792150d9616b",
+  "data_card_unchanged": true,
+  "android_boot_ids": [
+    "dea3f5ee-796d-4fa3-9fab-5c948cc8f24d",
+    "e046a643-5153-488f-b2f3-5b0c48270f75"
+  ],
+  "new_blocker": "watchdogd[95] SIGTRAP (OS_REASON_SIGNAL=2, signal=5). Its 127455232-byte core exhausts 128 MiB Data and overwrites the original error. Native watchdog cause remains to be captured in R64.",
+  "result": "PASS: original tzinit exits 0, Data root normalization and 128 MiB RW mount. Later critical watchdogd crash; no full-system success claim."
+}

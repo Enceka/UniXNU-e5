@@ -97,6 +97,12 @@ the report is `e5-xnu/uefi/build/data-publication-check/patch-series/patch-check
 
 ## Remaining acceptance
 
+Round 63–65 results supersede this historical frontier: see
+[data-capacity.md](data-capacity.md). The 128 MiB Data and direct tzinit
+exit-zero checkpoints are now qualified under the stated development policy.
+The 32 MiB checker examples above refer to the a0a5f1e driver header.
+
+
 The pinned CI build and full-readback flash are now complete. Require a
 directly retained tzinit completion plus capacity, ownership and persistence
 qualification. Round 62 below now establishes actual volatile Data writes.

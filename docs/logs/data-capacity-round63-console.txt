@@ -1,0 +1,348 @@
+locks 522 blocks_in_txn 0 num_records 370 num_data_blocks 18432 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 62 threshold_blocks 327
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 845 free_blocks 522 blocks_in_txn 0 num_records 14 num_data_blocks 619 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 63 threshold_blocks 327
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 845 free_blocks 522 blocks_in_txn 0 num_records 14 num_data_blocks 619 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 64 threshold_blocks 327
+
+coredump (watchdogd, pid 95): failed to write segment 1f7c00000->1fc400000: error 28
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 765 free_blocks 522 blocks_in_txn 0 num_records 17 num_data_blocks 512 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 65 threshold_blocks 327
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 2097152 bytes at offset 127336448 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127336448 alloced-size 129597440 offset 127336448 writlim 129433600
+
+coredump (watchdogd, pid 95): failed to write segment 1fc400000->1fc600000: error 28
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 765 free_blocks 522 blocks_in_txn 0 num_records 17 num_data_blocks 512 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 66 threshold_blocks 327
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 2097152 bytes at offset 127336448 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127336448 alloced-size 129597440 offset 127336448 writlim 129433600
+
+coredump (watchdogd, pid 95): failed to write segment 1fc600000->1fc800000: error 28
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 765 free_blocks 522 blocks_in_txn 0 num_records 17 num_data_blocks 512 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 67 threshold_blocks 327
+
+tx_flush:1338: disk5 xid 67 tx stats: # 60 owait 3 1219us finish 59 bar2 6 f 4 enter 1 fq 0 0 2us close 0us prep 25us flush 177us
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 2097152 bytes at offset 127336448 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127336448 alloced-size 129597440 offset 127336448 writlim 129433600
+
+coredump (watchdogd, pid 95): failed to write segment 1fc800000->1fca00000: error 28
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 765 free_blocks 522 blocks_in_txn 0 num_records 17 num_data_blocks 512 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 68 threshold_blocks 327
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 2097152 bytes at offset 127336448 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127336448 alloced-size 129597440 offset 127336448 writlim 129433600
+
+coredump (watchdogd, pid 95): failed to write segment 1fca00000->1fcc00000: error 28
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 4671 free_blocks 522 blocks_in_txn 0 num_records 79 num_data_blocks 3860 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 69 threshold_blocks 327
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 845 free_blocks 522 blocks_in_txn 0 num_records 14 num_data_blocks 619 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 70 threshold_blocks 327
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 845 free_blocks 522 blocks_in_txn 0 num_records 14 num_data_blocks 619 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 71 threshold_blocks 327
+
+coredump (watchdogd, pid 95): failed to write segment 1fcc00000->1fdb14000: error 28
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype INSERT num_blocks 191 blocks_in_txn 0 free_blocks 488 xid 72
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 488 xid 72
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 297 free_blocks 493 blocks_in_txn 0 num_records 9 num_data_blocks 116 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 73 threshold_blocks 327
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 475136 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 127926272
+
+coredump (watchdogd, pid 95): failed to write segment 1ffb30000->1ffba4000: error 28
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 7857 free_blocks 493 blocks_in_txn 0 num_records 133 num_data_blocks 6560 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 74 threshold_blocks 327
+
+fs_tx_enter_internal:27549: disk5s1 watchdogd: ENOSPC: ttype INSERT num_blocks 779 free_blocks 493 blocks_in_txn 0 num_records 13 num_data_blocks 562 num_active_txns 0 (reserved ranges total blocks: 3544) current xid: 75 threshold_blocks 327
+
+coredump (watchdogd, pid 95): failed to write segment 1ffba4000->201544000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 201544000->208380000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 507904 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 127959040
+
+coredump (watchdogd, pid 95): failed to write segment 208380000->2083fc000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 2083fc000->20f238000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 622592 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 128073728
+
+coredump (watchdogd, pid 95): failed to write segment 20f238000->20f2d0000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 20f2d0000->215838000: error 28
+
+tx_flush:1338: disk5 xid 87 tx stats: # 80 owait 8 883us finish 82 bar2 9 f 4 enter 1 fq 0 0 4us close 0us prep 23us flush 171us
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 589824 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 128040960
+
+coredump (watchdogd, pid 95): failed to write segment 215838000->2158c8000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 2158c8000->21c728000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 475136 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 127926272
+
+coredump (watchdogd, pid 95): failed to write segment 21c728000->21c79c000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 21c79c000->223560000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 589824 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 128040960
+
+coredump (watchdogd, pid 95): failed to write segment 223560000->2235f0000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 2235f0000->22a2fc000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 753664 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 128204800
+
+coredump (watchdogd, pid 95): failed to write segment 22a2fc000->22a3b4000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 22a3b4000->231200000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 770048 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 128221184
+
+coredump (watchdogd, pid 95): failed to write segment 231200000->2312bc000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 1441792 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 128892928
+
+coredump (watchdogd, pid 95): failed to write segment 2312bc000->23141c000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 32768 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 127483904
+
+coredump (watchdogd, pid 95): failed to write segment 23141c000->231424000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+tx_flush:1338: disk5 xid 107 tx stats: # 100 owait 14 642us finish 106 bar2 13 f 4 enter 1 fq 0 0 4us close 0us prep 22us flush 174us
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 475136 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 127926272
+
+coredump (watchdogd, pid 95): failed to write segment 231424000->231498000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 231498000->233d50000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 235d50000->238000000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 238000000->239e00000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 2097152 bytes at offset 127451136 in inode 329(watchdogd.core) - NoNativeSd: rw done #155648 8/8 at 13687384 d=100 p=published x=bb83a697 q=ready t=17:0
+
+ space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 129548288
+
+coredump (watchdogd, pid 95): failed to write segment 239e00000->23a000000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 23a000000->23a4d0000: error 28
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 65536 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 127516672
+
+coredump (watchdogd, pid 95): failed to write segment 23c4d0000->23c4e0000: error 28
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 490 xid 122
+
+fs_map_file_offset_ext:21029: disk5s1 Cannot start transaction with XID 0: No space left on device(28)
+
+prepare_write_and_lock:12245: disk5s1 Cannot allocate 475136 bytes at offset 127451136 in inode 329(watchdogd.core) - No space left on device(28), dstream size 127451136 alloced-size 129597440 offset 127451136 writlim 127926272
+
+coredump (watchdogd, pid 95): failed to write segment 23c4e0000->23c554000: error 28
+
+coredump (watchdogd, pid 95): failed to write segment 23c554000->254638000: error 28
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype INSERT num_blocks 164 blocks_in_txn 0 free_blocks 488 xid 126
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 488 xid 126
+
+coredump (watchdogd, pid 95): eliding unreadable segment fc0000000->1000000000
+
+coredump (watchdogd, pid 95): eliding unreadable segment 1000000000->7000000000
+
+coredump (watchdogd, pid 95): ending segment dump, kret=1
+
+coredump (watchdogd, pid 95): max file offset: 127455232
+
+coredump (watchdogd, pid 95): dumping 1 notes
+
+tx_flush:1338: disk5 xid 127 tx stats: # 120 owait 23 606us finish 131 bar2 18 f 4 enter 1 fq 0 0 1us close 0us prep 94us flush 309us
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype INSERT num_blocks 164 blocks_in_txn 0 free_blocks 487 xid 128
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 487 xid 128
+
+coredump (watchdogd, pid 95): dumping 2 threads
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype RR_HOLE num_blocks 97 blocks_in_txn 0 free_blocks 487 xid 128
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype DELETE num_blocks 13 blocks_in_txn 0 free_blocks 487 xid 128
+
+coredump (watchdogd, pid 95): core dump succeeded
+
+Generated core file for pid: 95 in 23.698 seconds
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 480 xid 129
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 480 xid 129
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 480 xid 129
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 480 xid 129
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 480 xid 129
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype MODVAL num_blocks 13 blocks_in_txn 0 free_blocks 480 xid 129
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype DELETE num_blocks 13 blocks_in_txn 0 free_blocks 479 xid 129
+
+fs_tx_leave_ext:27698: disk5s1 gettin' low on space: ttype DELETE num_blocks 13 blocks_in_txn 0 free_blocks 478 xid 129
+
+panic(cpu 0 caller 0xfffffff0079ea834):  watchdogd[95] exited -- exit reason namespace 2 subcode 0x5 description: none
+
+Debugger message: panic
+
+Memory ID: 0x0
+
+OS release type: User
+
+OS version: 21H461
+
+Kernel version: Darwin Kernel Version 23.6.0: Sat Oct 31 16:55:49 UTC 2026; runner:ios-obj/DEVELOPMENT_ARM64_BCM2837
+
+KernelCache UUID: A54DD360E842F5D98C75EBF3F392B3F5
+
+Kernel UUID: D79DCFE4-737E-3041-A570-388C447577D9
+
+Boot session UUID: 0F694D5F-2702-4CF9-92A1-03DEE2684327
+
+iBoot version: 
+
+iBoot Stage 2 version: 
+
+secure boot?: YES
+
+roots installed: 0
+
+Paniclog version: 14
+
+Kernel text base:  0xfffffff007004000
+
+mach_absolute_time: 0x3665c2d93
+
+Epoch Time:        sec       usec
+
+  Boot    : 0x00000021 0x00003686
+
+  Sleep   : 0x00000000 0x00000000
+
+  Wake    : 0x00000000 0x00000000
+
+  Calendar: 0x00000231 0x000984bb
+
+Zone info:
+
+  Zone map: 0xfffffff5b1a43000 - 0xfffffffbb1a43000
+
+  . PGZ   : 0xfffffff5b1a43000 - 0xfffffff5b1b22000
+
+  . VM    : 0xfffffff5b1b22000 - 0xfffffff698166000
+
+  . RO    : 0xfffffff698166000 - 0xfffffff6e4e27000
+
+  . GEN0  : 0xfffffff6e4e27000 - 0xfffffff7cb46c000
+
+  . GEN1  : 0xfffffff7cb46c000 - 0xfffffff8b1ab1000
+
+  . GEN2  : 0xfffffff8b1ab1000 - 0xfffffff9980f6000
+
+  . GEN3  : 0xfffffff9980f6000 - 0xfffffffa7e73b000
+
+  . DATA  : 0xfffffffa7e73b000 - 0xfffffffbb1a43000
+
+  Metadata: 0xfffffffbf9c9d000 - 0xfffffffbffc9d000
+
+  Bitmaps : 0xfffffffbffca0000 - 0xfffffffbffdec000
+
+  Extra   : 0 - 0
+
+TPIDRx_ELy = {1: 0xfffffff7cc01dea0  0: 0x0000000000000000  0ro: 0x00000001fc894e20 }
+
+CORE 0 is the one that panicked. Check the full backtrace for details.
+
+Compressor Info: 0% of compressed pages limit (OK) and 0% of segments limit (OK) with 0 swapfiles and OK swap space
+
+Panicked task 0xfffffffa7e6d3bd0: 5534 pages, 2 threads: pid 95: watchdogd
+
+Panicked thread: 0xfffffff7cc01dea0, backtrace: 0xfffffff44498f2f0, tid: 448
+
+		  lr: 0xfffffff00727d198  fp: 0xfffffff44498f380
+
+		  lr: 0xfffffff007406260  fp: 0xfffffff44498f3a0
+
+		  lr: 0xfffffff0073f8110  fp: 0xfffffff44498f3f0
+
+		  lr: 0xfffffff0079c9a44  fp: 0xfffffff44498f4e0
+
+		  lr: 0xfffffff0073f75d8  fp: 0xfffffff44498f4f0
+
+		  lr: 0xfffffff00727c7a4  fp: 0xfffffff44498f9c0
+
+		  lr: 0xfffffff00727d89c  fp: 0xfffffff44498fa40
+
+		  lr: 0xfffffff00799332c  fp: 0xfffffff44498fa60
+
+		  lr: 0xfffffff0079ea834  fp: 0xfffffff44498fac0
+
+		  lr: 0xfffffff0076eaaf8  fp: 0xfffffff44498fc00
+
+		  lr: 0xfffffff0076ea0f8  fp: 0xfffffff44498fc90
+
+		  lr: 0xfffffff007703c0c  fp: 0xfffffff44498fce0
+
+		  lr: 0xfffffff007703f44  fp: 0xfffffff44498fd20
+
+		  lr: 0xfffffff0072719ec  fp: 0xfffffff44498fd80
+
+		  lr: 0xfffffff0073f79fc  fp: 0xfffffff44498fd90
+
+		  lr: 0xfffffff0073f7b98  fp: 0xfffffff44498fdb0
+
+		  lr: 0xfffffff0072810c8  fp: 0xfffffff44498fe00
+
+		  lr: 0xfffffff0073f8220  fp: 0xfffffff44498fe20
+
+		  lr: 0xfffffff0079ca178  fp: 0xfffffff44498ff10
+
+		  lr: 0xfffffff0073f75d8  fp: 0xfffffff44498ff20
+
+		  lr: 0xfffffff0073f75a0  fp: 0x0000000000000000
+
+** Stackshot Incomplete ** Bytes Filled 240 **
+
+Please go to https://panic.apple.com to report this panic
+
