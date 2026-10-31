@@ -105,10 +105,9 @@ Observed: exit 0, `- Done -`; log retained as
 
 These are host results. The repaired kernel has not yet been compiled by
 CI or flashed. No new panic text or hardware success is claimed.
-The whole-record `porting-record.py check` remains blocked by an existing
-`storage: verification evidence needs a commit` error. Both the original
-HEAD record and this working tree produce the same error; existing storage
-evidence revisions have not been rewritten for this diagnostics change.
+The whole-record check initially exposed an existing shortened storage
+evidence revision. Expanding `e3fe21c` to its uniquely resolved full commit
+fixes that metadata error; `porting-record.py check` now passes all 13 areas.
 The bytewise position is not atomic across reset, and existing concurrent
 console writers are not serialized by this change. Warm-reset DRAM
 survival and pstore retention of the printed tail require a board run.

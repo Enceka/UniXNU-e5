@@ -265,7 +265,7 @@ result = "Round 16: sdio0 chain observed then switched to rpll (src 195 MHz), de
 kind = "source"
 reference = "docs/logs/sd-ext4-reference.json"
 command = "adb /debug_ramdisk/su dd /dev/block/mmcblk1 (raw captures in docs/logs/sd-ext4/)"
-revision = "e3fe21c"
+revision = "e3fe21cee33da61b0f975383eb9ed762e9d462a2"
 result = "Golden ext4 walk reference for the e5-openwrt image: sb geometry, gd0 inode table 145, root inode 2 extent -> fs-block 4241, 22 dirents, CRC32 70633ae6, corrupt sb first_ino/inode_size fields documented with the proven 256-byte stride. Driver round-17 evidence rides the board reports and is checker-gated."
 
 [[area.evidence]]
