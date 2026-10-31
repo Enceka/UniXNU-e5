@@ -22,6 +22,16 @@ static void sdlog(const char *fmt, ...) {
 /* kern_exec.c stash: -999 unreached, -1 absent, -2 copyout, -3 in mount, >=0 errno, 100 ok. */
 extern "C" int e5_data_mount_state;
 
+// Repeat publication and UUID-lookup checkpoints in sampled late reads:
+// launchd's EROFS output can overwrite the entire early console ring.
+static const char *dataPublication = "disabled";
+static const char *dataLookup = "unreached";
+static uint32_t dataDetail;
+static void dataCheckpoint(const char *phase, uint32_t detail = 0) {
+  __atomic_store_n(&dataDetail, detail, __ATOMIC_RELAXED);
+  __atomic_store_n(&dataPublication, phase, __ATOMIC_RELEASE);
+}
+
 class NativeSd;
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
@@ -734,7 +744,10 @@ public:
   // proven 24 MHz 4-bit throughput; runs once, before the device publishes.
   bool fillDataImage(char *destination) {
     for (uint64_t off = 0; off < E5Data::sectors; off += 16) {
-      if (!readSectors((uint32_t)(E5Data::base + off), 16)) return false;
+      if (!readSectors((uint32_t)(E5Data::base + off), 16)) {
+        dataCheckpoint("load-read-failed", (uint32_t)off);
+        return false;
+      }
       memcpy(destination + off * 512, buffer, 16 * 512);
     }
     return true;
@@ -892,8 +905,12 @@ public:
     // boot's own history. Keep the first few plus every 128th, with the
     // running count so progress stays measurable.
     if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0))
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d\n", bigReads, (unsigned long long)(done / 512),
-            (unsigned long long)count, (unsigned long long)block, e5_data_mount_state);
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d p=%s x=%08x q=%s\n",
+            bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
+            (unsigned long long)block, e5_data_mount_state,
+            __atomic_load_n(&dataPublication, __ATOMIC_ACQUIRE),
+            __atomic_load_n(&dataDetail, __ATOMIC_RELAXED),
+            __atomic_load_n(&dataLookup, __ATOMIC_RELAXED));
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
         done == count * 512 ? kIOReturnSuccess : kIOReturnIOError, done);
@@ -1040,44 +1057,65 @@ OSDefineMetaClassAndStructors(E5DataDevice, IOBlockStorageDevice)
   // load the whole image while no IOKit consumer can race the host.
 
 E5DataDevice *NativeSd::prepareDataDevice() {
-    if (!E5Data::fits(sectors)) return nullptr;
+    dataCheckpoint("probe");
+    if (!E5Data::fits(sectors)) { dataCheckpoint("bounds-failed"); return nullptr; }
     if (!readSectors((uint32_t)E5Data::base, 8)) {
+      dataCheckpoint("probe-read-failed");
       sdlog("NativeSd: data window read failed\n");
       return nullptr;
     }
     if (memcmp(buffer + 32, "NXSB", 4)) {
       uint32_t a = *(uint32_t *)(buffer + 32), b = *(uint32_t *)(buffer + 36);
+      dataCheckpoint("not-nxsb", a);
       sdlog("NativeSd: data window not NXSB (%08x %08x)\n", a, b);
       return nullptr;
     }
     E5DataDevice *device = new E5DataDevice;
-    if (!device) return nullptr;
-    if (!device->init(nullptr)) { device->release(); return nullptr; }
+    if (!device) { dataCheckpoint("object-failed"); return nullptr; }
+    if (!device->init(nullptr)) {
+      dataCheckpoint("init-failed"); device->release(); return nullptr;
+    }
+    dataCheckpoint("alloc");
     device->image = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
         kernel_task, kIODirectionInOut, E5Data::sectors * 512, 0x0000000FFFFFFFFFull);
-    if (!device->image || !fillDataImage((char *)device->image->getBytesNoCopy())) {
+    char *destination = device->image ? (char *)device->image->getBytesNoCopy() : nullptr;
+    bool loaded = false;
+    if (!destination) dataCheckpoint(device->image ? "buffer-failed" : "alloc-failed");
+    else {
+      dataCheckpoint("loading");
+      loaded = fillDataImage(destination);
+    }
+    if (!loaded) {
       sdlog("NativeSd: data image load failed\n");
       if (device->image) device->image->release();
       device->image = nullptr;
       device->release();
       return nullptr;
     }
+    dataCheckpoint("loaded", crc32n((const uint8_t *)destination, 4096));
     return device;
   }
 
 
 static bool publishData(E5DataDevice *device, NativeSd *host) {
-  if (!device->attach(host)) { device->release(); return false; }
-  if (!device->start(host)) { device->detach(host); device->release(); return false; }
+  if (!device->attach(host)) {
+    dataCheckpoint("attach-failed"); device->release(); return false;
+  }
+  if (!device->start(host)) {
+    dataCheckpoint("start-failed"); device->detach(host); device->release(); return false;
+  }
   sdlog("NativeSd: publishing Data read-write %llu sectors at %llu\n",
         (unsigned long long)E5Data::sectors, (unsigned long long)E5Data::base);
+  dataCheckpoint("register", __atomic_load_n(&dataDetail, __ATOMIC_RELAXED));
   device->registerService();
+  dataCheckpoint("published", __atomic_load_n(&dataDetail, __ATOMIC_RELAXED));
   device->release();
   return true;
 }
 
 // Select the Data volume by its actual UUID, never by enumeration order.
 extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
+  __atomic_store_n(&dataLookup, "match-alloc", __ATOMIC_RELAXED);
   OSDictionary *match = IOService::serviceMatching("IOMedia");
   OSDictionary *properties = OSDictionary::withCapacity(1);
   OSString *uuid = OSString::withCString(E5Data::uuid);
@@ -1089,10 +1127,11 @@ extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
   }
   bool ready = properties->setObject("UUID", uuid) && match->setObject(gIOPropertyMatchKey, properties);
   properties->release(); uuid->release();
-  if (!ready) { match->release(); return 0; }
+  if (!ready) { __atomic_store_n(&dataLookup, "match-build", __ATOMIC_RELAXED); match->release(); return 0; }
+  __atomic_store_n(&dataLookup, "waiting", __ATOMIC_RELAXED);
   IOService *volume = IOService::waitForMatchingService(match, 30ULL * 1000000000ULL);
   match->release();
-  if (!volume) return 0;
+  if (!volume) { __atomic_store_n(&dataLookup, "timeout", __ATOMIC_RELAXED); return 0; }
   OSString *name = OSDynamicCast(OSString, volume->getProperty("BSD Name"));
   OSNumber *maj = OSDynamicCast(OSNumber, volume->getProperty("BSD Major"));
   OSNumber *min = OSDynamicCast(OSNumber, volume->getProperty("BSD Minor"));
@@ -1103,7 +1142,7 @@ extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
     *major = (int)maj->unsigned32BitValue(); *minor = (int)min->unsigned32BitValue();
     sdlog("NativeSd: Data volume %s device %s\n", E5Data::uuid, path);
   }
+  __atomic_store_n(&dataLookup, ok ? "ready" : "bsd-missing", __ATOMIC_RELAXED);
   volume->release();
   return ok ? 1 : 0;
 }
-

@@ -25,7 +25,9 @@ namespace E5Data {
 // /private/var so tzinit and later boot tasks find a writable dataset.
 static constexpr uint64_t base = 19034112; // in 512-byte sectors.
 static constexpr uint64_t sectors = 65536; // 32 MiB.
-static constexpr const char *uuid = "B5A22774-89CF-41E5-A62B-5AFA6B2710BC";
+// Verified against the installed container's checksummed APSB objects and
+// diskutil's read-only attachment. The earlier B5A22774 UUID was stale.
+static constexpr const char *uuid = "30ADC749-351F-4FFF-998A-20E1B683859F";
 
 inline bool contains(uint64_t block, uint64_t count) {
   return count && block < sectors && count <= sectors - block;

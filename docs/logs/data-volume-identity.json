@@ -1,0 +1,90 @@
+{
+  "audited_device_base": "b3ac7cfff34735e4970ab4f8772bab37b00ff3c0",
+  "source_changes": "local working tree; no new CI kernel or board run",
+  "sd_device": "/dev/block/mmcblk1",
+  "data_lba": 19034112,
+  "data_sectors": 65536,
+  "read_command": "adb -s TS30520241202952 exec-out /debug_ramdisk/su -c 'dd if=/dev/block/mmcblk1 bs=512 skip=19034112 count=65536 2>/dev/null'",
+  "image_check": {
+    "result": "PASS",
+    "bytes": 33554432,
+    "container_bytes": 33513472,
+    "sha256": "42b81cab9b044819aa69d498b2dcf67dcefdcbb9a90651a04891c30d089b00b8",
+    "superblock_crc32": "2770965a",
+    "volume_uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+    "volume_superblocks": [
+      {
+        "offset": 663552,
+        "xid": 2,
+        "uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+        "role": 0
+      },
+      {
+        "offset": 696320,
+        "xid": 3,
+        "uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+        "role": 64
+      },
+      {
+        "offset": 1519616,
+        "xid": 4,
+        "uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+        "role": 64
+      },
+      {
+        "offset": 1544192,
+        "xid": 5,
+        "uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+        "role": 64
+      },
+      {
+        "offset": 1556480,
+        "xid": 6,
+        "uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+        "role": 64
+      }
+    ],
+    "limitation": "Fixed fixture identity only; APFS publication, RW mount and tzinit require a board run.",
+    "image": "/Volumes/Projects/e5-xnu/uefi/build/data-publication-check/data-card.bin",
+    "window_header": "/Volumes/Projects/unixnu-e5-repos/e5-device/scripts/emmc/SystemOSWindow.h"
+  },
+  "old_driver_rejected": {
+    "returncode": 1,
+    "message": "Data UUID 30ADC749-351F-4FFF-998A-20E1B683859F != driver UUID B5A22774-89CF-41E5-A62B-5AFA6B2710BC"
+  },
+  "android": {
+    "slot": "_a",
+    "completed": "1",
+    "boot_id": "49af7dc1-5831-4ef5-8ea4-6fc4ce88dd84"
+  },
+  "raw_candidate_bytes": 33533952,
+  "raw_candidate_sha256": "7e235db83ab8d0dc0cfeca1b1f69cdcd90345fc27619478e3f3c7328bf6182c4",
+  "raw_candidate_matches_card_prefix": true,
+  "round60_report": {
+    "path": "dumps/uefi-report-233521.txt",
+    "sha256": "ba2b41fb537be62892cf3cb01d782ba34b600d929de34c71e8723741aea60a8d",
+    "sample_count": 68,
+    "mount_state_counts": {
+      "-1": 68
+    }
+  },
+  "diskutil_readonly_confirmation": {
+    "image": "uefi/build/system-boot/e5-data.img",
+    "volume": "Data",
+    "volume_uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+    "detached": true
+  },
+  "host_checks": {
+    "image_regression_cases": 9,
+    "publication_control_flow_cases": 11,
+    "publication_sanitizer": "UBSan with IOKit mocks; not a kernel ABI build",
+    "ordered_patch_count": 81,
+    "ordered_patch_result": "PASS",
+    "window_tests": "PASS"
+  },
+  "changed_source_sha256": {
+    "scripts/emmc/SystemOSWindow.h": "907657506d92c53b953745ec3c93cd7259ea6cba608017301f69f53a3fd0ab03",
+    "scripts/emmc/NativeSd.cpp": "ec8874a488210d503d7edfbefec35677e173fa57b04e86d3d6b2fa47364a557f",
+    "scripts/emmc/check-data-image.py": "297c900c8501ff0c42ebcc090e2388cf65b59e4e921dfd6eff5804eec47e3669"
+  }
+}
