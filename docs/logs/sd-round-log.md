@@ -488,3 +488,36 @@ repeat 16/16; eMMC v8 + E5EMMC mount + shell intact (EXITH 5/5)".
 The ext4-mapping round objective is met: XNU natively walks the card's
 ext4 (superblock → group descriptor → root inode extent tree → root
 directory) and verifies content against the Android-side golden captures.
+
+## Round 19 (kernel 281, v17) — SD carries the OS disk; GPT probe reads, no slice, root wait panic
+
+Kernel 281 (v17) booted with the whole-card OS image (os-window.img raw at
+LBA 0, readback-verified against the local file at 5 LBAs). NativeSd probe:
+all four new reference CRCs golden (LBA0 ec8ce612, LBA1 10fb5eed, LBA2048
+d2e6e0b2, LBA2050 fba8aad8), `ext4 absent (os image)`, `gpt ok entries 128`,
+probe Success default-4bit-24MHz, tp single 128/26433us, tp multi 128/5014us
+match y. The kernel then waited for root volume UUID 04769D26 (new ADT dict
+present) and the storage stack probed the SD media: reads at LBA 0, LBA 1,
+and one 16KB entries read (32 blocks at LBA 2, served as two 16-sector CMD18
+chunks) — then NO slice was ever published, no further SD reads happened,
+the wait timed out and the kernel panicked "Failed to mount root device
+@IOKitBSDInit.cpp:984". The E5EMMC seed container mounted normally in the
+same boot (its own 32-block entries read succeeded through per-512 reads),
+which exonerates the kext (IOStorageFamily 2.1 prelinked from the iphoneos
+17.7 SDK) and the arbitration path.
+
+Offline analysis of os-window.img: the GPT is fully self-consistent — header
+CRC d9e4279c, entries CRC fa7a560c, p0 Apple_APFS (7c3457ef-…) spans LBA
+34..11870241, exactly the header's usable range 34..11870241, backup header
+at 11870274 = image end. So the rejection is not the image. Prime suspect:
+the 16-sector CMD18 chunk path, which only ever had first-sector CRC
+verification (tp self-test), while the 8-sector path is proven end-to-end
+golden by the ext4 walk.
+
+v18 (78ccbbf): doAsyncReadWrite serves kernel reads in 8-sector chunks (16
+kept for diagnostics); after `gpt ok entries` the driver replicates the
+scheme's read pattern — two 16-sector chunks (LBA 2/18) with CRC + p0
+fields, then four 8-sector reads with CRCs (golden chunks 3a740ceb/d8f49994,
+quarters 0c87a44e + c71c0011 x3) — so the next round distinguishes corrupt
+16-chunk data from a scheme rejection that is not data, and if the 8-sector
+chunking is the fix the boot may proceed straight to the volume mount.
