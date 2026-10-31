@@ -6,16 +6,6 @@ soc = "UMS9621"
 os_profile = "ipados-17.7.11-21H461"
 summary = "Rongyue E5 is a 5G senior bar phone (feature-phone form factor) with a removable battery, a 3.5-inch 320x480 ST7365P RGB565 panel, 2 GiB RAM, eMMC and a Unisoc UMS9621 (Qogirn6Lite) SoC with 2x Cortex-A76 plus 6x Cortex-A55. The record covers the BootROM-FDL-LK-BootShim-mu UEFI chain, XNU hand-off, framebuffer console, matrix keypad input, seed userland, the read-only eMMC block service and the read-only SD card service (native SD host, default-speed multi-block reads and an ext4 walk over the e5-openwrt image)."
 
-[[storage.evidence]]
-name = "headless-services-boot-r71"
-kind = "board-cycle"
-revision = "85ee22e"
-summary = "Round 71: launchd honors disabled.plist after removing disabled.migrated; SpringBoard/liveactivitiesd suppressed; 600s clean services window (0 crash markers, both tries)"
-artifacts = [
-  "dumps/uefi-report-044418.txt",
-  "uefi/build/watchdog-policy-r65/board-r71/",
-]
-
 [[area]]
 id = "configuration"
 status = "implemented"
@@ -342,6 +332,12 @@ reference = "docs/logs/e5tw-r2-summary.json"
 command = "Use e5-xnu set-e5-boot-manifest.py on the exact verified image pair; repack only ADT, verify full boot_b readback, run e5-uefi-cycle.sh and decode the raw E5TW pstore ring."
 revision = "9547b0c7525d2080ffcfdffc11a6cb6f55ba9e30"
 result = "PASS: mount exit 66 resolved with only two chosen metadata properties changed. Original later boot tasks reach tzinit; its captured EROFS exit 30 identifies writable Data as the current blocker. Kernel, firmware and original image bytes remain fixed; Android A recovery succeeds."
+
+[[area.evidence]]
+kind = "board-cycle"
+revision = "85ee22e"
+reference = "dumps/uefi-report-044418.txt"
+result = "Round 71 headless services boot: launchd honors disabled.plist after removing disabled.migrated; SpringBoard/liveactivitiesd suppressed; 600s clean window, 0 crash markers on both tries"
 
 [[area]]
 id = "display"
