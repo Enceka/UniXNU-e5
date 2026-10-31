@@ -19,3 +19,22 @@
  
  	/* stash the usage into corpse data if making_corpse == true */
  	if (create_corpse == TRUE) {
+
+--- a/bsd/uxkern/ux_exception.c
++++ b/bsd/uxkern/ux_exception.c
+@@ -126,6 +126,15 @@ handle_ux_exception(thread_t                    thread,
+ 		return KERN_FAILURE;
+ 	}
+ 
++	/* E5: log the mach exception (with the faulting subcode/PC) before it
++	 * becomes a bare signal, so trap sites can be symbolicated offline.
++	 */
++	if (exception == EXC_BAD_ACCESS || exception == EXC_BAD_INSTRUCTION ||
++	    exception == EXC_BREAKPOINT) {
++		printf("E5EXC pid %d (%s) exc %d code %llu sub %llu\n",
++		    proc_pid(p), p->p_comm, exception, code, subcode);
++	}
++ 
+ 	/* Translate exception and code to signal type */
+ 	int ux_signal = ux_exception(exception, code, subcode);
+ 
