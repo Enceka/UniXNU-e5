@@ -793,11 +793,18 @@ public:
           (unsigned long long)sectors);
     registerService();
     if (systemOS && !publishSystemOS(this)) sdlog("NativeSd: SystemOS publication failed\n");
-    if (systemOS && E5Data::fits(sectors) && readSectors((uint32_t)E5Data::base, 8) &&
-        !memcmp(buffer + 32, "NXSB", 4)) {
-      if (!publishData(this)) sdlog("NativeSd: data publication failed\n");
-    } else if (systemOS) {
-      sdlog("NativeSd: data window NXSB refused\n");
+    // Round 55 bisect: with the Data probe below, no boot attached the root
+    // media (zero scheme reads, "Still waiting for root device" panic), while
+    // kernel 306 attached root every time. The whole Data path now waits for
+    // an explicit e5-data boot arg; without it the driver is exactly the 306
+    // behavior.
+    if (systemOS && PE_parse_boot_argn("e5-data", nullptr, 0)) {
+      if (E5Data::fits(sectors) && readSectors((uint32_t)E5Data::base, 8) &&
+          !memcmp(buffer + 32, "NXSB", 4)) {
+        if (!publishData(this)) sdlog("NativeSd: data publication failed\n");
+      } else {
+        sdlog("NativeSd: data window NXSB refused\n");
+      }
     }
     return true;
   }
