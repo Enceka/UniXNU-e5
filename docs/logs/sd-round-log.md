@@ -553,3 +553,35 @@ entries read (GPT published, failure in the APFS container probe) or
 stop dead (scheme rejection).
 
 Report: docs/logs/uefi-report-083900.txt.
+
+## Round 20 (kernel 282, v18) — GPT data proven golden on board, boot unchanged
+
+v18 diagnostics ran during probe: `gpt ent16 h0 y crc 3a740ceb h1 y crc d8f49994
+p0 type 7c3457ef first 34 count 11870208` and `gpt ent8 yyyy crc 0c87a44e c71c0011
+c71c0011 c71c0011` — both 16-sector chunks, all four 8-sector quarters, and the
+parsed partition-0 fields are byte-perfect at driver level. Kernel-side the boot was
+identical to round 19 (rw 1@0/1@1/32@2 then silence → root-wait panic), so the
+8-sector-chunk mitigation did not matter: chunk size is irrelevant, data is golden.
+
+Revelations while re-auditing: seed.dbr is NOT a GPT disk (LBA0 "DBRDISK1" wrapper,
+LBA1 zeros) — E5EMMC's container attached to the WHOLE media via
+AppleAPFSContainerScheme; there had never been a successful GPT attach on this
+system. os-window.img LBA0 has a proper protective MBR (55aa, entry0 0xEE) — the
+system-volume-audit doc's "LBA0 all-zero" was wrong (it also misrecorded altLBA).
+Fetched IOGUIDPartitionScheme.cpp (apple-oss-distributions/IOStorageFamily) and
+verified every scan() check passes for our image on paper.
+
+## Round 21 (kernel 283, v19) — full kernel-read visibility; media-size theory
+
+With v19 logging (first 12 rw calls + all >4-block calls + wb-short/incomplete
+lines): reads `1@0, 1@1` (GPT PMBR+header), then the root-wait dict, then `32@2`
+(GPT entries), then `1@0, 1@0, 1@1` (FDisk + Apple partition scheme probes), then
+NOTHING. No wb-short, no incomplete — the 32-block entries request was fully
+delivered. No reads at LBA 34+ → no slice was ever published; rejection happens
+inside the kext's scan() despite byte-golden, fully delivered data.
+
+Working theory: macOS attached this image as a disk of exactly image size
+(altLBA 11870274 == last block); our 14.4GiB card presents the same GPT on a much
+larger media — structurally ambiguous. An iOS-17.7-vintage kext may validate the
+backup-header position against the media size. v20 sizes the published media to
+altLBA+1 (11870275 sectors) making the GPT fully self-consistent.
