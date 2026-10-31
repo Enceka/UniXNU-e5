@@ -1,24 +1,49 @@
---- ser/osfmk/kern/printf.c	2026-10-31 14:16:05
-+++ serb/osfmk/kern/printf.c	2026-10-31 14:16:24
-@@ -849,10 +849,54 @@
- 	lck_ticket_unlock(&log_lock);
- #endif /* __x86_64__ */
+--- ser/osfmk/console/serial_console.c	2026-10-31 15:11:25
++++ serb/osfmk/console/serial_console.c	2026-10-31 15:12:14
+@@ -363,6 +363,14 @@
+ _cnputc(char c, bool poll)
+ {
+ 	e5_kputc(c);
++	{
++		extern void e5flight_putc(char);
++		e5flight_putc(c);
++	}
++	{
++		extern void e5flight_putc(char);
++		e5flight_putc(c);
++	}
+ 	bool in_debugger = (kernel_debugger_entry_count > 0);
+ 	const uint32_t idx = get_cons_ops_index();
+ 
+--- ser/osfmk/kern/printf.c	2026-10-31 15:11:06
++++ serb/osfmk/kern/printf.c	2026-10-31 15:12:39
+@@ -853,6 +853,10 @@
+ void
+ conslog_putc(char c)
+ {
++	{
++		extern void e5flight_putc(char);
++		e5flight_putc(c);
++	}
+ 	console_write_char(c);
+ 
+ #ifdef MACH_BSD
+@@ -912,8 +916,81 @@
+ {
+ 	return vprintf_internal(fmt, ap, __builtin_return_address(0));
  }
 +
 +
 +/*
-+ * E5: PRAM flight recorder.  Mirror console bytes into a 16 KiB ring at
-+ * physical 0x9F020000 - DRAM that survives warm reset, deliberately OUTSIDE
-+ * the 64 KiB panic-pram window at 0x9F000000 that this boot's own debug
-+ * ring reuses.  debug_log_init dumps the previous boot's ring and then
-+ * arms this recorder, so the true final state of a boot - panic text
-+ * included - survives even when the ramoops console zones filled long
-+ * before the boot ended.
++ * E5 console flight recorder: 16 KiB wrapping ring + monotonic counter in
++ * PRAM at 0x9F020000, outside the 64 KiB panic-pram window at 0x9F000000
++ * that the debug ring reuses.  Mirrors console bytes from conslog_putc
++ * (printf main path, survives the console device switch to E5FB) and the
++ * panic path, so the LAST console output of a boot - panic text included
++ * - survives resets that the ramoops console zones cannot.
 + */
-+#if defined(__arm64__)
 +int e5flight_armed;
-+static volatile unsigned char * e5fr_ring;
-+static uint32_t e5fr_n;
++static vm_offset_t e5flight_base;
  
  void
 +e5flight_putc(char c)
@@ -26,83 +51,92 @@
 +	if (!e5flight_armed) {
 +		return;
 +	}
-+	if (e5fr_ring == NULL) {
-+		vm_offset_t base = ml_io_map_wcomb(0x9F020000ULL, 0x4020ULL);
-+		if (!base) {
-+			e5flight_armed = 0;     /* mapping failed: no recorder */
++	if (e5flight_base == 0) {
++		e5flight_base = ml_io_map_wcomb(0x9F020000ULL, 0x4020ULL);
++		if (e5flight_base == 0) {
++			e5flight_armed = 0;
 +			return;
 +		}
-+		e5fr_ring = (volatile unsigned char *)(base + 0x20);
-+		*(volatile uint32_t *)(base + 0) = 0x4C463545u;   /* "E5FL" */
-+		*(volatile uint32_t *)(base + 4) = 0;
-+		__asm__ volatile ("dmb ish" ::: "memory");
 +	}
-+	e5fr_ring[e5fr_n & 0x3FFFu] = (unsigned char)c;
-+	__asm__ volatile ("dmb ish" ::: "memory");
-+	*(volatile uint32_t *)((uintptr_t)e5fr_ring - 0x20 + 4) = ++e5fr_n;
++	volatile uint32_t * fh = (volatile uint32_t *)e5flight_base;
++	uint32_t n = fh[1];
++	((volatile unsigned char *)e5flight_base + 0x20)[n & 0x3FFFu] = (unsigned char)c;
++	__builtin_arm_dmb(0xBULL);
++	fh[1] = n + 1;
++	fh[0] = 0x4C463545u;
 +}
-+#else
++
++/*
++ * Dump the previous boot's ring tail via direct prz writes (printf is not
++ * up yet where this is called from), then consume the header.
++ */
 +void
-+e5flight_putc(__unused char c)
++e5flight_dump(void)
 +{
++	vm_offset_t fb = ml_io_map_wcomb(0x9F020000ULL, 0x4020ULL);
++	if (fb == 0) {
++		return;
++	}
++	volatile uint32_t * fh = (volatile uint32_t *)fb;
++	if (fh[0] == 0x4C463545u && fh[1] > 0) {
++		uint32_t total = fh[1];
++		uint32_t len = total > 768u ? 768u : total;
++		uint32_t start = (total - len) & 0x3FFFu;
++		volatile unsigned char * ring = (volatile unsigned char *)fb + 0x20;
++		char line[65];
++		char hdr[80];
++		uint32_t fill = 0, seen = 0;
++		extern void e5_panic_print(const char *);
++		snprintf(hdr, sizeof(hdr), "E5-FLIGHT-PREV: total %u bytes, tail %u", total, len);
++		e5_panic_print(hdr);
++		while (seen < len) {
++			unsigned char ch = ring[(start + seen++) & 0x3FFFu];
++			line[fill++] = (ch >= 0x20 && ch < 0x7F) ? ch : '.';
++			if (fill == 64) {
++				line[64] = 0;
++				e5_panic_print(line);
++				fill = 0;
++			}
++		}
++		if (fill) {
++			line[fill] = 0;
++			e5_panic_print(line);
++		}
++	}
++	fh[0] = 0;
 +}
-+#endif
 +
 +void
- conslog_putc(char c)
+ consdebug_putc(char c)
  {
-+	e5flight_putc(c);
- 	console_write_char(c);
- 
- #ifdef MACH_BSD
-@@ -936,6 +980,7 @@
+ 	{
+@@ -936,6 +1013,10 @@
  		extern void e5_kputc(char);
  		e5_kputc(c);
  	}
-+	e5flight_putc(c);
++	{
++		extern void e5flight_putc(char);
++		e5flight_putc(c);
++	}
  	console_write_unbuffered(c);
  
  	debug_putc(c);
---- ser/osfmk/kern/debug.c	2026-10-31 14:20:22
-+++ serb/osfmk/kern/debug.c	2026-10-31 14:20:36
-@@ -498,6 +498,42 @@
+--- ser/osfmk/kern/debug.c	2026-10-31 15:11:06
++++ serb/osfmk/kern/debug.c	2026-10-31 15:12:39
+@@ -498,6 +498,18 @@
  	debug_buf_base = (char *)gPanicBase + sizeof(struct embedded_panic_header);
  	debug_buf_ptr = debug_buf_base;
  	debug_buf_size = gPanicSize - sizeof(struct embedded_panic_header);
 +
 +	/*
 +	 * E5 console flight recorder (see e5-console-flight.patch): dump the
-+	 * previous boot's ring tail from PRAM, consume it, then arm this boot.
++	 * previous boot's ring tail from PRAM via direct prz writes (printf
++	 * is not up yet here), then arm this boot's recorder.
 +	 */
 +	{
++		extern void e5flight_dump(void);
 +		extern int e5flight_armed;
-+		vm_offset_t e5fb = ml_io_map_wcomb(0x9F020000ULL, 0x4020ULL);
-+		if (e5fb) {
-+			volatile uint32_t * e5fh = (volatile uint32_t *)e5fb;
-+			if (e5fh[0] == 0x4C463545u && e5fh[1] > 0) {
-+				uint32_t e5total = e5fh[1];
-+				uint32_t e5len = e5total > 768u ? 768u : e5total;
-+				uint32_t e5start = (e5total - e5len) & 0x3FFFu;
-+				volatile unsigned char * e5ring = (volatile unsigned char *)e5fb + 0x20;
-+				char e5line[65];
-+				uint32_t e5fill = 0, e5seen = 0;
-+				printf("E5-FLIGHT-PREV: total %u bytes, tail %u\n", e5total, e5len);
-+				while (e5seen < e5len) {
-+					unsigned char e5ch = e5ring[(e5start + e5seen++) & 0x3FFFu];
-+					e5line[e5fill++] = (e5ch >= 0x20 && e5ch < 0x7F) ? e5ch : '.';
-+					if (e5fill == 64) {
-+						e5line[64] = 0;
-+						printf("E5-FLIGHT-PREV: %s\n", e5line);
-+						e5fill = 0;
-+					}
-+				}
-+				if (e5fill) {
-+					e5line[e5fill] = 0;
-+					printf("E5-FLIGHT-PREV: %s\n", e5line);
-+				}
-+			}
-+			e5fh[0] = 0;
-+		}
++		e5flight_dump();
 +		e5flight_armed = 1;
 +	}
  
