@@ -1,5 +1,5 @@
---- a/osfmk/kern/printf.c	2026-10-31 14:10:36
-+++ b/osfmk/kern/printf.c	2026-10-31 14:10:36
+--- ser/osfmk/kern/printf.c	2026-10-31 14:16:05
++++ serb/osfmk/kern/printf.c	2026-10-31 14:16:24
 @@ -849,10 +849,54 @@
  	lck_ticket_unlock(&log_lock);
  #endif /* __x86_64__ */
@@ -55,17 +55,17 @@
  	console_write_char(c);
  
  #ifdef MACH_BSD
-@@ -928,6 +972,7 @@
- void
- consdebug_putc_unbuffered(char c)
- {
+@@ -936,6 +980,7 @@
+ 		extern void e5_kputc(char);
+ 		e5_kputc(c);
+ 	}
 +	e5flight_putc(c);
  	console_write_unbuffered(c);
  
  	debug_putc(c);
---- a/osfmk/kern/debug.c	2026-10-31 14:10:36
-+++ b/osfmk/kern/debug.c	2026-10-31 14:10:36
-@@ -496,6 +496,44 @@
+--- ser/osfmk/kern/debug.c	2026-10-31 14:16:05
++++ serb/osfmk/kern/debug.c	2026-10-31 14:16:24
+@@ -497,6 +497,44 @@
  	debug_buf_base = (char *)gPanicBase + sizeof(struct embedded_panic_header);
  	debug_buf_ptr = debug_buf_base;
  	debug_buf_size = gPanicSize - sizeof(struct embedded_panic_header);
