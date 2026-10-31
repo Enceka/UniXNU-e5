@@ -620,3 +620,28 @@ map-syscall return log (in kernel since 291) never printed.
   whether dyld uses the shared-region syscall at all versus a private mmap fallback.
   vm_unix.c section regenerated with exact stock-xnu-10063.141.1 headers (verified to apply
   cleanly to the pristine file); kern_exec section unchanged.
+
+## Round 30 (kernel 292, v22 read-completion tracing) — cache mapping WORKS, log flood
+
+Result: PROGRESS, instrumentation backfired. After the round-29 stall point
+(`rw 2048 blocks at 1279`), the boot now served HUNDREDS of completed large
+reads through the SystemOS window: `rw done 2048/2048` x470+ advancing from
+card LBA 16128656 to 16578816 (~2.2 GB of the original dyld cache) plus
+interleaved 8-sector metadata reads near the container tail. No
+`rw incomplete` or `rw wb short` anywhere — the driver delivered every
+request. The dyld cache mapping machinery itself works.
+
+Cost: 470+ log lines flooded the 32 KB ramoops ring; the ring rolled over
+into the second boot's UEFI markers, erasing the `dyld map enter` evidence,
+everything the kernel printed after the reads began, and the reset cause.
+Try 1 rebooted with no panic record; try 2 booted clean and fell back to
+Android. The eager ~2 GB read is most plausibly code-signature validation
+hashing the whole cache file at map time (1 MiB read batching).
+
+v23 (this branch, next round): throttle the trace (first 4 + every 128th
+`rw done #%u ...`), and boot with `cs_enforcement_disable=1` (standard XNU
+boot-arg, string present in the kernel) — if the eager read is CS hashing,
+the flood should collapse and launchd should proceed. Report archived at
+docs/logs/uefi-report-30.txt (ring-rolled; evidence lives in the job spill).
+Checker: FAIL "no NativeSd v1 probe" — same flood artifact, not a driver
+regression.
