@@ -54,5 +54,12 @@ the expected OS volume mount and a launchd attempt.
 
 Host tests cover a known CRC vector, streaming across chunk boundaries, a
 16 KiB zero array, corrupt entries, invalid backups, truncated APFS extents
-and missing or mismatched board checksum evidence. Source-built kernel 286
-board acceptance is pending.
+and missing or mismatched board checksum evidence.
+
+Round 26, source-built kernel 286, executes the original launchd/libignition
+and prints `hello from launchd.1`. Preboot lookup then fails with entitlement
+error 1, followed by missing `/usr/lib/libSystem.B.dylib` and no dyld cache.
+This is beyond GPT/root-device discovery. The 12 KiB XNU trace window lost
+the earlier probe/mount records, so full checker acceptance is pending a
+repeat with sampled request logging and a 24 KiB window. The window still
+ends at the same offset inside the existing pstore zone.

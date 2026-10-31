@@ -213,6 +213,11 @@ revision = "e99d359 (source-built kernel 286)"
 result = "Round 26 executes the original SD-root /sbin/launchd far enough to print libignition hello from launchd.1. It then fails Preboot lookup with entitlement error 1 and reports missing /usr/lib/libSystem.B.dylib / no dyld cache; this is beyond the former root-wait panic. Unbounded multi-block request logging overwrote the probe/mount records, so the strict report checker cannot qualify this truncated report. Sampled request logging is prepared for the next acceptance round."
 
 [[area.evidence]]
+kind = "source"
+reference = "patches/xnu/e5-ram-console-tee.patch"
+result = "Expand the XNU-only trace window from offsets 0x4f00..0x7f00 (12 KiB) to 0x1f00..0x7f00 (24 KiB), preserving the same pstore zone and end address. Sample NativeSd requests after the first twelve. This retains early GPT/root evidence alongside libignition and panic output; board acceptance is pending."
+
+[[area.evidence]]
 kind = "device"
 reference = "docs/logs/uefi-report-001448.txt"
 command = "PAYLOAD=<sd-v1>/e5-uefi.bin sh tools/e5-uefi-cycle.sh run; python3 tools/e5-sd-check.py <report> (e5-xnu repository)"

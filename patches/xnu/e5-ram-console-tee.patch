@@ -56,8 +56,8 @@ index 715c545..aba4a0a 100644
 + */
 +#define E5_PRZ_PA        0xFFF80000UL
 +#define E5_PRZ_DATA_OFF  27UL
-+#define E5_PRZ_WIN_OFF   0x4F00UL
-+#define E5_PRZ_WIN_SIZE  0x3000UL
++#define E5_PRZ_WIN_OFF   0x1F00UL
++#define E5_PRZ_WIN_SIZE  0x6000UL
 +
 +extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
 +

@@ -791,7 +791,7 @@ public:
     UInt64 done = 0; IOLockLock(lock);
     if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
     // Keep the GPT/first APFS requests, then sample progress. Logging every
-    // multi-block read overwrites the 32 KiB persistent ring during OS boot.
+    // multi-block read overwrites the persistent trace window during OS boot.
     uint32_t call = ++calls;
     if (call <= 12 || (call & (call - 1)) == 0)
       sdlog("NativeSd: rw %llu blocks at %llu\n", (unsigned long long)count, (unsigned long long)block);
