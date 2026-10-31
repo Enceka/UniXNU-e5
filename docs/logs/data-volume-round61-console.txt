@@ -1,0 +1,491 @@
+irst 9f800 last bafff szMB 55 type ebd0a0a2 nr_runtimenv1
+NativeEmmc: part 17 first bb000 last d67ff szMB 55 type ebd0a0a2 nr_runtimenv2
+NativeEmmc: part 18 first d6800 last d77ff szMB 2 type ebd0a0a2 persist
+NativeEmmc: part 19 first d7800 last f07ff szMB 50 type ebd0a0a2 nr_modem_a
+NativeEmmc: part 20 first f0800 last 1097ff szMB 50 type ebd0a0a2 nr_modem_b
+NativeEmmc: part 21 first 109800 last 109fff szMB 1 type ebd0a0a2 nr_deltanv_a
+NativeEmmc: part 22 first 10a000 last 10a7ff szMB 1 type ebd0a0a2 nr_deltanv_b
+NativeEmmc: part 23 first 10a800 last 1237ff szMB 50 type ebd0a0a2 nr_phy_a
+NativeEmmc: part 24 first 123800 last 13c7ff szMB 50 type ebd0a0a2 nr_phy_b
+NativeEmmc: part 25 first 13c800 last 13f7ff szMB 6 type ebd0a0a2 l_agdsp_a
+NativeEmmc: part 26 first 13f800 last 1427ff szMB 6 type ebd0a0a2 l_agdsp_b
+NativeEmmc: part 27 first 142800 last 142fff szMB 1 type ebd0a0a2 pm_sys_a
+NativeEmmc: part 28 first 143000 last 1437ff szMB 1 type ebd0a0a2 pm_sys_b
+NativeEmmc: part 29 first 143800 last 14b7ff szMB 16 type ebd0a0a2 ch_sys_a
+NativeEmmc: part 30 first 14b800 last 1537ff szMB 16 type ebd0a0a2 ch_sys_b
+NativeEmmc: part 31 first 153800 last 153fff szMB 1 type ebd0a0a2 teecfg_a
+NativeEmmc: part 32 first 154000 last 1547ff szMB 1 type ebd0a0a2 teecfg_b
+NativeEmmc: part 33 first 154800 last 1597ff szMB 10 type ebd0a0a2 hypervsior_a
+NativeEmmc: part 34 first 159800 last 15e7ff szMB 10 type ebd0a0a2 hypervsior_b
+NativeEmmc: part 35 first 15e800 last 17e7ff szMB 64 type ebd0a0a2 boot_a
+NativeEmmc: part 36 first 17e800 last 19e7ff szMB 64 type ebd0a0a2 boot_b
+NativeEmmc: part 37 first 19e800 last 1d07ff szMB 100 type ebd0a0a2 vendor_boot_a
+NativeEmmc: part 38 first 1d0800 last 2027ff szMB 100 type ebd0a0a2 vendor_boot_b
+NativeEmmc: part 39 first 202800 last 2067ff szMB 8 type ebd0a0a2 init_boot_a
+NativeEmmc: part 40 first 206800 last 20a7ff szMB 8 type ebd0a0a2 init_boot_b
+NativeEmmc: part 41 first 20a800 last 20e7ff szMB 8 type ebd0a0a2 dtb_a
+NativeEmmc: part 42 first 20e800 last 2127ff szMB 8 type ebd0a0a2 dtb_b
+NativeEmmc: part 43 first 212800 last 2167ff szMB 8 type ebd0a0a2 dtbo_a
+NativeEmmc: part 44 first 216800 last 21a7ff szMB 8 type ebd0a0a2 dtbo_b
+NativeEmmc: part 45 first 21a800 last d0a7ff szMB 5600 type ebd0a0a2 super
+NativeEmmc: part 46 first d0a800 last d2a7ff szMB 64 type ebd0a0a2 cache
+NativeEmmc: part 47 first d2a800 last e247ff szMB 500 type ebd0a0a2 blackbox
+NativeEmmc: part 48 first e24800 last e24fff szMB 1 type ebd0a0a2 vbmeta_a
+NativeEmmc: part 49 first e25000 last e257ff szMB 1 type ebd0a0a2 vbmeta_b
+NativeEmmc: part 50 first e25800 last e457ff szMB 64 type ebd0a0a2 metadata
+NativeEmmc: part 51 first e45800 last e637ff szMB 60 type ebd0a0a2 sysdumpdb
+NativeEmmc: part 52 first e63800 last e63fff szMB 1 type ebd0a0a2 vbmeta_system_a
+NativeEmmc: part 53 first e64000 last e647ff szMB 1 type ebd0a0a2 vbmeta_system_b
+NativeEmmc: part 54 first e64800 last e64fff szMB 1 type ebd0a0a2 vbmeta_vendor_a
+NativeEmmc: part 55 first e65000 last e657ff szMB 1 type ebd0a0a2 vbmeta_vendor_b
+NativeEmmc: part 56 first e65800 last e65fff szMB 1 type ebd0a0a2 vbmeta_system_ext_a
+NativeEmmc: part 57 first e66000 last e667ff szMB 1 type ebd0a0a2 vbmeta_system_ext_b
+NativeEmmc: part 58 first e66800 last e66fff szMB 1 type ebd0a0a2 vbmeta_product_a
+NativeEmmc: part 59 first e67000 last e677ff szMB 1 type ebd0a0a2 vbmeta_product_b
+NativeEmmc: part 60 first e67800 last e67fff szMB 1 type ebd0a0a2 vbmeta_odm_a
+NativeEmmc: part 61 first e68000 last e687ff szMB 1 type ebd0a0a2 vbmeta_odm_b
+NativeEmmc: part 62 first e68800 last e68fff szMB 1 type ebd0a0a2 avbmeta_rs_a
+NativeEmmc: part 63 first e69000 last e697ff szMB 1 type ebd0a0a2 avbmeta_rs_b
+NativeEmmc: part 64 first e69800 last e6d7ff szMB 8 type ebd0a0a2 common_rs1_a
+NativeEmmc: part 65 first e6d800 last e717ff szMB 8 type ebd0a0a2 common_rs1_b
+NativeEmmc: part 66 first e71800 last e797ff szMB 16 type ebd0a0a2 common_rs2_a
+NativeEmmc: part 67 first e79800 last e817ff szMB 16 type ebd0a0a2 common_rs2_b
+NativeEmmc: part 68 first e81800 last e88fff szMB 15 type ebd0a0a2 calinv
+NativeEmmc: part 69 first e89000 last 3a3efff szMB 22380 type ebd0a0a2 userdata
+NativeEmmc: verify bootb blk 0 st 00000003 words 14000010 00000000 00080000 00000000 crc cce8f212
+NativeEmmc: verify bootb blk 1 st 00000003 words 3840156f 380015af f100054a 54ffffa1 crc 225f948f
+NativeEmmc: verify misc blk 0 st 00000003 words 00000000 00000000 00000000 00000000 crc b2aa7578
+NativeEmmc: verify misc blk 1 st 00000003 words 00000000 00000000 00000000 00000000 crc b2aa7578
+NativeEmmc: v8 read-only service; errors override completion
+
+NativeEmmc: publishing cache window (131072 sectors @ lba d0a800)
+
+NativeSd: v1 start, independent SDIO0 host
+
+NativeEmmc: rw call 1 blocks @0 dir 1 len 512
+
+NativeSd: gates ahb 00000089 aon 04060fff
+
+NativeSd: dma c8a1e000
+
+NativeSd: inherit hc1 00 hc2 1000 clk 0000 power 00 reset 08 ps 00000000
+
+NativeSd: source 00000001 div 00000000 one 00000001 hotplug 00000000 rmldo 00000000
+
+NativeSd: cold legacy begin (PMIC LDO enable)
+
+NativeSd: adi gate a7ffff8f->a7ffff8f
+
+NativeSd: adi rst 00000000->00000000
+
+NativeSd: adi mux 00000002->00000002
+
+NativeSd: pmic prot 8000 sdcore pd 0001 vol 00b4 sdio pd 0001 vol 00b4
+
+NativeSd: lines ready pstate 01f00000 tries 0
+
+NativeSd: pmic after sdcore pd 0000 vol 00b4 sdio pd 0000 vol 00b4 pstate 01f00000
+
+NativeEmmc: rw call 1 blocks @1 dir 1 len 512
+
+NativeSd: hotplug 00000000->00210001 rmldo 00000000->00000001 prot 00000000 pstate 01f00000
+
+NativeSd: host reset 08->08 deb 00000003
+
+NativeSd: card rst 08->08 pstate 01f00000
+
+NativeSd: sdio0 chain mux 1 d2x 0 d1x 1 src 13000000Hz
+
+NativeSd: CMD0 st 00000001 clk 0907
+
+NativeSd: CMD8 st 00000001 r7 000001aa
+
+NativeEmmc: rw call 32 blocks @2 dir 1 len 16384
+
+NativeSd: ACMD41 st 00000001 ocr c0ff8000 tries 109
+
+NativeSd: CMD3 st 00000001 r6 50480500 rca 5048
+
+NativeSd: CSD 400e0032 5b590000 735f7f80 0a400000 sectors 30244864
+
+NativeSd: selected st 00000001 r1 00000900 rca 5048
+
+NativeSd: reference lba 0 st 00000003 crc ec8ce612
+
+NativeSd: reference lba 1 st 00000003 crc 10fb5eed
+
+NativeSd: reference lba 2048 st 00000003 crc d2e6e0b2
+
+NativeSd: reference lba 2050 st 00000003 crc fba8aad8
+
+NativeSd: reference 4/4 repeat 16/16 mode legacy-4bit-13MHz
+
+NativeSd: chain rpll mux 4 d2x 0 d1x 1 src 195000000Hz
+
+NativeSd: reference lba 0 st 00000003 crc ec8ce612
+
+NativeSd: reference lba 1 st 00000003 crc 10fb5eed
+
+NativeSd: reference lba 2048 st 00000003 crc d2e6e0b2
+
+NativeSd: reference lba 2050 st 00000003 crc fba8aad8
+
+NativeSd: reference 4/4 repeat 16/16 mode default-4bit-24MHz
+
+NativeSd: ext4 absent (os image)
+
+NativeSd: gpt header crc d9e4279c expected d9e4279c match y
+
+NativeSd: gpt altLba 11870274 card 30244864
+
+NativeSd: gpt ent16 h0 y crc 3a740ceb h1 y crc d8f49994 p0 type 7c3457ef first 34 count 11870208
+
+NativeSd: gpt ent8 yyyy crc 0c87a44e c71c0011 c71c0011 c71c0011
+
+NativeSd: gpt entries crc fa7a560c expected fa7a560c match y
+
+NativeSd: gpt ok entries 128
+
+NativeSd: tp single 128 sectors in 27751 us
+
+NativeSd: tp multi 128 sectors in 5103 us match y
+
+NativeSd: probe Success sectors 30244864 mode default-4bit-24MHz
+
+NativeSd: SystemOS superblock crc c034a6f0 match y
+
+NativeSd: wdt ctrl 000a cnt 00819448
+
+NativeSd: wdt extended 600s ctrl 000a
+
+NativeSd: publishing read-only SD card 30244864 sectors
+
+NativeSd: publishing SystemOS read-only 6451200 sectors at 12582912
+
+NativeSd: publishing Data read-write 65536 sectors at 19034112
+
+com.apple.AppleFSCompressionTypeZlib load succeeded
+
+Setting up notifier for CoreAnalyticsHub
+
+NativeSd: rw 1 blocks at 0
+
+dev_init:303: disk3 device accelerated crypto: 0 (compiled @ Jul 11 2025 17:34:16)
+
+dev_init:306: disk3 device_handle block sNativeSd: rw 1 blocks at 1
+
+ize 4096 block count 8192 features 0 internal 
+
+nx_mount:1275: disk3 initializing cache w/hash_size 1024 and cache size 2500
+
+NativeSd: rw 32 blocks at 2
+
+Waiting on <dict ID="0"><key>IOProviderClass</key><string ID="1">IOMedia</string><key>IOPropertyMatch</key><dict ID="2"><key>UUID</key><string ID="3">04769D26-2CA0-4825-B443-E2E5F88300F2</string></dict></dict>
+
+nx_mount:1617: disk3 checkpoint search: largest xid 6, best xid 6 @ 3
+
+nx_mount:1644: disk3 stable checkpoint indices: desc 2 data 18
+
+NativeSd: rw done #1 32/32 at 2 d=-999 p=published x=2770965a q=unreached
+
+NativeSd: rw 1 blocks at 0
+
+NativeSd: rw 3 blocks at 0
+
+NativeSd: rw 1 blocks at 0
+
+NativeSd: rw 1 blocks at 1
+
+NativeSd: rw 3 blocks at 34
+
+NativeSd: rw 8 blocks at 34
+
+NativeSd: rw done #2 8/8 at 34 d=-999 p=published x=2770965a q=unreached
+
+NativeSd: rw 8 blocks at 34
+
+NativeSd: rw done #3 8/8 at 34 d=-999 p=published x=2770965a q=unreached
+
+NativeSd: rw 8 blocks at 34
+
+NativeSd: rw done #4 8/8 at 34 d=-999 p=published x=2770965a q=unreached
+
+NativeSd: rw 8 blocks at 42
+
+dev_init:303: disk5s1 device accelerated crypto: 0 (compiled @ Jul 11 2025 17:34:16)
+
+dev_init:306: disk5s1 device_handle block size 4096 block count 1483776 features 0 internal 
+
+NativeSd: rw 1 blocks at 12582912
+
+dev_init:303: disk6 device accelerated crypto: 0 (compiled @ Jul 11 2025 17:34:16)
+
+dev_init:306: disk6 device_handle block size 4096 block count 806400 features 0 internal 
+
+nx_mount:1275: disk5s1 initializing cache w/hash_size 1024 and cache size 2500
+
+NativeSd: rw 8 blocks at 126698
+
+NativeSd: rw 8 blocks at 126954
+
+nx_mount:1617: disk5s1 checkpoint search: largest xid 418, best xid 418 @ 3
+
+nx_mount:1644: disk5s1 stable checkpoint indices: desc 2 data 4
+
+Got boot device = IOService:/IOResources/NativeSd/IOBlockStorageDriver/SD E5 SDHC (read-only bring-up) Media/IOGUIDPartitionScheme/Untitled 1@1/AppleAPFSContainerScheme/AppleAPFSMedia/AppleAPFSContainer/DawnUpdate21H461.J120J121J207J208OS@1
+
+BSD root: disk7s1, major 1, minor 13
+
+nx_mount:1275: disk6 initializing cache w/hash_size 1024 and cache size 2500
+
+spec_open : si_devbsdunit initialized to (3), throttle_mask is (0xf8), isssd is (0)
+
+disk7s1: device is not readable.
+
+mockfs_mountroot failed: 13
+
+apfs_vfsop_mountroot:2965: apfs: mountroot called!
+
+spec_open : si_devbsdunit initialized to (3), throttle_mask is (0xf8), isssd is (0)
+
+dev_init:303: disk7 device accelerated crypto: 0 (compiled @ Jul 11 2025 17:34:16)
+
+dev_init:306: disk7 device_handle block size 4096 block count 1483776 features 0 internal 
+
+nx_mount:1275: disk7 initializing cache w/hash_size 1024 and cache size 2500
+
+NativeSd: rw 8 blocks at 126898
+
+NativeSd: rw done #128 8/8 at 126994 d=-999 p=published x=2770965a q=unreached
+
+nx_mount:1617: disk7 checkpoint search: largest xid 418, best xid 418 @ 3
+
+nx_mount:1644: disk7 stable checkpoint indices: desc 2 data 4
+
+apfs_vfsop_mount:2675: disk7 Promoter has been locked 
+
+fs_lookup_root_snapshot_name:373: disk7s1 failed to get root-snapshot-name from DT
+
+apfs_find_named_root_snapshot_xid:2035: disk7s1 failed to retrieve default root snapshot xid: No such file or directory (2)
+
+apfs_find_named_root_snapshot_xid:2073: disk7s1 The global payload bytes pointer is NULL
+
+apfs_vfsop_mount:2714: disk7s1 failed to find named root snapshot: Need authenticator (81)
+
+apfs_log_op_with_proc:3091: disk7s1 mounting volume DawnUpdate21H461.J120J121J207J208OS, requested by: kernel_task (pid 0); parent: kernel_task (pid 0)
+
+handle_mount:817: disk7s1 vol-uuid: 04769D26-2CA0-4825-B443-E2E5F88300F2 block size: 4096 block count: 1483776 (unencrypted; flags: 0x1; features: 8.0.12)
+
+handle_mount:830: disk7s1 setting dev block size to 4096 from 512
+
+apfs_log_op_with_proc:3091: disk7s1 mount-complete volume DawnUpdate21H461.J120J121J207J208OS, requested by: kernel_task (pid 0); parent: kernel_task (pid 0)
+
+E5: rootvp authentication deferred (e5-rootauth-off)
+
+VM Swap Subsystem is ON
+
+E5KINIT 000f7f030000000077777777
+No POST boot-arg set.
+
+nx_mount:1617: disk6 checkpoint search: largest xid 14, best xid 14 @ 9
+
+nx_mount:1644: disk6 stable checkpoint indices: desc 8 data 16
+
+Failed to open swap file 30
+
+vm_swap_create_file failed @ 43 secs
+
+NativeSd: SystemOS volume 8846FE78-2910-4297-AF97-D59BB6F8FC16 device /dev/disk8s1
+
+E5SystemOS: mount /dev/disk8s1 read-only union enter
+
+spec_open : si_devbsdunit initialized to (6), throttle_mask is (0x140), isssd is (0)
+
+spec_open : si_devbsdunit initialized to (6), throttle_mask is (0x140), isssd is (0)
+
+dev_init:303: disk8 device accelerated crypto: 0 (compiled @ Jul 11 2025 17:34:16)
+
+dev_init:306: disk8 device_handle block size 4096 block count 806400 features 0 internal 
+
+nx_mount:1275: disk8 initializing cache w/hash_size 1024 and cache size 2500
+
+NativeSd: rw 8 blocks at 18820088
+
+NativeSd: rw done #256 8/8 at 18820184 d=-999 p=published x=2770965a q=unreached
+
+nx_mount:1617: disk8 checkpoint search: largest xid 14, best xid 14 @ 9
+
+nx_mount:1644: disk8 stable checkpoint indices: desc 8 data 16
+
+apfs_log_op_with_proc:3091: disk8s1 mounting volume DawnUpdate21H461.J120J121J207J208SystemCryptex, requested by: init (pid 1); parent: kernel_task (pid 0)
+
+handle_mount:817: disk8s1 vol-uuid: 8846FE78-2910-4297-AF97-D59BB6F8FC16 block size: 4096 block count: 806400 (unencrypted; flags: 0x1; features: 28.0.2)
+
+handle_mount:830: disk8s1 setting dev block size to 4096 from 512
+
+apfs_log_op_with_proc:3091: disk8s1 mount-complete volume DawnUpdate21H461.J120J121J207J208SystemCryptex, requested by: init (pid 1); parent: kernel_task (pid 0)
+
+E5SystemOS: mounted uuid 8846FE78-2910-4297-AF97-D59BB6F8FC16 read-only union
+
+E5SystemOS: original arm64 dyld cache header verified
+
+E5SystemOS: development startup dyld_flags 0x8
+
+NativeSd: Data volume 30ADC749-351F-4FFF-998A-20E1B683859F device /dev/disk4s1
+
+E5SystemOS: data mount /dev/disk4s1 read-write enter
+
+spec_open : si_devbsdunit initialized to (3), throttle_mask is (0x18), isssd is (0)
+
+dev_init:303: disk2s1 device accelerated crypto: 0 (compiled @ Jul 11 2025 17:34:16)
+
+dev_init:306: disk2s1 device_handle block size 4096 block count 2038 features 0 internal 
+
+spec_open : si_devbsdunit initialized to (3), throttle_mask is (0x18), isssd is (0)
+
+dev_init:303: disk4 device accelerated crypto: 0 (compiled @ Jul 11 2025 17:34:16)
+
+dev_init:306: disk4 device_handle block size 4096 block count 8192 features 0 internal 
+
+nx_mount:1275: disk4 initializing cache w/hash_size 1024 and cache size 2500
+
+nx_mount:1617: disk4 checkpoint search: largest xid 6, best xid 6 @ 3
+
+nx_mount:1644: disk4 stable checkpoint indices: desc 2 data 18
+
+spaceman_metazone_init:111: disk4 no metazone for device 0, of size 33513472 bytes, block_size 4096
+
+apfs_log_op_with_proc:3091: disk4s1 mounting volume Data, requested by: init (pid 1); parent: kernel_task (pid 0)
+
+spaceman_scan_free_blocks:3878: disk4 scan took 0.000207 s (no trims)
+
+spaceman_fxc_print_stats:473: disk4 dev 0 smfree 7799/8182 table 1/127 blocks 7799 7799:7799:7799 100.00% range 383:7799 95.31% scans 1
+
+handle_mount:817: disk4s1 vol-uuid: 30ADC749-351F-4FFF-998A-20E1B683859F block size: 4096 block count: 8182 (unencrypted; flags: 0x1; features: 8.0.2)
+
+handle_mount:830: disk4s1 setting dev block size to 4096 from 512
+
+E5PANIC: 
+"unencrypted data volume is not allowed" @apfs_vfsops.c:2276
+panic(cpu 0 caller 0xfffffff0056d1f98): "unencrypted data volume is not allowed" @apfs_vfsops.c:2276
+
+Debugger message: panic
+
+Memory ID: 0x0
+
+OS release type: Not set yet
+
+OS version: Not set yet
+
+Kernel version: Darwin Kernel Version 23.6.0: Sat Oct 31 15:56:33 UTC 2026; runner:ios-obj/DEVELOPMENT_ARM64_BCM2837
+
+KernelCache UUID: 97C2CCA55249767D7826D392260D8B5D
+
+Kernel UUID: 4D3FCF48-05F5-38C4-970B-5877968D1BB1
+
+Boot session UUID: 8C4BEC55-72EE-4119-A8AC-FE86A4DA6EB8
+
+iBoot version: 
+
+iBoot Stage 2 version: 
+
+secure boot?: YES
+
+roots installed: 0
+
+Paniclog version: 14
+
+Kernel text base:  0xfffffff007004000
+
+mach_absolute_time: 0x441c8039
+
+Epoch Time:        sec       usec
+
+  Boot    : 0x00000021 0x00024af9
+
+  Sleep   : 0x00000000 0x00000000
+
+  Wake    : 0x00000000 0x00000000
+
+  Calendar: 0x0000002b 0x000e81b7
+
+Zone info:
+
+  Zone map: 0xfffffff0782c6000 - 0xfffffff6782c6000
+
+  . PGZ   : 0xfffffff0782c6000 - 0xfffffff0783a5000
+
+  . VM    : 0xfffffff0783a5000 - 0xfffffff15e9e9000
+
+  . RO    : 0xfffffff15e9e9000 - 0xfffffff1ab6aa000
+
+  . GEN0  : 0xfffffff1ab6aa000 - 0xfffffff291cef000
+
+  . GEN1  : 0xfffffff291cef000 - 0xfffffff378334000
+
+  . GEN2  : 0xfffffff378334000 - 0xfffffff45e979000
+
+  . GEN3  : 0xfffffff45e979000 - 0xfffffff544fbe000
+
+  . DATA  : 0xfffffff544fbe000 - 0xfffffff6782c6000
+
+  Metadata: 0xfffffff6c0ad7000 - 0xfffffff6c6ad7000
+
+  Bitmaps : 0xfffffff6c6ad8000 - 0xfffffff6c6c24000
+
+  Extra   : 0 - 0
+
+TPIDRx_ELy = {1: 0xfffffff45ea686f8  0: 0x0000000000000000  0ro: 0x0000000000000000 }
+
+CORE 0 is the one that panicked. Check the full backtrace for details.
+
+Compressor Info: 0% of compressed pages limit (OK) and 0% of segments limit (OK) with 0 swapfiles and OK swap space
+
+Panicked task 0xfffffff3782a5df0: 1 pages, 1 threads: pid 1: init
+
+Panicked thread: 0xfffffff45ea686f8, backtrace: 0xfffffffbf1f6a440, tid: 219
+
+		  lr: 0xfffffff00727d198  fp: 0xfffffffbf1f6a4d0
+
+		  lr: 0xfffffff007406260  fp: 0xfffffffbf1f6a4f0
+
+		  lr: 0xfffffff0073f8110  fp: 0xfffffffbf1f6a540
+
+		  lr: 0xfffffff0079c98c4  fp: 0xfffffffbf1f6a630
+
+		  lr: 0xfffffff0073f75d8  fp: 0xfffffffbf1f6a640
+
+		  lr: 0xfffffff00727c7a4  fp: 0xfffffffbf1f6ab10
+
+		  lr: 0xfffffff00727d89c  fp: 0xfffffffbf1f6ab90
+
+		  lr: 0xfffffff007993124  fp: 0xfffffffbf1f6abc0
+
+		  lr: 0xfffffff0056d1f98  fp: 0xfffffffbf1f6ac00
+
+		  lr: 0xfffffff0056c812c  fp: 0xfffffffbf1f6b480
+
+		  lr: 0xfffffff007486bd0  fp: 0xfffffffbf1f6b6f0
+
+		  lr: 0xfffffff00748789c  fp: 0xfffffffbf1f6b950
+
+		  lr: 0xfffffff0074876d8  fp: 0xfffffffbf1f6b990
+
+		  lr: 0xfffffff0076e47fc  fp: 0xfffffffbf1f6be10
+
+		  lr: 0xfffffff0076b9d18  fp: 0xfffffffbf1f6be50
+
+		  lr: 0xfffffff007703e28  fp: 0xfffffffbf1f6be90
+
+		  lr: 0xfffffff0072719ec  fp: 0xfffffffbf1f6bef0
+
+		  lr: 0xfffffff0073f79fc  fp: 0xfffffffbf1f6bf00
+
+		  lr: 0xfffffff0073f7838  fp: 0xfffffffbf1f6bf20
+
+		  lr: 0xfffffff0073fb704  fp: 0x0000000000000000
+
+** Stackshot Incomplete ** Bytes Filled 240 **
+
+Please go to https://panic.apple.com to report this panic
+

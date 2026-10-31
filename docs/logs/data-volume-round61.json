@@ -1,0 +1,63 @@
+{
+  "round": 61,
+  "device_revision": "a0a5f1e291b93eda422eeaa945f2c71f622eaabc",
+  "ci": {
+    "device_revision": "a0a5f1e291b93eda422eeaa945f2c71f622eaabc",
+    "unixnu_revision": "066c8d8315f83749d28bcae2faf3595718646be5",
+    "dispatched_at": "2026-10-31T15:49:40.857014+00:00",
+    "run_id": 41216691830,
+    "run_number": 314,
+    "html_url": "https://github.com/Enceka/unixnu-e5-kernel-builder/actions/runs/41216691830",
+    "conclusion": "success",
+    "artifact_directory": "/Volumes/Projects/e5-xnu/uefi/build/e5-kernel-artifact-314-data-uuid",
+    "artifacts_saved_locally": true,
+    "kernel_sha256": "732d8c942471f902c6175302e1533333d6aafc1ef13cbaf7b689167c2cb90c08",
+    "public_run_deleted": true
+  },
+  "inputs": {
+    "changed_files": [
+      "kernel.macho"
+    ],
+    "other_eight_files_unchanged": true,
+    "firmware_prefix_unchanged": true,
+    "kernel_uuid": "4D3FCF48-05F5-38C4-970B-5877968D1BB1",
+    "payload_sha256": "47b5ed9533f1eeaab84de489c589e2994a1153132573cf3464921d7b0120196e",
+    "bytes": 62926860
+  },
+  "cycle": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/data-publication-check/board-r61/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "47b5ed9533f1eeaab84de489c589e2994a1153132573cf3464921d7b0120196e",
+    "stage": "complete",
+    "updated_at": "2026-10-31T16:11:07.847902+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-001106.txt"
+    ]
+  },
+  "console": {
+    "record": "/Volumes/Projects/e5-xnu/uefi/build/data-publication-check/board-r61/dmesg-ramoops-0.bin",
+    "record_sha256": "28df5bee0ab92e845cee75614b8e8a9be1d815bba2e2be20448cb9f21227a040",
+    "offset": 7936,
+    "position": 11067,
+    "ring_bytes": 24568,
+    "panic": "panic(cpu 0 caller 0xfffffff0056d1f98): \"unencrypted data volume is not allowed\" @apfs_vfsops.c:2276",
+    "kernel_uuid": "4D3FCF48-05F5-38C4-970B-5877968D1BB1"
+  },
+  "checkpoints": [
+    "NativeSd: publishing Data read-write 65536 sectors at 19034112",
+    "NativeSd: Data volume 30ADC749-351F-4FFF-998A-20E1B683859F device /dev/disk4s1",
+    "E5SystemOS: data mount /dev/disk4s1 read-write enter",
+    "\"unencrypted data volume is not allowed\" @apfs_vfsops.c:2276",
+    "panic(cpu 0 caller 0xfffffff0056d1f98): \"unencrypted data volume is not allowed\" @apfs_vfsops.c:2276"
+  ],
+  "sd_data_sha256_after": "42b81cab9b044819aa69d498b2dcf67dcefdcbb9a90651a04891c30d089b00b8",
+  "sd_data_unchanged": true,
+  "result": "UUID selection and RAM publication PASS; RW mount entered APFS then panicked on unencrypted Data policy. tzinit not reached.",
+  "android_boot_ids": [
+    "49af7dc1-5831-4ef5-8ea4-6fc4ce88dd84",
+    "b5736a5c-e579-418c-b9b0-e7da69a81987"
+  ]
+}

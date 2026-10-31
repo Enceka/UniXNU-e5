@@ -1,0 +1,450 @@
+oreData: error:   Device ID: 		16777231 
+E5FB|CoreData: error:   File Size: 		128 bytes 
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		0 
+E5FB|CoreData: error:   File group ID: 		0 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		1216 bytes 
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		501 
+E5FB|CoreData: error:   File group ID: 		20 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+fs_tx_enter_internal:27549: disk4s1 containermanagerd_system: ENOSPC: ttype INSERT num_blocks 127 free_blocks 211 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 237 threshold_blocks 100
+
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is not readable with errno 1 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var/wireless 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		72 
+NativeSd: rw done #207232 8/8 at 12845856 d=100 p=published x=2770965a q=ready
+
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		73 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library/Databases 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		96 bytes 
+E5FB|CoreData: error:   File inode: 		881 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: addPersistentStoreWithType:configuration:URL:options:error: returned error NSCocoaErrorDomain (512) 
+E5FB|CoreData: error: userInfo: 
+E5FB|CoreData: error: 	reason : Failed to create file; code = 28 
+E5FB|CoreData: error: storeType: SQLite 
+E5FB|CoreData: error: configuration: (null) 
+E5FB|CoreData: error: URL: file:///var/wireless/Library/Databases/DataUsage.sqlite 
+E5FB|CoreData: annotation: options: 
+E5FB|CoreData: annotation: 	NSMigratePersistentStoresAutomaticallyOption : 1 
+E5FB|CoreData: annotation: 	<null> : <null> 
+E5FB|CoreData: annotation: 	NSSQLitePragmasOption : {     "cache_size" = 32;     "integrity_check" = YES;     "journal_mode" = WAL; } 
+E5FB|CoreData: annotation: 	NSPersistentStoreFileProtectionKey : NSFileProtectionNone 
+E5FB|CoreData: annotation: 	NSInferMappingModelAutomaticallyOption : 1 
+fs_tx_enter_internal:27549: disk4s1 CommCenter: ENOSPC: ttype INSERT num_blocks 127 free_blocks 211 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 238 threshold_blocks 181
+
+E5FB|CoreData: error: Failed to stat path '/var/wireless/Library/Databases/DataUsage.sqlite', errno 2 / No such file or directory. 
+E5FB|CoreData: error: Executing as effective user 25 
+E5FB|CoreData: error: Failed to statfs file; errno 2 / No such file or directory. 
+E5FB|CoreData: error: Logging status information for directory path: /var/wireless/Library/Databases 
+E5FB|CoreData: error: Executing as effective user 25 
+E5FB|CoreData: error: Information for / 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777231 
+E5FB|CoreData: error:   File Size: 		128 bytes 
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		0 
+E5FB|CoreData: error:   File group ID: 		0 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		1216 bytes 
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		501 
+E5FB|CoreData: error:   File group ID: 		20 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is not readable with errno 1 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var/wireless 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		72 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		73 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library/Databases 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		96 bytes 
+E5FB|CoreData: error:   File inode: 		881 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: addPersistentStoreWithType:configuration:URL:options:error: returned error NSCocoaErrorDomain (512) 
+E5FB|CoreData: error: userInfo: 
+E5FB|CoreData: error: 	reason : Failed to create file; code = 28 
+E5FB|CoreData: error: storeType: SQLite 
+E5FB|CoreData: error: configuration: (null) 
+E5FB|CoreData: error: URL: file:///var/wireless/Library/Databases/DataUsage.sqlite 
+E5FB|CoreData: annotation: options: 
+E5FB|CoreData: annotation: 	NSMigratePersistentStoresAutomaticallyOption : 1 
+E5FB|CoreData: annotation: 	<null> : <null> 
+E5FB|CoreData: annotation: 	NSSQLitePragmasOption : {     "cache_size" = 32;     "journal_mode" = WAL; } 
+E5FB|CoreData: annotation: 	NSPersistentStoreFileProtectionKey : NSFileProtectionNone 
+E5FB|CoreData: annotation: 	NSInferMappingModelAutomaticallyOption : 1 
+fs_tx_enter_internal:27549: disk4s1 CommCenter: ENOSPC: ttype INSERT num_blocks 127 free_blocks 211 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 239 threshold_blocks 181
+
+E5FB|CoreData: error: Failed to stat path '/var/wireless/Library/Databases/DataUsage.sqlite', errno 2 / No such file or directory. 
+E5FB|CoreData: error: Executing as effective user 25 
+E5FB|CoreData: error: Failed to statfs file; errno 2 / No such file or directory. 
+E5FB|CoreData: error: Logging status information for directory path: /var/wireless/Library/Databases 
+E5FB|CoreData: error: Executing as effective user 25 
+E5FB|CoreData: error: Information for / 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777231 
+E5FB|CoreData: error:   File Size: 		128 bytes 
+NativeSd: rw done #207360 8/8 at 13283192 d=100 p=published x=2770965a q=ready
+
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		0 
+E5FB|CoreData: error:   File group ID: 		0 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		1216 bytes 
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		501 
+E5FB|CoreData: error:   File group ID: 		20 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is not readable with errno 1 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var/wireless 
+fs_tx_enter_internal:27549: disk4s1 seserviced: ENOSPC: ttype INSERT num_blocks 127 free_blocks 211 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 240 threshold_blocks 181
+
+E5FB|CoreData: error:   File Device ID: 	0 
+NativeSd: rw done #207488 8/8 at 18101384 d=100 p=published x=2770965a q=ready
+
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		72 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+fs_tx_enter_internal:27549: disk4s1 analyticsd: ENOSPC: ttype INSERT num_blocks 127 free_blocks 211 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 241 threshold_blocks 181
+
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		73 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library/Databases 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		96 bytes 
+E5FB|CoreData: error:   File inode: 		881 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer 
+E5FB|CoreData: error:   component is writeable 
+E5FB|could not find BT_DEVICE_ADDRESS env variable 
+E5FB|marconi-bt: Unable to match bluetooth service in device tree. 
+E5FB|marconi-bt: Not a valid MAC address (all 00s). 
+E5FB|bluetooth: Unable to match bluetooth service in device tree. 
+E5FB|bluetooth: Not a valid MAC address (all 00s). 
+E5FB|FindLocalMacAddress did not find bootargs for random address generation
+E5FB|com.apple.server.bluetooth: Not a valid MAC address (all 00s). 
+E5FB|bluetoothd: 
+E5FB|No bluetooth on this device. 
+E5FB| 
+E5FB|CoreData: error: addPersistentStoreWithType:configuration:URL:options:error: returned error NSCocoaErrorDomain (512) 
+E5FB|CoreData: error: userInfo: 
+E5FB|CoreData: error: 	reason : Failed to create file; code = 28 
+E5FB|CoreData: error: storeType: SQLite 
+E5FB|CoreData: error: configuration: (null) 
+E5FB|CoreData: error: URL: file:///var/wireless/Library/Databases/DataUsage.sqlite 
+E5FB|CoreData: annotation: options: 
+E5FB|CoreData: annotation: 	NSMigratePersistentStoresAutomaticallyOption : 1 
+E5FB|CoreData: annotation: 	<null> : <null> 
+NativeSd: rw done #207616 8/8 at 16129056 d=100 p=published x=2770965a q=ready
+
+E5FB|CoreData: annotation: 	NSSQLitePragmasOption : {     "cache_size" = 32;     "integrity_check" = YES;     "journal_mode" = WAL; } 
+E5FB|CoreData: annotation: 	NSPersistentStoreFileProtectionKey : NSFileProtectionNone 
+E5FB|CoreData: annotation: 	NSInferMappingModelAutomaticallyOption : 1 
+fs_tx_enter_internal:27549: disk4s1 CommCenter: ENOSPC: ttype INSERT num_blocks 127 free_blocks 209 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 242 threshold_blocks 181
+
+E5FB|CoreData: error: Failed to stat path '/var/wireless/Library/Databases/DataUsage.sqlite', errno 2 / No such file or directory. 
+E5FB|CoreData: error: Executing as effective user 25 
+E5FB|CoreData: error: Failed to statfs file; errno 2 / No such file or directory. 
+E5FB|CoreData: error: Logging status information for directory path: /var/wireless/Library/Databases 
+E5FB|CoreData: error: Executing as effective user 25 
+E5FB|CoreData: error: Information for / 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777231 
+E5FB|CoreData: error:   File Size: 		128 bytes 
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		0 
+E5FB|CoreData: error:   File group ID: 		0 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		1216 bytes 
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		501 
+E5FB|CoreData: error:   File group ID: 		20 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is not readable with errno 1 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var/wireless 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		72 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+fs_tx_enter_internal:27549: disk4s1 containermanagerd: ENOSPC: ttype INSERT num_blocks 127 free_blocks 209 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 243 threshold_blocks 100
+
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		73 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library/Databases 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		96 bytes 
+E5FB|CoreData: error:   File inode: 		881 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+NativeSd: rw done #207744 8/8 at 15414016 d=100 p=published x=2770965a q=ready
+
+E5FB|CoreData: error: addPersistentStoreWithType:configuration:URL:options:error: returned error NSCocoaErrorDomain (512) 
+E5FB|CoreData: error: userInfo: 
+E5FB|CoreData: error: 	reason : Failed to create file; code = 28 
+E5FB|CoreData: error: storeType: SQLite 
+E5FB|CoreData: error: configuration: (null) 
+E5FB|CoreData: error: URL: file:///var/wireless/Library/Databases/DataUsage.sqlite 
+E5FB|CoreData: annotation: options: 
+E5FB|CoreData: annotation: 	NSMigratePersistentStoresAutomaticallyOption : 1 
+E5FB|CoreData: annotation: 	<null> : <null> 
+E5FB|CoreData: annotation: 	NSSQLitePragmasOption : {     "cache_size" = 32;     "journal_mode" = WAL; } 
+E5FB|CoreData: annotation: 	NSPersistentStoreFileProtectionKey : NSFileProtectionNone 
+E5FB|CoreData: annotation: 	NSInferMappingModelAutomaticallyOption : 1 
+fs_tx_enter_internal:27549: disk4s1 CommCenter: ENOSPC: ttype INSERT num_blocks 127 free_blocks 209 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 244 threshold_blocks 181
+
+fs_tx_enter_internal:27549: disk4s1 locationd: ENOSPC: ttype INSERT num_blocks 127 free_blocks 211 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 245 threshold_blocks 100
+
+E5FB|CoreData: error: Failed to stat path '/var/wireless/Library/Databases/DataUsage.sqlite', errno 2 / No such file or directory. 
+E5FB|CoreData: error: Executing as effective user 25 
+E5FB|CoreData: error: Failed to statfs file; errno 2 / No such file or directory. 
+E5FB|CoreData: error: Logging status information for directory path: /var/wireless/Library/Databases 
+E5FB|CoreData: error: Executing as effective user 25 
+E5FB|CoreData: error: Information for / 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777231 
+E5FB|CoreData: error:   File Size: 		128 bytes 
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		0 
+E5FB|CoreData: error:   File group ID: 		0 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		1216 bytes 
+E5FB|CoreData: error:   File inode: 		2 
+E5FB|CoreData: error:   File user ID: 		501 
+E5FB|CoreData: error:   File group ID: 		20 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is not readable with errno 1 
+E5FB|CoreData: error:   component is not writeable with errno 1 
+E5FB|CoreData: error: Information for /var/wireless 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		72 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+fs_tx_enter_internal:27549: disk4s1 apsd: ENOSPC: ttype INSERT num_blocks 127 free_blocks 209 blocks_in_txn 0 num_records 3 num_data_blocks 0 num_active_txns 0 (reserved ranges total blocks: 8) current xid: 246 threshold_blocks 181
+
+tx_flush:1338: disk4 xid 246 tx stats: # 240 owait 81 33542us finish 242 bar2 43 f 2 enter 1 fq 0 0 2us close 1us prep 227us flush 410us
+
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		160 bytes 
+E5FB|CoreData: error:   File inode: 		73 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: Information for /var/wireless/Library/Databases 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: error:   File Size: 		96 bytes 
+E5FB|CoreData: error:   File inode: 		881 
+E5FB|CoreData: error:   File user ID: 		25 
+E5FB|CoreData: error:   File group ID: 		25 
+E5FB|CoreData: error:   File Permissions: 	 
+E5FB|CoreData: error: d 
+E5FB|CoreData: error:   755 
+E5FB|CoreData: error:   component is not a symbolic link 
+E5FB|CoreData: error:   component is readable 
+E5FB|CoreData: error:   component is writeable 
+E5FB|CoreData: error: addPersistentStoreWithType:configuration:URL:options:error: returned error NSCocoaErrorDomain (512) 
+E5FB|CoreData: error: userInfo: 
+E5FB|CoreData: error: Information for /var/mobile 
+E5FB|CoreData: error:   File Device ID: 	0 
+E5FB|CoreData: error: 	reason : Failed to create file; code = 28 
+E5FB|CoreData: error: storeType: SQLite 
+E5FB|CoreData: error: configuration: (null) 
+E5FB|CoreData: error: URL: file:///var/wireless/Library/Databases/DataUsage.sqlite 
+E5FB|CoreData: annotation: options: 
+E5FB|CoreData: annotation: 	NSMigratePersistentStoresAutomaticallyOption : 1 
+E5FB|CoreData: annotation: 	<null> : <null> 
+E5FB|CoreData: error:   Device ID: 		16777224 
+E5FB|CoreData: annotation: 	NSSQLitePragmasOption : {     "cache_size" = 32;     "integrity_check" = YES;     "journal_mode" = WAL; } 
+E5FB|CoreData: annotation: 	NSPersistentStoreFileProtectionKey : NSFileProtectionNone 
+E5FB|CoreData: annotation: 	NSInferMappingModelAutomaticallyOption : 1 

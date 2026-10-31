@@ -1,0 +1,123 @@
+{
+  "round": 62,
+  "device_revision": "a0a5f1e291b93eda422eeaa945f2c71f622eaabc",
+  "ci_build": 314,
+  "inputs": {
+    "changed_files": [
+      "kernel.macho.adt"
+    ],
+    "other_eight_files_unchanged": true,
+    "firmware_prefix_unchanged": true,
+    "kernel_uuid": "4D3FCF48-05F5-38C4-970B-5877968D1BB1",
+    "payload_sha256": "2bb4f94df9923c91760e0311705098dbe8d4b5f99a5407a197390b8ed578b71f",
+    "bytes": 62926860
+  },
+  "adt": {
+    "source": "uefi/build/sd-v1/kernel.macho.adt",
+    "before_sha256": "083bf8db3be00a32da4ef89d32ae7eb406b8f1ba96d61d40eb46707ad97b8733",
+    "after_sha256": "25445262732083b99caca1d69fc648e82c5229d52a686f40b3bf128038cc0379",
+    "added_property": "/device-tree/filesystems/DoNotUseSEP",
+    "value": 1,
+    "other_properties_unchanged": true
+  },
+  "cycle": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/data-publication-check/board-r62/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "2bb4f94df9923c91760e0311705098dbe8d4b5f99a5407a197390b8ed578b71f",
+    "stage": "complete",
+    "updated_at": "2026-10-31T16:28:01.210632+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-002800.txt"
+    ]
+  },
+  "console": {
+    "record": "/Volumes/Projects/e5-xnu/uefi/build/data-publication-check/board-r62/dmesg-ramoops-0.bin",
+    "record_sha256": "6de83532a8e4d4e702c127a785318500f813693a09e0e82e64a7a1e0cf7a0049",
+    "offset": 7936,
+    "position": 1456,
+    "ring_bytes": 24568,
+    "panic": null,
+    "kernel_uuid": null
+  },
+  "late_checkpoints": [
+    {
+      "read_count": 207232,
+      "mount_state": 100,
+      "publication": "published",
+      "superblock_crc32": "2770965a",
+      "lookup": "ready"
+    },
+    {
+      "read_count": 207360,
+      "mount_state": 100,
+      "publication": "published",
+      "superblock_crc32": "2770965a",
+      "lookup": "ready"
+    },
+    {
+      "read_count": 207488,
+      "mount_state": 100,
+      "publication": "published",
+      "superblock_crc32": "2770965a",
+      "lookup": "ready"
+    },
+    {
+      "read_count": 207616,
+      "mount_state": 100,
+      "publication": "published",
+      "superblock_crc32": "2770965a",
+      "lookup": "ready"
+    },
+    {
+      "read_count": 207744,
+      "mount_state": 100,
+      "publication": "published",
+      "superblock_crc32": "2770965a",
+      "lookup": "ready"
+    }
+  ],
+  "sd_data_sha256_after": "42b81cab9b044819aa69d498b2dcf67dcefdcbb9a90651a04891c30d089b00b8",
+  "sd_data_unchanged": true,
+  "android_boot_ids": [
+    "b5736a5c-e579-418c-b9b0-e7da69a81987",
+    "dea3f5ee-796d-4fa3-9fab-5c948cc8f24d"
+  ],
+  "android_slot": "_a",
+  "android_boot_completed": true,
+  "apfs_initial_xid": 6,
+  "late_xids": [
+    237,
+    238,
+    239,
+    240,
+    241,
+    242,
+    243,
+    244,
+    245,
+    246
+  ],
+  "late_free_blocks": [
+    209,
+    211
+  ],
+  "late_services": [
+    "CommCenter",
+    "analyticsd",
+    "apsd",
+    "containermanagerd",
+    "containermanagerd_system",
+    "locationd",
+    "seserviced"
+  ],
+  "tzinit": {
+    "old_panic_observed": false,
+    "direct_exit_zero_line_retained": false,
+    "status": "Later services ran and the old critical exit/panic was not captured; the early tzinit exit line was overwritten."
+  },
+  "result": "PASS: volatile Data mounted and served real writes. The 32 MiB filesystem fills (ENOSPC) during later services. No panic captured; no full-system or persistence claim.",
+  "adt_tool_revision": "188f9049c54081a9a4cfd38e6c66d2c09b2279d9"
+}
