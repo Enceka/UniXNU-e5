@@ -51,6 +51,7 @@ class NativeSd : public IOBlockStorageDevice {
   bool softVerify = false, multiOk = false;
   const char *mode = "none";
   uint32_t calls = 0;
+  uint32_t bigReads = 0;
 
   uint8_t r8(uint32_t o) const { return host.bytes[o]; }
   uint16_t r16(uint32_t o) const { return *(volatile uint16_t *)(host.bytes + o); }
@@ -833,11 +834,12 @@ public:
     }
     if (wbShort) sdlog("NativeSd: rw wb short %llu at %llu\n", (unsigned long long)wbShort, (unsigned long long)block);
     if (done != count * 512) sdlog("NativeSd: rw incomplete %llu/%llu blocks at %llu\n", (unsigned long long)(done / 512), (unsigned long long)count, (unsigned long long)block);
-    // v22: large-read completion trace — round 29's console ended exactly at a
-    // 2048-block dyld cache read with no further output; this line decides
-    // whether such reads finish inside the driver or the stall is above us.
-    if (count >= 8)
-      sdlog("NativeSd: rw done %llu/%llu at %llu\n", (unsigned long long)(done / 512),
+    // v23: large-read completion trace, THROTTLED — round 30's unthrottled
+    // per-read lines (470+) flooded the 32 KB ramoops ring and erased the
+    // boot's own history. Keep the first few plus every 128th, with the
+    // running count so progress stays measurable.
+    if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0))
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu\n", bigReads, (unsigned long long)(done / 512),
             (unsigned long long)count, (unsigned long long)block);
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
