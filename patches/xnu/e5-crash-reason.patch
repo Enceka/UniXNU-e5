@@ -11,8 +11,8 @@
 +	 * liveactivitiesd crash-loop with nothing but "Too many corpses" today.
 +	 */
 +	if (create_corpse == TRUE && PROC_HAS_EXITREASON(p)) {
-+		printf("E5CRASH pid %d (%s) sig %d: reason ns %u code %llu flags %llu\n",
-+		    proc_getpid(p), p->p_comm, p->p_xsig,
++		printf("E5CRASH pid %d (%s) xstat %d: reason ns %u code %llu flags %llu\n",
++		    proc_getpid(p), p->p_comm, p->p_xstat,
 +		    p->p_exit_reason->osr_namespace, p->p_exit_reason->osr_code,
 +		    p->p_exit_reason->osr_flags);
 +	}
