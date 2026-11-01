@@ -127,7 +127,8 @@ extern "C" void e5_display_frame_kick(void) {
     // many distinct values with smooth counts; icons/UI = few saturated
     // clusters. Encoded as the top 8 buckets "rrrgggbb:count" in 4800.
     if ((n % 8) == 0 || n == 1) {
-      unsigned hist[16][16][16];
+      static unsigned hist[16][16][16];  // 16 KiB: must NOT live on the
+      // echo-thread stack (r106 kernel data abort, stack overflow).
       for (unsigned a = 0; a < 16; ++a)
         for (unsigned b = 0; b < 16; ++b)
           for (unsigned c = 0; c < 16; ++c) hist[a][b][c] = 0;
