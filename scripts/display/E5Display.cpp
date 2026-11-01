@@ -21,6 +21,8 @@ unsigned e5_display_lifecycle = 0;
 unsigned e5_display_resources = 0;
 unsigned e5_display_cap213_calls = 0;
 unsigned e5_display_cap213_status = (unsigned)kIOReturnNotReady;
+unsigned e5_display_ok211_calls = 0;
+unsigned e5_display_ok306_calls = 0;
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
@@ -160,10 +162,21 @@ public:
     __atomic_store_n(&e5_display_cap213_status, (unsigned)status, __ATOMIC_RELAXED);
     return status;
   }
-  E5_GUARDED_SLOT(211)
+  // Slot 211 (r90: generic 3-scalar backend entry, sel=3) and slot 306
+  // (r90: set/clear boolean pair at 0x6796094/0x67963e4) answered with
+  // success to reveal the next walk gate; the other guards stay loud.
+  IOReturn opaque211(uint32_t selector, void *b, void *c, void *d) override {
+    (void)selector; (void)b; (void)c; (void)d;
+    __atomic_fetch_add(&e5_display_ok211_calls, 1U, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque306(uint32_t selector, void *b, void *c, void *d) override {
+    (void)selector; (void)b; (void)c; (void)d;
+    __atomic_fetch_add(&e5_display_ok306_calls, 1U, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
   E5_GUARDED_SLOT(245)
   E5_GUARDED_SLOT(246)
-  E5_GUARDED_SLOT(306)
   E5_GUARDED_SLOT(307)
   E5_GUARDED_SLOT(337)
   E5_GUARDED_SLOT(338)
