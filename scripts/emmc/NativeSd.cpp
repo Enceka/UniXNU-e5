@@ -35,6 +35,7 @@ extern int e5_display_construction;
 extern int e5_display_original_size;
 extern int e5_display_registration_result;
 extern "C" int e5_concrete_display_probe(void);
+extern "C" int e5_display_publish(IOService *provider);
 
 // Repeat publication and UUID-lookup checkpoints in sampled late reads:
 // launchd's EROFS output can overwrite the entire early console ring.
@@ -1267,7 +1268,6 @@ extern "C" int e5_display_start(void) {
   // construction probe. Headless Data keeps every consumer away from the
   // guarded backend slots on this round.
   if (e5_display_construction == 0x1ff) {
-    extern "C" int e5_display_publish(IOService *provider);
     int published = e5_display_publish(nub);
     e5_display_attach |= published ? 4 : 0;
     sdlog("NativeSd: display publish %d a=%x\n", published,
