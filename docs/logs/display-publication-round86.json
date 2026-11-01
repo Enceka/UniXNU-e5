@@ -1,0 +1,52 @@
+{
+ "round": 86,
+ "kernel": {
+  "ci": 341,
+  "sha_prefix": "7c12920f",
+  "uuid": "B3D3407B-94B4-350E-B645-412D8E0DF2F5",
+  "commit": "152e22a (user v11)"
+ },
+ "audit": {
+  "tool": "e5-xnu tools/e5-display-family-audit.py",
+  "vptr": "0xfffffff00720d440",
+  "entries": 358,
+  "differing_slots": [
+   0,
+   1,
+   7,
+   86,
+   91,
+   141,
+   188,
+   211,
+   213,
+   245,
+   246,
+   306,
+   307,
+   337,
+   338,
+   345
+  ],
+  "all_other_match_original": true
+ },
+ "payload": {
+  "sha_prefix": "a5357f41",
+  "adt_sha_prefix": "07e35d3d",
+  "adt": "CI341 adt + set-e5-scratch-data.py"
+ },
+ "result": {
+  "publish": "a=130055 (0x1FC07) uniform, o=0 (newUserClient not reached), d=100, pager rw #195840 (DEEPER than r85 #189696 — getDotPitch override let the consumer past the r85 crash site)",
+  "crash": {
+   "pc": "0xfffffff00789d278 = IORecursiveLockLock body ([x0+0x18], x0=NULL, far=0x18)",
+   "entry": "0xfffffff00789d264 = IORecursiveLockLock (kernel 341 symtab)",
+   "lr": "0xfffffff005798038 (family+0x2c038): function at raw 0xfffffff006798014 loads lock at [this+0x1868], calls IORecursiveLockLock thunk 0xfffffff0067a2734, then compares arg1 vs [this+0x1810], touches flag bytes [+0x1860]/[+0x1861], checks [+0x1858]",
+   "interpretation": "slot-188 getDotPitch override WORKED; next consumer step gated on IORecursiveLock* member +0x1868 which the ORIGINAL Legacy start chain allocates (slots 22/25/5 setup -> 288 start_hardware -> 299 finalize; our owned start bypasses it). Member-by-member pattern confirmed: +0x1640 provider cache (r85), +0x1868 lock (r86)."
+  }
+ },
+ "recommendation": "run the original start sub-chain in owned start(): slots 22/25/5 + 299, skipping only 288 (start_hardware = real DPU/DSI, D2 work); alternatively allocate the known members manually — but the lock/token block (+0x1810..+0x1868) suggests more state than is worth hand-building",
+ "evidence": {
+  "report": "e5-xnu/dumps/uefi-report-172857.txt",
+  "decoded": "e5-xnu/uefi/build/watchdog-policy-r65/board-r86/decoded/console-readable.txt"
+ }
+}
