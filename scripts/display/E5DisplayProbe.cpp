@@ -21,9 +21,16 @@ static const OSMetaClass *findClass(const char *name) {
   return meta;
 }
 
-extern "C" __attribute__((noreturn)) void e5_display_backend_guard(unsigned slot) {
-  printf("E5Display: unqualified backend slot %u v=%x\n", slot, (unsigned)e5_display_construction);
-  panic("E5Display construction probe entered unqualified backend slot %u", slot);
+extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
+                                            void *b, void *c, void *d) {
+  // r88 walk-research round: backboardd reached slot 213 (r87). The remaining
+  // abstract backend slots return the SAME tolerated error the pitch path
+  // proved safe (kIOReturnUnsupported) so the client walk continues past
+  // every backend call, with the full argument echo on the console.
+  printf("E5Display: soft backend slot %u sel=%x b=%llx c=%llx d=%llx -> e00002f0\n",
+         slot, selector, (unsigned long long)b, (unsigned long long)c,
+         (unsigned long long)d);
+  return kIOReturnUnsupported;
 }
 
 extern "C" int e5_concrete_display_probe(void) {

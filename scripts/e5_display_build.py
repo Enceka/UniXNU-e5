@@ -189,7 +189,7 @@ public:
         elif i == 288:
             header += '  virtual bool startHardware();\n'
         elif i in PURE:
-            header += f'  virtual __attribute__((noreturn)) void opaque{i}() = 0;\n'
+            header += f'  virtual IOReturn opaque{i}(uint32_t, void *, void *, void *) = 0;\n'
         else:
             header += f'  virtual __attribute__((deprecated("Unqualified prototype: never call from source"))) void opaque{i}();\n'
     header += '};\nstatic_assert(sizeof(IOMobileFramebufferLegacy) == 0x18a0, "Original Legacy extent");\n'

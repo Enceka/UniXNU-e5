@@ -6,7 +6,8 @@
 #include <libkern/c++/OSData.h>
 #include <pexpert/pexpert.h>
 
-extern "C" __attribute__((noreturn)) void e5_display_backend_guard(unsigned slot);
+extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
+                                            void *b, void *c, void *d);
 extern "C" unsigned e5_display_open_count;
 extern "C" kern_return_t OSKextLoadKextWithIdentifier(const char *);
 extern "C" {
@@ -137,7 +138,9 @@ public:
     return status;
   }
 #define E5_GUARDED_SLOT(n) \
-  __attribute__((noreturn)) void opaque##n() override { e5_display_backend_guard(n); }
+  IOReturn opaque##n(uint32_t selector, void *b, void *c, void *d) override { \
+    return e5_display_backend_soft(n, selector, b, c, d); \
+  }
   E5_GUARDED_SLOT(211)
   E5_GUARDED_SLOT(213)
   E5_GUARDED_SLOT(245)
