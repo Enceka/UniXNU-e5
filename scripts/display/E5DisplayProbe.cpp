@@ -122,6 +122,49 @@ extern "C" void e5_display_frame_kick(void) {
       for (unsigned i = 0; i < 300; ++i) printf("%02x", thumb[i]);
       printf("\n");
     }
+    // r106: 4-bit-per-channel color histogram over a 4px grid (80x60 =
+    // 4800 samples). Text = two dominant values (bg/fg); a wallpaper =
+    // many distinct values with smooth counts; icons/UI = few saturated
+    // clusters. Encoded as the top 8 buckets "rrrgggbb:count" in 4800.
+    if ((n % 8) == 0 || n == 1) {
+      unsigned hist[16][16][16];
+      for (unsigned a = 0; a < 16; ++a)
+        for (unsigned b = 0; b < 16; ++b)
+          for (unsigned c = 0; c < 16; ++c) hist[a][b][c] = 0;
+      for (unsigned y = 0; y < 480; y += 8)
+        for (unsigned x = 0; x < 320; x += 4) {
+          uint16_t v = px[y * 320 + x];
+          unsigned r = (v >> 12) & 0xf, g = (v >> 7) & 0xf, b = (v >> 3) & 0xf;
+          hist[r][g][b]++;
+        }
+      struct Top { unsigned rgb, cnt; } top[8] = {};
+      for (unsigned a = 0; a < 16; ++a)
+        for (unsigned b = 0; b < 16; ++b)
+          for (unsigned c = 0; c < 16; ++c) {
+            unsigned cnt = hist[a][b][c];
+            for (unsigned k = 0; k < 8; ++k)
+              if (cnt > top[k].cnt) {
+                for (unsigned m = 7; m > k; --m) top[m] = top[m - 1];
+                top[k].rgb = (a << 8) | (b << 4) | c;
+                top[k].cnt = cnt;
+                break;
+              }
+          }
+      printf("E5PANELHIST %u", n);
+      for (unsigned k = 0; k < 8; ++k)
+        printf(" %03x:%u", top[k].rgb, top[k].cnt);
+      printf("\n");
+    }
+    // r106: two raw pixel rows (y=64 and y=240) sampled every 4px, every
+    // 32nd change: real RGB565 values identify text edges vs gradients.
+    if ((n % 32) == 0) {
+      for (unsigned yr = 0; yr < 2; ++yr) {
+        unsigned y = yr ? 240 : 64;
+        printf("E5PANELROW %u y%u", n, y);
+        for (unsigned x = 0; x < 320; x += 4) printf("%04x", px[y * 320 + x]);
+        printf("\n");
+      }
+    }
   }
 }
 
