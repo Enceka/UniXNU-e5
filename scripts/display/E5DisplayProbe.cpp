@@ -156,15 +156,37 @@ extern "C" void e5_display_frame_kick(void) {
         printf(" %03x:%u", top[k].rgb, top[k].cnt);
       printf("\n");
     }
-    // r106: two raw pixel rows (y=64 and y=240) sampled every 4px, every
-    // 32nd change: real RGB565 values identify text edges vs gradients.
-    if ((n % 32) == 0) {
-      for (unsigned yr = 0; yr < 2; ++yr) {
-        unsigned y = yr ? 240 : 64;
-        printf("E5PANELROW %u y%u", n, y);
-        for (unsigned x = 0; x < 320; x += 4) printf("%04x", px[y * 320 + x]);
+    // r108: read the actual glyphs. Three 8x8 tiles at fixed anchors plus
+    // a 16px-tall band across the full width at 4px/2px sampling; large UI
+    // text (24-32px glyphs) shows letter silhouettes -> identify the
+    // drawing client by WHAT the panel says.
+    if ((n % 8) == 1 || (n % 32) == 0) {
+      const unsigned anchors[3][2] = {{16, 240}, {160, 240}, {280, 240}};
+      for (unsigned t = 0; t < 3; ++t) {
+        unsigned ax = anchors[t][0], ay = anchors[t][1];
+        printf("E5TILE %u a%u,%u ", n, ax, ay);
+        for (unsigned y = 0; y < 8; ++y) {
+          unsigned bits = 0;
+          for (unsigned x = 0; x < 8; ++x)
+            if (px[(ay + y) * 320 + ax + x]) bits |= 1u << x;
+          printf("%02x", bits);
+        }
         printf("\n");
       }
+      printf("E5BAND %u y238", n);
+      for (unsigned y = 238; y < 254; y += 2) {
+        unsigned char bits[40];
+        for (unsigned xb = 0; xb < 40; ++xb) {
+          unsigned b = 0;
+          for (unsigned x = 0; x < 8; ++x)
+            if (px[y * 320 + xb * 8 + x]) b |= 1u << x;
+          bits[xb] = (unsigned char)b;
+        }
+        for (unsigned xb = 0; xb < 40; ++b += 0)
+          { printf("%02x", bits[xb]); if (++xb == 40) break; }
+        printf(" ");
+      }
+      printf("\n");
     }
   }
 }
