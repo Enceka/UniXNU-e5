@@ -1,0 +1,25 @@
+{
+  "round": 97,
+  "purpose": "frame-acceptance probe \u2014 kernel-side crc32 of the panel scanout window to detect rendering after the XNU handoff",
+  "build": {
+    "kernel": "353 (CI run 41323340152, device fix/display-frame-probe-r97 cf8233a)",
+    "kernel_sha256_prefix": "9eb974b9",
+    "adt": "0fea719d (r96 scale ADT rebuilt identically)",
+    "payload_sha256_prefix": "682ea639",
+    "data_fixture": "SB-enabled c1744ab4 (unchanged from r96)"
+  },
+  "probe": {
+    "window": "0xBE000000+0x4B000 (320x480 RGB565)",
+    "cadence": "crc every 16th big-read echo tick (~3s)",
+    "echo_field": "F=<changes>:<crc>"
+  },
+  "result": {
+    "panel_changes_total": 108,
+    "retained_tail": "changes 101-108 consecutive new crc per tick through the final tick",
+    "display_fields": "u=5:5 B=0.0.0.0 C=1:0 D=1:1 a=130055 h=4ff:3f g=2:0 identical to r96",
+    "panic": null,
+    "E5EXC/E5CRASH": "2 lines = known liveactivitiesd abort (SB silent since r96)"
+  },
+  "interpretation_pending": "change source ambiguous between kernel fb console, backboardd, and SpringBoard; r98 headless A/B discriminates",
+  "report": "dumps/uefi-report-001651.txt"
+}
