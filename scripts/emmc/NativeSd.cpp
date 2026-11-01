@@ -1185,7 +1185,11 @@ int e5_display_metaclasses = -999;  // m: registered metaclass mask, same class 
 int e5_display_kext_state = -999;   // k: record/loaded/started/CPP/declares/exec/interface/kernel
 int e5_display_load_result = -999;  // l: full OSReturn from the locked public load API
 int e5_display_attach = -999;      // a: bit0 lcd nub, bit1 concrete E5Display class,
-                                  // bit2 published E5Display service (v6 semantics)
+                                  // bit2 published E5Display service (v6 semantics);
+                                  // v8 attach bits set in e5_display_publish:
+                                  // 0x400 provider, 0x800 alloc, 0x1000 init,
+                                  // 0x2000 attach, 0x4000 start, 0x8000 register,
+                                  // 0x10000 copyMatchingService sees it.
 
 static const char *const e5DisplayBundle = "com.apple.iokit.IOMobileGraphicsFamily";
 
@@ -1256,8 +1260,20 @@ extern "C" int e5_display_start(void) {
     return 0;
   }
   e5_display_attach |= 2;
-  sdlog("NativeSd: concrete E5Display construction v=%x s=%x r=%x; publication pending\n",
+  sdlog("NativeSd: concrete E5Display construction v=%x s=%x r=%x\n",
         (unsigned)e5_display_construction, (unsigned)e5_display_original_size,
         (unsigned)e5_display_registration_result);
+  // V8: full lifecycle publication on the lcd nub, after a qualified
+  // construction probe. Headless Data keeps every consumer away from the
+  // guarded backend slots on this round.
+  if (e5_display_construction == 0x1ff) {
+    extern "C" int e5_display_publish(IOService *provider);
+    int published = e5_display_publish(nub);
+    e5_display_attach |= published ? 4 : 0;
+    sdlog("NativeSd: display publish %d a=%x\n", published,
+          (unsigned)__atomic_load_n(&e5_display_attach, __ATOMIC_RELAXED));
+  } else {
+    sdlog("NativeSd: display construction not qualified; publish skipped\n");
+  }
   return 0;
 }
