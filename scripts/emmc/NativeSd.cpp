@@ -1213,7 +1213,9 @@ extern "C" int e5_display_start(void) {
   // arg cannot be added without FAT surgery.  Opt-out via e5-display-off.
   if (PE_parse_boot_argn("e5-display-off", nullptr, 0)) return 0;
   e5_display_attach = 0;
-  mach_timespec_t ts = {3, 0};  // 3s cap; NULL would wait forever
+  // r76: cold-boot try-1 missed the lcd nub inside 3s (a=0), warm try-2
+  // found it (a=1) - the platform publishes ADT nubs at its own pace.
+  mach_timespec_t ts = {20, 0};  // 20s cap; NULL would wait forever
   IOService *provider = IOService::waitForService(
       IOService::nameMatching("lcd"), &ts);
   if (!provider) { sdlog("NativeSd: display provider lcd absent\n"); return 0; }
