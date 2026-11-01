@@ -909,9 +909,10 @@ public:
     // running count so progress stays measurable.
     if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0)) {
       int tzstatus = __atomic_load_n(&e5_tzinit_wait_status, __ATOMIC_ACQUIRE);
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d p=%s x=%08x q=%s t=%d:%x\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d p=%s x=%08x q=%s t=%d:%x\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
+            __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
             __atomic_load_n(&dataPublication, __ATOMIC_ACQUIRE),
             __atomic_load_n(&dataDetail, __ATOMIC_RELAXED),
             __atomic_load_n(&dataLookup, __ATOMIC_RELAXED),
@@ -1166,6 +1167,8 @@ extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
 // v1 = census only: can we find and allocate the Legacy class at all?
 // ---------------------------------------------------------------------------
 
+int e5_display_census = -999;  // -999 probe not run; else bitmask bit0=Service bit1=Legacy
+
 extern "C" int e5_display_probe(void) {
   // Concrete classes we try to allocate; the rest are only named in the log
   // (OSKext::getMetaClasses is private, and abstract-class allocation is not
@@ -1176,10 +1179,11 @@ extern "C" int e5_display_probe(void) {
     nullptr,
   };
   int found = 0;
+  e5_display_census = 0;
   for (int i = 0; names[i]; i++) {
     OSObject *inst = OSMetaClass::allocClassWithName(names[i]);
     IOLog("NativeSd: display census %s inst %p\n", names[i], inst);
-    if (inst) { found++; inst->release(); }
+    if (inst) { found++; e5_display_census |= (1 << i); inst->release(); }
   }
   return found;
 }
