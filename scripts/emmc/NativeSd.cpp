@@ -1202,6 +1202,33 @@ extern "C" int e5_display_probe(void) {
   }
   // c = kr<<8 | mask  (kr 0 = load OK; mask bit0 Service, bit1 Legacy)
   e5_display_census = ((unsigned)(int)kr & 0xff) << 8 | mask;
+
+  // v5: kr=0 with no class registration means load() took an early-exit
+  // (alreadyLoaded/codeless) path.  Interrogate the OSKext record and
+  // START it directly - start() runs the module init that registers the
+  // OSMetaClasses.  Encoded into e5_display_attach high bits:
+  //   0x020 kext record found, 0x040 loaded, 0x080 started,
+  //   0x100 explicit start() ok, 0x200 Legacy alloc AFTER start.
+  {
+    OSPtr<OSKext> k =
+        OSKext::lookupKextWithIdentifier("com.apple.iokit.IOMobileGraphicsFamily");
+    IOLog("NativeSd: display kext rec %p\n", (void *)k.get());
+    if (k) {
+      e5_display_attach |= 0x20;
+      bool ld = k->isLoaded(), st = k->isStarted();
+      IOLog("NativeSd: display kext loaded %d started %d\n", (int)ld, (int)st);
+      if (ld) e5_display_attach |= 0x40;
+      if (st) e5_display_attach |= 0x80;
+      if (!st) {
+        OSReturn sr = k->start();
+        IOLog("NativeSd: display kext start kr %d\n", (int)sr);
+        if (sr == kOSReturnSuccess) e5_display_attach |= 0x100;
+      }
+      OSObject *after = OSMetaClass::allocClassWithName("IOMobileFramebufferLegacy");
+      IOLog("NativeSd: display post-start census inst %p\n", after);
+      if (after) { e5_display_attach |= 0x200; after->release(); }
+    }
+  }
   return mask;
 }
 
