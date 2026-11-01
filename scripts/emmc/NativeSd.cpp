@@ -1241,7 +1241,7 @@ extern "C" int e5_display_start(void) {
     arr->setObject(pers);
     bool ok = gIOCatalogue->addDrivers(arr, true);
     IOLog("NativeSd: display addDrivers ok %d\n", (int)ok);
-    e5_display_attach |= 2;
+    if (ok) e5_display_attach |= 2;
     OSSafeReleaseNULL(arr);
   } else {
     IOLog("NativeSd: display personality alloc failed\n");
@@ -1252,9 +1252,50 @@ extern "C" int e5_display_start(void) {
   OSSafeReleaseNULL(prov);
   OSSafeReleaseNULL(name);
   OSSafeReleaseNULL(cat);
-  if (!(e5_display_attach & 2)) return 0;
-  // bit2: an IOMobileFramebufferLegacy service appeared (kext started +
-  // matched + start() ran on the lcd nub)
+
+  // v4 bit3: give matching a moment, then re-census.  If the class
+  // allocates now the kext really started inside matching and only the
+  // IONameMatch vs nub name ("lcd" vs "lcd@0") can be wrong.
+  if (e5_display_attach & 2) {
+    IOSleep(2000);
+    OSObject *late = OSMetaClass::allocClassWithName("IOMobileFramebufferLegacy");
+    IOLog("NativeSd: display late census inst %p\n", late);
+    if (late) { e5_display_attach |= 8; late->release(); }
+  }
+
+  // v4 bit4: fallback personality on IOResources - no name matching.
+  // backboardd looks services up by class, so an IOResources-attached
+  // Legacy is a valid first light even if the lcd nub match failed.
+  if ((e5_display_attach & 2) && !(e5_display_attach & 8)) {
+    OSDictionary *res = OSDictionary::withCapacity(5);
+    OSString *rbid = OSString::withCString("com.apple.iokit.IOMobileGraphicsFamily");
+    OSString *rcls = OSString::withCString("IOMobileFramebufferLegacy");
+    OSString *rprov = OSString::withCString("IOResources");
+    OSString *rmat = OSString::withCString("IOBSD");
+    OSString *rcat = OSString::withCString("com.apple.iokit.IOMobileGraphicsFamily.res");
+    if (res && rbid && rcls && rprov && rmat && rcat) {
+      res->setObject("CFBundleIdentifier", rbid);
+      res->setObject("IOClass", rcls);
+      res->setObject("IOProviderClass", rprov);
+      res->setObject("IOResourceMatch", rmat);
+      res->setObject("IOMatchCategory", rcat);
+      OSArray *rarr = OSArray::withCapacity(1);
+      rarr->setObject(res);
+      bool ok2 = gIOCatalogue->addDrivers(rarr, true);
+      IOLog("NativeSd: display addDrivers res ok %d\n", (int)ok2);
+      if (ok2) e5_display_attach |= 16;
+      OSSafeReleaseNULL(rarr);
+    }
+    OSSafeReleaseNULL(res);
+    OSSafeReleaseNULL(rbid);
+    OSSafeReleaseNULL(rcls);
+    OSSafeReleaseNULL(rprov);
+    OSSafeReleaseNULL(rmat);
+    OSSafeReleaseNULL(rcat);
+  }
+
+  // bit2: an IOMobileFramebufferLegacy service appeared somewhere
+  // (kext started + matched + start() ran).
   IOService *legacy = IOService::waitForService(
       IOService::serviceMatching("IOMobileFramebufferLegacy"), &ts);
   if (!legacy) { sdlog("NativeSd: display legacy service absent\n"); return 0; }
