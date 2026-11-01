@@ -85,13 +85,38 @@ extern "C" void e5_display_frame_kick(void) {
   if (!sPanelMap) return;
   sPanelKicks++;
   if ((sPanelKicks % 16) != 2) return; // ~every 16th big-read echo batch
-  uint32_t crc = e5_display_crc32((const volatile uint8_t *)sPanelMap->getVirtualAddress(), 0x4B000);
+  const volatile uint16_t *px = (const volatile uint16_t *)sPanelMap->getVirtualAddress();
+  uint32_t crc = e5_display_crc32((const volatile uint8_t *)px, 0x4B000);
   if (crc != e5_display_frame_crc) {
     if (e5_display_frame_changes || e5_display_frame_crc)
       printf("E5Display: panel crc %08x (was %08x) change #%u\n",
              crc, e5_display_frame_crc, e5_display_frame_changes + 1);
     __atomic_store_n(&e5_display_frame_crc, crc, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&e5_display_frame_changes, 1U, __ATOMIC_RELAXED);
+    unsigned n = __atomic_fetch_add(&e5_display_frame_changes, 1U, __ATOMIC_RELAXED) + 1;
+    // r99: render a 20x60 block thumbnail (2px x 8px blocks, 1 = any
+    // non-black pixel) into a 150-byte buffer; print it every 16th change so
+    // the persistent ring tail keeps the last few and we can SEE what is
+    // drawing (scrolling console text vs UI shapes).
+    static uint8_t thumb[150];
+    for (unsigned row = 0; row < 60; ++row) {
+      uint32_t bits = 0;
+      for (unsigned col = 0; col < 20; ++col) {
+        unsigned any = 0;
+        for (unsigned y = 0; y < 8 && !any; ++y) {
+          const volatile uint16_t *p = px + (row * 8 + y) * 320 + col * 2;
+          if (p[0] || p[1]) any = 1;
+        }
+        if (any) bits |= 1u << col;
+      }
+      thumb[row * 3 + 0] = (uint8_t)(bits & 0xff);
+      thumb[row * 3 + 1] = (uint8_t)((bits >> 8) & 0x0f);
+      thumb[row * 3 + 2] = 0;
+    }
+    if ((n % 16) == 0 || n == 1) {
+      printf("E5PANELSNAP %u %08x ", n, crc);
+      for (unsigned i = 0; i < 150; ++i) printf("%02x", thumb[i]);
+      printf("\n");
+    }
   }
 }
 
