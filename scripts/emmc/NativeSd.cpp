@@ -1209,8 +1209,9 @@ extern "C" int e5_display_start(void) {
   // arg cannot be added without FAT surgery.  Opt-out via e5-display-off.
   if (PE_parse_boot_argn("e5-display-off", nullptr, 0)) return 0;
   e5_display_attach = 0;
+  mach_timespec_t ts = {3, 0};  // 3s cap; NULL would wait forever
   IOService *provider = IOService::waitForService(
-      IOService::nameMatching("lcd"), 3ULL * 1000000000ULL);
+      IOService::nameMatching("lcd"), &ts);
   if (!provider) { sdlog("NativeSd: display provider lcd absent\n"); return 0; }
   e5_display_attach |= 1;
   OSObject *obj = OSMetaClass::allocClassWithName("IOMobileFramebufferLegacy");
