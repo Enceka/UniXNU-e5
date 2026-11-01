@@ -1,0 +1,33 @@
+{
+  "round": 90,
+  "date": "2026-11-01",
+  "summary": "Slot-213 success unblocked the walk: slots 306 then 211(selector 3) became reachable; no panic across the full window.",
+  "kernel": {
+    "ci_run": 41302276379,
+    "ci_index": 346,
+    "sha256": "094e703d",
+    "bytes": 52113408,
+    "device_ref": "main @ 1bfc73c",
+    "echo_fields": ["C=<calls>:<status> for slot 213"]
+  },
+  "payload": {
+    "sha256": "d46a695c",
+    "bytes": 62926860,
+    "adt": {"sha256": "284f5c6d", "bytes": 14152, "note": "CI346 adt 488afc5e + set-e5-scratch-data.py; DoNotUseSEP @0x3720, display-subsystem @0x3414"},
+    "data_fixture": "headless fe0619f0 unchanged"
+  },
+  "runtime": {
+    "adb_back_seconds": 665,
+    "C_field": "1:0 (slot 213 answered once, kIOReturnSuccess)",
+    "B_field": "2.11.211.3 (two soft-backend hits: slot 306 once, slot 211 selector 3 last)",
+    "u_field": "5:5:0:0",
+    "other_fields": "a=130055 h=4ff:3f d=100 g=2:e00002f0 p=published q=ready",
+    "panic": null,
+    "crash_lines": "none in window (no E5EXC/E5CRASH)"
+  },
+  "slot_semantics": {
+    "211": "generic three-scalar backend entry: wrapper 0x67a0a78 packs (service, u32, u64, u32) with 0x5555-sentinel defaults for missing IOExternalMethodArguments scalars, vcall at 0x67a0b18 (vtable+0x698)",
+    "306": "set/clear boolean pair: kernel-side sites 0x6796094 passes w2=1, 0x67963e4 passes w2=0 (vtable+0x990)"
+  },
+  "next": "r91 (CI 347, device 6bdc0ea): 211 and 306 return success (D=<211>:<306> echo); watch for the next walk gate among slots 245/246/307/337/338/345 or a frame-path request"
+}

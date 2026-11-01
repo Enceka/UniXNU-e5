@@ -409,6 +409,13 @@ command = "CI345; ADT = CI adt + set-e5-scratch-data.py (DoNotUseSEP); kernel-on
 result = "PASS for walk telemetry: B=1.2.213.0 on every retained sample. The whole backend sequence gates on ONE slot-213 call (selector 0); its e00002f0 makes backboardd abandon the sequence, and the other eight abstract slots are never reached. Kernel-side decode: family wrapper 0x6778688 passes (&out1, structureOutput, &out2) and caches out2 at service+0x3c8; trampoline 0x677a718 maps IOExternalMethodArguments scalar[0]/scalarOutput[]/structureOutput onto it. u reaches 5:5:0:0, no panic, Android A returns with fresh boot ID, Data hash unchanged."
 
 [[area.evidence]]
+kind = "device"
+reference = "docs/logs/display-walk-round90.json"
+revision = "6bdc0ea4c9f2e945184ecbf3a4133f5348b26f35"
+command = "CI346; ADT = CI adt + set-e5-scratch-data.py; kernel-only payload d46a695c on headless Data; run-board-cycle.py full flash readback + 600s window; B=/C= echo telemetry"
+result = "PASS: the slot-213 success answer (C=1:0) unblocked the walk - B=2.11.211.3 shows slot 306 then slot 211 selector 3 reached, both soft-guarded; u=5:5:0:0, no panic or crash lines across the full window, Android A returns fresh, Data hash unchanged."
+
+[[area.evidence]]
 kind = "host"
 reference = "docs/logs/display-softwalk-round89.json"
 revision = "d36fb1c8a846e10cb19f442918fb189ee3036ba1"
