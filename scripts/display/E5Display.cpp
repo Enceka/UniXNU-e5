@@ -76,13 +76,20 @@ extern "C" int e5_display_publish(IOService *provider) {
         e5_display_attach |= 0x4000;
         display->registerService();
         e5_display_attach |= 0x8000;
-        OSDictionary *match = IOService::nameMatching("E5Display");
-        IOService *seen = match ? IOService::copyMatchingService(match) : nullptr;
-        if (match) match->release();
-        if (seen) {
-          e5_display_attach |= 0x10000;
-          seen->release();
-          live = true;  // published AND observable by name
+        // r84 evidence: registerService() registers ASYNCHRONOUSLY on the
+        // IOKit workloop; an immediate copyMatchingService() raced and
+        // missed (a=0xfc03). Bounded retry (up to 2s, 10ms steps).
+        for (unsigned tries = 0; tries != 200; ++tries) {
+          OSDictionary *match = IOService::nameMatching("E5Display");
+          IOService *seen = match ? IOService::copyMatchingService(match) : nullptr;
+          if (match) match->release();
+          if (seen) {
+            e5_display_attach |= 0x10000;
+            seen->release();
+            live = true;  // published AND observable by name
+            break;
+          }
+          IOSleep(10);
         }
       }
     }

@@ -6,6 +6,14 @@
     model = "Rongyue E5";
     compatible = "rongyue,e5", "sprd,ums9621";
 
+    // r84 regression: the hand-augmented ADT always carried /filesystems
+    // DoNotUseSEP=1, which AppleAPFS reads (gate at apfs_vfsops.c:2276) to
+    // allow mounting the unencrypted Data volume. CI dts-built ADTs lacked
+    // the node -> "unencrypted data volume is not allowed" panic.
+    filesystems {
+        DoNotUseSEP = <1>;
+    };
+
     memory@80000000 {
         device_type = "memory";
         reg = <0 0x80000000 0 0x80000000>;
