@@ -19,6 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
+OWNED = sorted([0, 1, 7, 86, 91, 141, 188] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -119,6 +120,12 @@ def main():
     names = exports(kc, original)
     pure = [i for i, va in enumerate(table) if '___cxa_pure_virtual' in names.get(va, [])]
     require(pure == PURE, 'original pure virtual slots changed')
+    require(table[141] + slide == 0xfffffff005789080,
+            'original newUserClient slot changed')
+    require(table[188] + slide == 0xfffffff005798184 and
+            read(0xfffffff0057981d4 - slide, 8) == bytes.fromhex('00214bf9080040f9') and
+            read(0xfffffff0057982a0 - slide, 16) == bytes.fromhex('e81740b9a9035ff8280100b9a0c35eb8'),
+            'original slot-188 uint32 output / IOReturn ABI changed')
     for pc, target in [(0xfffffff0057865fc, 0xfffffff00577b510),
                        (0xfffffff00577b540, 0xfffffff00577b318),
                        (0xfffffff005786630, 0xfffffff00577b55c)]:
@@ -146,7 +153,9 @@ public:
   IOReturn setPowerState(unsigned long, IOService *) override;
 '''
     for i in range(168, 358):
-        if i in PURE:
+        if i == 188:
+            header += '  virtual IOReturn getDotPitch(uint32_t *);\n'
+        elif i in PURE:
             header += f'  virtual __attribute__((noreturn)) void opaque{i}() = 0;\n'
         else:
             header += f'  virtual __attribute__((deprecated("Unqualified prototype: never call from source"))) void opaque{i}();\n'
@@ -206,19 +215,20 @@ public:
     bindings = {'__ZN25IOMobileFramebufferLegacyC2EPK11OSMetaClass': 0xfffffff0057865cc,
                 '__ZN25IOMobileFramebufferLegacyD2Ev': 0xfffffff005786618,
                 '__ZN25IOMobileFramebufferLegacy10gMetaClassE': 0xfffffff006b35940,
+                '__ZN25IOMobileFramebufferLegacy13newUserClientEP4taskPvjPP12IOUserClient': table[141] + slide,
                 '__ZTV25IOMobileFramebufferLegacy': vptr - 16}
     owned_slots, native_slots = [], []
     for i, name in enumerate(compiled):
         if name.startswith(('__ZN9E5Display', '__ZNK9E5Display')):
             owned_slots.append(i)
-            require(i in [0, 1, 7, 86, 91] + PURE, 'unexpected owned override ' + str(i))
+            require(i in OWNED, 'unexpected owned override ' + str(i))
         elif '25IOMobileFramebufferLegacy' in name:
             require(i not in PURE and text['va'] <= table[i] < text['va'] + text['filesize'], 'unqualified family binding ' + str(i))
             bindings[name] = table[i] + slide
         else:
             require(i < 168 and name in names.get(table[i], []), 'native inherited symbol mismatch at slot ' + str(i) + ': ' + name)
             native_slots.append(i)
-    require(owned_slots == sorted([0, 1, 7, 86, 91] + PURE), 'owned dispatch set changed')
+    require(owned_slots == OWNED, 'owned dispatch set changed')
     undefined = {name for name, _, kind in symbols if kind == 1 and 'IOMobileFramebufferLegacy' in name}
     require(undefined <= set(bindings), 'unqualified original-class imports: ' + str(undefined - set(bindings)))
     bindings = {name: bindings[name] for name in undefined}

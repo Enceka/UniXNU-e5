@@ -1,26 +1,68 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 // Copyright (c) 2026, UniXNU contributors.
-// Construction probe only. No provider, user client or hardware is published.
+// Published lifecycle probe. Hardware initialization remains unqualified.
 #include "OriginalLegacyFramebufferABI.h"
 #include <IOKit/IOLib.h>
+#include <libkern/c++/OSData.h>
 
 extern "C" __attribute__((noreturn)) void e5_display_backend_guard(unsigned slot);
 extern "C" unsigned e5_display_open_count;
+extern "C" {
+unsigned e5_display_client_calls = 0;
+unsigned e5_display_client_successes = 0;
+unsigned e5_display_client_type = 0;
+unsigned e5_display_client_status = (unsigned)kIOReturnNotReady;
+unsigned e5_display_pitch_calls = 0;
+unsigned e5_display_pitch_status = (unsigned)kIOReturnNotReady;
+}
 
 class E5Display : public IOMobileFramebufferLegacy {
   OSDeclareDefaultStructors(E5Display)
 public:
-  // V8 lifecycle publication: no hardware is touched. The guarded backend
-  // slots below keep any premature consumer from reaching the DPU path; the
-  // first attach round runs on headless Data where no userland opens us.
+  // V8 lifecycle probe, not the original family's initialized start chain.
+  // R85 reaches read-only UserClient selectors even with handleOpen == 0.
   bool start(IOService *) override { return true; }
-  // V9 open accounting: slot 91 is IOService::handleOpen in the original
-  // Legacy table (audit-verified: Legacy does not override it), so counting
-  // here observes every IOServiceOpen on the published service without
-  // altering semantics. This is the "Open works" acceptance instrument.
+  // IOService::open accounting only; IOServiceOpen need not call handleOpen.
   bool handleOpen(IOService *forClient, IOOptionBits options, void *arg) override {
-    e5_display_open_count++;
+    __atomic_fetch_add(&e5_display_open_count, 1U, __ATOMIC_RELAXED);
     return IOService::handleOpen(forClient, options, arg);
+  }
+  IOReturn newUserClient(task_t task, void *security, UInt32 type,
+                        IOUserClient **client) override {
+    __atomic_fetch_add(&e5_display_client_calls, 1U, __ATOMIC_RELAXED);
+    __atomic_store_n(&e5_display_client_type, type, __ATOMIC_RELAXED);
+    IOReturn status = IOMobileFramebufferLegacy::newUserClient(task, security, type, client);
+    if (status == kIOReturnSuccess && client && *client)
+      __atomic_fetch_add(&e5_display_client_successes, 1U, __ATOMIC_RELAXED);
+    __atomic_store_n(&e5_display_client_status, (unsigned)status, __ATOMIC_RELAXED);
+    return status;
+  }
+  // Original slot 188 takes one uint32_t output and returns an IOReturn.
+  // Its cached AppleARMIODevice (+0x1640) is absent on our generic lcd nub.
+  // Use the registry edge instead. Do not invent a pitch from panel geometry:
+  // the provider has no qualified dot-pitch encoding yet.
+  IOReturn getDotPitch(uint32_t *pitch) override {
+    __atomic_fetch_add(&e5_display_pitch_calls, 1U, __ATOMIC_RELAXED);
+    IOReturn status = kIOReturnBadArgument;
+    if (pitch) {
+      *pitch = 0;
+      IOService *provider = getProvider();
+      status = kIOReturnNotReady;
+      if (provider) {
+        OSObject *property = provider->getProperty("dot-pitch");
+        status = kIOReturnNotFound;
+        if (property) {
+          OSData *data = OSDynamicCast(OSData, property);
+          status = kIOReturnBadArgument;
+          if (data && data->getLength() == sizeof(*pitch)) {
+            memcpy(pitch, data->getBytesNoCopy(), sizeof(*pitch));
+            status = kIOReturnSuccess;
+          }
+        }
+      }
+    }
+    __atomic_store_n(&e5_display_pitch_status, (unsigned)status, __ATOMIC_RELAXED);
+    return status;
   }
 #define E5_GUARDED_SLOT(n) \
   __attribute__((noreturn)) void opaque##n() override { e5_display_backend_guard(n); }

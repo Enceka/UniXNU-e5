@@ -18,7 +18,7 @@
 
 extern "C" void e5_panic_print(const char *);
 static void sdlog(const char *fmt, ...) {
-  char text[192]; va_list ap; va_start(ap, fmt);
+  char text[256]; va_list ap; va_start(ap, fmt);
   vsnprintf(text, sizeof(text), fmt, ap); va_end(ap); e5_panic_print(text);
 }
 
@@ -29,6 +29,9 @@ extern "C" int e5_tzinit_pid;
 extern int e5_display_census;  // defined next to e5_display_probe (file tail)
 extern int e5_display_attach;
 extern "C" unsigned e5_display_open_count;
+extern "C" unsigned e5_display_client_calls, e5_display_client_successes;
+extern "C" unsigned e5_display_client_type, e5_display_client_status;
+extern "C" unsigned e5_display_pitch_calls, e5_display_pitch_status;
 extern int e5_display_metaclasses;
 extern int e5_display_kext_state;
 extern int e5_display_load_result;
@@ -922,7 +925,7 @@ public:
     // running count so progress stays measurable.
     if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0)) {
       int tzstatus = __atomic_load_n(&e5_tzinit_wait_status, __ATOMIC_ACQUIRE);
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
@@ -931,6 +934,12 @@ public:
             (unsigned)__atomic_load_n(&e5_display_load_result, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_display_attach, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_display_open_count, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_client_calls, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_client_successes, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_client_type, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_client_status, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_pitch_calls, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_pitch_status, __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&e5_display_construction, __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&e5_display_original_size, __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&e5_display_registration_result, __ATOMIC_RELAXED),
