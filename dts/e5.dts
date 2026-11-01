@@ -11,3 +11,17 @@
         reg = <0 0x80000000 0 0x80000000>;
     };
 };
+
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+
+        // v2 display bring-up: IOMobileFramebufferLegacy expects a provider
+        // service named "lcd" (AppleARMPlatform publishes ADT device nodes
+        // as IOPlatformDevice/AppleARMIODevice instances).
+        lcd@0 {
+            compatible = "lcd";
+            unixnu,adt-name = "lcd";
+        };
+    };
