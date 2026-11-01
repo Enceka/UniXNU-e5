@@ -29,6 +29,8 @@ extern "C" int e5_tzinit_pid;
 extern int e5_display_census;  // defined next to e5_display_probe (file tail)
 extern int e5_display_attach;
 extern "C" unsigned e5_display_open_count;
+extern "C" uint64_t e5_display_crash_words[23];
+extern "C" unsigned e5_display_crash_state;
 extern "C" unsigned e5_display_client_calls, e5_display_client_successes;
 extern "C" unsigned e5_display_client_type, e5_display_client_status;
 extern "C" unsigned e5_display_pitch_calls, e5_display_pitch_status;
@@ -37,6 +39,8 @@ extern "C" unsigned e5_display_cap213_calls, e5_display_cap213_status;
 extern "C" unsigned e5_display_ok211_calls, e5_display_ok306_calls;
 extern "C" unsigned e5_display_backend_last_slot, e5_display_backend_last_sel;
 extern "C" unsigned e5_display_lifecycle, e5_display_resources;
+extern "C" unsigned e5_display_frame_changes, e5_display_frame_crc;
+extern "C" void e5_display_frame_kick(void);
 extern int e5_display_metaclasses;
 extern int e5_display_kext_state;
 extern int e5_display_load_result;
@@ -932,13 +936,23 @@ public:
       int tzstatus = __atomic_load_n(&e5_tzinit_wait_status, __ATOMIC_ACQUIRE);
       // r89: soft-backend telemetry rides the always-captured echo line.
       // B=<total hits>.<9-bit PURE slot mask>.<last slot>.<last sel>
+      if (__atomic_load_n(&e5_display_crash_state, __ATOMIC_ACQUIRE) == 2) {
+        const uint64_t *w = e5_display_crash_words;
+        sdlog("E5KEEP EXC pid %llu (SpringBoard) exc 6 code 1 sub %llu lr %llx fp 0 x16 %llx x17 %llx fr %llx %llx %llx %llx %llx %llx\n",
+              w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8], w[9], w[10]);
+        sdlog("E5KEEP OBJ19 pid %llu (SpringBoard) ptr %llx read %llu words %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx\n",
+              w[0], w[11], w[12], w[13], w[14], w[15], w[16], w[17], w[18], w[19], w[20], w[21], w[22]);
+      }
       unsigned btotal = __atomic_load_n(&e5_display_backend_total, __ATOMIC_RELAXED);
       unsigned bmask = __atomic_load_n(&e5_display_backend_slots, __ATOMIC_RELAXED);
       unsigned bslot = __atomic_load_n(&e5_display_backend_last_slot, __ATOMIC_RELAXED);
       unsigned bsel = __atomic_load_n(&e5_display_backend_last_sel, __ATOMIC_RELAXED);
+      // r97: frame-acceptance probe — crc32 the panel scanout window at a
+      // slow cadence; F=<changes>:<crc> rides the echo line.
+      e5_display_frame_kick();
       // r90: slot 213 left the soft-guard set for a real capability answer;
       // C=<calls>:<status> tracks it on the same echo line.
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
@@ -966,7 +980,9 @@ public:
             __atomic_load_n(&e5_display_cap213_calls, __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&e5_display_cap213_status, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_display_ok211_calls, __ATOMIC_RELAXED),
-            __atomic_load_n(&e5_display_ok306_calls, __ATOMIC_RELAXED));
+            __atomic_load_n(&e5_display_ok306_calls, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_frame_changes, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_frame_crc, __ATOMIC_RELAXED));
     }
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,

@@ -16,18 +16,17 @@
   "channel_note": "The dts/e5.dts provider-contract properties (e5-device 75eb63a) do NOT reach the ADT: devicetree.py hardware_properties() forwards only STRINGS={compatible,device_type,reg-names,interrupt-names,clock-names,method}, U32={phandle,#cells,clock-frequency,timebase-frequency}, U64={redistributor-stride}, FLAGS, REFERENCES. The three contract u32s ride the set-e5-scratch-data.py postprocess instead (same channel as DoNotUseSEP).",
   "runtime": {
     "adb_back_seconds": 665,
-    "samples": "u mid-window 4:4:0:0 then 5:5:0:0 (SB + liveactivitiesd opened their own userclients)",
+    "samples": "u mid-window 4:4:0:0 then 5:5:0:0; aggregate successful type-0 clients, without caller PID attribution",
     "walk": "B=0.0.0.0 (zero guard hits), C=1:0, D=1:1, a=130055, h=4ff:3f, d=100, m=15, k=3f, l=0, p=published, q=ready",
-    "pitch": "g=2:0 — getDotPitch answered SUCCESS twice (was e00002f0 in r87-r92). HYPOTHESIS CONFIRMED: the contract channel works and the family reads the injected values.",
-    "springboard": "STILL crashes at the SAME site as r92: E5EXC exc 6 code 1 sub 7403161412 lr 1b9434744 fp 16f12ec70 x16 1a97c06bc frames 1b9445f8c 1b943399c 1b94438cc 1b94436d0 1b9442f8c 1c114e84c; E5CRASH reason ns 2 code 5. liveactivitiesd: sub 7812375800 lr 1d1a764cc frames 1d1a5c0ec 19f736cc0 19f7080e4 1d1a5c0c0 1d1bc9ec0 1d1bbc024. Kernel panic: none. Window healthy 665s.",
+    "pitch": "g=2:0 \u2014 getDotPitch answered SUCCESS twice (was e00002f0 in r87-r92). HYPOTHESIS CONFIRMED: the contract channel works and the family reads the injected values.",
+    "springboard": "Actual r93 current ring: pid 120 exc 6 code 1 sub 7236552516 lr 1af550744 fp 16efe3c70 x16 19f8dc6bc x17 198022c78; frames 1af561f8c 1af54f99c 1af55f8cc 1af55f6d0 1af55ef8c 1b726a84c. Slide 0x10180000 normalizes to FBSDisplayMode +0x244 at 0x19f3d0744. The earlier r93 record copied r92 addresses; raw addresses differ by ASLR.",
     "kernel_uuid": null,
     "dmesg_sha256": "7d4971d504d3a1c21bcf2f5904f554c1e82c8bed7c17957b424b0c20cf0e8cd7"
   },
-  "conclusion": "Pitch/dimension contract: FIXED (g=2:0). SB abort: UNMOVED (identical lr/sub across r92/r93 — the two boots even share the SB binary slide). The abort is not driven by pitch or dimensions. Remaining suspects: the surface/swap userclient API band (service slots 175-261, original family code answering on our object) returning failures to SB; or a userland-side capability SB parses out of band. SB/LA trap PCs are NOT in dyld-cache images (brute-force over 3245 walked images, zero page-aligned slides fit 6 anchors at code offsets >=0x1000) — naming the site needs the SpringBoard/liveactivitiesd binaries extracted from os-window.img (per-process ASLR, frame deltas usable).",
+  "conclusion": "The ADT contract channel delivers the three provider properties and pitch status reaches success. R92/r93 normalize to the same shared-cache FBSDisplayMode validation trap, with six caller returns and x16/x17 anchors confirmed. Extracting SpringBoard is unnecessary for this trap. R95 subsequently identifies preferred UI scale=0 and stored scale override=0 with otherwise valid 320x480/60 Hz mode fields; R96 tests chosen display-scale=1. Frame presentation remains unqualified.",
   "open_items": [
-    "symbolicate the SB trap via SpringBoard.app extraction from os-window.img",
-    "trace which userclient external methods SB calls after open (wrapper band 175-261) and which return errors",
-    "decode the E5EXC 'sub' field (may carry abort_with_payload payload code)",
-    "record r93 in porting.toml display area (tool revision e5-xnu f7e6f43, device 75eb63a)"
+    "Validate the r96 chosen display-scale=1 repair with the CI350 retained-snapshot kernel.",
+    "Qualify caller-specific UserClient and surface/swap behavior after mode validation.",
+    "Preserve pitch delivery evidence separately from physical pitch and full mode qualification."
   ]
 }

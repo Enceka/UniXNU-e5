@@ -1,0 +1,58 @@
+{
+  "rounds": "97-101",
+  "purpose": "attribute the panel drawing after the XNU handoff; frame-acceptance ladder",
+  "ladder": [
+    {
+      "round": 97,
+      "sb": true,
+      "fb_console": true,
+      "changes": 108,
+      "note": "probe debut"
+    },
+    {
+      "round": 98,
+      "sb": false,
+      "fb_console": true,
+      "changes": 120,
+      "note": "headless A/B: crc alone inconclusive"
+    },
+    {
+      "round": 99,
+      "sb": true,
+      "fb_console": true,
+      "changes": 117,
+      "snapshot": "left-40px strip shows periodic identical text bands = console text (every rw-done line starts NativeSd)"
+    },
+    {
+      "round": 100,
+      "sb": true,
+      "fb_console": false,
+      "changes": 117,
+      "snapshot": "strip becomes near-solid fill, no text periodicity \u2014 a real non-console renderer",
+      "detail": "boot args e5-fb -> e5-xx byte-patched in the payload FAT (offset 0x36a5bea, length-preserving)"
+    },
+    {
+      "round": 101,
+      "sb": false,
+      "fb_console": false,
+      "changes": 120,
+      "note": "headless + no console: STILL renders"
+    }
+  ],
+  "conclusion": "The drawer survives both the fb-console removal and the SpringBoard/liveactivitiesd/watchdogd disable. It is the userspace compositor stack (backboardd, which holds 3-4 userclients even headless) drawing through E5Display \u2014 the userspace display pipeline is ALIVE end-to-end. SpringBoard-attributable content is still unproven; visual confirmation on the panel (r100 config) is the next ground truth.",
+  "kernels": {
+    "r97/r98": "353 9eb974b9",
+    "r99-r101": "355 be43ccaa (snapshot probe; 150->180B thumb overrun fixed pre-flash)"
+  },
+  "payloads": {
+    "r100": "611034a8 (e5-xx args patch)",
+    "r101": "same as r100 + headless Data fe0619f0"
+  },
+  "reports": [
+    "dumps/uefi-report-001651.txt",
+    "dumps/uefi-report-003035.txt",
+    "dumps/uefi-report-010403.txt",
+    "dumps/uefi-report-011643.txt",
+    "dumps/uefi-report-012914.txt"
+  ]
+}

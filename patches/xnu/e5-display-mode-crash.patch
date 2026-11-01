@@ -1,0 +1,22 @@
+diff --git a/bsd/uxkern/ux_exception.c b/bsd/uxkern/ux_exception.c
+index ff01630..14629d8 100644
+--- a/bsd/uxkern/ux_exception.c
++++ b/bsd/uxkern/ux_exception.c
+@@ -160,6 +160,17 @@ handle_ux_exception(thread_t                    thread,
+ 					printf(" %llx", e5ret[e5k]);
+ 			}
+ 			printf("\n");
++			/* Fixed-size, EFAULT-safe diagnostic only. The host qualifies
++			 * the trap/stack before interpreting these raw object words. */
++			if (exception == EXC_BREAKPOINT) {
++				uint64_t e5obj[10] = {0};
++				int e5err = copyin((user_addr_t)e5s->x[19],
++				    (char *)e5obj, sizeof(e5obj));
++				printf("E5OBJ19 pid %d (%s) ptr %llx read %d words %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx\n",
++				    proc_pid(p), p->p_comm, e5s->x[19], e5err,
++				    e5obj[0], e5obj[1], e5obj[2], e5obj[3], e5obj[4],
++				    e5obj[5], e5obj[6], e5obj[7], e5obj[8], e5obj[9]);
++			}
+ 		} else {
+ 			printf("E5EXC pid %d (%s) exc %d code %llu sub %llu\n",
+ 			    proc_pid(p), p->p_comm, exception, code, subcode);

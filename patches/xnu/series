@@ -20,3 +20,5 @@ e5-systemos-startup.patch
 e5-console-flight.patch
 e5-data-progress.patch
 e5-crash-reason.patch
+e5-display-mode-crash.patch
+e5-display-mode-keep.patch

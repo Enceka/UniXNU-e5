@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-01",
+  "round": 96,
+  "kind": "ADT-only UI scale repair and device control",
+  "kernel": {
+    "ci": 350,
+    "run": 41314787322,
+    "device_revision": "7bb73d48d33654a3f513517ea78c74ac700e4efe",
+    "sha256": "2ddda95a6119bb9db9f4ef95e87bf5413625ff39dde69c64319ed89a0cae6a8a",
+    "unchanged_from_round95": true
+  },
+  "board_policy_revision": "2d171af556d2c1c5dcf9a7a2a3bd411453506b79",
+  "tool": {
+    "path": "uefi/tools/set-e5-display-scale.py",
+    "sha256": "edd82a311963338581f716c876c494ace3fe006b7f564c7ed10f13e2f1cf4f66"
+  },
+  "adt": {
+    "sha256": "0fea719d31cfe95092ee8576d41264c47548cec89e12911a85c031b44c637fd0",
+    "size": 14312,
+    "added_bytes": 40,
+    "added_property": "/device-tree/chosen/display-scale",
+    "value": 1,
+    "other_properties_unchanged": true,
+    "source_sha256": "6af55ba499cc3907ef625cf682825859b465c34eee877997d8916761655e27f9"
+  },
+  "cycle": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-policy-r65/board-r96/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "8c3bf26c9b1207beea53003f9f70ff56400be9bed1fc167e72ebd75c749723bc",
+    "stage": "complete",
+    "updated_at": "2026-11-01T15:04:39.947737+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-230438.txt"
+    ]
+  },
+  "host_checks": {
+    "files": 9,
+    "fat_mirrors_identical": true,
+    "firmware_unchanged": true,
+    "independent_mtools_reads": true,
+    "source_pin": "7bb73d48d33654a3f513517ea78c74ac700e4efe"
+  },
+  "console_sha256": "f4c3512b2d5213e297af39c3e070a1163647192a1b3a691859ff1928460d7ca8",
+  "record_sha256": "b3e5de2c4e619b222ca528e74fd1718deded1045dfd93698b6b1098029a62988",
+  "retained": {
+    "springboard_breakpoint_snapshots": 0,
+    "springboard_crash_lines": 0,
+    "liveactivitiesd_exception_lines": 2,
+    "last_telemetry": "NativeSd: rw done #246784 8/8 at 14145592 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=5:5:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1",
+    "panic": null
+  },
+  "before": {
+    "captured_at": "2026-11-01T14:51:45.959710+00:00",
+    "serial": "TS30520241202952",
+    "boot_id": "a25b49be-f0df-4425-aeec-39d3a1bc77b5",
+    "slot": "_a",
+    "boot_completed": "1",
+    "misc.bin": {
+      "bytes": 4096,
+      "sha256": "5087339d803fc30953abab752427a40d401443a7c8afc5a4da35a6dcf4f7abb2"
+    },
+    "boot_b.img": {
+      "bytes": 67108864,
+      "sha256": "80e6b1e20ce803c6724232c1bb80b6c1bd30f7e53465bf6ff374f50ab961d40c"
+    },
+    "data-current.raw": {
+      "bytes": 134217728,
+      "sha256": "c1744ab42d3baac3baaf50742afbf64fc51159d13620a2f5fef4e2655fe4ec47"
+    }
+  },
+  "after": {
+    "captured_at": "2026-11-01T15:06:30.604160+00:00",
+    "serial": "TS30520241202952",
+    "boot_id": "b6da7ae9-defb-4c80-9c34-593739e1ed7f",
+    "slot": "_a",
+    "boot_completed": "1",
+    "data-current.raw": {
+      "bytes": 134217728,
+      "sha256": "c1744ab42d3baac3baaf50742afbf64fc51159d13620a2f5fef4e2655fe4ec47"
+    }
+  },
+  "conclusion": "The only ADT change is native UI scale 1. The original SpringBoard mode-validation breakpoint is no longer captured in the approximately 665s round, with the first-breakpoint retention diagnostic unchanged. No panic; pitch/lifecycle controls and full Data hash preserved.",
+  "limits": [
+    "No claim of continuous SpringBoard liveness or presented UI frames.",
+    "liveactivitiesd retains independent breakpoint failures.",
+    "Surface submission, scanout ownership and hardware frame timing remain unqualified."
+  ],
+  "console_archive": "display-scale-round96-console.txt"
+}

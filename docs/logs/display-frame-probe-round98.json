@@ -1,0 +1,18 @@
+{
+  "round": 98,
+  "purpose": "A/B control for the r97 frame probe \u2014 headless Data (SpringBoard/liveactivitiesd/watchdogd disabled) with the SAME kernel 353 payload",
+  "inputs": {
+    "kernel": "353 unchanged (payload 682ea639)",
+    "adt": "0fea719d",
+    "data_fixture": "headless fe0619f0 (readback verified)"
+  },
+  "result": {
+    "panel_changes_total": 120,
+    "tail": "changes 115-120 consecutive per tick to the end",
+    "display_fields": "u=4:4 then 5:5 B=0.0.0.0 D=1:1 a=130055 (no SB/LA clients)",
+    "E5EXC/E5CRASH": 0,
+    "panic": null
+  },
+  "conclusion": "panel activity is EQUAL with and without SpringBoard (120 vs 108) \u2014 the crc changes cannot be attributed to SB rendering; likely kernel fb console and/or backboardd. Frame acceptance still unproven; r99 adds 20x60 block thumbnails printed into the ring to identify the drawer.",
+  "report": "dumps/uefi-report-003035.txt"
+}

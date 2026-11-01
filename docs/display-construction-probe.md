@@ -92,11 +92,24 @@ Next: implement the E5 primary-display/mode/mapping overrides with the
 verified (0xbe000000, 320x480, RGB565, row 640) tuple, then qualify the
 IOMobileFramebufferUserClient open path before any SB-enabled round.
 
-## Round 93 — provider contract fed (g green), SB abort unmoved
+## R93 through R96: provider delivery and native UI scale
 
-- Channel: set-e5-scratch-data.py --display-contract 320 480 123 (e5-xnu f7e6f43). dts
-  properties alone cannot reach the ADT (devicetree.py whitelist: STRINGS/U32/U64/FLAGS/REFERENCES).
-- Result: g=2:0 (pitch SUCCESS ×2), B=0 C=1:0 D=1:1 a=130055, u=5:5:0:0, no panic.
-- SpringBoard still aborts at the identical site (lr 1b9434744 sub 7403161412 across r92/r93);
-  trap PCs are outside dyld-cache images — extraction of the process binaries is the next
-  symbolication step. Evidence: docs/logs/display-contract-round93.json.
+R93's actual ADT provider contract is delivered by e5-xnu
+`set-e5-scratch-data.py --display-contract 320 480 123`; DTS hardware
+properties alone are filtered by the common generator. Pitch reaches `g=2:0`.
+The earlier r93 record copied r92's raw SpringBoard addresses; after ASLR
+normalization both traps are FBSDisplayMode +0x244 in the shared cache.
+
+R95/CI350 retains two complete mode snapshots: 320x480, 60 Hz, preferred
+scale 0 and stored scale override 0. The original object class and enum
+validators match. The missing chosen display-scale property produces the
+zero UI-scale rejection. See [R95 evidence](logs/display-scale-round95.json).
+
+Board policy `adt.chosen.u32.display-scale=1` selects native pixels per UI
+point. R96 changes only that property in the retained ADT, with the exact
+CI350 kernel and r95 Data. The approximately 665s round captures no retained
+SpringBoard breakpoint snapshot or current-ring SB crash line; pitch and
+lifecycle remain qualified, full Data readback is unchanged and fresh Android
+A returns. [R96 evidence](logs/display-scale-round96.json) preserves the inputs
+and limits. Continuous SB liveness and presented frames remain unqualified;
+liveactivitiesd still has a breakpoint failure.
