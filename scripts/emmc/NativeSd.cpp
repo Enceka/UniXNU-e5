@@ -1239,7 +1239,7 @@ extern "C" int e5_display_start(void) {
     pers->setObject("IOMatchCategory", cat);
     OSArray *arr = OSArray::withCapacity(1);
     arr->setObject(pers);
-    bool ok = IOCatalogue::addDrivers(arr, true);
+    bool ok = gIOCatalogue->addDrivers(arr, true);
     IOLog("NativeSd: display addDrivers ok %d\n", (int)ok);
     e5_display_attach |= 2;
     OSSafeReleaseNULL(arr);
