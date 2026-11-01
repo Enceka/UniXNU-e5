@@ -21,12 +21,27 @@ static const OSMetaClass *findClass(const char *name) {
   return meta;
 }
 
+extern "C" unsigned e5_display_backend_total = 0;
+extern "C" unsigned e5_display_backend_slots = 0;
+extern "C" unsigned e5_display_backend_last_slot = 0;
+extern "C" unsigned e5_display_backend_last_sel = 0;
+
 extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
                                             void *b, void *c, void *d) {
   // r88 walk-research round: backboardd reached slot 213 (r87). The remaining
   // abstract backend slots return the SAME tolerated error the pitch path
   // proved safe (kIOReturnUnsupported) so the client walk continues past
-  // every backend call, with the full argument echo on the console.
+  // every backend call. r89: counters ride the always-captured rw-done echo
+  // (printf alone wraps out of the ring), mask bits follow PURE order
+  // 211,213,245,246,306,307,337,338,345 -> bits 0..8.
+  static const unsigned kPureSlots[9] = {211, 213, 245, 246, 306, 307, 337, 338, 345};
+  unsigned mask = 0;
+  for (unsigned i = 0; i < 9; ++i)
+    if (kPureSlots[i] == slot) { mask = 1u << i; break; }
+  __atomic_fetch_add(&e5_display_backend_total, 1U, __ATOMIC_RELAXED);
+  __atomic_fetch_or(&e5_display_backend_slots, mask, __ATOMIC_RELAXED);
+  __atomic_store_n(&e5_display_backend_last_slot, slot, __ATOMIC_RELAXED);
+  __atomic_store_n(&e5_display_backend_last_sel, selector, __ATOMIC_RELAXED);
   printf("E5Display: soft backend slot %u sel=%x b=%llx c=%llx d=%llx -> e00002f0\n",
          slot, selector, (unsigned long long)b, (unsigned long long)c,
          (unsigned long long)d);
