@@ -10,6 +10,8 @@
 #include <libkern/c++/OSNumber.h>
 #include <libkern/c++/OSString.h>
 #include <libkern/c++/OSMetaClass.h>
+#include <libkern/c++/OSDictionary.h>
+#include <libkern/c++/OSKext.h>
 #include "TransferStatus.h"
 #include "SdProtocol.h"
 #include "SystemOSWindow.h"
@@ -1176,9 +1178,11 @@ extern "C" int e5_display_probe(void) {
     nullptr,
   };
   const bool concrete[] = {false, true, true, false, false};
+  OSDictionary *classes = OSKext::getMetaClasses();
   int found = 0;
   for (int i = 0; names[i]; i++) {
-    OSMetaClass *meta = OSMetaClass::getMetaClassWithName(names[i]);
+    OSMetaClass *meta =
+        classes ? OSDynamicCast(OSMetaClass, classes->getObject(names[i])) : nullptr;
     OSObject *inst = nullptr;
     if (meta && concrete[i]) inst = OSMetaClass::allocClassWithName(names[i]);
     IOLog("NativeSd: display census %s meta %p inst %p\n",
