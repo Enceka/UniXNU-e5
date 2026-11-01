@@ -30,8 +30,10 @@ V6 progress fields are persistent in sampled NativeSd reads:
 
 `c=12 m=15 k=3f l=0 a=1` is consistent with a started family and registered
 abstract display classes, while the concrete platform driver is still absent.
-It is an expected interpretation, not a board result. If `m` lacks bits 0/1,
-use `k` and `l` to investigate the actual loader/C++ state before changing it.
+R80 observes this exact combination in all 202 complete retained samples.
+The concrete platform driver is the next missing implementation. If a later
+round loses `m` bits 0/1, use `k` and `l` to investigate the actual loader/C++
+state before changing it.
 V5 high bits of `a` are not reused: the old start() experiment never built.
 They also could not survive the call sequence: v5 ORed them into the initial
 `a=-999`, then `e5_display_start()` reset `a` to zero. V6 keeps loader state in
@@ -49,7 +51,19 @@ python3 tools/e5-display-family-audit.py \
   --kernel uefi/build/e5-kernel-artifact-332/kernel.macho
 ```
 
-V6 has not been qualified by a complete CI archive/kernel build or board cycle.
+CI 335 passes the complete archive, kernel link and prelink at device revision
+`9db769180fcf76dc0043f2436e9436aaa5a39901` with the common source pinned to
+`066c8d8315f83749d28bcae2faf3595718646be5`. See
+`docs/logs/display-family-ci335.json`. The r80 board cycle
+confirms family startup/registration separately, as recorded in
+`docs/logs/display-family-round80.json` and its 202-sample console. All samples
+show `c=12 m=15 k=3f l=0 a=1`, `d=100`, published/ready and `t=17:0`; completed
+request counters run 221312..247040. The retained ring contains no
+panic/E5EXC/ENOSPC. Fresh Android A returns and the complete 128 MiB card Data
+fixture hash remains unchanged. The headless fixture keeps SpringBoard and
+liveactivitiesd disabled; this does not retest their abort or qualify UI.
+The original host wait process ended before collection; pstore was harvested
+read-only after fresh Android identity checks, without another reboot.
 The standalone host audit reproduces the three NULL factories on CI 321 and
 332. The pre-existing R71 storage note is normalized from the unsupported
 `board-cycle` kind/short revision to the standard `device` kind, full historical

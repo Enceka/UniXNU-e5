@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "round": 80,
+  "created_at": "2026-11-01T04:46:09.496227+00:00",
+  "source": {
+    "schema_version": 1,
+    "build_number": 335,
+    "run_id": 41272957819,
+    "run_url": "https://github.com/Enceka/unixnu-e5-kernel-builder/actions/runs/41272957819",
+    "status": "completed",
+    "conclusion": "success",
+    "unixnu_revision": "066c8d8315f83749d28bcae2faf3595718646be5",
+    "device_revision": "9db769180fcf76dc0043f2436e9436aaa5a39901",
+    "code_revision": "ffbf19f",
+    "kernel": {
+      "size": 52076544,
+      "sha256": "9a6d333ef0c2eca0027980442cb0afacc952b9255d640a20c4908dde0a917ede"
+    },
+    "generated_adt": {
+      "size": 13808,
+      "sha256": "df7ab36b637608d143a4e47c83dc8c4838793a044187df41b29eb81382fc69fa"
+    },
+    "local_artifact_directory": "e5-xnu/uefi/build/e5-kernel-artifact-335",
+    "kernel_archive_link_prelink_verified": true,
+    "source_checkout_pins_checked_in_logs": true,
+    "v6_telemetry_strings_present": true,
+    "public_kernel_artifact_removed_after_verified_download": true,
+    "private_relay_limit": "billing/spending-limit setup rejection; no account changes attempted",
+    "runtime_qualified": false,
+    "prior_dispatch_334": "wrong repository SHA at checkout; corrected before compiling"
+  },
+  "payload": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-policy-r65/board-r80/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "a543d76e39a0d04af25e2b72678f4e104751075ac796d52aa3c7caf35fe30789",
+    "stage": "complete",
+    "updated_at": "2026-11-01T04:45:58.614768+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-124557.txt"
+    ],
+    "collection_resumed_without_reboot": true,
+    "collection_note": "Original host wait process ended before collection; resumed with fresh Android A identity checks and read-only pstore harvest. No second reboot or flash."
+  },
+  "inputs": {
+    "baseline_payload": "uefi/build/baseline-data-r62/e5-uefi.bin",
+    "manifest": "uefi/build/baseline-data-r62/e5-payload-fat.json",
+    "retained_adt_sha256": "2a419ab4a9f2702567f2a92d13602314e53f1c7055ba86b2c213b384bab91b5c",
+    "retained_adt_bytes": 13904,
+    "r79_payload_sha256": "02a8357597415ceabbfc580b7661e06fe25c98e5db34d1d392a3d774aa2ba744",
+    "data_policy": "preserve current headless/RW fixture; do not modify Data for registration probe",
+    "only_kernel_changed_vs_r79": true
+  },
+  "android": {
+    "before_boot_id": "cc066a53-9e54-488b-8910-7eb12f7e0292",
+    "boot_id": "318b519c-c4d6-4890-8d31-9f36fc52829b",
+    "slot": "_a",
+    "boot_completed": "1",
+    "data": {
+      "bytes": 134217728,
+      "sha256": "fe0619f08c72460b5a22a4460644f265180a2f1dfdb09c9026b61999382d5fe7",
+      "unchanged": true
+    },
+    "captured_at": "2026-11-01T04:46:09.496227+00:00"
+  },
+  "retained_console": {
+    "bytes": 24135,
+    "sha256": "5c793bb577b179a1d71be2c9cab8af29d58a5d0151d557ae782b17c6f22b4e60",
+    "complete_v6_samples": 202,
+    "values": {
+      "d": [
+        "100"
+      ],
+      "c": [
+        "12"
+      ],
+      "m": [
+        "15"
+      ],
+      "k": [
+        "3f"
+      ],
+      "l": [
+        "0"
+      ],
+      "a": [
+        "1"
+      ],
+      "p": [
+        "published"
+      ],
+      "q": [
+        "ready"
+      ],
+      "t": [
+        "17:0"
+      ]
+    },
+    "read_request_count_range": [
+      221312,
+      247040
+    ],
+    "all_requests_complete": true,
+    "expected_registration_sample_values": {
+      "d": [
+        "100"
+      ],
+      "c": [
+        "12"
+      ],
+      "m": [
+        "15"
+      ],
+      "k": [
+        "3f"
+      ],
+      "l": [
+        "0"
+      ],
+      "a": [
+        "1"
+      ],
+      "p": [
+        "published"
+      ],
+      "q": [
+        "ready"
+      ],
+      "t": [
+        "17:0"
+      ]
+    },
+    "matches_expected_registration": true,
+    "fault_lines": [],
+    "fixture_identity": "current v6 E5TW ring from dmesg-ramoops-0; flattened UEFI report also contains previous r79 console text",
+    "reference": "display-family-round80-console.txt"
+  },
+  "decoded_pstore": {
+    "record": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-policy-r65/board-r80/dmesg-ramoops-0.bin",
+    "record_sha256": "45d7431a7378c6d35104981930ddd0cee0dfd1c63a390680ad1612943d625b9c",
+    "offset": 7936,
+    "position": 5228,
+    "ring_bytes": 24568,
+    "panic": null,
+    "kernel_uuid": null
+  },
+  "limits": [
+    "Retained late ring only; no claim that every early log line survives.",
+    "Headless Data fixture preserved: SpringBoard/liveactivitiesd disabled; this cycle does not test their abort or any UI.",
+    "Concrete E5Display, userclient open, frame submission and visible XNU presentation are not implemented/qualified."
+  ],
+  "qualification": {
+    "family_started_and_cpp_initialized": true,
+    "display_metaclasses_registered": true,
+    "concrete_driver_instantiated": false,
+    "userclient_opened": false,
+    "frame_presented": false,
+    "ui_qualified": false
+  },
+  "command": "e5-uefi-cycle.sh flash; full payload readback; e5-uefi-cycle.sh collect initiated the sole reboot; host wait process ended, so harvest-r80.py resumed with fresh Android A identity checks and read-only pstore collection; e5-console-tee-read.py; full 128 MiB Data readback",
+  "conclusion": "Family is started and its abstract display metaclasses are registered. NULL allocation of Service/Legacy is expected; the missing implementation is a concrete E5Display subclass, not a missing family startup trigger."
+}
