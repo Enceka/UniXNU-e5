@@ -96,6 +96,7 @@ result = "R81/CI336: the larger kernel boots through a FAT chain extended into 1
 kind = "device"
 reference = "docs/logs/display-publication-round82.json"
 revision = "220779e79593107a3cf5087e3f6e623522017273"
+command = "CI338 kernel-only payload via e5-payload-kernel.py (ADT from r81 FAT); run-board-cycle.py full flash readback + collect; e5-console-tee-read.py decode"
 result = "PASS: v8 e5_display_publish on the lcd nub reaches alloc/init/attach/start/register/lookup; all 169 retained samples a=64519 (0xfc07) with v=1ff s=18a0 r=0, no panic or backend guard, 600 s window healthy, Android A recovery. The published E5Display stays inert (nine guarded backend slots); SpringBoard remains disabled until the E5 lifecycle surface and checked RGB565 mapping land."
 
 [[area]]
@@ -409,19 +410,22 @@ result = "PASS for walk telemetry: B=1.2.213.0 on every retained sample. The who
 
 [[area.evidence]]
 kind = "host"
-reference = "docs/display-softwalk-round89.json"
+reference = "docs/logs/display-softwalk-round89.json"
+revision = "d36fb1c8a846e10cb19f442918fb189ee3036ba1"
 command = "capstone decode of the pinned kernelcache family text + kernel 345 LC_SYMTAB scan (symoff 0xbce4d8, nsyms 277323, classic field order)"
 result = "Kernel 345 symtab covers kernel proper only (0 family-window symbols; 5 in the whole PLK region) - kext internals stay stripped. The 0x55fa3bc 'BLNitsCap' string cluster is a getDefaultsKey switch tail (0x677cf60 returns key pointers), so the brightness-cap naming of slot 213 is UNPROVEN; the wrapper/trampoline ABI decode above is the verified part."
 
 [[area.evidence]]
 kind = "host"
 reference = "docs/display-start-lifecycle.md"
+revision = "0bd37bd09d7c9615f9ce7e7746732e9ef23678d9"
 command = "e5_display_build.py --audit-only against the SHA-pinned original kernelcache"
 result = "V12 host ABI checks pass for the original startHardware/isMainDisplay calls and uint32 dimension getter. Calls complete original Legacy start, checks six original resources and defers publication until readiness. R86 confirms one successful type-0 UserClient via u=1:1:0:0, then faults in kernel-task cleanup on the uninitialized +0x1868 lock. CI342/run41294526511 passes at device 3a5d9e9: final 358-entry dispatch differs only at 20 owned/guarded slots, and all nine FAT files reproduce through mtools. Full 62926860-byte boot_b readback matches before reboot; R87 then qualifies original start and publication at h=4ff:3f in all 80 retained samples. No frame mapping/transfer or DPU/DSI implementation is claimed."
 
 [[area.evidence]]
 kind = "host"
 reference = "docs/display-provider-contract.md"
+revision = "152e22a61f192ce6d76385d9167f8c953e2a3296"
 command = "e5_display_build.py --audit-only against the SHA-pinned original kernelcache"
 result = "PASS: original slot-188 target/provider load/uint32 output/IOReturn anchors and slot-141 factory identity. V11 changes the typed pitch getter and UserClient accounting plus retained measurements; CI and R86 remain pending. R85 o=0 counts handleOpen only: its external-method backtrace already demonstrates a UserClient consumer."
 
