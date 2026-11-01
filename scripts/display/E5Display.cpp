@@ -19,6 +19,8 @@ unsigned e5_display_pitch_calls = 0;
 unsigned e5_display_pitch_status = (unsigned)kIOReturnNotReady;
 unsigned e5_display_lifecycle = 0;
 unsigned e5_display_resources = 0;
+unsigned e5_display_cap213_calls = 0;
+unsigned e5_display_cap213_status = (unsigned)kIOReturnNotReady;
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
@@ -141,8 +143,24 @@ public:
   IOReturn opaque##n(uint32_t selector, void *b, void *c, void *d) override { \
     return e5_display_backend_soft(n, selector, b, c, d); \
   }
+  // Slot 213 (r89: the walk's single gate, selector 0): the family wrapper at
+  // 0x6778688 passes (&out1, structureOutput, &out2) and caches out2 at
+  // service+0x3c8. Answer success with a minimal capability pair so the
+  // backboardd open sequence can advance past the first backend query.
+  IOReturn opaque213(uint32_t selector, void *b, void *c, void *d) override {
+    (void)selector;
+    (void)c;
+    __atomic_fetch_add(&e5_display_cap213_calls, 1U, __ATOMIC_RELAXED);
+    IOReturn status = kIOReturnBadArgument;
+    if (b && d) {
+      *static_cast<uint32_t *>(b) = 1;
+      *static_cast<uint32_t *>(d) = 1;
+      status = kIOReturnSuccess;
+    }
+    __atomic_store_n(&e5_display_cap213_status, (unsigned)status, __ATOMIC_RELAXED);
+    return status;
+  }
   E5_GUARDED_SLOT(211)
-  E5_GUARDED_SLOT(213)
   E5_GUARDED_SLOT(245)
   E5_GUARDED_SLOT(246)
   E5_GUARDED_SLOT(306)
