@@ -117,7 +117,7 @@ extern "C" void e5_display_frame_kick(void) {
       thumb[row * 5 + 3] = (uint8_t)((bits >> 24) & 0xff);
       thumb[row * 5 + 4] = (uint8_t)((bits >> 32) & 0xff);
     }
-    if ((n % 16) == 0 || n == 1) {
+    if ((n % 8) == 0 || n == 1) {
       printf("E5PANELSNAP %u %08x ", n, crc);
       for (unsigned i = 0; i < 300; ++i) printf("%02x", thumb[i]);
       printf("\n");
