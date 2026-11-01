@@ -1205,7 +1205,9 @@ extern "C" int e5_display_probe(void) {
 // the FAT payload without rebuilding the kernel.  Progress lands in
 // e5_display_attach (echoed on rw-done lines next to c=).
 extern "C" int e5_display_start(void) {
-  if (!PE_parse_boot_argn("e5-display", nullptr, 0)) return 0;
+  // Default ON: the payload FAT's unixnu.toml is size-frozen, so a new boot
+  // arg cannot be added without FAT surgery.  Opt-out via e5-display-off.
+  if (PE_parse_boot_argn("e5-display-off", nullptr, 0)) return 0;
   e5_display_attach = 0;
   IOService *provider = IOService::waitForService(
       IOService::nameMatching("lcd"), 3ULL * 1000000000ULL);
