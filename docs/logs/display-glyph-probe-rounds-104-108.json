@@ -1,0 +1,24 @@
+{
+  "rounds": "104-108",
+  "purpose": "identify the panel drawing client via color histogram + glyph tiles",
+  "kernels": {
+    "r104/r105": "358 bc57d2c1 (40x60 thumbs)",
+    "r106": "359 2cd054e8 (histogram; STACK OVERFLOW panic - 16KiB hist array, fixed in 360)",
+    "r107": "360 06d466ef (static hist)",
+    "r108": "362 cc0f848e (glyph tiles+band)"
+  },
+  "findings": [
+    "r104 SB arm and r105 headless arm show the SAME repeating text-like grid at different scroll offsets: 1-bit thumbnails cannot attribute",
+    "r107 histogram (headless): 000:4219 7ff:581 out of 4800 samples - the ENTIRE panel is exactly two colors, 88 percent black + 12 percent pure white, ZERO intermediate grays = hard-edged binary content, no antialiasing, no wallpaper gradients, no icons",
+    "r108 glyph tiles at x=16/160/280 all identical (00003c66061f0606): content is a repeating 8x8 tile lattice, not text",
+    "crc changes every F tick while the 2-color histogram stays constant: the tile pattern ANIMATES = noise/dither placeholder",
+    "kernel painter enumeration: the e5-fb fd-hook path is gated by PE_parse_boot_argn(e5-fb) which is ABSENT on card (payload readback verified: single toml at 0x36a5ba0 patched to e5-xx); kernel printf goes to serial+E5TW only; the panic fb path did not fire (no panic)",
+    "CORRECTION of rounds 97-101: the r100 e5-fb patch WAS effective; my r99-vs-r100 snapshot interpretation (text->fill) was a sampling-moment artifact. The r97-101 ladder conclusion (userspace pipeline alive) stands, now on stronger evidence"
+  ],
+  "conclusion": "The userspace compositor loop (backboardd -> IOMobileGraphicsFamily -> E5Display -> panel scanout 0xBE000000) SUBMITS FRAMES CONTINUOUSLY (~0.2 Hz scene changes): an animated binary-noise placeholder of an EMPTY scene (no wallpaper asset, no SB-visible layers). SpringBoard is alive (own userclient since r92, no traps since the scale fix) but produces no visible layer content yet; liveactivitiesd still aborts at its fixed site.",
+  "open": [
+    "why SB layers produce no visible content (layer registration? render server rejects? FrontBoard services?)",
+    "LA abort root cause",
+    "SB liveness via os_log not console"
+  ]
+}
