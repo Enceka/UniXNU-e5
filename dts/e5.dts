@@ -23,6 +23,12 @@
             compatible = "lcd";
             device_type = "display-subsystem";
             unixnu,adt-name = "lcd";
+            // Provider contract the IOMobileFramebuffer family reads at start
+            // and on pitch/dimension queries (docs/display-provider-contract.md;
+            // tuple verified since r78: 320x480 RGB565, row 640).
+            framebuffer-width = <320>;
+            framebuffer-height = <480>;
+            dot-pitch = <123>;
         };
     };
 };
