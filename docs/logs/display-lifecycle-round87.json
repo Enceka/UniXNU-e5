@@ -1,0 +1,161 @@
+{
+  "round": 87,
+  "kernel_ci": 342,
+  "kernel_sha256": "12f600232e4b143486317800b927db47c60699100387ff32d697ebc2dd9a9f38",
+  "device_source": "3a5d9e94d8ae80251c35789cf4d025df7422e7f1",
+  "cycle": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-policy-r65/board-r87/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "1764f113b90c2783f7ed722b59d8b0ae174f4d297e76b61db94adce84b7d2675",
+    "stage": "complete",
+    "updated_at": "2026-11-01T10:05:44.262540+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-180543.txt"
+    ]
+  },
+  "console_sha256": "d165da554edfe1739efcf79cb01299423c392bd5fd488ef0ab29bad63d51fad2",
+  "complete_samples": 80,
+  "last_sample": {
+    "read_count": 203520,
+    "data_mount": 100,
+    "attach": 130055,
+    "handle_open": 0,
+    "client_calls": 2,
+    "client_successes": 2,
+    "client_type": 0,
+    "client_status": "0",
+    "pitch_calls": 2,
+    "pitch_status": "e00002f0",
+    "lifecycle": "4ff",
+    "resources": "3f",
+    "construction": "1ff",
+    "original_size": "18a0",
+    "registration": "0"
+  },
+  "lifecycle_histogram": {
+    "4ff:3f": 80
+  },
+  "userclient_histogram": {
+    "0:0:0:e00002d8": 59,
+    "1:1:0:0": 10,
+    "2:2:0:0": 11
+  },
+  "panics": [
+    "panic(cpu 0 caller 0xfffffff007a2e150): E5Display construction probe entered unqualified backend slot 213 @E5DisplayProbe.cpp:26"
+  ],
+  "backend_guards": [
+    "E5Display: unqualified backend slot 213 v=1ff",
+    "E5Display construction probe entered unqualified backend slot 213 @E5DisplayProbe.cpp:26",
+    "E5Display construction probe entered unqualified backend slot 213 @E5DisplayProbe.cpp:26"
+  ],
+  "fresh_android_boot_id": "8ba01656-7424-4136-bec9-4c737f01fa2c",
+  "before_android_boot_id": "48b8514d-4399-45cc-8688-8899571cc6d5",
+  "android_slot": "_a",
+  "data_after_sha256": "fe0619f08c72460b5a22a4460644f265180a2f1dfdb09c9026b61999382d5fe7",
+  "data_unchanged": true,
+  "payload_verification": {
+    "payload_sha256": "1764f113b90c2783f7ed722b59d8b0ae174f4d297e76b61db94adce84b7d2675",
+    "payload_bytes": 62926860,
+    "only_kernel_file_and_its_fat_metadata_changed_vs_r86": true,
+    "firmware_bytes_unchanged": true,
+    "all_other_file_allocations_unchanged": true,
+    "fat_mirrors_equal": true,
+    "mtools_independent_readback": true,
+    "files": {
+      "kernel.macho": {
+        "bytes": 52113408,
+        "sha256": "12f600232e4b143486317800b927db47c60699100387ff32d697ebc2dd9a9f38"
+      },
+      "kernel.macho.adt": {
+        "bytes": 13960,
+        "sha256": "07e35d3dd3fcf951cd8b451a52fc7f919fa6da4fba116210e7e09656afc91f08"
+      },
+      "seed.dbr": {
+        "bytes": 585936,
+        "sha256": "d633984f596c32d0fb3e84a7970dc2898e4cb08201841a809660a4e297f979c5"
+      },
+      "kernel.macho.trustcache": {
+        "bytes": 61356,
+        "sha256": "7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7"
+      },
+      "E5BootMenu.efi": {
+        "bytes": 45056,
+        "sha256": "8e5cdc024eb7f79775df1f0fd6794431a5c2c6f0440af8afebdf7ee61924b05b"
+      },
+      "DarwinBoot.efi": {
+        "bytes": 49152,
+        "sha256": "2da0c8688e0f21c423122015371396c68713a8921bd30d2f2924f4d9d84d8632"
+      },
+      "UniXNU.efi": {
+        "bytes": 126976,
+        "sha256": "1a29a249419ef03a2bc6db287505fe055cdc5497c53cfd4036ab83a20a1039d1"
+      },
+      "startup.nsh": {
+        "bytes": 57,
+        "sha256": "5041880f6623c6e2659648ab91a26ae6696754b63e2ab33b78ce7052a235a52e"
+      },
+      "EFI/UniXNU/unixnu.toml": {
+        "bytes": 732,
+        "sha256": "bf566b6ae0cf092e4a124e2df41d3871345228c5dd448b41731083e5cf18345f"
+      }
+    },
+    "kernel_payload_extents": [
+      {
+        "payload_offset": 4338188,
+        "file_offset": 0,
+        "bytes": 52076544
+      },
+      {
+        "payload_offset": 57307660,
+        "file_offset": 52076544,
+        "bytes": 36864
+      }
+    ],
+    "kernel_extension_clusters": [
+      25866,
+      25867,
+      25868,
+      25869,
+      25870,
+      25871,
+      25872,
+      25873,
+      25874,
+      25875,
+      25876,
+      25877,
+      25878,
+      25879,
+      25880,
+      25881,
+      25882,
+      25883
+    ]
+  },
+  "compiled_lifecycle_checks": {
+    "kernel_ci": 342,
+    "owned_start_va": "0xfffffff00798ed9c",
+    "qualified_base_dispatch_call_va": "0xfffffff00798ee74",
+    "base_vtable_got_va": "0xfffffff007a7b130",
+    "base_vtable_va": "0xfffffff005f38560",
+    "base_vtable_entry_offset": "0x2c0",
+    "original_legacy_start_target": "0xfffffff0057872e8",
+    "base_call_uses_original_vtable_not_owned_vtable": true,
+    "owned_compiled_size": 6312,
+    "original_legacy_size": 6304,
+    "only_owned_tail_bytes": 8
+  },
+  "collected_at": "2026-11-01T10:07:26.146976+00:00",
+  "runtime_lifecycle_qualified": true,
+  "pitch_query_qualified": true,
+  "frame_presentation_qualified": false,
+  "next_frontier": {
+    "task": "backboardd",
+    "guarded_backend_slot": 213,
+    "wrapper_lr": "0xfffffff0057786e8",
+    "external_method_lr": "0xfffffff005778f34"
+  }
+}

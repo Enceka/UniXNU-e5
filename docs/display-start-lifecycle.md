@@ -67,10 +67,35 @@ Host ABI validation and CI342/run41294526511 pass at device revision `3a5d9e9`.
 The final linked 358-entry dispatch differs at exactly the 20 intended slots.
 Kernel SHA256 is `12f600232e4b143486317800b927db47c60699100387ff32d697ebc2dd9a9f38`.
 The kernel-only r87 payload is `1764f113b90c2783f7ed722b59d8b0ae174f4d297e76b61db94adce84b7d2675`;
-its ADT is the actual r86 `07e35d3d` image, retained byte for byte. R87 is running.
+its ADT is the actual r86 `07e35d3d` image, retained byte for byte. R87 now qualifies the complete start lifecycle.
 [Host evidence](logs/display-lifecycle-ci342.json) contains source hashes, dispatch
-and independent FAT verification. R87 must hold the actual
+and independent FAT verification. The R87 procedure holds the actual
 r86 ADT, firmware, seed and Data fixed, verify the final dispatch and all FAT
 files, verify complete boot_b readback before reboot, then collect the retained
 resource mask, UserClient results, first fault/guard (if any) and fresh Android
 A recovery. Initialization qualification is separate from frame presentation.
+
+## R87 device result
+
+All 80 retained complete samples have `h=4ff:3f` and `a=130055` (0x1fc07).
+Original start returns success, the exact boot geometry is accepted, all six
+resources are non-null and publication occurs after readiness. The original
+parent size remains `s=18a0`, with construction `v=1ff` and registration `r=0`.
+The final sample at read #203520 has `u=2:2:0:0` and `g=2:e00002f0`: two
+successful type-0 UserClients and two pitch queries returning NotFound.
+`o=0` continues to demonstrate why handleOpen cannot measure UserClient creation.
+
+The new terminal fault is the existing **slot-213 backend guard**, called by
+backboardd through the original UserClient external-method path. This is the
+next backend ABI checkpoint; frame presentation remains unqualified. The
+r85 null-provider fault and r86 null-lock cleanup are passed on this run.
+
+The full 62926860-byte flash readback matches. Firmware, actual r86 ADT, seed,
+trust cache and other FAT files are fixed; both FAT copies match and all nine
+files reproduce through independent mtools reads. Fresh Android A boot ID is
+`8ba01656-7424-4136-bec9-4c737f01fa2c`. The full 128 MiB Data fixture remains
+`fe0619f08c72460b5a22a4460644f265180a2f1dfdb09c9026b61999382d5fe7`.
+[Machine evidence](logs/display-lifecycle-round87.json) includes the exact
+artifact, counters, panic and input checks. Raw report is
+`e5-xnu/dumps/uefi-report-180543.txt`; decoded retained console is under
+`e5-xnu/uefi/build/watchdog-policy-r65/board-r87/decoded/`.
