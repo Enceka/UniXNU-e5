@@ -10,6 +10,7 @@
 #include <libkern/c++/OSNumber.h>
 #include <libkern/c++/OSString.h>
 #include <libkern/c++/OSMetaClass.h>
+#include <libkern/c++/OSKext.h>
 #include "TransferStatus.h"
 #include "SdProtocol.h"
 #include "SystemOSWindow.h"
@@ -25,6 +26,7 @@ extern "C" int e5_data_mount_state;
 extern "C" int e5_tzinit_wait_status;
 extern "C" int e5_tzinit_pid;
 extern int e5_display_census;  // defined next to e5_display_probe (file tail)
+extern int e5_display_attach;
 
 // Repeat publication and UUID-lookup checkpoints in sampled late reads:
 // launchd's EROFS output can overwrite the entire early console ring.
@@ -910,10 +912,11 @@ public:
     // running count so progress stays measurable.
     if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0)) {
       int tzstatus = __atomic_load_n(&e5_tzinit_wait_status, __ATOMIC_ACQUIRE);
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d p=%s x=%08x q=%s t=%d:%x\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d a=%d p=%s x=%08x q=%s t=%d:%x\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_attach, __ATOMIC_RELAXED),
             __atomic_load_n(&dataPublication, __ATOMIC_ACQUIRE),
             __atomic_load_n(&dataDetail, __ATOMIC_RELAXED),
             __atomic_load_n(&dataLookup, __ATOMIC_RELAXED),
@@ -1169,22 +1172,60 @@ extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
 // ---------------------------------------------------------------------------
 
 int e5_display_census = -999;  // -999 probe not run; else bitmask bit0=Service bit1=Legacy
+int e5_display_attach = -999;  // -999 attach stage not run; else bitmask:
+                               // bit0 provider found, bit1 alloc+init, bit2 attach,
+                               // bit3 start, bit4 registerService
 
 extern "C" int e5_display_probe(void) {
-  // Concrete classes we try to allocate; the rest are only named in the log
-  // (OSKext::getMetaClasses is private, and abstract-class allocation is not
-  // worth a panic risk on the first round).
+  // The kernelcache ships IOMobileGraphicsFamily with ZERO personalities, so
+  // IOKit never matches it, the kext never loads, and its OSMetaClasses
+  // never register (r74 census: alloc returned NULL for both classes).
+  // Force-load the kext first, then take the census.
+  OSReturn kr = OSKext::loadKextWithIdentifier(
+      "com.apple.iokit.IOMobileGraphicsFamily");
+  IOLog("NativeSd: display kext load kr %d\n", (int)kr);
   const char *names[] = {
     "IOMobileFramebufferService",
     "IOMobileFramebufferLegacy",
     nullptr,
   };
-  int found = 0;
-  e5_display_census = 0;
+  int mask = 0;
   for (int i = 0; names[i]; i++) {
     OSObject *inst = OSMetaClass::allocClassWithName(names[i]);
     IOLog("NativeSd: display census %s inst %p\n", names[i], inst);
-    if (inst) { found++; e5_display_census |= (1 << i); inst->release(); }
+    if (inst) { mask |= (1 << i); inst->release(); }
   }
-  return found;
+  // c = kr<<8 | mask  (kr 0 = load OK; mask bit0 Service, bit1 Legacy)
+  e5_display_census = ((unsigned)(int)kr & 0xff) << 8 | mask;
+  return mask;
+}
+
+// v2: attach + start an IOMobileFramebufferLegacy instance on a provider.
+// Gated by the e5-display boot arg so a bad start() can be turned off from
+// the FAT payload without rebuilding the kernel.  Progress lands in
+// e5_display_attach (echoed on rw-done lines next to c=).
+extern "C" int e5_display_start(void) {
+  if (!PE_parse_boot_argn("e5-display", nullptr, 0)) return 0;
+  e5_display_attach = 0;
+  IOService *provider = IOService::waitForService(
+      IOService::nameMatching("lcd"), 3ULL * 1000000000ULL);
+  if (!provider) { sdlog("NativeSd: display provider lcd absent\n"); return 0; }
+  e5_display_attach |= 1;
+  OSObject *obj = OSMetaClass::allocClassWithName("IOMobileFramebufferLegacy");
+  IOService *svc = OSDynamicCast(IOService, obj);
+  if (!svc) { if (obj) obj->release(); sdlog("NativeSd: display alloc failed\n"); return 0; }
+  e5_display_attach |= 2;
+  svc->init();
+  if (!svc->attach(provider)) { svc->release(); sdlog("NativeSd: display attach failed\n"); return 0; }
+  e5_display_attach |= 4;
+  if (!svc->start(provider)) {
+    svc->detach(provider); svc->release();
+    sdlog("NativeSd: display start failed\n"); return 0;
+  }
+  e5_display_attach |= 8;
+  svc->registerService();
+  e5_display_attach |= 16;
+  svc->release();  // registry holds the reference now
+  sdlog("NativeSd: display legacy attached %p\n", svc);
+  return 1;
 }
