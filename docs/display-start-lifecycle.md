@@ -63,7 +63,13 @@ isMainDisplay call conventions and both uint32 dimension loads. The exact
 owned dispatch is slots 0, 1, 7, 84, 86, 87, 91, 141, 184, 188, 288 plus the
 nine guarded leaves; the other 338 entries remain original bindings.
 
-Host ABI validation passes. CI and R87 are pending. R87 must hold the actual
+Host ABI validation and CI342/run41294526511 pass at device revision `3a5d9e9`.
+The final linked 358-entry dispatch differs at exactly the 20 intended slots.
+Kernel SHA256 is `12f600232e4b143486317800b927db47c60699100387ff32d697ebc2dd9a9f38`.
+The kernel-only r87 payload is `1764f113b90c2783f7ed722b59d8b0ae174f4d297e76b61db94adce84b7d2675`;
+its ADT is the actual r86 `07e35d3d` image, retained byte for byte. R87 is running.
+[Host evidence](logs/display-lifecycle-ci342.json) contains source hashes, dispatch
+and independent FAT verification. R87 must hold the actual
 r86 ADT, firmware, seed and Data fixed, verify the final dispatch and all FAT
 files, verify complete boot_b readback before reboot, then collect the retained
 resource mask, UserClient results, first fault/guard (if any) and fresh Android

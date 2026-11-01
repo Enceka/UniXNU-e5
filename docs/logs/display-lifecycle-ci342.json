@@ -1,0 +1,256 @@
+{
+  "schema": 1,
+  "device_revision": "3a5d9e94d8ae80251c35789cf4d025df7422e7f1",
+  "ci": {
+    "status": "success",
+    "run_id": 41294526511,
+    "run_number": 342,
+    "url": "https://github.com/Enceka/unixnu-e5-kernel-builder/actions/runs/41294526511",
+    "device_revision": "3a5d9e94d8ae80251c35789cf4d025df7422e7f1",
+    "unixnu_revision": "066c8d8315f83749d28bcae2faf3595718646be5",
+    "files": {
+      "hardware.dtb": {
+        "bytes": 1589,
+        "sha256": "ed389aa0f8aadbc2484b0e20ef32d2eaad657758b8b5e93805f56d0c6986e6ae"
+      },
+      "kernel.macho": {
+        "bytes": 52113408,
+        "sha256": "12f600232e4b143486317800b927db47c60699100387ff32d697ebc2dd9a9f38"
+      },
+      "kernel.macho.adt": {
+        "bytes": 13864,
+        "sha256": "5aabacc950ac4a5e348168f2885ecac8ca45b40723a85722372c90e6427d5651"
+      }
+    },
+    "compiled_vtable_verified": true,
+    "public_kernel_artifact_removed": true,
+    "runtime_qualified": false
+  },
+  "linked": {
+    "schema": 1,
+    "kernel": "uefi/build/e5-kernel-artifact-342-v12/kernel.macho",
+    "kernel_sha256": "12f600232e4b143486317800b927db47c60699100387ff32d697ebc2dd9a9f38",
+    "bundle": "com.apple.iokit.IOMobileGraphicsFamily",
+    "executable": "IOMobileGraphicsFamily",
+    "interface": false,
+    "kernel_resource": false,
+    "initializer_count": 10,
+    "alloc_vtable_slot": "0x68",
+    "control_class": "NativeSd",
+    "classes": {
+      "IOMobileFramebufferUserClient": {
+        "name_va": "0xfffffff0045f673a",
+        "constructor_reference_va": "0xfffffff005776298",
+        "metaclass_vtable_va": "0xfffffff005f353c0",
+        "alloc_va": "0xfffffff0057762c4",
+        "static_instance_bytes": 1336,
+        "first_five_words": [
+          "0xd10083ff",
+          "0xa9017bfd",
+          "0x910043fd",
+          "0xf90007e0",
+          "0xd280a700"
+        ],
+        "null_factory_stub": false
+      },
+      "IOMobileFramebuffer": {
+        "name_va": "0xfffffff0045f7030",
+        "constructor_reference_va": "0xfffffff00577b3f4",
+        "metaclass_vtable_va": "0xfffffff005f365e8",
+        "alloc_va": "0xfffffff00577b420",
+        "static_instance_bytes": 144,
+        "first_five_words": [
+          "0xd10043ff",
+          "0xf90007e0",
+          "0xd2800000",
+          "0x910043ff",
+          "0xd65f03c0"
+        ],
+        "null_factory_stub": true
+      },
+      "IOMobileFramebufferService": {
+        "name_va": "0xfffffff0045f7070",
+        "constructor_reference_va": "0xfffffff00577b5f4",
+        "metaclass_vtable_va": "0xfffffff005f36ec8",
+        "alloc_va": "0xfffffff00577b620",
+        "static_instance_bytes": 144,
+        "first_five_words": [
+          "0xd10043ff",
+          "0xf90007e0",
+          "0xd2800000",
+          "0x910043ff",
+          "0xd65f03c0"
+        ],
+        "null_factory_stub": true
+      },
+      "IOMobileFramebufferLegacy": {
+        "name_va": "0xfffffff0045fbc47",
+        "constructor_reference_va": "0xfffffff0057866a8",
+        "metaclass_vtable_va": "0xfffffff005f390b8",
+        "alloc_va": "0xfffffff0057866d4",
+        "static_instance_bytes": 6304,
+        "first_five_words": [
+          "0xd10043ff",
+          "0xf90007e0",
+          "0xd2800000",
+          "0x910043ff",
+          "0xd65f03c0"
+        ],
+        "null_factory_stub": true
+      }
+    },
+    "runtime_registration_verified": false,
+    "conclusion": "NULL allocation alone does not establish missing runtime metaclass registration",
+    "family_text_sha256": "2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b",
+    "legacy_dispatch": {
+      "constructor_va": "0xfffffff0057865cc",
+      "destructor_va": "0xfffffff005786618",
+      "metaclass_va": "0xfffffff006b35940",
+      "instance_vptr": "0xfffffff005f38570",
+      "static_instance_bytes": 6304,
+      "virtual_entries": 358,
+      "abstract_slots": [
+        211,
+        213,
+        245,
+        246,
+        306,
+        307,
+        337,
+        338,
+        345
+      ],
+      "runtime_instance_created": false,
+      "backend_prototypes_qualified": false
+    },
+    "legacy_provider_contract": {
+      "new_userclient_slot": 141,
+      "new_userclient_va": "0xfffffff005789080",
+      "pitch_slot": 188,
+      "pitch_getter_va": "0xfffffff005798184",
+      "pitch_output_bytes": 4,
+      "pitch_return": "IOReturn",
+      "cached_provider_offset": "0x1640",
+      "cached_provider_store_va": "0xfffffff005787828",
+      "userclient_pitch_wrapper_va": "0xfffffff005778168",
+      "handle_open_count_proves_userclient_absence": false,
+      "original_start_required_for_backend_state": true
+    },
+    "concrete_probe": {
+      "name": "E5Display",
+      "instance_vptr": "0xfffffff00720d440",
+      "virtual_entries": 358,
+      "differing_slots": [
+        0,
+        1,
+        7,
+        84,
+        86,
+        87,
+        91,
+        141,
+        184,
+        188,
+        211,
+        213,
+        245,
+        246,
+        288,
+        306,
+        307,
+        337,
+        338,
+        345
+      ],
+      "all_other_entries_match_original_legacy": true,
+      "initializer_va": "0xfffffff00798f318",
+      "initializer_is_automatic": false,
+      "concrete_factory_va": "0xfffffff00798ea70",
+      "factory_is_abstract_null_stub": false,
+      "runtime_registration_verified": false,
+      "runtime_construction_verified": false,
+      "driver_published": false,
+      "display_presented": false
+    }
+  },
+  "payload": {
+    "payload_sha256": "1764f113b90c2783f7ed722b59d8b0ae174f4d297e76b61db94adce84b7d2675",
+    "payload_bytes": 62926860,
+    "only_kernel_file_and_its_fat_metadata_changed_vs_r86": true,
+    "firmware_bytes_unchanged": true,
+    "all_other_file_allocations_unchanged": true,
+    "fat_mirrors_equal": true,
+    "mtools_independent_readback": true,
+    "files": {
+      "kernel.macho": {
+        "bytes": 52113408,
+        "sha256": "12f600232e4b143486317800b927db47c60699100387ff32d697ebc2dd9a9f38"
+      },
+      "kernel.macho.adt": {
+        "bytes": 13960,
+        "sha256": "07e35d3dd3fcf951cd8b451a52fc7f919fa6da4fba116210e7e09656afc91f08"
+      },
+      "seed.dbr": {
+        "bytes": 585936,
+        "sha256": "d633984f596c32d0fb3e84a7970dc2898e4cb08201841a809660a4e297f979c5"
+      },
+      "kernel.macho.trustcache": {
+        "bytes": 61356,
+        "sha256": "7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7"
+      },
+      "E5BootMenu.efi": {
+        "bytes": 45056,
+        "sha256": "8e5cdc024eb7f79775df1f0fd6794431a5c2c6f0440af8afebdf7ee61924b05b"
+      },
+      "DarwinBoot.efi": {
+        "bytes": 49152,
+        "sha256": "2da0c8688e0f21c423122015371396c68713a8921bd30d2f2924f4d9d84d8632"
+      },
+      "UniXNU.efi": {
+        "bytes": 126976,
+        "sha256": "1a29a249419ef03a2bc6db287505fe055cdc5497c53cfd4036ab83a20a1039d1"
+      },
+      "startup.nsh": {
+        "bytes": 57,
+        "sha256": "5041880f6623c6e2659648ab91a26ae6696754b63e2ab33b78ce7052a235a52e"
+      },
+      "EFI/UniXNU/unixnu.toml": {
+        "bytes": 732,
+        "sha256": "bf566b6ae0cf092e4a124e2df41d3871345228c5dd448b41731083e5cf18345f"
+      }
+    },
+    "kernel_payload_extents": [
+      {
+        "payload_offset": 4338188,
+        "file_offset": 0,
+        "bytes": 52076544
+      },
+      {
+        "payload_offset": 57307660,
+        "file_offset": 52076544,
+        "bytes": 36864
+      }
+    ],
+    "kernel_extension_clusters": [
+      25866,
+      25867,
+      25868,
+      25869,
+      25870,
+      25871,
+      25872,
+      25873,
+      25874,
+      25875,
+      25876,
+      25877,
+      25878,
+      25879,
+      25880,
+      25881,
+      25882,
+      25883
+    ]
+  },
+  "runtime_qualified": false
+}
