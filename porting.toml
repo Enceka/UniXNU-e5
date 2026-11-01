@@ -411,7 +411,7 @@ result = "PASS for walk telemetry: B=1.2.213.0 on every retained sample. The who
 [[area.evidence]]
 kind = "device"
 reference = "docs/logs/display-walk-round90.json"
-revision = "6bdc0ea4c9f2e945184ecbf3a4133f5348b26f35"
+revision = "1bfc73c94f6507c3573c0c945a8be151d3492447"
 command = "CI346; ADT = CI adt + set-e5-scratch-data.py; kernel-only payload d46a695c on headless Data; run-board-cycle.py full flash readback + 600s window; B=/C= echo telemetry"
 result = "PASS: the slot-213 success answer (C=1:0) unblocked the walk - B=2.11.211.3 shows slot 306 then slot 211 selector 3 reached, both soft-guarded; u=5:5:0:0, no panic or crash lines across the full window, Android A returns fresh, Data hash unchanged."
 
