@@ -94,10 +94,11 @@ extern "C" void e5_display_frame_kick(void) {
     __atomic_store_n(&e5_display_frame_crc, crc, __ATOMIC_RELAXED);
     unsigned n = __atomic_fetch_add(&e5_display_frame_changes, 1U, __ATOMIC_RELAXED) + 1;
     // r99: render a 20x60 block thumbnail (2px x 8px blocks, 1 = any
-    // non-black pixel) into a 150-byte buffer; print it every 16th change so
-    // the persistent ring tail keeps the last few and we can SEE what is
-    // drawing (scrolling console text vs UI shapes).
-    static uint8_t thumb[150];
+    // non-black pixel) into a 180-byte buffer (3 bytes per row, 20 bits
+    // LSB-first + pad); print it every 16th change so the persistent ring
+    // tail keeps the last few and we can SEE what is drawing (scrolling
+    // console text vs UI shapes).
+    static uint8_t thumb[180];
     for (unsigned row = 0; row < 60; ++row) {
       uint32_t bits = 0;
       for (unsigned col = 0; col < 20; ++col) {
@@ -114,7 +115,7 @@ extern "C" void e5_display_frame_kick(void) {
     }
     if ((n % 16) == 0 || n == 1) {
       printf("E5PANELSNAP %u %08x ", n, crc);
-      for (unsigned i = 0; i < 150; ++i) printf("%02x", thumb[i]);
+      for (unsigned i = 0; i < 180; ++i) printf("%02x", thumb[i]);
       printf("\n");
     }
   }
