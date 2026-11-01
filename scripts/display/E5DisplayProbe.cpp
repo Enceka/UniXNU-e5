@@ -48,6 +48,52 @@ extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
   return kIOReturnUnsupported;
 }
 
+// r97 frame-acceptance probe: crc32 the panel scanout window the loader
+// handed the kernel (0xBE000000, 320x480 RGB565, 0x4B000 bytes) at a slow
+// cadence. The UEFI menu leaves a static image; any later change is a
+// kernel-console redraw or a real SpringBoard frame. Count + last crc ride
+// the rw-done echo (F=) because standalone printf lines wrap out of the
+// persistent ring; the print only fires on transitions.
+extern "C" unsigned e5_display_frame_changes = 0;
+extern "C" unsigned e5_display_frame_crc = 0;
+static IODeviceMemory *sPanelMemory = nullptr;
+static IOMemoryMap *sPanelMap = nullptr;
+static unsigned sPanelKicks = 0;
+
+static uint32_t e5_display_crc32(const volatile uint8_t *p, size_t n) {
+  uint32_t crc = 0xFFFFFFFFu;
+  for (size_t i = 0; i < n; ++i) {
+    crc ^= p[i];
+    for (int b = 0; b < 8; ++b)
+      crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+  }
+  return ~crc;
+}
+
+extern "C" void e5_display_frame_kick(void) {
+  if (sPanelKicks == 0) {
+    sPanelMemory = IODeviceMemory::withRange(0xBE000000ull, 0x4B000ull);
+    if (sPanelMemory) sPanelMap = sPanelMemory->map();
+    if (!sPanelMap) {
+      printf("E5Display: panel map failed - frame probe disabled\n");
+      sPanelKicks = 1; // never try again; crc stays 0
+      return;
+    }
+    printf("E5Display: panel mapped at %p (0xBE000000+0x4B000)\n", sPanelMap->getVirtualAddress());
+  }
+  if (!sPanelMap) return;
+  sPanelKicks++;
+  if ((sPanelKicks % 16) != 2) return; // ~every 16th big-read echo batch
+  uint32_t crc = e5_display_crc32((const volatile uint8_t *)sPanelMap->getVirtualAddress(), 0x4B000);
+  if (crc != e5_display_frame_crc) {
+    if (e5_display_frame_changes || e5_display_frame_crc)
+      printf("E5Display: panel crc %08x (was %08x) change #%u\n",
+             crc, e5_display_frame_crc, e5_display_frame_changes + 1);
+    __atomic_store_n(&e5_display_frame_crc, crc, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&e5_display_frame_changes, 1U, __ATOMIC_RELAXED);
+  }
+}
+
 extern "C" int e5_concrete_display_probe(void) {
   int expected = 0;
   if (!__atomic_compare_exchange_n(&e5_display_construction, &expected, 1, false,
