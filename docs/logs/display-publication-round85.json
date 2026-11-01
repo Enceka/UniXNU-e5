@@ -1,0 +1,38 @@
+{
+ "round": 85,
+ "kernel": {
+  "ci": 340,
+  "run": 41288474405,
+  "sha_prefix": "c1871a04",
+  "uuid": "26181326-4009-3D21-BC15-D50AD4545D7A"
+ },
+ "payload": {
+  "adt_sha_prefix": "e1ef296a",
+  "adt_source": "CI340 adt 625134f8 + uefi/tools/set-e5-scratch-data.py",
+  "adt_size": 14152,
+  "notes": "dts /filesystems cannot reach ADT (generator emits only chosen/cpus/psci/arm-io + defaults/options/product/buttons); payload postprocess is the required mechanism per docs/data-volume-uuid.md"
+ },
+ "result": {
+  "publish": "a=130055 (0x1FC07) uniform: nub+concrete+publish-ok+0x400..0x10000 all set; bounded lookup (200x10ms) landed; o=0 (no opens yet)",
+  "data": "d=100 read-write mounted; ~189k sector reads (pager deep in boot); no E5PANIC text (unencrypted-data gate passed: DoNotUseSEP present)",
+  "crash": {
+   "what": "kernel data abort, try-1, deep in boot (post-Data-pager)",
+   "pc": "0xfffffff0057981d8 (family+0x2c1d8): ldr x0,[x8,#0x1640]; ldr x8,[x0] with x0=NULL (far=0, esr 0x96000005)",
+   "lr": "0xfffffff005778194 (family+0xc194): vcall slot 0x5e0/8=188 on object [x8+0xd8], string arg 'dot-pitch' at 0xfffffff0055fd75e",
+   "interpretation": "first consumer interaction with the published service (discovery count=1 unlocked matching per m07393): inherited family code read provider property 'dot-pitch' via member at +0x1640 which is NULL because our owned start() bypasses the family start chain (slots 22/25/5/288/299) that populates provider/EDT members",
+   "registers": "x9/x10/x11=0xaaaaaaaa (poison), x19=0xfffffff1c8e49500 heap obj, x21=0x1c"
+  }
+ },
+ "evidence": {
+  "report": "e5-xnu/dumps/uefi-report-164501.txt",
+  "decoded": "e5-xnu/uefi/build/watchdog-policy-r65/board-r85/decoded/console-readable.txt"
+ },
+ "repo": {
+  "e5_device_main": "f5bc757 (5b416f3 bounded publish -> 05abb13 revert dts hunk keep publish -> f5bc757 restore bounded publish after bad revert)"
+ },
+ "open": [
+  "family start sub-chain (slots 22/25/5 EDT/provider parse, then 288 start_hardware needs real HW) vs minimal provider-contract members",
+  "o>0 acceptance (userclient open) after crash fixed",
+  "SB-enabled round after display stack alive"
+ ]
+}
