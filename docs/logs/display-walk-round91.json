@@ -1,0 +1,29 @@
+{
+  "round": 91,
+  "date": "2026-11-01",
+  "summary": "Slots 211 and 306 answered success: the backend walk completed with zero remaining guard hits.",
+  "kernel": {
+    "ci_run": 41304789123,
+    "ci_index": 347,
+    "sha256": "4a165e15",
+    "device_ref": "main @ 6bdc0ea",
+    "echo_fields": ["D=<211>:<306> success counters"]
+  },
+  "payload": {
+    "sha256": "26f11f97",
+    "bytes": 62926860,
+    "adt": {"sha256": "6535fdfc", "bytes": 14152},
+    "data_fixture": "headless fe0619f0 unchanged"
+  },
+  "runtime": {
+    "adb_back_seconds": 665,
+    "D_field": "1:1 (slots 211 and 306 each answered once with success)",
+    "B_field": "0.0.0.0 (zero soft-guard hits - no other abstract slot touched)",
+    "C_field": "1:0",
+    "u_field": "3:3:0:0 (three userclients, all successful)",
+    "other_fields": "a=130055 h=4ff:3f d=100 g=2:e00002f0 p=published q=ready",
+    "panic": null
+  },
+  "conclusion": "The backboardd backend capability walk is complete: 213 -> 306 -> 211 all answered, no further queries. The PURE slot set is no longer the frontier; the next consumer is the SpringBoard frame path (r92 = SB-enabled Data on this kernel).",
+  "next": "r92: data-policy-verified.raw c1744ab4 (SB enabled) + kernel 347 payload 26f11f97 - first SB-vs-live-display encounter; watch E5EXC/E5CRASH for the surface/swap frontier or UI on panel"
+}
