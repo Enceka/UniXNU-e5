@@ -1,0 +1,33 @@
+{
+  "round": 93,
+  "date": "2026-11-01T21:18:08+08:00",
+  "hypothesis": "SpringBoard aborts because the family pitch/dimension queries fail: the lcd provider node lacks framebuffer-width/-height and dot-pitch, so getDotPitch returns kIOReturnUnsupported (g=2:e00002f0 since r87). Feed the verified 320x480 tuple plus a 2.8in-class pitch and SB's abort should move or clear.",
+  "build": {
+    "kernel_ci_run": 41308573175,
+    "kernel_sha256_prefix": "eae735aa",
+    "kernel_size": 52113408,
+    "adt_source": "CI adt 0d3e3d62 + uefi/tools/set-e5-scratch-data.py --display-contract 320 480 123 (e5-xnu f7e6f43)",
+    "adt_sha256_prefix": "6af55ba4",
+    "adt_size": 14272,
+    "payload_sha256_prefix": "4550cc4f",
+    "payload_size": 62926860,
+    "data_fixture": "SB-enabled c1744ab4 (carried over from r92)"
+  },
+  "channel_note": "The dts/e5.dts provider-contract properties (e5-device 75eb63a) do NOT reach the ADT: devicetree.py hardware_properties() forwards only STRINGS={compatible,device_type,reg-names,interrupt-names,clock-names,method}, U32={phandle,#cells,clock-frequency,timebase-frequency}, U64={redistributor-stride}, FLAGS, REFERENCES. The three contract u32s ride the set-e5-scratch-data.py postprocess instead (same channel as DoNotUseSEP).",
+  "runtime": {
+    "adb_back_seconds": 665,
+    "samples": "u mid-window 4:4:0:0 then 5:5:0:0 (SB + liveactivitiesd opened their own userclients)",
+    "walk": "B=0.0.0.0 (zero guard hits), C=1:0, D=1:1, a=130055, h=4ff:3f, d=100, m=15, k=3f, l=0, p=published, q=ready",
+    "pitch": "g=2:0 — getDotPitch answered SUCCESS twice (was e00002f0 in r87-r92). HYPOTHESIS CONFIRMED: the contract channel works and the family reads the injected values.",
+    "springboard": "STILL crashes at the SAME site as r92: E5EXC exc 6 code 1 sub 7403161412 lr 1b9434744 fp 16f12ec70 x16 1a97c06bc frames 1b9445f8c 1b943399c 1b94438cc 1b94436d0 1b9442f8c 1c114e84c; E5CRASH reason ns 2 code 5. liveactivitiesd: sub 7812375800 lr 1d1a764cc frames 1d1a5c0ec 19f736cc0 19f7080e4 1d1a5c0c0 1d1bc9ec0 1d1bbc024. Kernel panic: none. Window healthy 665s.",
+    "kernel_uuid": null,
+    "dmesg_sha256": "7d4971d504d3a1c21bcf2f5904f554c1e82c8bed7c17957b424b0c20cf0e8cd7"
+  },
+  "conclusion": "Pitch/dimension contract: FIXED (g=2:0). SB abort: UNMOVED (identical lr/sub across r92/r93 — the two boots even share the SB binary slide). The abort is not driven by pitch or dimensions. Remaining suspects: the surface/swap userclient API band (service slots 175-261, original family code answering on our object) returning failures to SB; or a userland-side capability SB parses out of band. SB/LA trap PCs are NOT in dyld-cache images (brute-force over 3245 walked images, zero page-aligned slides fit 6 anchors at code offsets >=0x1000) — naming the site needs the SpringBoard/liveactivitiesd binaries extracted from os-window.img (per-process ASLR, frame deltas usable).",
+  "open_items": [
+    "symbolicate the SB trap via SpringBoard.app extraction from os-window.img",
+    "trace which userclient external methods SB calls after open (wrapper band 175-261) and which return errors",
+    "decode the E5EXC 'sub' field (may carry abort_with_payload payload code)",
+    "record r93 in porting.toml display area (tool revision e5-xnu f7e6f43, device 75eb63a)"
+  ]
+}

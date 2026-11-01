@@ -91,3 +91,12 @@ checked RGB565 boot-video mapping are implemented.
 Next: implement the E5 primary-display/mode/mapping overrides with the
 verified (0xbe000000, 320x480, RGB565, row 640) tuple, then qualify the
 IOMobileFramebufferUserClient open path before any SB-enabled round.
+
+## Round 93 — provider contract fed (g green), SB abort unmoved
+
+- Channel: set-e5-scratch-data.py --display-contract 320 480 123 (e5-xnu f7e6f43). dts
+  properties alone cannot reach the ADT (devicetree.py whitelist: STRINGS/U32/U64/FLAGS/REFERENCES).
+- Result: g=2:0 (pitch SUCCESS ×2), B=0 C=1:0 D=1:1 a=130055, u=5:5:0:0, no panic.
+- SpringBoard still aborts at the identical site (lr 1b9434744 sub 7403161412 across r92/r93);
+  trap PCs are outside dyld-cache images — extraction of the process binaries is the next
+  symbolication step. Evidence: docs/logs/display-contract-round93.json.
