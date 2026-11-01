@@ -24,6 +24,7 @@ static void sdlog(const char *fmt, ...) {
 extern "C" int e5_data_mount_state;
 extern "C" int e5_tzinit_wait_status;
 extern "C" int e5_tzinit_pid;
+extern int e5_display_census;  // defined next to e5_display_probe (file tail)
 
 // Repeat publication and UUID-lookup checkpoints in sampled late reads:
 // launchd's EROFS output can overwrite the entire early console ring.
