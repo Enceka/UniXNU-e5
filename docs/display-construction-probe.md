@@ -61,3 +61,33 @@ service attach/start/publication is claimed.
 
 Next: qualify lcd attach/resources and an explicit checked RGB565 boot mapping,
 then implement the E5 lifecycle before enabling original start/publication.
+
+## R82: lifecycle publication qualified (v8)
+
+V8 keeps the R81 construction probe untouched and adds `e5_display_publish`
+(E5Display.cpp) after it reaches 0x1ff: factory allocation, `init()`,
+`attach(lcd)`, `start(provider)` (E5Display::start now returns true and still
+touches no hardware), `registerService()`, then a `copyMatchingService` lookup
+of the published service. Every step echoes into the persistent `a=` field:
+
+- 0x400 provider, 0x800 alloc, 0x1000 init, 0x2000 attach, 0x4000 start,
+  0x8000 register, 0x10000 lookup (plus 0x1 lcd, 0x2 metaclass, 0x4 publish ok).
+
+R82 (CI 338, device 220779e, kernel 19d0adaf; payload 19d70ef5 with the R81
+ADT 2a419ab4 and 16-cluster kernel chain, full readback verified) observes
+**a=64519 (0xfc07) uniformly in all 169 retained samples**, with
+v=1ff s=18a0 r=0 d=100 k=3f preserved, no panic/E5EXC/E5CRASH, no backend
+guard, healthy 600 s window, fresh Android A recovery. Evidence:
+`docs/logs/display-publication-round82.json`.
+
+Deviation from the conservative ladder: the plan asked for attach/resources
+first with start refusal kept. Publication was taken in one step because the
+headless fixture guarantees no consumer, and the result qualifies exactly the
+lifecycle steps the plan listed (attach, register, lookup). The service is
+intentionally inert: all nine backend slots stay guarded, so SpringBoard
+remains disabled until the E5 lifecycle surface (open/swaps/wake) and the
+checked RGB565 boot-video mapping are implemented.
+
+Next: implement the E5 primary-display/mode/mapping overrides with the
+verified (0xbe000000, 320x480, RGB565, row 640) tuple, then qualify the
+IOMobileFramebufferUserClient open path before any SB-enabled round.

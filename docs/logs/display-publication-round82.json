@@ -1,0 +1,85 @@
+{
+ "schema_version": 1,
+ "round": 82,
+ "created_at": "2026-11-01T06:20:48.919679+00:00",
+ "build": {
+  "status": "success",
+  "run_id": 41278878912,
+  "run_number": 338,
+  "url": "https://github.com/Enceka/unixnu-e5-kernel-builder/actions/runs/41278878912",
+  "device_revision": "220779e79593107a3cf5087e3f6e623522017273",
+  "unixnu_revision": "066c8d8315f83749d28bcae2faf3595718646be5",
+  "files": {
+   "kernel.macho": {
+    "bytes": 52109312,
+    "sha256": "19d0adaf76689f67e20ad59df2fceba3fcdf8c7709993d2c6bd576f855720e2e"
+   }
+  },
+  "compiled_vtable_verified": true,
+  "public_kernel_artifact_removed": true,
+  "runtime_qualified": false
+ },
+ "purpose": "Qualify the v8 lifecycle publication on the lcd nub: after the R81 construction probe reaches 0x1ff, e5_display_publish allocates E5Display, runs init, attaches to the lcd provider nub, starts it (E5Display::start now returns true; no hardware is touched), issues registerService, and confirms the service is visible via copyMatchingService(name 'E5Display'). Deviation from the D0 plan's conservative ladder is documented in docs/display-construction-probe.md; the nine backend slots stay guarded and the headless fixture keeps every consumer away.",
+ "payload": {
+  "baseline_payload": "uefi/build/baseline-data-r62/e5-uefi.bin",
+  "baseline_payload_sha256": "2bb4f94df9923c91760e0311705098dbe8d4b5f99a5407a197390b8ed578b71f",
+  "payload_sha256": "19d70ef507aa105681ddc2084b694d4fa522d84941c1266e5060452c5456ab5f",
+  "payload_size": 62926860,
+  "full_readback_verified": true,
+  "kernel_fat_chain_readback_verified": true,
+  "kernel_growth_bytes": 32768,
+  "kernel_extension_clusters": [25866, 25867, 25868, 25869, 25870, 25871, 25872, 25873, 25874, 25875, 25876, 25877, 25878, 25879, 25880, 25881],
+  "adt": {
+   "bytes": 13904,
+   "sha256": "2a419ab4a9f2702567f2a92d13602314e53f1c7055ba86b2c213b384bab91b5c",
+   "retained_from_round": 81
+  },
+  "data_fixture": "headless v3 (SpringBoard/liveactivitiesd/watchdogd disabled); card Data LBAs untouched by this flash cycle, R81-verified fixture hash fe0619f0 remains the card state by construction",
+  "command_line": "E5 boot serial=3 debug=0x14E e5-rootauth-off e5-exec-policy-off e5-uplink e5-fb e5-systemos e5-systemos-boot e5-data"
+ },
+ "runtime": {
+  "adb_back_after_seconds_approx": 665,
+  "android_boot_id_before": "f90bfb03-80b8-4166-9e0b-5a911fc888cb",
+  "android_boot_id_after": "5c6fcaf5-00c1-4873-900a-a68e90a78347",
+  "slot": "_a",
+  "complete_v8_samples": 169,
+  "uniform_values": {
+   "d": ["100"],
+   "c": ["12"],
+   "m": ["15"],
+   "k": ["3f"],
+   "l": ["0"],
+   "a": ["64519"],
+   "v": ["1ff"],
+   "s": ["18a0"],
+   "r": ["0"],
+   "p": ["published"],
+   "q": ["ready"],
+   "t": ["17:0"]
+  },
+  "a_decode": {
+   "0x0001": "lcd provider nub",
+   "0x0002": "concrete E5Display metaclass",
+   "0x0004": "e5_display_publish returned success",
+   "0x0400": "provider handed to publish",
+   "0x0800": "factory allocation",
+   "0x1000": "init()",
+   "0x2000": "attach(provider)",
+   "0x4000": "start(provider) returned true",
+   "0x8000": "registerService()",
+   "0x10000": "copyMatchingService sees the published service"
+  },
+  "panic": null,
+  "e5exc": 0,
+  "e5crash": 0,
+  "backend_guard_fired": false,
+  "dmesg_ramoops0_sha256": "70c412c4f21edcb480403ea7c21e151b5c6926b1b0d5029ce4e16bc0e8226a49",
+  "console": "decoded/console-readable.txt",
+  "report": "/Volumes/Projects/e5-xnu/dumps/uefi-report-142047.txt"
+ },
+ "open_items": [
+  "E5Display publication is inert: the nine guarded backend slots (211,213,245,246,306,307,337,338,345) panic on any premature consumer; SpringBoard must stay disabled until the E5 lifecycle surface (open/swaps/wake) is implemented.",
+  "lcd has no indexed IODeviceMemory; the checked RGB565 boot-video mapping (0xbe000000,320x480,row640) still needs an explicit verified mapping step per the plan.",
+  "userclient open path (IOMobileFramebufferUserClient) untested; original newUserClient binding is linked and registered."
+ ]
+}
