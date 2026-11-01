@@ -1,0 +1,42 @@
+{
+  "round": 89,
+  "date": "2026-11-01",
+  "summary": "Soft-guard telemetry round: the entire backend walk gates on ONE slot 213 call with selector 0.",
+  "kernel": {
+    "ci_run": 41299401041,
+    "ci_index": 345,
+    "sha256": "43043fa9",
+    "bytes": 52113408,
+    "device_ref": "fix/display-start-lifecycle-v12 @ 1e10c97 (main ff'd)",
+    "echo_string": "B=%u.%x.%u.%x"
+  },
+  "payload": {
+    "sha256": "79f592de",
+    "bytes": 62926860,
+    "adt": {
+      "sha256": "929fa9cc",
+      "bytes": 14152,
+      "note": "CI345 adt 73512958 + set-e5-scratch-data.py; DoNotUseSEP present"
+    },
+    "data_fixture": "headless fe0619f0 (card state unchanged by flash cycle)"
+  },
+  "runtime": {
+    "adb_back_seconds": 670,
+    "B_field": "1.2.213.0 on every sample (uniform)",
+    "B_decode": "exactly one soft-backend hit in the whole boot: slot 213, selector 0; PURE mask bit 1 only",
+    "u_field": "4:4:0:0 then 5:5:0:0 (fifth userclient late in window)",
+    "g_field": "2:e00002f0 (getDotPitch property-based miss, tolerated)",
+    "other_fields": "a=130055 h=4ff:3f d=100 p=published q=ready",
+    "panic": null,
+    "guest_lines": "AppleMobileFileIntegrityUserClient isCdhashInTrustCache process 96 returning 0x0 (normal CS check)"
+  },
+  "conclusion": "Slot 213 is the sole gate: its e00002f0 return makes backboardd abandon the backend sequence. The other eight abstract slots are never reached.",
+  "slot213_kernel_side": {
+    "wrapper": "family raw 0xfffffff006778688: (client, w1 sel, out1, arg3=structureOutput, out2); service from [client+0xd8]; vcall vtable+0x6a8; caches out2 at service+0x3c8 (only family write there)",
+    "trampoline": "family raw 0xfffffff00677a718: scalar[0] from IOExternalMethodArguments+0x20 -> sel; scalarOutput array +0x48 -> out1/out2; structureOutput +0x58 -> arg3",
+    "sibling": "wrapper 0xfffffff006778720 -> slot 232, single scalar arg, no outputs",
+    "string_lead": "0x55fa3bc..0x55fa3f3 defaults-key table ('APTEnableCA','BLNitsCap','RTPLCBLNitsCap',...) is a getDefaultsKey switch tail (0x677cf60 returns the key pointer); proximity to the +0x3c8 offset is coincidental - hypothesis 'brightness nits cap' UNPROVEN",
+    "symtab": "kernel 345 LC_SYMTAB classic order symoff=0xbce4d8 nsyms=277323 stroff=0x10099a0; family window symbols: 0 (kexts stay stripped in kernel symtab; 5 symbols total in PLK region)"
+  },
+  "next": "r90 (CI 346, device 1bfc73c): opaque213 real override answering success with (out1,out2)=(1,1), C=<calls>:<status> echo field; walk advance = mask grows / u climbs; stall = value-sensitive, calibrate next round"
+}

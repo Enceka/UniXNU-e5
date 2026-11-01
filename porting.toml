@@ -391,7 +391,7 @@ procedure = ["Boot the payload, wait for the seed shell, and read the E5FB lines
 findings = ["Screen output after the XNU hand-off is verified on device: the shell banner and E5 prompt render on the panel and mirror to serial (30 E5FB lines per boot across four reproducible flashes).", "kPETextMode with a zero v_display was required; with serial=3 the UART stays the kernel printf console while vcputc renders to the framebuffer.", "CI 332 static audit shows IOMobileFramebuffer/Service/Legacy MetaClass allocation stubs return NULL. The r77/r79 c=12 allocation mask cannot establish missing registration; v6 records metaclass presence and kext loaded/started/CPP state separately. CI 333 v5 did not compile (OSPtr misuse and private start call); v6 removes that path and abstract-class personalities. CI 335 compiles, links and prelinks v6 at device revision 9db769180fcf76dc0043f2436e9436aaa5a39901. R80 now confirms c=12 m=15 k=3f l=0 a=1 in all 202 late samples: family loaded/started/CPP initialized, Service/Legacy metaclasses present, abstract factories NULL and lcd nub present. At R80, concrete E5Display and UI were still unimplemented/unqualified.", "V7 implements a concrete E5Display construction probe with the exact 358-slot/0x18a0-byte original Legacy inheritance. The owned metaclass is initialized once after family startup under preModLoad/postModLoad. It checks actual parent identity/size/ancestry, then tests the concrete metaclass factory, original init and release/instance-count balance. All nine unqualified backend leaves fail loudly; start refuses activation. CI 336 compiles, links and prelinks this probe and its final linked vtable/initializer audit passes. R81 qualifies concrete registration/factory/original init/release: all 173 complete late samples show a=3 v=1ff s=18a0 r=0 with balanced instance counts. No attach/start/publication, userclient or frame presentation is qualified."]
 completion = ["A known frame appears with correct geometry and colors, then userland presentation and backlight controls work."]
 limits = ["Backlight control and userland presentation are not implemented; only the kernel text console path is verified."]
-next_action = ["R87/CI342 qualifies complete original Legacy start and deferred publication: h=4ff:3f in 80/80 retained samples, two successful type-0 UserClients and two pitch queries returning NotFound. Preserve this lifecycle control; audit the backboardd selector that reaches guarded backend slot 213 before implementing its exact bounded contract.", "Frame mapping, CPU surface conversion/submission and native DPU/DSI operation remain unqualified. Use the retained tuple 0xbe000000,320x480,RGB565,row640,v_display=0 and explicit checked memory ownership/mapping. Keep unqualified backend leaves guarded."]
+next_action = ["R89 proves the walk gates on a single slot-213 selector-0 call (B=1.2.213.0 uniform). R90/CI346 (device 1bfc73c) answers it with success and a minimal (1,1) capability pair via C=<calls>:<status>; walk advance = mask grows/u climbs, stall = value-sensitive calibration next. Preserve r87 lifecycle control and the eight remaining soft guards.", "Frame mapping, CPU surface conversion/submission and native DPU/DSI operation remain unqualified. Use the retained tuple 0xbe000000,320x480,RGB565,row640,v_display=0 and explicit checked memory ownership/mapping. Keep unqualified backend leaves guarded."]
 
 [[area.evidence]]
 kind = "device"
@@ -399,6 +399,19 @@ reference = "docs/logs/display-lifecycle-round87.json"
 revision = "3a5d9e94d8ae80251c35789cf4d025df7422e7f1"
 command = "CI342; kernel-only payload retaining actual r86 ADT; full flash readback; detached e5-uefi-cycle.sh; retained console decode; full 128 MiB Data readback"
 result = "PASS for original start lifecycle: 80/80 retained samples h=4ff:3f, a=130055, v=1ff, s=18a0, r=0. Final u=2:2:0:0 proves two successful type-0 UserClients; g=2:e00002f0 proves defined pitch-query failures. New frontier is backboardd calling guarded backend slot 213. Android A returns with a fresh boot ID and the Data fixture hash is unchanged; frame presentation remains unqualified."
+
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/display-softwalk-round89.json"
+revision = "1e10c97113cf0c9c65e409e6ee98f7b47d437b1c"
+command = "CI345; ADT = CI adt + set-e5-scratch-data.py (DoNotUseSEP); kernel-only payload on headless Data; run-board-cycle.py full flash readback + 1500s window; B= echo telemetry"
+result = "PASS for walk telemetry: B=1.2.213.0 on every retained sample. The whole backend sequence gates on ONE slot-213 call (selector 0); its e00002f0 makes backboardd abandon the sequence, and the other eight abstract slots are never reached. Kernel-side decode: family wrapper 0x6778688 passes (&out1, structureOutput, &out2) and caches out2 at service+0x3c8; trampoline 0x677a718 maps IOExternalMethodArguments scalar[0]/scalarOutput[]/structureOutput onto it. u reaches 5:5:0:0, no panic, Android A returns with fresh boot ID, Data hash unchanged."
+
+[[area.evidence]]
+kind = "host"
+reference = "docs/display-softwalk-round89.json"
+command = "capstone decode of the pinned kernelcache family text + kernel 345 LC_SYMTAB scan (symoff 0xbce4d8, nsyms 277323, classic field order)"
+result = "Kernel 345 symtab covers kernel proper only (0 family-window symbols; 5 in the whole PLK region) - kext internals stay stripped. The 0x55fa3bc 'BLNitsCap' string cluster is a getDefaultsKey switch tail (0x677cf60 returns key pointers), so the brightness-cap naming of slot 213 is UNPROVEN; the wrapper/trampoline ABI decode above is the verified part."
 
 [[area.evidence]]
 kind = "host"
