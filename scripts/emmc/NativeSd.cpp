@@ -9,9 +9,9 @@
 #include <pexpert/pexpert.h>
 #include <libkern/c++/OSNumber.h>
 #include <libkern/c++/OSString.h>
+#include <libkern/c++/OSSymbol.h>
 #include <libkern/c++/OSMetaClass.h>
 #include <libkern/c++/OSKext.h>
-#include <IOKit/IOCatalogue.h>
 #include "TransferStatus.h"
 #include "SdProtocol.h"
 #include "SystemOSWindow.h"
@@ -28,6 +28,13 @@ extern "C" int e5_tzinit_wait_status;
 extern "C" int e5_tzinit_pid;
 extern int e5_display_census;  // defined next to e5_display_probe (file tail)
 extern int e5_display_attach;
+extern int e5_display_metaclasses;
+extern int e5_display_kext_state;
+extern int e5_display_load_result;
+extern int e5_display_construction;
+extern int e5_display_original_size;
+extern int e5_display_registration_result;
+extern "C" int e5_concrete_display_probe(void);
 
 // Repeat publication and UUID-lookup checkpoints in sampled late reads:
 // launchd's EROFS output can overwrite the entire early console ring.
@@ -913,11 +920,17 @@ public:
     // running count so progress stays measurable.
     if (count >= 8 && (++bigReads <= 4 || (bigReads % 128) == 0)) {
       int tzstatus = __atomic_load_n(&e5_tzinit_wait_status, __ATOMIC_ACQUIRE);
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d a=%d p=%s x=%08x q=%s t=%d:%x\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_metaclasses, __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&e5_display_kext_state, __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&e5_display_load_result, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_display_attach, __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&e5_display_construction, __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&e5_display_original_size, __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&e5_display_registration_result, __ATOMIC_RELAXED),
             __atomic_load_n(&dataPublication, __ATOMIC_ACQUIRE),
             __atomic_load_n(&dataDetail, __ATOMIC_RELAXED),
             __atomic_load_n(&dataLookup, __ATOMIC_RELAXED),
@@ -1160,174 +1173,91 @@ extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
 }
 
 // ---------------------------------------------------------------------------
-// E5 display probe (display-touch-gpu plan, D1)
-//
-// This kernelcache ships IOMobileGraphicsFamily (IOMobileFramebufferLegacy
-// et al.) WITHOUT the SoC display kext that would normally instantiate the
-// framebuffer service, and without any IOKit personality for it.  The class
-// registry is still fully populated, and OSMetaClass::allocClassWithName is
-// an exported base-kernel symbol — so we can allocate the instance at
-// runtime, exactly like the missing SoC driver would.
-//
-// v1 = census only: can we find and allocate the Legacy class at all?
+// E5 display probe v6 (D1).
+// IOMobileFramebuffer/Service/Legacy are abstract in the pinned 21H461 KC:
+// their MetaClass::alloc() returns NULL even when the metaclass is registered.
+// Keep allocation and registration censuses separate. Only a concrete E5
+// platform subclass can be matched/instantiated; do not match Legacy itself.
 // ---------------------------------------------------------------------------
 
-int e5_display_census = -999;  // -999 probe not run; else bitmask bit0=Service bit1=Legacy
-int e5_display_attach = -999;  // -999 attach stage not run; else bitmask:
-                               // bit0 provider found, bit1 alloc+init, bit2 attach,
-                               // bit3 start, bit4 registerService
+int e5_display_census = -999;       // c: legacy alloc mask + low load errno byte
+int e5_display_metaclasses = -999;  // m: registered metaclass mask, same class order
+int e5_display_kext_state = -999;   // k: record/loaded/started/CPP/declares/exec/interface/kernel
+int e5_display_load_result = -999;  // l: full OSReturn from the locked public load API
+int e5_display_attach = -999;      // a: bit0 lcd nub, bit1 concrete E5Display class,
+                                  // bit2 published E5Display service (v6 semantics)
 
-extern "C" int e5_display_probe(void) {
-  // The kernelcache ships IOMobileGraphicsFamily with ZERO personalities, so
-  // IOKit never matches it, the kext never loads, and its OSMetaClasses
-  // never register (r74 census: alloc returned NULL for both classes).
-  // Force-load the kext first, then take the census.
-  OSReturn kr = OSKext::loadKextWithIdentifier(
-      "com.apple.iokit.IOMobileGraphicsFamily");
-  IOLog("NativeSd: display kext load kr %d\n", (int)kr);
-  // bit0 Service, bit1 Legacy, bit2 IOMedia (control, base-linked),
-  // bit3 AppleARMIODevice (control, prelink kext with personalities)
-  const char *names[] = {
-    "IOMobileFramebufferService",
-    "IOMobileFramebufferLegacy",
-    "IOMedia",
-    "AppleARMIODevice",
-    nullptr,
-  };
-  int mask = 0;
-  for (int i = 0; names[i]; i++) {
-    OSObject *inst = OSMetaClass::allocClassWithName(names[i]);
-    IOLog("NativeSd: display census %s inst %p\n", names[i], inst);
-    if (inst) { mask |= (1 << i); inst->release(); }
-  }
-  // c = kr<<8 | mask  (kr 0 = load OK; mask bit0 Service, bit1 Legacy)
-  e5_display_census = ((unsigned)(int)kr & 0xff) << 8 | mask;
+static const char *const e5DisplayBundle = "com.apple.iokit.IOMobileGraphicsFamily";
 
-  // v5: kr=0 with no class registration means load() took an early-exit
-  // (alreadyLoaded/codeless) path.  Interrogate the OSKext record and
-  // START it directly - start() runs the module init that registers the
-  // OSMetaClasses.  Encoded into e5_display_attach high bits:
-  //   0x020 kext record found, 0x040 loaded, 0x080 started,
-  //   0x100 explicit start() ok, 0x200 Legacy alloc AFTER start.
-  {
-    OSPtr<OSKext> k =
-        OSKext::lookupKextWithIdentifier("com.apple.iokit.IOMobileGraphicsFamily");
-    IOLog("NativeSd: display kext rec %p\n", (void *)k.get());
-    if (k) {
-      e5_display_attach |= 0x20;
-      bool ld = k->isLoaded(), st = k->isStarted();
-      IOLog("NativeSd: display kext loaded %d started %d\n", (int)ld, (int)st);
-      if (ld) e5_display_attach |= 0x40;
-      if (st) e5_display_attach |= 0x80;
-      if (!st) {
-        OSReturn sr = k->start();
-        IOLog("NativeSd: display kext start kr %d\n", (int)sr);
-        if (sr == kOSReturnSuccess) e5_display_attach |= 0x100;
-      }
-      OSObject *after = OSMetaClass::allocClassWithName("IOMobileFramebufferLegacy");
-      IOLog("NativeSd: display post-start census inst %p\n", after);
-      if (after) { e5_display_attach |= 0x200; after->release(); }
-    }
-  }
-  return mask;
+static const OSMetaClass *e5DisplayMetaClass(const char *name) {
+  const OSSymbol *key = OSSymbol::withCString(name);
+  const OSMetaClass *meta = key ? OSMetaClass::getMetaClassWithName(key) : nullptr;
+  if (key) key->release();
+  return meta;
 }
 
-// v3: let IOKit do the work.  r77 proved the KC-resident kext's classes
-// never register without personality matching (c=12: only the personality'd
-// AppleARMIODevice and base-linked IOMedia alloc'd; loadKextWithIdentifier
-// returned 0 but registered nothing).  Injecting a personality via
-// IOCatalogue::addDrivers makes IOKit resolve CFBundleIdentifier ->
-// load+start the kext (classes register) -> instantiate IOClass on every
-// matching nub -> our lcd nub gets a STARTED IOMobileFramebufferLegacy.
-// Progress lands in e5_display_attach (echoed on rw-done lines).
+extern "C" int e5_display_probe(void) {
+  if (PE_parse_boot_argn("e5-display-off", nullptr, 0)) return 0;
+  // load() reaches its loaded: start gate even for an already-loaded record.
+  // Use its public, locked wrapper; OSKext::start() is private and requires
+  // the loader's lock/initialization discipline. Do not force CPP re-init.
+  OSReturn kr = OSKext::loadKextWithIdentifier(
+      e5DisplayBundle, false, false, kOSKextExcludeNone, kOSKextExcludeAll);
+  e5_display_load_result = (int)kr;
+
+  // OSPtr is a raw retained return type in this archive's header mode.
+  // Store a raw pointer and release it; do not use OSPtr as a local or .get().
+  OSKext *kext = OSKext::lookupKextWithIdentifier(e5DisplayBundle);
+  int state = 0;
+  if (kext) {
+    state = 0x01;
+    if (kext->isLoaded()) state |= 0x02;
+    if (kext->isStarted()) state |= 0x04;
+    if (kext->isCPPInitialized()) state |= 0x08;
+    if (kext->declaresExecutable()) state |= 0x10;
+    if (kext->isExecutable()) state |= 0x20;
+    if (kext->isInterface()) state |= 0x40;
+    if (kext->isKernelComponent()) state |= 0x80;
+    kext->release();
+  }
+  e5_display_kext_state = state;
+  sdlog("NativeSd: display family load=%x state=%x\n", (unsigned)kr, (unsigned)state);
+
+  const char *names[] = {
+    "IOMobileFramebufferService", "IOMobileFramebufferLegacy",
+    "IOMedia", "AppleARMIODevice", nullptr,
+  };
+  int registered = 0, allocated = 0;
+  for (int i = 0; names[i]; ++i) {
+    const OSMetaClass *meta = e5DisplayMetaClass(names[i]);
+    OSObject *inst = OSMetaClass::allocClassWithName(names[i]);
+    if (meta) registered |= (1 << i);
+    if (inst) { allocated |= (1 << i); inst->release(); }
+    sdlog("NativeSd: display class %s meta=%p alloc=%d\n",
+          names[i], meta, (allocated >> i) & 1);
+  }
+  e5_display_metaclasses = registered;
+  e5_display_census = (int)(((unsigned)kr & 0xffU) << 8) | allocated;
+  return registered;
+}
+
 extern "C" int e5_display_start(void) {
-  // Default ON: the payload FAT's unixnu.toml is size-frozen, so a new boot
-  // arg cannot be added without FAT surgery.  Opt-out via e5-display-off.
   if (PE_parse_boot_argn("e5-display-off", nullptr, 0)) return 0;
   e5_display_attach = 0;
-  // bit0: the lcd nub exists (the personality match target)
   mach_timespec_t ts = {20, 0};
-  IOService *nub = IOService::waitForService(
-      IOService::nameMatching("lcd"), &ts);
+  IOService *nub = IOService::waitForService(IOService::nameMatching("lcd"), &ts);
   if (!nub) { sdlog("NativeSd: display provider lcd absent\n"); return 0; }
   e5_display_attach |= 1;
-  // bit1: personality installed
-  OSDictionary *pers = OSDictionary::withCapacity(6);
-  OSString *bid = OSString::withCString("com.apple.iokit.IOMobileGraphicsFamily");
-  OSString *cls = OSString::withCString("IOMobileFramebufferLegacy");
-  OSString *prov = OSString::withCString("IOService");
-  OSString *name = OSString::withCString("lcd");
-  OSString *cat = OSString::withCString("com.apple.iokit.IOMobileGraphicsFamily.lcd");
-  if (pers && bid && cls && prov && name && cat) {
-    pers->setObject("CFBundleIdentifier", bid);
-    pers->setObject("IOClass", cls);
-    pers->setObject("IOProviderClass", prov);
-    pers->setObject("IONameMatch", name);
-    pers->setObject("IOMatchCategory", cat);
-    OSArray *arr = OSArray::withCapacity(1);
-    arr->setObject(pers);
-    bool ok = gIOCatalogue->addDrivers(arr, true);
-    IOLog("NativeSd: display addDrivers ok %d\n", (int)ok);
-    if (ok) e5_display_attach |= 2;
-    OSSafeReleaseNULL(arr);
-  } else {
-    IOLog("NativeSd: display personality alloc failed\n");
+  // V7 constructs/releases an owned concrete instance after registering its
+  // metaclass. No attach/start/personality or hardware operation is attempted.
+  e5_concrete_display_probe();
+  if (!e5DisplayMetaClass("E5Display")) {
+    sdlog("NativeSd: lcd present; concrete E5Display implementation required\n");
+    return 0;
   }
-  OSSafeReleaseNULL(pers);
-  OSSafeReleaseNULL(bid);
-  OSSafeReleaseNULL(cls);
-  OSSafeReleaseNULL(prov);
-  OSSafeReleaseNULL(name);
-  OSSafeReleaseNULL(cat);
-
-  // v4 bit3: give matching a moment, then re-census.  If the class
-  // allocates now the kext really started inside matching and only the
-  // IONameMatch vs nub name ("lcd" vs "lcd@0") can be wrong.
-  if (e5_display_attach & 2) {
-    IOSleep(2000);
-    OSObject *late = OSMetaClass::allocClassWithName("IOMobileFramebufferLegacy");
-    IOLog("NativeSd: display late census inst %p\n", late);
-    if (late) { e5_display_attach |= 8; late->release(); }
-  }
-
-  // v4 bit4: fallback personality on IOResources - no name matching.
-  // backboardd looks services up by class, so an IOResources-attached
-  // Legacy is a valid first light even if the lcd nub match failed.
-  if ((e5_display_attach & 2) && !(e5_display_attach & 8)) {
-    OSDictionary *res = OSDictionary::withCapacity(5);
-    OSString *rbid = OSString::withCString("com.apple.iokit.IOMobileGraphicsFamily");
-    OSString *rcls = OSString::withCString("IOMobileFramebufferLegacy");
-    OSString *rprov = OSString::withCString("IOResources");
-    OSString *rmat = OSString::withCString("IOBSD");
-    OSString *rcat = OSString::withCString("com.apple.iokit.IOMobileGraphicsFamily.res");
-    if (res && rbid && rcls && rprov && rmat && rcat) {
-      res->setObject("CFBundleIdentifier", rbid);
-      res->setObject("IOClass", rcls);
-      res->setObject("IOProviderClass", rprov);
-      res->setObject("IOResourceMatch", rmat);
-      res->setObject("IOMatchCategory", rcat);
-      OSArray *rarr = OSArray::withCapacity(1);
-      rarr->setObject(res);
-      bool ok2 = gIOCatalogue->addDrivers(rarr, true);
-      IOLog("NativeSd: display addDrivers res ok %d\n", (int)ok2);
-      if (ok2) e5_display_attach |= 16;
-      OSSafeReleaseNULL(rarr);
-    }
-    OSSafeReleaseNULL(res);
-    OSSafeReleaseNULL(rbid);
-    OSSafeReleaseNULL(rcls);
-    OSSafeReleaseNULL(rprov);
-    OSSafeReleaseNULL(rmat);
-    OSSafeReleaseNULL(rcat);
-  }
-
-  // bit2: an IOMobileFramebufferLegacy service appeared somewhere
-  // (kext started + matched + start() ran).
-  IOService *legacy = IOService::waitForService(
-      IOService::serviceMatching("IOMobileFramebufferLegacy"), &ts);
-  if (!legacy) { sdlog("NativeSd: display legacy service absent\n"); return 0; }
-  e5_display_attach |= 4;
-  sdlog("NativeSd: display legacy service %p on %s\n", legacy,
-        legacy->getProvider() ? legacy->getProvider()->getName() : "?");
-  return 1;
+  e5_display_attach |= 2;
+  sdlog("NativeSd: concrete E5Display construction v=%x s=%x r=%x; publication pending\n",
+        (unsigned)e5_display_construction, (unsigned)e5_display_original_size,
+        (unsigned)e5_display_registration_result);
+  return 0;
 }

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "build_number": 335,
+  "run_id": 41272957819,
+  "run_url": "https://github.com/Enceka/unixnu-e5-kernel-builder/actions/runs/41272957819",
+  "status": "completed",
+  "conclusion": "success",
+  "unixnu_revision": "066c8d8315f83749d28bcae2faf3595718646be5",
+  "device_revision": "9db769180fcf76dc0043f2436e9436aaa5a39901",
+  "code_revision": "ffbf19f",
+  "kernel": {
+    "size": 52076544,
+    "sha256": "9a6d333ef0c2eca0027980442cb0afacc952b9255d640a20c4908dde0a917ede"
+  },
+  "generated_adt": {
+    "size": 13808,
+    "sha256": "df7ab36b637608d143a4e47c83dc8c4838793a044187df41b29eb81382fc69fa"
+  },
+  "local_artifact_directory": "e5-xnu/uefi/build/e5-kernel-artifact-335",
+  "kernel_archive_link_prelink_verified": true,
+  "source_checkout_pins_checked_in_logs": true,
+  "v6_telemetry_strings_present": true,
+  "public_kernel_artifact_removed_after_verified_download": true,
+  "private_relay_limit": "billing/spending-limit setup rejection; no account changes attempted",
+  "runtime_qualified": false,
+  "prior_dispatch_334": "wrong repository SHA at checkout; corrected before compiling"
+}

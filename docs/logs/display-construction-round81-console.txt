@@ -1,0 +1,380 @@
+5280 8/8 at 18825512 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #225408 32/32 at 9007866 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #225536 8/8 at 15980392 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #225664 8/8 at 13672968 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #225792 8/8 at 774618 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #225920 8/8 at 16391152 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #226048 8/8 at 15979504 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #226176 24/24 at 18296032 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|Dec 31 16:10:17  audiomxd[91] <Error>: failed to open connection to AppleKeyStore 
+E5FB|Dec 31 16:10:17  audiomxd[91] <Error>: failed to open connection to AppleKeyStore 
+NativeSd: rw done #226304 8/8 at 14818176 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #226432 8/8 at 14818712 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #226560 8/8 at 14819968 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #226688 8/8 at 14816080 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #226816 8/8 at 16080608 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #226944 8/8 at 16941016 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #227072 8/8 at 14646840 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #227200 8/8 at 16125040 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #227328 8/8 at 15296232 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #227456 8/8 at 16860624 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #227584 8/8 at 13644536 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #227712 8/8 at 13234712 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #227840 8/8 at 16130056 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #227968 8/8 at 15295864 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #228096 8/8 at 16056368 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #228224 8/8 at 12845992 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #228352 8/8 at 16613352 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+tx_flush:1338: disk5 xid 63 tx stats: # 40 owait 1 1669us finish 32 bar2 23 f 4 enter 85 fq 0 33 13us close 2us prep 272us flush 486us
+
+NativeSd: rw done #228480 8/8 at 16860744 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #228608 8/8 at 15056616 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #228736 8/8 at 17674880 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #228864 8/8 at 17675552 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #228992 8/8 at 14648352 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #229120 8/8 at 13903264 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #229248 8/8 at 16269872 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #229376 8/8 at 16269592 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #229504 8/8 at 14663880 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #229632 8/8 at 14665768 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #229760 8/8 at 18820488 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #229888 8/8 at 15783688 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #230016 8/8 at 14114400 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #230144 8/8 at 17899104 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #230272 8/8 at 18127112 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #230400 8/8 at 14672272 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #230528 8/8 at 16391512 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #230656 8/8 at 16015360 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #230784 8/8 at 16601608 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #230912 8/8 at 16708352 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #231040 8/8 at 16612024 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #231168 8/8 at 17685096 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer 
+NativeSd: rw done #231296 8/8 at 781426 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|could not find BT_DEVICE_ADDRESS env variable 
+NativeSd: rw done #231424 8/8 at 13908080 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #231552 8/8 at 13154928 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+static IOReturn AppleMobileFileIntegrityUserClient::isCdhashInTrustCache(OSObject *, void *, IOExternalMethodArguments *): Process 94 is checking if a cdhash is in the trust cache
+
+static IOReturn AppleMobileFileIntegrityUserClient::isCdhashInTrustCache(OSObject *, void *, IOExternalMethodArguments *): Returning IOReturn 0x0 to process 94
+
+E5FB|marconi-bt: Unable to match bluetooth service in device tree. 
+E5FB|marconi-bt: Not a valid MAC address (all 00s). 
+E5FB|bluetooth: Unable to match bluetooth service in device tree. 
+E5FB|bluetooth: Not a valid MAC address (all 00s). 
+E5FB|FindLocalMacAddress did not find bootargs for random address generation
+NativeSd: rw done #231680 8/8 at 12886960 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #231808 8/8 at 821330 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #231936 8/8 at 16158528 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|com.apple.server.bluetooth: Not a valid MAC address (all 00s). 
+E5FB|bluetoothd: 
+E5FB|No bluetooth on this device. 
+E5FB| 
+NativeSd: rw done #232064 8/8 at 551002 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #232192 8/8 at 16066440 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #232320 8/8 at 12889000 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #232448 56/56 at 11099578 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #232576 8/8 at 12887784 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #232704 8/8 at 12887632 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #232832 8/8 at 12889832 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #232960 8/8 at 12894720 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #233088 8/8 at 774338 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #233216 8/8 at 12894592 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #233344 8/8 at 16160496 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #233472 8/8 at 13919280 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #233600 8/8 at 15995072 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #233728 8/8 at 15993080 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #233856 8/8 at 16708216 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #233984 8/8 at 13234584 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #234112 8/8 at 16234488 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #234240 8/8 at 13911264 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #234368 8/8 at 16126152 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #234496 8/8 at 12713040 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #234624 8/8 at 15994984 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #234752 8/8 at 12696976 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #234880 8/8 at 12711280 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #235008 8/8 at 15994856 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #235136 8/8 at 12716576 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #235264 32/32 at 16589504 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #235392 8/8 at 13273208 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #235520 8/8 at 18750272 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #235648 8/8 at 14223752 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #235776 8/8 at 14224080 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #235904 8/8 at 13064432 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #236032 48/48 at 8880314 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #236160 8/8 at 16158512 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #236288 8/8 at 15325744 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #236416 8/8 at 15992112 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #236544 8/8 at 12686848 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #236672 8/8 at 16672112 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #236800 8/8 at 14682456 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #236928 8/8 at 14371872 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #237056 8/8 at 16673528 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #237184 8/8 at 16426496 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #237312 8/8 at 14691536 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #237440 8/8 at 16391232 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #237568 8/8 at 14718288 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #237696 8/8 at 15341768 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #237824 8/8 at 14008104 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #237952 8/8 at 15804672 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #238080 8/8 at 17525712 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #238208 8/8 at 14711728 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #238336 8/8 at 12894712 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #238464 8/8 at 13957000 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #238592 8/8 at 12682160 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #238720 8/8 at 16897864 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #238848 8/8 at 14182960 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #238976 8/8 at 14713488 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #239104 8/8 at 12850112 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #239232 8/8 at 14715456 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #239360 8/8 at 16392928 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #239488 8/8 at 14716592 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #239616 8/8 at 14478368 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #239744 64/64 at 13141360 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #239872 8/8 at 16255392 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #240000 8/8 at 18237184 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #240128 8/8 at 16689680 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #240256 8/8 at 15217472 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #240384 8/8 at 16704088 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #240512 8/8 at 16704816 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #240640 8/8 at 16039080 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #240768 8/8 at 12703088 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #240896 8/8 at 16391456 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #241024 8/8 at 16257232 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #241152 8/8 at 16259816 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #241280 8/8 at 3081778 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #241408 56/56 at 3082690 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #241536 8/8 at 18047704 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #241664 8/8 at 18764432 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|Dec 31 16:10:34  audiomxd[91] <Error>: failed to open connection to AppleKeyStore 
+NativeSd: rw done #241792 56/56 at 3083738 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #241920 8/8 at 16398200 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #242048 8/8 at 12679824 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #242176 8/8 at 3075794 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #242304 8/8 at 13145312 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #242432 8/8 at 13158536 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #242560 8/8 at 17977536 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #242688 8/8 at 15853576 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #242816 8/8 at 13658472 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #242944 8/8 at 15015128 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #243072 8/8 at 18031104 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #243200 8/8 at 14224072 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #243328 8/8 at 13779984 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #243456 8/8 at 15972096 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #243584 8/8 at 16021320 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #243712 8/8 at 16267928 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #243840 8/8 at 18825728 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #243968 8/8 at 16036600 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #244096 8/8 at 13832296 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #244224 8/8 at 13670240 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #244352 8/8 at 16074352 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #244480 8/8 at 16392744 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #244608 8/8 at 16673576 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #244736 8/8 at 18032336 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #244864 8/8 at 16131416 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #244992 8/8 at 12904352 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #245120 8/8 at 12903944 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #245248 8/8 at 12922368 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #245376 8/8 at 14402664 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer 
+NativeSd: rw done #245504 8/8 at 12902608 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|could not find BT_DEVICE_ADDRESS env variable 
+NativeSd: rw done #245632 8/8 at 13240440 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #245760 8/8 at 16017496 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|marconi-bt: Unable to match bluetooth service in device tree. 
+E5FB|marconi-bt: Not a valid MAC address (all 00s). 
+E5FB|bluetooth: Unable to match bluetooth service in device tree. 
+E5FB|bluetooth: Not a valid MAC address (all 00s). 
+E5FB|FindLocalMacAddress did not find bootargs for random address generation
+NativeSd: rw done #245888 8/8 at 14479568 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #246016 8/8 at 15364064 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #246144 8/8 at 15514784 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|com.apple.server.bluetooth: Not a valid MAC address (all 00s). 
+E5FB|bluetoothd: 
+E5FB|No bluetooth on this device. 
+E5FB| 
+NativeSd: rw done #246272 8/8 at 13394096 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #246400 8/8 at 16054464 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #246528 8/8 at 18243040 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #246656 8/8 at 14236880 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #246784 8/8 at 18768384 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+E5FB|objc[24]: Class MBAccountChange is implemented in both /System/Library/PrivateFrameworks/MobileBackup.framework/MobileBackup (0x20d7558f0) and /System/Library/UserEventPlugins/MobileBackupUEA.plugin/MobileBackupUEA (0x100cb5
+NativeSd: rw done #246912 8/8 at 14742344 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #247040 8/8 at 16262656 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #247168 8/8 at 14404168 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #247296 8/8 at 15853808 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
+NativeSd: rw done #247424 8/8 at 16002776 d=100 c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0 p=published x=53bd815c q=ready t=17:0
+
