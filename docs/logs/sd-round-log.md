@@ -749,3 +749,13 @@ family). All other subsystems healthy (Data RW, 250K+ I/O, no panics,
   HEADLESS SERVICES BOOT ACHIEVED (display stack absent by design; SB+LA disabled).
 - Next frontier: display stack (FBSDisplayMonitor abort root-caused r69) — needs
   IOMobileFramebuffer-class IOKit node or gpu-addon assets (user decision).
+
+## Round 76-77 (display D1 v2/v3 on board)
+
+- r76: FAT-internal ADT swap live (DARWINBOOT dbg adt 13904, dtlen 0x3650); e5_display_start
+  FOUND the lcd provider on warm try-2 (a=1); cold try-1 missed the 3s waitForService window
+  (a=0) -> wait widened to 20s (a788071). c=0 still (kernel 328 census, no controls).
+- r77: kernel 329 census controls (IOMedia bit2, AppleARMIODevice bit3) decode WHERE class
+  registration stalls after the force-load of IOMobileGraphicsFamily.
+- CI trigger change: kernel.yml is workflow_dispatch-only now; dispatch via
+  /actions/workflows/395780801/dispatches {"ref":"main","inputs":{...}}.
