@@ -1204,37 +1204,61 @@ extern "C" int e5_display_probe(void) {
   return mask;
 }
 
-// v2: attach + start an IOMobileFramebufferLegacy instance on a provider.
-// Gated by the e5-display boot arg so a bad start() can be turned off from
-// the FAT payload without rebuilding the kernel.  Progress lands in
-// e5_display_attach (echoed on rw-done lines next to c=).
+// v3: let IOKit do the work.  r77 proved the KC-resident kext's classes
+// never register without personality matching (c=12: only the personality'd
+// AppleARMIODevice and base-linked IOMedia alloc'd; loadKextWithIdentifier
+// returned 0 but registered nothing).  Injecting a personality via
+// IOCatalogue::addDrivers makes IOKit resolve CFBundleIdentifier ->
+// load+start the kext (classes register) -> instantiate IOClass on every
+// matching nub -> our lcd nub gets a STARTED IOMobileFramebufferLegacy.
+// Progress lands in e5_display_attach (echoed on rw-done lines).
 extern "C" int e5_display_start(void) {
   // Default ON: the payload FAT's unixnu.toml is size-frozen, so a new boot
   // arg cannot be added without FAT surgery.  Opt-out via e5-display-off.
   if (PE_parse_boot_argn("e5-display-off", nullptr, 0)) return 0;
   e5_display_attach = 0;
-  // r76: cold-boot try-1 missed the lcd nub inside 3s (a=0), warm try-2
-  // found it (a=1) - the platform publishes ADT nubs at its own pace.
-  mach_timespec_t ts = {20, 0};  // 20s cap; NULL would wait forever
-  IOService *provider = IOService::waitForService(
+  // bit0: the lcd nub exists (the personality match target)
+  mach_timespec_t ts = {20, 0};
+  IOService *nub = IOService::waitForService(
       IOService::nameMatching("lcd"), &ts);
-  if (!provider) { sdlog("NativeSd: display provider lcd absent\n"); return 0; }
+  if (!nub) { sdlog("NativeSd: display provider lcd absent\n"); return 0; }
   e5_display_attach |= 1;
-  OSObject *obj = OSMetaClass::allocClassWithName("IOMobileFramebufferLegacy");
-  IOService *svc = OSDynamicCast(IOService, obj);
-  if (!svc) { if (obj) obj->release(); sdlog("NativeSd: display alloc failed\n"); return 0; }
-  e5_display_attach |= 2;
-  svc->init();
-  if (!svc->attach(provider)) { svc->release(); sdlog("NativeSd: display attach failed\n"); return 0; }
-  e5_display_attach |= 4;
-  if (!svc->start(provider)) {
-    svc->detach(provider); svc->release();
-    sdlog("NativeSd: display start failed\n"); return 0;
+  // bit1: personality installed
+  OSDictionary *pers = OSDictionary::withCapacity(6);
+  OSString *bid = OSString::withCString("com.apple.iokit.IOMobileGraphicsFamily");
+  OSString *cls = OSString::withCString("IOMobileFramebufferLegacy");
+  OSString *prov = OSString::withCString("IOService");
+  OSString *name = OSString::withCString("lcd");
+  OSString *cat = OSString::withCString("com.apple.iokit.IOMobileGraphicsFamily.lcd");
+  if (pers && bid && cls && prov && name && cat) {
+    pers->setObject("CFBundleIdentifier", bid);
+    pers->setObject("IOClass", cls);
+    pers->setObject("IOProviderClass", prov);
+    pers->setObject("IONameMatch", name);
+    pers->setObject("IOMatchCategory", cat);
+    OSArray *arr = OSArray::withCapacity(1);
+    arr->setObject(pers);
+    bool ok = IOCatalogue::addDrivers(arr, true);
+    IOLog("NativeSd: display addDrivers ok %d\n", (int)ok);
+    e5_display_attach |= 2;
+    OSSafeReleaseNULL(arr);
+  } else {
+    IOLog("NativeSd: display personality alloc failed\n");
   }
-  e5_display_attach |= 8;
-  svc->registerService();
-  e5_display_attach |= 16;
-  svc->release();  // registry holds the reference now
-  sdlog("NativeSd: display legacy attached %p\n", svc);
+  OSSafeReleaseNULL(pers);
+  OSSafeReleaseNULL(bid);
+  OSSafeReleaseNULL(cls);
+  OSSafeReleaseNULL(prov);
+  OSSafeReleaseNULL(name);
+  OSSafeReleaseNULL(cat);
+  if (!(e5_display_attach & 2)) return 0;
+  // bit2: an IOMobileFramebufferLegacy service appeared (kext started +
+  // matched + start() ran on the lcd nub)
+  IOService *legacy = IOService::waitForService(
+      IOService::serviceMatching("IOMobileFramebufferLegacy"), &ts);
+  if (!legacy) { sdlog("NativeSd: display legacy service absent\n"); return 0; }
+  e5_display_attach |= 4;
+  sdlog("NativeSd: display legacy service %p on %s\n", legacy,
+        legacy->getProvider() ? legacy->getProvider()->getName() : "?");
   return 1;
 }
