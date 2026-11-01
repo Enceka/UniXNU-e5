@@ -4,9 +4,11 @@
 #include "OriginalLegacyFramebufferABI.h"
 #include <IOKit/IOLib.h>
 #include <libkern/c++/OSData.h>
+#include <pexpert/pexpert.h>
 
 extern "C" __attribute__((noreturn)) void e5_display_backend_guard(unsigned slot);
 extern "C" unsigned e5_display_open_count;
+extern "C" kern_return_t OSKextLoadKextWithIdentifier(const char *);
 extern "C" {
 unsigned e5_display_client_calls = 0;
 unsigned e5_display_client_successes = 0;
@@ -14,14 +16,76 @@ unsigned e5_display_client_type = 0;
 unsigned e5_display_client_status = (unsigned)kIOReturnNotReady;
 unsigned e5_display_pitch_calls = 0;
 unsigned e5_display_pitch_status = (unsigned)kIOReturnNotReady;
+unsigned e5_display_lifecycle = 0;
+unsigned e5_display_resources = 0;
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
   OSDeclareDefaultStructors(E5Display)
+  bool familyStarted = false;
+  bool bootValidated = false;
 public:
-  // V8 lifecycle probe, not the original family's initialized start chain.
-  // R85 reaches read-only UserClient selectors even with handleOpen == 0.
-  bool start(IOService *) override { return true; }
+  bool start(IOService *provider) override {
+    __atomic_fetch_or(&e5_display_lifecycle, 0x001U, __ATOMIC_RELAXED);
+    if (!provider || OSKextLoadKextWithIdentifier("com.apple.iokit.IOSurface") != 0)
+      return false;
+    OSDictionary *match = IOService::nameMatching("IOCoreSurfaceRoot");
+    IOService *surface = match ? IOService::waitForMatchingService(match, 5000000000ULL) : nullptr;
+    if (match) match->release();
+    if (!surface) return false;
+    surface->release();
+    __atomic_fetch_or(&e5_display_lifecycle, 0x400U, __ATOMIC_RELAXED);
+    if (!IOMobileFramebufferLegacy::start(provider)) return false;
+    __atomic_fetch_or(&e5_display_lifecycle, 0x010U, __ATOMIC_RELAXED);
+    unsigned resources = lifecycleResourceMask();
+    __atomic_store_n(&e5_display_resources, resources, __ATOMIC_RELAXED);
+    if (!bootValidated || resources != 0x3f) {
+      __atomic_fetch_or(&e5_display_lifecycle, 0x100U, __ATOMIC_RELAXED);
+      IOMobileFramebufferLegacy::stop(provider);
+      bootValidated = false;
+      return false;
+    }
+    __atomic_fetch_or(&e5_display_lifecycle, 0x020U, __ATOMIC_RELAXED);
+    familyStarted = true;
+    return true;
+  }
+  void stop(IOService *provider) override {
+    familyStarted = false;
+    bootValidated = false;
+    __atomic_fetch_or(&e5_display_lifecycle, 0x200U, __ATOMIC_RELAXED);
+    IOMobileFramebufferLegacy::stop(provider);
+  }
+  // The original start calls virtual registerService before it returns.
+  // Publication is released by e5_display_publish only after the entire
+  // start chain and its lock/gate/workloop checks have completed.
+  void registerService(IOOptionBits options = 0) override {
+    if (!familyStarted) {
+      __atomic_fetch_or(&e5_display_lifecycle, 0x040U, __ATOMIC_RELAXED);
+      return;
+    }
+    __atomic_fetch_or(&e5_display_lifecycle, 0x080U, __ATOMIC_RELAXED);
+    IOService::registerService(options);
+  }
+  bool isMainDisplay() override { return bootValidated; }
+  // D1 inherits firmware scanout. This hook validates that exact handoff
+  // and installs its geometry; it does not reprogram the DPU or claim a
+  // surface mapping, frame transfer, power transition or vblank.
+  bool startHardware() override {
+    __atomic_fetch_or(&e5_display_lifecycle, 0x002U, __ATOMIC_RELAXED);
+    PE_Video video = {};
+    if (!getProvider() || PE_current_console(&video) ||
+        video.v_baseAddr != 0xbe000000ULL || video.v_width != 320 ||
+        video.v_height != 480 || video.v_rowBytes != 640 ||
+        video.v_depth != 16 || video.v_rotate != 0) return false;
+    __atomic_fetch_or(&e5_display_lifecycle, 0x004U, __ATOMIC_RELAXED);
+    installBootDimensions(320, 480);
+    uint32_t width = 0, height = 0;
+    getDisplayDimensions(&width, &height);
+    if (width != 320 || height != 480) return false;
+    bootValidated = true;
+    __atomic_fetch_or(&e5_display_lifecycle, 0x008U, __ATOMIC_RELAXED);
+    return true;
+  }
   // IOService::open accounting only; IOServiceOpen need not call handleOpen.
   bool handleOpen(IOService *forClient, IOOptionBits options, void *arg) override {
     __atomic_fetch_add(&e5_display_open_count, 1U, __ATOMIC_RELAXED);
@@ -49,7 +113,12 @@ public:
       IOService *provider = getProvider();
       status = kIOReturnNotReady;
       if (provider) {
-        OSObject *property = provider->getProperty("dot-pitch");
+        auto retained = provider->copyProperty("dot-pitch");
+#if defined(IOKIT_ENABLE_SHARED_PTR)
+        OSObject *property = retained.get();
+#else
+        OSObject *property = retained;
+#endif
         status = kIOReturnNotFound;
         if (property) {
           OSData *data = OSDynamicCast(OSData, property);
@@ -59,6 +128,9 @@ public:
             status = kIOReturnSuccess;
           }
         }
+#if !defined(IOKIT_ENABLE_SHARED_PTR)
+        OSSafeReleaseNULL(property);
+#endif
       }
     }
     __atomic_store_n(&e5_display_pitch_status, (unsigned)status, __ATOMIC_RELAXED);
@@ -79,7 +151,7 @@ public:
 };
 
 OSDefineMetaClassAndStructors(E5Display, IOMobileFramebufferLegacy)
-static_assert(sizeof(E5Display) == 0x18a0, "E5 factory probe adds no private state");
+static_assert(sizeof(E5Display) == 0x18a8, "Only owned lifecycle flags extend Legacy");
 
 extern "C" unsigned e5_display_compiled_size(void) { return sizeof(E5Display); }
 
@@ -106,6 +178,7 @@ extern "C" int e5_display_publish(IOService *provider) {
   e5_display_attach |= 0x800;
   IOService *display = OSDynamicCast(IOService, object);
   bool live = false;
+  bool started = false;
   if (display && display->init()) {
     e5_display_attach |= 0x1000;
     display->attach(provider);
@@ -115,6 +188,7 @@ extern "C" int e5_display_publish(IOService *provider) {
     if (display->getProvider() == provider) {
       e5_display_attach |= 0x2000;
       if (display->start(provider)) {
+        started = true;
         e5_display_attach |= 0x4000;
         display->registerService();
         e5_display_attach |= 0x8000;
@@ -135,7 +209,10 @@ extern "C" int e5_display_publish(IOService *provider) {
         }
       }
     }
-    if (!live) display->detach(provider);
+    if (!live) {
+      if (started) display->stop(provider);
+      display->detach(provider);
+    }
   }
   object->release();
   return live ? 1 : 0;

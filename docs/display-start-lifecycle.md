@@ -1,0 +1,70 @@
+# E5 Legacy start lifecycle: v12
+
+R86 / CI341 reaches `u=1:1:0:0`: one type-0 UserClient creation succeeds.
+Its later kernel-task cleanup faults on the null IORecursiveLock at `+0x1868`.
+The last retained pitch count is `g=0`; greater pager depth alone does not
+prove a pitch query ran. `o=0` measures handleOpen, not UserClient creation.
+
+## Change
+
+E5Display now calls the complete original Legacy `start(provider)`. It retains
+the unchanged family initializer, command gate/workloop, event-source setup,
+queue setup, slot-299 finalization and lock allocation. It does not manually
+construct a partial set of locks or call unrelated numbered slots as a
+replacement for the start method.
+
+Before entering the original start, it loads IOSurface and waits at most five
+seconds for IOCoreSurfaceRoot, which the family otherwise waits for itself.
+The platform hook at slot 288 is now typed `bool startHardware()`. For this
+firmware-scanout stage it checks the exact PE tuple: physical `0xbe000000`,
+320x480, 640 bytes/row, 16 bits/pixel, no rotation. It installs only the two
+mode-dimension words proven by the original slot-249 getter and reads them
+back through that getter. It maps or writes no framebuffer, touches no DPU/DSI
+registers and supplies no frame/power/vblank implementation. Slot 184 reports
+the validated E5 panel as primary without changing `Video.v_display=0`.
+
+The original start calls virtual registerService before returning. An owned
+slot-84 override defers that call until the whole original start has returned
+success and six original resource pointers have been checked. The existing
+publish helper then performs the actual registration and bounded lookup.
+If lookup fails after start, it calls stop before detach. Nine unqualified
+backend leaves continue to panic with their slot numbers.
+
+The original Legacy extent stays `0x18a0`; two owned boolean flags extend
+E5Display to `0x18a8`. The construction probe already compares the owned
+metaclass size against its compiled size independently of the original size.
+Pitch reads now retain the provider's property during inspection.
+
+## Observations
+
+NativeSd retains `h=lifecycle:resources`, both hexadecimal. Lifecycle bits:
+
+| Bit | Event |
+| --- | --- |
+| 0x001 | Entered owned start |
+| 0x002 | Entered startHardware |
+| 0x004 | Exact PE boot-video tuple accepted |
+| 0x008 | Original mode getter confirms 320x480 |
+| 0x010 | Complete original start returned true |
+| 0x020 | Original resource mask is 0x3f |
+| 0x040 | Original start's registration was deferred |
+| 0x080 | Actual registration forwarded after readiness |
+| 0x100 | Post-start readiness failed; original stop called |
+| 0x200 | Owned stop entered |
+| 0x400 | IOSurface loaded and IOCoreSurfaceRoot found |
+
+Resources bits 0..5 correspond to pointers at `0x1608`, `0x1610`, `0x1638`,
+`0x1648`, `0x17f8`, `0x1868`. This is a non-null readiness measurement; the
+original init/start owns allocation and initialization. No pointer is fabricated.
+Normal publication should retain `h=4ff:3f`.
+
+The builder checks the unchanged family hash, original startHardware and
+isMainDisplay call conventions and both uint32 dimension loads. The exact
+owned dispatch is slots 0, 1, 7, 84, 86, 87, 91, 141, 184, 188, 288 plus the
+nine guarded leaves; the other 338 entries remain original bindings.
+
+Host ABI validation passes. CI and R87 are pending. R87 must hold the actual
+r86 ADT, firmware, seed and Data fixed, verify the final dispatch and all FAT
+files, verify complete boot_b readback before reboot, then collect the retained
+resource mask, UserClient results, first fault/guard (if any) and fresh Android
+A recovery. Initialization qualification is separate from frame presentation.

@@ -19,7 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
-OWNED = sorted([0, 1, 7, 86, 91, 141, 188] + PURE)
+OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 184, 188, 288] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -126,6 +126,16 @@ def main():
             read(0xfffffff0057981d4 - slide, 8) == bytes.fromhex('00214bf9080040f9') and
             read(0xfffffff0057982a0 - slide, 16) == bytes.fromhex('e81740b9a9035ff8280100b9a0c35eb8'),
             'original slot-188 uint32 output / IOReturn ABI changed')
+    require(table[86] + slide == 0xfffffff0057872e8 and
+            read(0xfffffff005787ef8 - slide, 16) == bytes.fromhex('080040f9088144f900013fd6e0000037'),
+            'original bool startHardware() call changed')
+    require(read(0xfffffff005777e9c - slide, 16) == bytes.fromhex('080040f908e142f900013fd6c0000036'),
+            'original bool isMainDisplay() call changed')
+    getter = table[249] + slide
+    require(getter == 0xfffffff00579fc8c and
+            struct.unpack('<I', read(getter + 0x30 - slide, 4))[0] == 0xb956b108 and
+            struct.unpack('<I', read(getter + 0x58 - slide, 4))[0] == 0xb956b508,
+            'original uint32 width/height fields changed')
     for pc, target in [(0xfffffff0057865fc, 0xfffffff00577b510),
                        (0xfffffff00577b540, 0xfffffff00577b318),
                        (0xfffffff005786630, 0xfffffff00577b55c)]:
@@ -137,10 +147,27 @@ def main():
 // Generated opaque inheritance layout for the hash-qualified 21H461 family.
 #pragma once
 #include <IOKit/IOService.h>
+#include <libkern/libkern.h>
 class IOMobileFramebufferLegacy : public IOService {
   OSDeclareAbstractStructors(IOMobileFramebufferLegacy)
   unsigned char originalPrivate[0x18a0 - sizeof(IOService)];
 public:
+  void installBootDimensions(uint32_t width, uint32_t height) {
+    auto bytes = reinterpret_cast<unsigned char *>(this);
+    memcpy(bytes + 0x16b0, &width, sizeof(width));
+    memcpy(bytes + 0x16b4, &height, sizeof(height));
+  }
+  unsigned lifecycleResourceMask() const {
+    const unsigned offsets[] = {0x1608, 0x1610, 0x1638, 0x1648, 0x17f8, 0x1868};
+    auto bytes = reinterpret_cast<const unsigned char *>(this);
+    unsigned mask = 0;
+    for (unsigned i = 0; i != 6; ++i) {
+      const void *resource = nullptr;
+      memcpy(&resource, bytes + offsets[i], sizeof(resource));
+      if (resource) mask |= 1U << i;
+    }
+    return mask;
+  }
   void free() override;
   bool init(OSDictionary *properties=nullptr) override;
   IOReturn setProperties(OSObject *) override;
@@ -153,8 +180,14 @@ public:
   IOReturn setPowerState(unsigned long, IOService *) override;
 '''
     for i in range(168, 358):
-        if i == 188:
+        if i == 184:
+            header += '  virtual bool isMainDisplay();\n'
+        elif i == 188:
             header += '  virtual IOReturn getDotPitch(uint32_t *);\n'
+        elif i == 249:
+            header += '  virtual void getDisplayDimensions(uint32_t *, uint32_t *);\n'
+        elif i == 288:
+            header += '  virtual bool startHardware();\n'
         elif i in PURE:
             header += f'  virtual __attribute__((noreturn)) void opaque{i}() = 0;\n'
         else:
@@ -216,6 +249,8 @@ public:
                 '__ZN25IOMobileFramebufferLegacyD2Ev': 0xfffffff005786618,
                 '__ZN25IOMobileFramebufferLegacy10gMetaClassE': 0xfffffff006b35940,
                 '__ZN25IOMobileFramebufferLegacy13newUserClientEP4taskPvjPP12IOUserClient': table[141] + slide,
+                '__ZN25IOMobileFramebufferLegacy5startEP9IOService': table[86] + slide,
+                '__ZN25IOMobileFramebufferLegacy4stopEP9IOService': table[87] + slide,
                 '__ZTV25IOMobileFramebufferLegacy': vptr - 16}
     owned_slots, native_slots = [], []
     for i, name in enumerate(compiled):

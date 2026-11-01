@@ -395,6 +395,12 @@ next_action = ["R85 confirms observable publication (a=0x1fc07), then MobileGest
 
 [[area.evidence]]
 kind = "host"
+reference = "docs/display-start-lifecycle.md"
+command = "e5_display_build.py --audit-only against the SHA-pinned original kernelcache"
+result = "V12 host ABI checks pass for the original startHardware/isMainDisplay calls and uint32 dimension getter. Calls complete original Legacy start, checks six original resources and defers publication until readiness. R86 confirms one successful type-0 UserClient via u=1:1:0:0, then faults in kernel-task cleanup on the uninitialized +0x1868 lock. CI and R87 remain pending; no frame mapping/transfer or DPU/DSI implementation is claimed."
+
+[[area.evidence]]
+kind = "host"
 reference = "docs/display-provider-contract.md"
 command = "e5_display_build.py --audit-only against the SHA-pinned original kernelcache"
 result = "PASS: original slot-188 target/provider load/uint32 output/IOReturn anchors and slot-141 factory identity. V11 changes the typed pitch getter and UserClient accounting plus retained measurements; CI and R86 remain pending. R85 o=0 counts handleOpen only: its external-method backtrace already demonstrates a UserClient consumer."
