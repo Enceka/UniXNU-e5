@@ -1,0 +1,43 @@
+diff --git a/bsd/uxkern/ux_exception.c b/bsd/uxkern/ux_exception.c
+index 14629d8..96c127b 100644
+--- a/bsd/uxkern/ux_exception.c
++++ b/bsd/uxkern/ux_exception.c
+@@ -112,6 +112,9 @@ ux_exception(int                        exception,
+ /*
+  * Sends the corresponding UNIX signal to a thread that has triggered a Mach exception.
+  */
++uint64_t e5_display_crash_words[23];
++unsigned e5_display_crash_state;
++
+ kern_return_t
+ handle_ux_exception(thread_t                    thread,
+     int                         exception,
+@@ -155,6 +158,28 @@ handle_ux_exception(thread_t                    thread,
+ 					e5ret[e5n++] = e5pair[1];
+ 					e5fp = (user_addr_t)e5pair[0];
+ 				}
++				/* Keep the first SB breakpoint outside the wrapping log.
++				 * NativeSd repeats it only after the release publication. */
++				if (e5n == 6 && exception == EXC_BREAKPOINT &&
++				    strcmp(p->p_comm, "SpringBoard") == 0) {
++					unsigned e5expected = 0;
++					if (__atomic_compare_exchange_n(&e5_display_crash_state,
++					    &e5expected, 1, FALSE, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
++						uint64_t *e5w = e5_display_crash_words;
++						e5w[0] = proc_pid(p);
++						e5w[1] = subcode;
++						e5w[2] = e5s->lr;
++						e5w[3] = e5s->x[16];
++						e5w[4] = e5s->x[17];
++						for (unsigned e5i = 0; e5i < 6; ++e5i) {
++							e5w[5 + e5i] = e5ret[e5i];
++						}
++						e5w[11] = e5s->x[19];
++						e5w[12] = copyin((user_addr_t)e5s->x[19],
++						    (char *)&e5w[13], 10 * sizeof(uint64_t));
++						__atomic_store_n(&e5_display_crash_state, 2, __ATOMIC_RELEASE);
++					}
++				}
+ 				printf(" fr");
+ 				for (unsigned e5k = 0; e5k < e5n; e5k++)
+ 					printf(" %llx", e5ret[e5k]);
