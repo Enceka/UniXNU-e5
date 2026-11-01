@@ -93,29 +93,33 @@ extern "C" void e5_display_frame_kick(void) {
              crc, e5_display_frame_crc, e5_display_frame_changes + 1);
     __atomic_store_n(&e5_display_frame_crc, crc, __ATOMIC_RELAXED);
     unsigned n = __atomic_fetch_add(&e5_display_frame_changes, 1U, __ATOMIC_RELAXED) + 1;
-    // r99: render a 20x60 block thumbnail (2px x 8px blocks, 1 = any
-    // non-black pixel) into a 180-byte buffer (3 bytes per row, 20 bits
-    // LSB-first + pad); print it every 16th change so the persistent ring
-    // tail keeps the last few and we can SEE what is drawing (scrolling
-    // console text vs UI shapes).
-    static uint8_t thumb[180];
+    // r102: render a FULL-WIDTH 40x60 block thumbnail (8x8 px blocks over
+    // the 320x480 panel, 1 = any non-black pixel) into a 300-byte buffer
+    // (5 bytes per row, 40 bits LSB-first). Printed every 16th change and
+    // at the first; the persistent ring tail keeps the last couple so
+    // host-side ASCII rendering can diff SB-enabled vs headless content
+    // (status bar / dock structure vs uniform compositor fill).
+    static uint8_t thumb[300];
     for (unsigned row = 0; row < 60; ++row) {
-      uint32_t bits = 0;
-      for (unsigned col = 0; col < 20; ++col) {
+      uint64_t bits = 0;
+      for (unsigned col = 0; col < 40; ++col) {
         unsigned any = 0;
         for (unsigned y = 0; y < 8 && !any; ++y) {
-          const volatile uint16_t *p = px + (row * 8 + y) * 320 + col * 2;
-          if (p[0] || p[1]) any = 1;
+          const volatile uint16_t *p = px + (row * 8 + y) * 320 + col * 8;
+          for (unsigned x = 0; x < 8 && !any; ++x)
+            if (p[x]) any = 1;
         }
-        if (any) bits |= 1u << col;
+        if (any) bits |= 1ull << col;
       }
-      thumb[row * 3 + 0] = (uint8_t)(bits & 0xff);
-      thumb[row * 3 + 1] = (uint8_t)((bits >> 8) & 0x0f);
-      thumb[row * 3 + 2] = 0;
+      thumb[row * 5 + 0] = (uint8_t)(bits & 0xff);
+      thumb[row * 5 + 1] = (uint8_t)((bits >> 8) & 0xff);
+      thumb[row * 5 + 2] = (uint8_t)((bits >> 16) & 0xff);
+      thumb[row * 5 + 3] = (uint8_t)((bits >> 24) & 0xff);
+      thumb[row * 5 + 4] = (uint8_t)((bits >> 32) & 0xff);
     }
     if ((n % 16) == 0 || n == 1) {
       printf("E5PANELSNAP %u %08x ", n, crc);
-      for (unsigned i = 0; i < 180; ++i) printf("%02x", thumb[i]);
+      for (unsigned i = 0; i < 300; ++i) printf("%02x", thumb[i]);
       printf("\n");
     }
   }
