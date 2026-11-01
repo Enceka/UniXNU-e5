@@ -79,7 +79,8 @@ extern "C" void e5_display_frame_kick(void) {
       sPanelKicks = 1; // never try again; crc stays 0
       return;
     }
-    printf("E5Display: panel mapped at %p (0xBE000000+0x4B000)\n", sPanelMap->getVirtualAddress());
+    printf("E5Display: panel mapped at %p (0xBE000000+0x4B000)\n",
+           (void *)(uintptr_t)sPanelMap->getVirtualAddress());
   }
   if (!sPanelMap) return;
   sPanelKicks++;
