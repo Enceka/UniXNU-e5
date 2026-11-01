@@ -11,6 +11,7 @@
 #include <libkern/c++/OSString.h>
 #include <libkern/c++/OSMetaClass.h>
 #include <libkern/c++/OSKext.h>
+#include <IOKit/IOCatalogue.h>
 #include "TransferStatus.h"
 #include "SdProtocol.h"
 #include "SystemOSWindow.h"
