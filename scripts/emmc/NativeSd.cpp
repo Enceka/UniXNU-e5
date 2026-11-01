@@ -9,6 +9,7 @@
 #include <pexpert/pexpert.h>
 #include <libkern/c++/OSNumber.h>
 #include <libkern/c++/OSString.h>
+#include <libkern/c++/OSMetaClass.h>
 #include "TransferStatus.h"
 #include "SdProtocol.h"
 #include "SystemOSWindow.h"
@@ -1150,4 +1151,40 @@ extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
   __atomic_store_n(&dataLookup, ok ? "ready" : "bsd-missing", __ATOMIC_RELAXED);
   volume->release();
   return ok ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// E5 display probe (display-touch-gpu plan, D1)
+//
+// This kernelcache ships IOMobileGraphicsFamily (IOMobileFramebufferLegacy
+// et al.) WITHOUT the SoC display kext that would normally instantiate the
+// framebuffer service, and without any IOKit personality for it.  The class
+// registry is still fully populated, and OSMetaClass::allocClassWithName is
+// an exported base-kernel symbol — so we can allocate the instance at
+// runtime, exactly like the missing SoC driver would.
+//
+// v1 = census only: can we find and allocate the Legacy class at all?
+// ---------------------------------------------------------------------------
+
+extern "C" int e5_display_probe(void) {
+  const char *names[] = {
+    "IOMobileFramebuffer",
+    "IOMobileFramebufferService",
+    "IOMobileFramebufferLegacy",
+    "IOMobileFramebufferUserClient",
+    "AppleARMBacklight",
+    nullptr,
+  };
+  const bool concrete[] = {false, true, true, false, false};
+  int found = 0;
+  for (int i = 0; names[i]; i++) {
+    OSMetaClass *meta = OSMetaClass::getMetaClassWithName(names[i]);
+    OSObject *inst = nullptr;
+    if (meta && concrete[i]) inst = OSMetaClass::allocClassWithName(names[i]);
+    IOLog("NativeSd: display census %s meta %p inst %p\n",
+          names[i], meta, inst);
+    if (meta) found++;
+    if (inst) inst->release();
+  }
+  return found;
 }

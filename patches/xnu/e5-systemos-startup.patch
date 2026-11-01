@@ -1,6 +1,6 @@
 --- a/bsd/kern/kern_exec.c
 +++ b/bsd/kern/kern_exec.c
-@@ -8142,6 +8142,134 @@
+@@ -8142,6 +8142,138 @@
  	"/sbin/launchd",
  };
  
@@ -28,6 +28,10 @@
 +	int32_t result = 0;
 +	vnode_t original_root = rootvnode, mounted_root = NULLVP, cache = NULLVP;
 +	vfs_context_t ctx = vfs_context_current();
++	{
++		extern int e5_display_probe(void);
++		printf("E5SystemOS: display census %d\n", e5_display_probe());
++	}
 +	if (!e5_systemos_device(device_path, sizeof(device_path), &major, &minor)) return ENOENT;
 +	if (!(vfs_flags(vnode_mount(original_root)) & MNT_RDONLY)) return EROFS;
 +	user64_addr_t spec = scratch + 0x160;
@@ -135,7 +139,7 @@
  /*
   * load_init_program
   *
-@@ -8183,6 +8311,12 @@
+@@ -8183,6 +8315,12 @@
  
  	(void) mach_vm_allocate_kernel(map, &scratch_addr, map_page_size, VM_FLAGS_ANYWHERE, VM_KERN_MEMORY_NONE);
  	user_addr_t init_envp = USER_ADDR_NULL;
