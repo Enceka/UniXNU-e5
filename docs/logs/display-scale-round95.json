@@ -1,0 +1,135 @@
+{
+  "date": "2026-11-01",
+  "round": 95,
+  "build": {
+    "ci": 350,
+    "run": 41314787322,
+    "device_revision": "7bb73d48d33654a3f513517ea78c74ac700e4efe",
+    "kernel_sha256": "2ddda95a6119bb9db9f4ef95e87bf5413625ff39dde69c64319ed89a0cae6a8a"
+  },
+  "cycle": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-policy-r65/board-r95/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "a98dc31b712c1508bbc5c43ea28bb8e73580f48c05ce8d815762d5301fe596fc",
+    "stage": "complete",
+    "updated_at": "2026-11-01T14:31:44.383329+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-223143.txt"
+    ]
+  },
+  "console_sha256": "19163225003920949ba2d520c508e10bf0c3120f531b559a00298baa592f112d",
+  "record_sha256": "7c2aa57522f056fa3f2bd738f68a10d12ea0b6eb63044546cf808cf182356029",
+  "panic": null,
+  "mode_samples": [
+    {
+      "pid": 27,
+      "slide": "0x9364000",
+      "object": "0x300f586e0",
+      "copyin_error": 0,
+      "raw_words": [
+        "0x21a1fdc55d21",
+        "0x140",
+        "0x1e0",
+        "0x0",
+        "0x0",
+        "0x404e000000000000",
+        "0x1",
+        "0x0",
+        "0x0",
+        "0x0"
+      ],
+      "values": {
+        "width": 320,
+        "height": 480,
+        "preferred_scale": 0,
+        "stored_scale_override": 0.0,
+        "refresh_hz": 60.0,
+        "gamut": 1,
+        "hdr": 0,
+        "rotation": 0,
+        "virtual": 0
+      },
+      "demonstrated_invalid_fields": [
+        "zero_scale"
+      ],
+      "class_va": "0x1f48f1d20",
+      "class_matches_original_FBSDisplayMode": true
+    },
+    {
+      "pid": 125,
+      "slide": "0x9364000",
+      "object": "0x300ae68a0",
+      "copyin_error": 0,
+      "raw_words": [
+        "0x21a1fdc55d21",
+        "0x140",
+        "0x1e0",
+        "0x0",
+        "0x0",
+        "0x404e000000000000",
+        "0x1",
+        "0x0",
+        "0x0",
+        "0x0"
+      ],
+      "values": {
+        "width": 320,
+        "height": 480,
+        "preferred_scale": 0,
+        "stored_scale_override": 0.0,
+        "refresh_hz": 60.0,
+        "gamut": 1,
+        "hdr": 0,
+        "rotation": 0,
+        "virtual": 0
+      },
+      "demonstrated_invalid_fields": [
+        "zero_scale"
+      ],
+      "class_va": "0x1f48f1d20",
+      "class_matches_original_FBSDisplayMode": true
+    }
+  ],
+  "mobile_gestalt": {
+    "base": "0x1a0206000",
+    "uuid": "FFB2683B-781D-3D73-BC3F-1D4797C00F0D",
+    "text_sha256": "2496491e428dc2f0a15e1287c7a3d52c44972c91ed299a1cf1beea66f70e76ab",
+    "chosen_scale_read_va": "0x1a0215738",
+    "property_cfstring_va": "0x1e7c9a1d0",
+    "default_value": 0,
+    "cfdata_size_check_va": "0x1a020fca0",
+    "u32_load_va": "0x1a020fcb0",
+    "integer_to_float_va": "0x1a0215950",
+    "instruction_bytes": {
+      "0x1a021574c": "02008052",
+      "0x1a0215750": "03008052",
+      "0x1a0215754": "24008052",
+      "0x1a0215758": "05e9ff97",
+      "0x1a020fca0": "1f1000f1",
+      "0x1a020fcb0": "130040b9",
+      "0x1a0215950": "6002221e"
+    }
+  },
+  "data_before": {
+    "bytes": 134217728,
+    "sha256": "c1744ab42d3baac3baaf50742afbf64fc51159d13620a2f5fef4e2655fe4ec47"
+  },
+  "data_after": {
+    "bytes": 134217728,
+    "sha256": "c1744ab42d3baac3baaf50742afbf64fc51159d13620a2f5fef4e2655fe4ec47"
+  },
+  "conclusion": "The two zero scale values reject the mode. Width/height, refresh and enums are valid; both object classes match original FBSDisplayMode.",
+  "candidate": {
+    "round": 96,
+    "board_revision": "2d171af",
+    "property": "/chosen/display-scale",
+    "pixels_per_point": 1,
+    "adt_sha256": "0fea719d31cfe95092ee8576d41264c47548cec89e12911a85c031b44c637fd0",
+    "kernel_unchanged": true,
+    "payload_sha256": "8c3bf26c9b1207beea53003f9f70ff56400be9bed1fc167e72ebd75c749723bc"
+  },
+  "console_archive": "display-scale-round95-console.txt"
+}

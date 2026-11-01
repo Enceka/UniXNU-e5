@@ -1,0 +1,317 @@
+xc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #241536 8/8 at 16036552 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #241664 8/8 at 16039248 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #241792 8/8 at 16391136 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5FB|Dec 31 16:10:33  audiomxd[94] <Error>: failed to open connection to AppleKeyStore 
+E5FB|Dec 31 16:10:33  audiomxd[94] <Error>: failed to open connection to AppleKeyStore 
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #241920 8/8 at 14391064 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #242048 8/8 at 18825960 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #242176 8/8 at 13306072 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #242304 8/8 at 14819680 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #242432 8/8 at 13842736 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #242560 8/8 at 14404616 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #242688 8/8 at 15630056 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #242816 8/8 at 18833936 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #242944 8/8 at 13912024 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #243072 8/8 at 15999304 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #243200 8/8 at 13912784 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #243328 8/8 at 15990736 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #243456 40/40 at 4428298 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #243584 8/8 at 15306600 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #243712 8/8 at 13962224 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #243840 8/8 at 15302568 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #243968 8/8 at 14467704 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #244096 8/8 at 16021624 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #244224 8/8 at 13687304 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #244352 8/8 at 16088536 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #244480 8/8 at 15354616 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #244608 8/8 at 12757960 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #244736 8/8 at 15309976 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #244864 8/8 at 16113496 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5FB|com.apple.server.bluetooth: Bluetooth Super Server Robot Destroyer 
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #244992 8/8 at 15310560 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5EXC pid 125 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 16ee8cc70 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5OBJ19 pid 125 (SpringBoard) ptr 300ae68a0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #245120 8/8 at 18761328 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5CRASH pid 125 (SpringBoard) xstat 5: reason E5FB|could not find BT_DEVICE_ADDRESS env variable 
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #245248 72/72 at 16430472 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #245376 8/8 at 16362560 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #245504 8/8 at 13058832 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #245632 8/8 at 13015816 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #245760 8/8 at 13060496 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5FB|marconi-bt: Unable to match bluetooth service in device tree. 
+E5FB|marconi-bt: Not a valid MAC address (all 00s). 
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #245888 8/8 at 13012920 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5FB|bluetooth: Unable to match bluetooth service in device tree. 
+E5FB|bluetooth: Not a valid MAC address (all 00s). 
+E5FB|FindLocalMacAddress did not find bootargs for random address generation
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #246016 8/8 at 16253280 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #246144 8/8 at 13000136 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #246272 8/8 at 12961272 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #246400 8/8 at 12999864 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #246528 8/8 at 16245160 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+nE5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #246656 8/8 at 16161688 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #246784 8/8 at 13000272 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+sE5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #246912 8/8 at 13011576 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #247040 8/8 at 13011312 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+ 2E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #247168 8/8 at 12965288 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+ code 5 flags 0
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #247296 8/8 at 12996456 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+Process[125] crashed: SpringBoard. Too many corpses being created.
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #247424 8/8 at 12964264 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #247552 8/8 at 16250152 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #247680 8/8 at 16252824 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
+E5KEEP EXC pid 27 (SpringBoard) exc 6 code 1 sub 7121094468 lr 1a8734744 fp 0 x16 198ac06bc x17 191206c78 fr 1a8745f8c 1a873399c 1a87438cc 1a87436d0 1a8742f8c 1b044e84c
+
+E5KEEP OBJ19 pid 27 (SpringBoard) ptr 300f586e0 read 0 words 21a1fdc55d21 140 1e0 0 0 404e000000000000 1 0 0 0
+
+NativeSd: rw done #247808 8/8 at 13009712 d=100 c=12 m=15 k=3f l=0 a=130055 o=0 u=4:4:0:0 g=2:0 h=4ff:3f v=1ff s=18a0 r=0 p=published x=ab20a450 q=ready t=17:0 B=0.0.0.0 C=1:0 D=1:1
+
