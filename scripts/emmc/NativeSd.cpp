@@ -1184,9 +1184,13 @@ extern "C" int e5_display_probe(void) {
   OSReturn kr = OSKext::loadKextWithIdentifier(
       "com.apple.iokit.IOMobileGraphicsFamily");
   IOLog("NativeSd: display kext load kr %d\n", (int)kr);
+  // bit0 Service, bit1 Legacy, bit2 IOMedia (control, base-linked),
+  // bit3 AppleARMIODevice (control, prelink kext with personalities)
   const char *names[] = {
     "IOMobileFramebufferService",
     "IOMobileFramebufferLegacy",
+    "IOMedia",
+    "AppleARMIODevice",
     nullptr,
   };
   int mask = 0;
