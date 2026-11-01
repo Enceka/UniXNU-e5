@@ -211,14 +211,14 @@ public:
     for i, name in enumerate(compiled):
         if name.startswith(('__ZN9E5Display', '__ZNK9E5Display')):
             owned_slots.append(i)
-            require(i in [0, 1, 7, 86] + PURE, 'unexpected owned override ' + str(i))
+            require(i in [0, 1, 7, 86, 91] + PURE, 'unexpected owned override ' + str(i))
         elif '25IOMobileFramebufferLegacy' in name:
             require(i not in PURE and text['va'] <= table[i] < text['va'] + text['filesize'], 'unqualified family binding ' + str(i))
             bindings[name] = table[i] + slide
         else:
             require(i < 168 and name in names.get(table[i], []), 'native inherited symbol mismatch at slot ' + str(i) + ': ' + name)
             native_slots.append(i)
-    require(owned_slots == sorted([0, 1, 7, 86] + PURE), 'owned dispatch set changed')
+    require(owned_slots == sorted([0, 1, 7, 86, 91] + PURE), 'owned dispatch set changed')
     undefined = {name for name, _, kind in symbols if kind == 1 and 'IOMobileFramebufferLegacy' in name}
     require(undefined <= set(bindings), 'unqualified original-class imports: ' + str(undefined - set(bindings)))
     bindings = {name: bindings[name] for name in undefined}

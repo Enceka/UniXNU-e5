@@ -5,6 +5,7 @@
 #include <IOKit/IOLib.h>
 
 extern "C" __attribute__((noreturn)) void e5_display_backend_guard(unsigned slot);
+extern "C" unsigned e5_display_open_count;
 
 class E5Display : public IOMobileFramebufferLegacy {
   OSDeclareDefaultStructors(E5Display)
@@ -13,6 +14,14 @@ public:
   // slots below keep any premature consumer from reaching the DPU path; the
   // first attach round runs on headless Data where no userland opens us.
   bool start(IOService *) override { return true; }
+  // V9 open accounting: slot 91 is IOService::handleOpen in the original
+  // Legacy table (audit-verified: Legacy does not override it), so counting
+  // here observes every IOServiceOpen on the published service without
+  // altering semantics. This is the "Open works" acceptance instrument.
+  bool handleOpen(IOService *forClient, IOOptionBits options, void *arg) override {
+    e5_display_open_count++;
+    return IOService::handleOpen(forClient, options, arg);
+  }
 #define E5_GUARDED_SLOT(n) \
   __attribute__((noreturn)) void opaque##n() override { e5_display_backend_guard(n); }
   E5_GUARDED_SLOT(211)
@@ -45,6 +54,7 @@ extern "C" unsigned e5_display_compiled_size(void) { return sizeof(E5Display); }
 // dropped here. The construction probe's instance-count balance (r=0)
 // covers only its own transient object and stays valid.
 extern int e5_display_attach;
+extern "C" unsigned e5_display_open_count = 0;
 
 extern "C" int e5_display_publish(IOService *provider) {
   if (!provider) return 0;
@@ -57,24 +67,26 @@ extern "C" int e5_display_publish(IOService *provider) {
   if (display && display->init()) {
     e5_display_attach |= 0x1000;
     display->attach(provider);
-    e5_display_attach |= 0x2000;
-    if (display->start(provider)) {
-      e5_display_attach |= 0x4000;
-      display->registerService();
-      e5_display_attach |= 0x8000;
-      live = true;
-    } else {
-      display->detach(provider);
+    // IOService::attach returns void; confirm the registry edge exists
+    // before claiming the step (r83 evidence review: attach is not
+    // verified by side effect).
+    if (display->getProvider() == provider) {
+      e5_display_attach |= 0x2000;
+      if (display->start(provider)) {
+        e5_display_attach |= 0x4000;
+        display->registerService();
+        e5_display_attach |= 0x8000;
+        OSDictionary *match = IOService::nameMatching("E5Display");
+        IOService *seen = match ? IOService::copyMatchingService(match) : nullptr;
+        if (match) match->release();
+        if (seen) {
+          e5_display_attach |= 0x10000;
+          seen->release();
+          live = true;  // published AND observable by name
+        }
+      }
     }
-  }
-  if (live) {
-    OSDictionary *match = IOService::nameMatching("E5Display");
-    IOService *seen = match ? IOService::copyMatchingService(match) : nullptr;
-    if (match) match->release();
-    if (seen) {
-      e5_display_attach |= 0x10000;
-      seen->release();
-    }
+    if (!live) display->detach(provider);
   }
   object->release();
   return live ? 1 : 0;

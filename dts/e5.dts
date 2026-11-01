@@ -21,6 +21,7 @@
         // as IOPlatformDevice/AppleARMIODevice instances).
         lcd@0 {
             compatible = "lcd";
+            device_type = "display-subsystem";
             unixnu,adt-name = "lcd";
         };
     };
