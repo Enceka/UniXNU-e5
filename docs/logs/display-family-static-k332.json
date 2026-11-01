@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "kernel": "uefi/build/e5-kernel-artifact-332/kernel.macho",
+  "kernel_sha256": "50b56faffa1d451b723f93942b4311989dadaf0afb99afe232a5b104c5fb8652",
+  "bundle": "com.apple.iokit.IOMobileGraphicsFamily",
+  "executable": "IOMobileGraphicsFamily",
+  "interface": false,
+  "kernel_resource": false,
+  "initializer_count": 10,
+  "alloc_vtable_slot": "0x68",
+  "control_class": "NativeSd",
+  "classes": {
+    "IOMobileFramebufferUserClient": {
+      "name_va": "0xfffffff0045f673a",
+      "constructor_reference_va": "0xfffffff005776298",
+      "metaclass_vtable_va": "0xfffffff005f353c0",
+      "alloc_va": "0xfffffff0057762c4",
+      "first_five_words": [
+        "0xd10083ff",
+        "0xa9017bfd",
+        "0x910043fd",
+        "0xf90007e0",
+        "0xd280a700"
+      ],
+      "null_factory_stub": false
+    },
+    "IOMobileFramebuffer": {
+      "name_va": "0xfffffff0045f7030",
+      "constructor_reference_va": "0xfffffff00577b3f4",
+      "metaclass_vtable_va": "0xfffffff005f365e8",
+      "alloc_va": "0xfffffff00577b420",
+      "first_five_words": [
+        "0xd10043ff",
+        "0xf90007e0",
+        "0xd2800000",
+        "0x910043ff",
+        "0xd65f03c0"
+      ],
+      "null_factory_stub": true
+    },
+    "IOMobileFramebufferService": {
+      "name_va": "0xfffffff0045f7070",
+      "constructor_reference_va": "0xfffffff00577b5f4",
+      "metaclass_vtable_va": "0xfffffff005f36ec8",
+      "alloc_va": "0xfffffff00577b620",
+      "first_five_words": [
+        "0xd10043ff",
+        "0xf90007e0",
+        "0xd2800000",
+        "0x910043ff",
+        "0xd65f03c0"
+      ],
+      "null_factory_stub": true
+    },
+    "IOMobileFramebufferLegacy": {
+      "name_va": "0xfffffff0045fbc47",
+      "constructor_reference_va": "0xfffffff0057866a8",
+      "metaclass_vtable_va": "0xfffffff005f390b8",
+      "alloc_va": "0xfffffff0057866d4",
+      "first_five_words": [
+        "0xd10043ff",
+        "0xf90007e0",
+        "0xd2800000",
+        "0x910043ff",
+        "0xd65f03c0"
+      ],
+      "null_factory_stub": true
+    }
+  },
+  "runtime_registration_verified": false,
+  "conclusion": "NULL allocation alone does not establish missing runtime metaclass registration",
+  "input_device_revision": "04c4a611d3742d7a45572732bdde849bb67a4b0f"
+}
