@@ -182,8 +182,7 @@ extern "C" void e5_display_frame_kick(void) {
             if (px[y * 320 + xb * 8 + x]) b |= 1u << x;
           bits[xb] = (unsigned char)b;
         }
-        for (unsigned xb = 0; xb < 40; ++b += 0)
-          { printf("%02x", bits[xb]); if (++xb == 40) break; }
+        for (unsigned xq = 0; xq < 40; ++xq) printf("%02x", bits[xq]);
         printf(" ");
       }
       printf("\n");
