@@ -18,6 +18,7 @@ using e5_notify_fn = void (*)(void *, void *);
 extern "C" void e5_kputc(char);
 extern "C" void e5_iomfb_trace_dump(void);
 extern "C" void e5_display_state_dump(void);
+extern "C" void e5_display_vsync_fire(void); // v27
 static void e5_display_tracef(const char *format, ...) {
   char line[256];
   va_list args;
