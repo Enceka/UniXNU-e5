@@ -193,6 +193,14 @@
       "selector": 5,
       "anchor": "0x1b63d1ef4"
     },
+    "swap_wait": {
+      "selector": 6,
+      "anchor": "0x1b63d25e8"
+    },
+    "request_power_change": {
+      "selector": 12,
+      "anchor": "0x1b63d6ffc"
+    },
     "brightness_correction": {
       "selector": 50,
       "anchor": "0x1b63d09d4"
@@ -216,6 +224,51 @@
     "surface_pointer_offset": "0x1620",
     "allocation_observed": false,
     "animation_generator_found": false
+  },
+  "power_contract": {
+    "family_start_clear": [
+      "0xfffffff005787e4c: ldr x8, [sp, #0x68]",
+      "0xfffffff005787e50: str wzr, [x8, #0x16c8]",
+      "0xfffffff005787e54: str wzr, [x8, #0x1880]",
+      "0xfffffff005787e58: strb wzr, [x8, #0x8c]"
+    ],
+    "request_gate": [
+      "0xfffffff005777c38: ldur x8, [x29, #-0x20]",
+      "0xfffffff005777c3c: ldr x8, [x8, #0xd8]",
+      "0xfffffff005777c40: ldrb w8, [x8, #0x8c]",
+      "0xfffffff005777c44: tbz w8, #0, #0xfffffff005777c74",
+      "0xfffffff005777c48: b #0xfffffff005777c4c",
+      "0xfffffff005777c4c: ldur x8, [x29, #-0x20]",
+      "0xfffffff005777c50: ldr x0, [x8, #0xd8]",
+      "0xfffffff005777c54: ldur w8, [x29, #-0x14]",
+      "0xfffffff005777c58: mov x1, x8",
+      "0xfffffff005777c5c: ldr x8, [x0]",
+      "0xfffffff005777c60: ldr x8, [x8, #0x728]",
+      "0xfffffff005777c64: mov x2, #0",
+      "0xfffffff005777c68: blr x8",
+      "0xfffffff005777c6c: stur w0, [x29, #-0x24]",
+      "0xfffffff005777c70: b #0xfffffff005777c84",
+      "0xfffffff005777c74: mov w8, #0x2c7",
+      "0xfffffff005777c78: movk w8, #0xe000, lsl #16",
+      "0xfffffff005777c7c: stur w8, [x29, #-0x24]",
+      "0xfffffff005777c80: b #0xfffffff005777c84"
+    ],
+    "family_support_byte": "0x8c bit 0",
+    "wait_state_fields": [
+      "0x16d0",
+      "0x16e0"
+    ],
+    "quartzcore_ready_check": [
+      "0x189510870: ldr x0, [x19, #0x6378]",
+      "0x189510874: mov w1, #0",
+      "0x189510878: mov w2, #-0x7ffffffd",
+      "0x18951087c: bl #0x18da80818",
+      "0x189510880: cbnz w0, #0x1895108ac",
+      "0x189510884: mov x0, x19",
+      "0x189510888: bl #0x1896013c4"
+    ],
+    "request_scalar_values_observed": false,
+    "exact_busy_return_branch_observed": false
   },
   "system_image": {
     "root": "/Volumes/DawnUpdate21H461.J120J121J207J208OS",

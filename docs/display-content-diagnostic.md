@@ -41,4 +41,4 @@ NULL from MKBEventsRegister in SessionSyncEngine. AppleKeyStore lookup and
 event registration need their own diagnosis; no display property is checked
 at that site.
 
-Host validation: all 86 resolved patches replay successfully against pristine XNU 10063.141.1 with the pinned common, XnuPrelink and SoC inputs. The 13-area porting-record checker passes. CI and hardware validation are pending.
+Host validation: all 86 resolved patches replay successfully against pristine XNU 10063.141.1 with the pinned common, XnuPrelink and SoC inputs. The 13-area porting-record checker passes. CI363 and R109 now pass compile/link/prelink, full flash readback and Android/Data recovery checks. See [R109 findings](display-submit-r109.md). Readiness and visible presentation remain unqualified.
