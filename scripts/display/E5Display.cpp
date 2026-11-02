@@ -2,6 +2,7 @@
 // Copyright (c) 2026, UniXNU contributors.
 // Published lifecycle probe. Hardware initialization remains unqualified.
 #include "OriginalLegacyFramebufferABI.h"
+#include <stdarg.h>
 #include <IOKit/IOLib.h>
 #include <libkern/c++/OSData.h>
 #include <pexpert/pexpert.h>
@@ -40,6 +41,34 @@ static E5Display *sPowerInstance = nullptr;
 extern "C" unsigned e5_display_power_read(void) {
   if (!sPowerInstance) return 0xFF;
   return *(volatile uint8_t *)((uint8_t *)sPowerInstance + 0x8c);
+}
+
+// v16: one-line dump of the family wait/swap machinery state so the host can
+// see which gate is closed (members: +0x3c8 slot-213 cap, +0x1608 power helper,
+// +0x1640 provider cache, +0x1658 wait sub-object, +0x1810 waiter vtable,
+// +0x1818 waiter out-object, +0x1858 pending object, +0x1860/+0x1861 flags,
+// +0x1868 lock, +0x16d0 reader-A object, +0x3c4 last power arg).
+extern "C" void e5_kputc(char);
+static void e5_state_log(const char *format, ...) {
+  char line[288];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(line, sizeof(line), format, args);
+  va_end(args);
+  for (const char *p = line; *p; ++p) e5_kputc(*p);
+  e5_kputc('\n');
+}
+extern "C" void e5_display_state_dump(void) {
+  if (!sPowerInstance) return;
+  const volatile uint8_t *b = (const volatile uint8_t *)sPowerInstance;
+  auto q = [&](unsigned off) -> unsigned long long {
+    unsigned long long v = 0;
+    for (unsigned i = 0; i != 8; ++i) v |= (unsigned long long)b[off + i] << (8 * i);
+    return v;
+  };
+  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx",
+         (const void *)b, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
+         q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0));
 }
 
 class E5Display : public IOMobileFramebufferLegacy {

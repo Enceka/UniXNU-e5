@@ -9,6 +9,7 @@
 #include <stdarg.h>
 extern "C" void e5_kputc(char);
 extern "C" void e5_iomfb_trace_dump(void);
+extern "C" void e5_display_state_dump(void);
 static void e5_display_tracef(const char *format, ...) {
   char line[256];
   va_list args;
@@ -88,6 +89,7 @@ static uint32_t e5_display_crc32(const volatile uint8_t *p, size_t n) {
 extern "C" void e5_display_frame_kick(void) {
   static unsigned traceKicks;
   if ((traceKicks++ % 16) == 0) e5_iomfb_trace_dump();
+  e5_display_state_dump(); // v16: wait-machinery state alongside the selector census
   if (sPanelKicks == 0) {
     sPanelMemory = IODeviceMemory::withRange(0xBE000000ull, 0x4B000ull);
     if (sPanelMemory) sPanelMap = sPanelMemory->map();
