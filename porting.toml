@@ -396,6 +396,13 @@ next_action = ["Preserve the qualified R109 gateway and no-vc control. Capture s
 
 [[area.evidence]]
 kind = "device"
+command = "board rounds 137-144 (D2 native DPU paint + PWM backlight + vsync poll + RUN bit)"
+reference = "docs/logs/display-dpu-rounds-143-144.json"
+result = "D2 VISUAL ACCEPTANCE PASS: user-confirmed RGB bands scrolling on panel (kernel paint via DPU scanout, 0 panic); vsync INT telemetry open"
+revision = "2ee6037ef10f59b112fdc84ca08edf62d2c78cf56d8aca0718d09e9858289c9a"
+
+[[area.evidence]]
+kind = "device"
 revision = "91e2c049f63948a560ce82d01d50499f8694c8f8"
 status = "pass"
 summary = "r114-r115 swap-band rounds: slot-176 wait override turned the sel-6 3491x Timeout loop into first-call success; v18 swap band (180/183/199/206/207/232) turned sel 15/22/27/33/50/57 all green and u climbed to 5:5; v19 (201/224) dispatched for the sel 79/84 leftovers"
