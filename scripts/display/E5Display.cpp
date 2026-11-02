@@ -46,7 +46,7 @@ extern "C" unsigned e5_display_power_read(void) {
   return *(volatile uint8_t *)((uint8_t *)sPowerInstance + 0x8c);
 }
 
-void *e5_display_service_instance() { return sPowerInstance; }
+extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 
 // v16: one-line dump of the family wait/swap machinery state so the host can
 // see which gate is closed (members: +0x3c8 slot-213 cap, +0x1608 power helper,
