@@ -121,10 +121,9 @@ extern "C" void e5_display_async_fire(void); // timer body below
 static thread_call_t sFireTimer = nullptr;
 extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backlight
 static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
-  // merged main: native-list delivery (r126 semantics) + D2 dpu tick
-  if (sPowerInstance)
-    e5_display_async_action(sPowerInstance, nullptr, nullptr, nullptr,
-                            nullptr);
+  // merged main: native-list delivery (r126 semantics, gate-protected in
+  // fire()) + D2 dpu tick
+  e5_display_async_fire();
   e5_dpu_tick(); // D2 v1: native scanout pattern + backlight pulse (timer ctx)
   // v1.2: reschedule UNCONDITIONALLY. r138 proved the first fire lands
   // ~100ms after the first pager echo — before display start() sets
