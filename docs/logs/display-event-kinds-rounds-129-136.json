@@ -1,0 +1,19 @@
+{
+  "rounds": {
+    "r129": {"kernel": "389", "data": "data-sb-copy.raw", "result": "G absent (stage echo not yet in kernel); zero E5UL; healthy u=5:5"},
+    "r130": {"kernel": "392 bc69dbb6", "result": "G=2 uniform: e5diag wrapper EXEC as init CONFIRMED; zero E5UL; no telemetry child"},
+    "r131": {"kernel": "392", "data": "data-diag2.raw posix_spawn", "result": "G=2; zero E5UL; child never produced output"},
+    "r132": {"kernel": "394 623807b4 (E5BEAT reader)", "data": "data-diag3.raw beat agent", "result": "E5BEAT absent x48: reader works, heartbeat file never written -> child never ran"},
+    "r133": {"kernel": "394", "data": "data-diag4.raw v4 markers", "result": "E5BEAT spawn=1 child=0: posix_spawn returns EPERM - spawn of adhoc agent DENIED; kernel-side regression g=0:e00002d8 u=0:0 (beat vn_rdwr from frame_kick stalls display service) -> revert"},
+    "r134": {"kernel": "395 45196084 (revert)", "data": "data-diag5.raw + e5lib.dylib DYLD beacon", "result": "health restored u=4:4 C=1:0; ZERO E5UL: dyld ignored DYLD_INSERT_LIBRARIES for launchd (platform binary) - interpose closed"},
+    "r135": {"kernel": "396 bef73cf0 v29 family-broadcast inline", "result": "REGRESSION C=0:e00002d8 Q=0:0 vc-14%: family broadcast marshaling too heavy inline from frame_kick echo thread; F=19-20 mostly frozen"},
+    "r136": {"kernel": "397 9e72e3e6 v29.1 thread_call timer", "result": "health restored u=3:3 C=1:0 F=32 changing; family-marshaled kind-3 delivery live; STILL d/b/e=0 (no sel 3/4/5)"}
+  },
+  "conclusions": [
+    "Userspace telemetry from Data volume is closed: fork blocked, posix_spawn EPERM for adhoc binaries, DYLD interpose ignored for platform binaries",
+    "Heavy work inline in frame_kick (NativeSd echo thread) stalls client service calls (slot 213 Timeout) - twice observed (r133 vn_rdwr, r135 family broadcast); deliver via thread_call instead",
+    "kind-3 async events - raw (r126) or family-marshaled via +0x1608 helper (r136) - do not unlock surface/swap; the client's no-surface decision is upstream of event delivery",
+    "Two-color animated dither drawer (r107/108) + no swap calls + SB alive = consistent with CoreAnimation no-renderer placeholder: UI content plausibly gated on the G phase (GPU)"
+  ],
+  "open": ["why backboardd never calls sel 3 GetLayerDefaultSurface", "LA fixed abort", "G phase GPU as UI prerequisite"]
+}

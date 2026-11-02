@@ -44,6 +44,7 @@ extern "C" unsigned e5_display_power_before_nuc, e5_display_power_after_nuc, e5_
 extern "C" unsigned e5_display_pw_calls, e5_display_pw_results;
 extern "C" unsigned e5_display_wait_calls, e5_display_wait_last;
 extern "C" unsigned e5_display_swap_mask;
+extern "C" int e5_diag_stage;
 extern "C" void e5_display_frame_kick(void);
 extern int e5_display_metaclasses;
 extern int e5_display_kext_state;
@@ -64,12 +65,19 @@ static void dataCheckpoint(const char *phase, uint32_t detail = 0) {
   __atomic_store_n(&dataPublication, phase, __ATOMIC_RELEASE);
 }
 
+
 class NativeSd;
+// D2 v1.3: file-scope ADI peek so the display DPU tick line can read the
+// UMP9620 watchdog state (r139 ticks spanned >600s with no wdt reboot).
+static NativeSd *sWdtPeekInstance = nullptr;
+extern "C" unsigned e5_pmic_peek(unsigned off); // defined after the class
+
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
 static bool publishData(E5DataDevice *device, NativeSd *host);
 
 class NativeSd : public IOBlockStorageDevice {
+  friend unsigned e5_pmic_peek(unsigned off);
   OSDeclareDefaultStructors(NativeSd)
   struct Region {
     IOMemoryDescriptor *md = nullptr;
@@ -786,6 +794,7 @@ public:
   }
   bool start(IOService *provider) override {
     if (!IOBlockStorageDevice::start(provider)) return false;
+    sWdtPeekInstance = this; // D2 v1.3: wdt peek for the display tick line
     sdlog("NativeSd: v1 start, independent SDIO0 host\n");
     if (!ahb.open(0x20000000, 0x2000) || !aon.open(0x64900000, 0x3000) ||
         !clocks.open(0x64920000, 0x1000) || !adi.open(0x64400000, 0x1000) ||
@@ -956,7 +965,7 @@ public:
       e5_display_frame_kick();
       // r90: slot 213 left the soft-guard set for a real capability answer;
       // C=<calls>:<status> tracks it on the same echo line.
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
@@ -994,7 +1003,8 @@ public:
             __atomic_load_n(&e5_display_pw_results, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_display_wait_calls, __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&e5_display_wait_last, __ATOMIC_RELAXED),
-            __atomic_load_n(&e5_display_swap_mask, __ATOMIC_RELAXED));
+            __atomic_load_n(&e5_display_swap_mask, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_diag_stage, __ATOMIC_RELAXED));
     }
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
@@ -1002,6 +1012,11 @@ public:
     return kIOReturnSuccess;
   }
 };
+extern "C" unsigned e5_pmic_peek(unsigned off) {
+  return (sWdtPeekInstance && off < 0x8000u) ? sWdtPeekInstance->pmicRead(off)
+                                             : 0xeeeeeeeeu;
+}
+
 OSDefineMetaClassAndStructors(NativeSd, IOBlockStorageDevice)
 
 // A second storage device shares the host's lock, DMA buffer and error handling.

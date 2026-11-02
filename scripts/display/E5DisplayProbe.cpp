@@ -18,10 +18,11 @@ using e5_notify_fn = void (*)(void *, void *);
 // E5TW only: printf would change the framebuffer being measured.
 #include <stdarg.h>
 extern "C" void e5_kputc(char);
+extern "C" unsigned e5_pmic_peek(unsigned off); // NativeSd.cpp: PMIC ADI read for wdt probe
 extern "C" void e5_iomfb_trace_dump(void);
 extern "C" void e5_display_state_dump(void);
 extern "C" void e5_display_vsync_fire(void); // v27
-extern "C" void e5_display_async_fire(void); // v28: real async-event delivery
+extern "C" void e5_display_async_kick(void); // v29.1: arm the delivery timer
 static void e5_display_tracef(const char *format, ...) {
   char line[256];
   va_list args;
@@ -154,7 +155,7 @@ extern "C" void e5_display_frame_kick(void) {
   }
   e5_display_state_dump(); // v16: wait-machinery state alongside the selector census
   e5_display_vsync_fire();  // v27: fire the armed vsync event (token bump + clear)
-  e5_display_async_fire();  // v28: deliver vsync-class async notifications
+  e5_display_async_kick();   // v29.1: arm the delivery timer (fire moved off the echo thread)
   if (sPanelKicks == 0) {
     sPanelMemory = IODeviceMemory::withRange(0xBE000000ull, 0x4B000ull);
     if (sPanelMemory) sPanelMap = sPanelMemory->map();
@@ -335,4 +336,219 @@ extern "C" int e5_concrete_display_probe(void) {
          (unsigned)e5_display_construction, (unsigned)e5_display_original_size,
          (unsigned)e5_display_registration_result, instances, owned->getInstanceCount());
   return e5_display_construction == 0x1ff;
+}
+
+// ---------------------------------------------------------------------------
+// D2 v1: native DPU takeover probe + paint + backlight modulation.
+// The plan (display-touch-gpu-plan.md D2) wants E5-owned scanout BEFORE the
+// GPU phase: continuous dynamic output and panel/backlight control, with the
+// UEFI-programmed pipeline as the starting point. All register facts come
+// from the M0 live decode (docs/m0-bringup-report.md): DPU core
+// 0x31000000+0x3000 (PANEL_SIZE@0x18, LAYER_ENABLE@0x2c, LAY0_BASE@0x30,
+// LAY0_CTRL@0x40, LAY0_PITCH@0x4c), PWM ch0 at 0x30000 (PRESCALE@0, MOD@4,
+// DUTY@8, ENABLE@0x18, 16KiB channel stride, pwm-sprd.c).
+// ---------------------------------------------------------------------------
+static IODeviceMemory *sDpuMemory = nullptr;
+static IOMemoryMap *sDpuMap = nullptr;
+static IODeviceMemory *sPwmMemory = nullptr;
+static IOMemoryMap *sPwmMap = nullptr;
+static uint32_t sPwmOrigDuty = 0;
+static unsigned sPaintTicks = 0;
+// D2 v2: poll DPU vsync (REG_DPU_INT_STS @0x1E8 bit5, Linux sprd_dpu.c
+// BIT_DPU_INT_VSYNC). A ~60Hz pulse here proves the scanout engine runs
+// and frame-locks the SwapWait completion path.
+extern "C" unsigned e5_display_vsync_edges(void);
+// D3 v0: I2C3 controller probe. i2c@2270000 is a child of ap-ahb whose
+// ranges are <0 0 0x20000000 0x22f0000> (live-fdt) -> controller PA
+// 0x22270000. tlsc6x@2e (X320 Y480, irq gpio13, reset gpio14) rides it.
+// Android used this bus until the handoff: first probe reads VERSION with
+// NO gate/clock/pinmux touches to test the hot-state shortcut.
+static IODeviceMemory *sI2cMemory = nullptr;
+static IOMemoryMap *sI2cMap = nullptr;
+static unsigned sI2cStage = 0;
+static unsigned sI2cVersion = 0xeeeeeeee, sI2cProbeStatus = 0xeeeeeeee;
+
+static volatile uint32_t *i2cReg(unsigned off) {
+  return (volatile uint32_t *)((uint8_t *)sI2cMap->getVirtualAddress() + off);
+}
+
+// apahb gate block (live-fdt apahb-gate reg <0x0 0x3000> under ap-ahb
+// ranges -> PA 0x20003000). ums9621-clk.c: i2c3_eb = SC gate BIT(13) with
+// set-mirror at +0x1000 (write-1-to-set 0x20004000; status in 0x20003000).
+// r145 proved the controller answers nothing while gated (data abort on the
+// first register read), so the gate must be armed BEFORE any i2c access.
+static IODeviceMemory *sGateMemory = nullptr;
+static IOMemoryMap *sGateMap = nullptr;
+static unsigned sGateStatusBefore = 0xeeeeeeee, sGateStatusAfter = 0xeeeeeeee;
+
+static volatile uint32_t *gateReg(unsigned off) {
+  return (volatile uint32_t *)((uint8_t *)sGateMap->getVirtualAddress() + off);
+}
+
+extern "C" void e5_i2c3_tick(unsigned now) {
+  if (!sGateMap) {
+    sGateMemory = IODeviceMemory::withRange(0x20003000ull, 0x2000ull);
+    if (sGateMemory) sGateMap = sGateMemory->map();
+    if (!sGateMap) return;
+  }
+  if (sI2cStage == 0) {
+    sGateStatusBefore = *gateReg(0x0);
+    *gateReg(0x1000) = (1u << 13); // set-mirror: i2c3_eb on
+    for (int i = 0; i < 50; ++i) { __asm__ volatile("" ::: "memory"); }
+    sGateStatusAfter = *gateReg(0x0);
+    if (sGateStatusAfter & (1u << 13)) {
+      sI2cMemory = IODeviceMemory::withRange(0x22270000ull, 0x1000ull);
+      if (sI2cMemory) sI2cMap = sI2cMemory->map();
+    }
+    sI2cStage = 1;
+    return;
+  }
+  if (!sI2cMap) {
+    if ((now % 5000) == 30)
+      e5_display_tracef("E5I2C gate %x->%x (i2c3_eb still off)",
+                        sGateStatusBefore, sGateStatusAfter);
+    return;
+  }
+  if (sI2cStage == 1) {
+    sI2cVersion = *i2cReg(0x1c); // I2C_VERSION
+    sI2cStage = 2;
+    return;
+  }
+  if (sI2cStage == 2 && (now % 5000) == 20) {
+    // 0-byte write probe of the TLSC6x address: ADDR_CFG=0x2e<<1,
+    // COUNT=0, START. STATUS readback captures ACK/NACK state bits.
+    uint32_t ctl = *i2cReg(0x00);
+    *i2cReg(0x04) = (0x2e << 1);
+    *i2cReg(0x08) = 0;
+    *i2cReg(0x00) = (ctl | 1u) & ~(1u << 20);
+    for (int i = 0; i < 200; ++i) { __asm__ volatile("" ::: "memory"); }
+    sI2cProbeStatus = *i2cReg(0x14);
+    *i2cReg(0x00) = ctl | (1u << 20); // STP releases the bus
+    sI2cStage = 3;
+  }
+  if ((now % 5000) == 30)
+    e5_display_tracef("E5I2C gate %x->%x ver=%x st=%x", sGateStatusBefore,
+                      sGateStatusAfter, sI2cVersion, sI2cProbeStatus);
+}
+
+static bool sVsyncArmed = false;
+static uint32_t sVsyncEdges = 0, sVsyncLastSts = 0;
+extern "C" unsigned e5_display_vsync_edges(void) { return sVsyncEdges; }
+
+static volatile uint32_t *dpuReg(unsigned off) {
+  if (!sDpuMap) return nullptr;
+  return (volatile uint32_t *)((uint8_t *)sDpuMap->getVirtualAddress() + off);
+}
+static volatile uint32_t *pwmReg(unsigned off) {
+  if (!sPwmMap) return nullptr;
+  return (volatile uint32_t *)((uint8_t *)sPwmMap->getVirtualAddress() + off);
+}
+
+// Paint the M0 acceptance pattern into the live scanout window: red / green
+// / blue / white horizontal bands with a black vertical stripe whose x
+// position rotates — one stripe step per call. Called from the delivery
+// timer (thread context, never the echo thread).
+extern "C" void e5_dpu_paint_step(void) {
+  if (!sPanelMap) return;
+  volatile uint16_t *px = (volatile uint16_t *)sPanelMap->getVirtualAddress();
+  const unsigned W = 320, H = 480;
+  // r141: tick rate ~1.8kHz means %8 = 4.4ms per stripe step - invisible.
+  // Human-visible: advance the stripe every 4096 ticks (~2.3s per step).
+  unsigned stripe = ((sPaintTicks++ / 4096) % 8) * 40;
+  for (unsigned y = 0; y < H; ++y) {
+    uint16_t band = (y < 120) ? 0xF800 : (y < 240) ? 0x07E0 : (y < 360) ? 0x001F : 0xFFFF;
+    for (unsigned x = 0; x < W; ++x) px[y * W + x] = (x >= stripe && x < stripe + 40) ? 0x0000 : band;
+  }
+}
+
+extern "C" void e5_dpu_tick(void) {
+  // first entry: map + dump + take a baseline of the backlight duty
+  if (!sDpuMap) {
+    sDpuMemory = IODeviceMemory::withRange(0x31000000ull, 0x3000ull);
+    if (sDpuMemory) sDpuMap = sDpuMemory->map();
+    // pwm@30000 is a CHILD of /soc/aon whose ranges make children OFFSETS of
+    // 0x64000000 (same translation the ADI rounds taught us) — absolute PA of
+    // PWM channel 0 is 0x64030000; mapping 0x30000 directly = data abort
+    // (r137 panic, E5DPU dump had already proven the DPU side).
+    sPwmMemory = IODeviceMemory::withRange(0x64030000ull, 0x20ull);
+    if (sPwmMemory) sPwmMap = sPwmMemory->map();
+    if (sDpuMap) {
+      e5_display_tracef(
+          "E5DPU id=%03x ctrl=%x panel=%08x layen=%x base=%08x layctrl=%x pitch=%03x",
+          *dpuReg(0x000) & 0xFFF, *dpuReg(0x008), *dpuReg(0x018),
+          *dpuReg(0x02c), *dpuReg(0x030), *dpuReg(0x040), *dpuReg(0x04c));
+    } else {
+      e5_display_tracef("E5DPU map failed");
+    }
+    if (sPwmMap) {
+      sPwmOrigDuty = *pwmReg(0x08) & 0xFFFF;
+      e5_display_tracef("E5PWM prescale=%x mod=%x duty=%x enable=%x",
+                           *pwmReg(0x0), *pwmReg(0x4), sPwmOrigDuty,
+                           *pwmReg(0x18));
+    } else {
+      e5_display_tracef("E5PWM map failed");
+    }
+  }
+  // continuous dynamic output: step the paint pattern; every 8th tick also
+  // pulse the backlight to 1/4 duty and back (panel/backlight acceptance)
+  e5_dpu_paint_step();
+  e5_i2c3_tick(sPaintTicks);
+
+  if (sDpuMap) {
+    volatile uint32_t *en =
+        (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x1E0 / 4;
+    volatile uint32_t *clr =
+        (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x1E4 / 4;
+    volatile uint32_t *sts =
+        (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x1E8 / 4;
+    if (!sVsyncArmed) {
+      *clr = 0xffu;
+      *en |= 0x20u;
+      // r143: ctrl=0 (STOPPED) with zero vsync edges the whole window -
+      // the firmware handoff left the DPU not scanning. Linux
+      // sprd_dpu_run() = REG_DPU_CTRL(0x4) |= BIT_DPU_RUN(bit0); resume
+      // the firmware-era scanout (layer base 0xbe000000 = logo buffer).
+      volatile uint32_t *ctl =
+          (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x04 / 4;
+      *ctl |= 0x01u;
+      sVsyncArmed = true;
+    }
+    uint32_t cur = *sts;
+    if ((cur & 0x20u) && !(sVsyncLastSts & 0x20u)) sVsyncEdges++;
+    if (cur) *clr = cur;
+    sVsyncLastSts = cur;
+  }
+
+  // v1.3: 5s cadence kept but the line is minimal and self-verifying:
+  // row0 crc computed right after paint proves the stripe advanced IN the
+  // surviving line itself (r139's F= evidence was flooded out of the ring);
+  // wdt peek (PMIC ADI cnt@0x50/ctrl@0x48 via NativeSd helper) tests the
+  // r139 anomaly where ticks spanned >600s without a watchdog reboot.
+  // r140 measured the real tick rate at ~1.8 kHz (thread_call interval
+  // unit mismatch vs assumption): %50 printed ~40 Hz and flooded the ring
+  // again. %5000 = one line every ~3 s.
+  if ((sPaintTicks % 5000) == 10) {
+    unsigned rowCrc = 0;
+    if (sPanelMap) {
+      volatile uint16_t *px =
+          (volatile uint16_t *)sPanelMap->getVirtualAddress();
+      for (unsigned x = 0; x < 320; ++x) rowCrc = rowCrc * 31 + px[x];
+    }
+    if (sDpuMap) {
+      volatile uint32_t *ctl2 =
+          (volatile uint32_t *)sDpuMap->getVirtualAddress() + 1;
+      e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x",
+          sPaintTicks, *ctl2,
+          sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc, sVsyncEdges,
+          e5_pmic_peek(0x48));
+    }
+  }
+  if (sPwmMap && sPwmOrigDuty) {
+    // r141: %8 toggles every 4.4ms - invisible flicker. ~1.1s per phase.
+    unsigned phase = (sPaintTicks / 2048) % 2;
+    unsigned duty = phase ? (sPwmOrigDuty / 4) : sPwmOrigDuty;
+    // pwm-sprd.c: writing DUTY applies MOD+DUTY to the output; keep ENABLE
+    // untouched so the channel keeps running.
+    *pwmReg(0x08) = duty;
+  }
 }

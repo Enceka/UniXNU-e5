@@ -1,0 +1,13 @@
+{
+  "rounds": [143, 144],
+  "kernel": "LOCAL BUILD v2 = 263a0ef1 (payload f53bf7b2), v2.1 = 2ee6037e padded ed68b662 (payload f864cd23)",
+  "verdict": "D2 VISUAL ACCEPTANCE PASS - USER CONFIRMED RGB BANDS SCROLLING ON PANEL",
+  "facts": [
+    "r143 (v2 poll-only): v=0 uniform ALL 219 lines = DPU INT_STS bit5 never pulses; ctrl=0 read",
+    "r144 (v2.1 RUN bit): USER SAW 红绿蓝彩条从左向右在滚动 at ~06:30 during the live XNU window (m11759) = PANEL STREAM LIVE, KERNEL-DRIVEN CONTENT VISIBLE",
+    "r144 telemetry paradox: ctl=0 and v=0 uniform across 219 lines despite visible motion - RUN bit is likely a self-clearing trigger (DPI shadow-load pulse), and INT_EN/STS may need extra clock gating or differ on qogirn6lite; panel motion + crc cycling prove scanout independently",
+    "0 E5EXC, 0 panic both rounds; wdt armed; paint crc cycles all phases",
+    "SAFETY INCIDENT (recovered): r144 first launch flashed an EMPTY payload (disk-full OSError during payload copy left 0 bytes; run-board-cycle.py readback-verify compared empty==empty and passed); device fell back to Android A normally; freed 450MB (old artifacts), rebuilt payload f864cd23, relaunched successfully. Harness needs a minimum-size guard on the payload file."
+  ],
+  "acceptance": "D2 partial: 持续动态输出 (kernel paint -> DPU scanout -> panel) + 背光调制 both human-confirmed; vsync IRQ telemetry remains open"
+}

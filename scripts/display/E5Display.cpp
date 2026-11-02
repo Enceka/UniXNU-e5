@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 // Copyright (c) 2026, UniXNU contributors.
 // Published lifecycle probe. Hardware initialization remains unqualified.
+#include <kern/thread_call.h>
 #include "OriginalLegacyFramebufferABI.h"
 #include <stdarg.h>
 #include <IOKit/IOLib.h>
@@ -29,6 +30,8 @@ unsigned e5_display_ok306_calls = 0;
 // v15 power-band override counters (slots 229/255/256/258/260/261).
 unsigned e5_display_pw_calls = 0;
 extern "C" unsigned e5_display_swap_mask = 0;
+extern "C" unsigned e5_display_vsync_edges(void); // D2 v2 (probe)
+static unsigned sWaitSeenEdges = 0;
 extern "C" unsigned e5_display_wait_calls = 0;
 extern "C" unsigned e5_display_wait_last = 0;
 unsigned e5_display_pw_results = 0;
@@ -104,8 +107,35 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
       }
       node = *(uint8_t **)node;
     }
+
+// v28: deliver a vsync-style async notification through the bound kernel
+// export to every registered event context. Called from frame_kick.
+// v29.1: r135 proved firing the family broadcast INLINE from frame_kick
+// (NativeSd echo thread) stalls client service calls (C=0:e00002d8) — the
+// marshaling is far heavier than r126's raw send. Move delivery to a
+// self-rescheduling thread_call timer so the echo thread never blocks.
+extern "C" void e5_display_async_fire(void); // timer body below
+static thread_call_t sFireTimer = nullptr;
+extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backlight
+static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
+  // merged main: native-list delivery (r126 semantics) + D2 dpu tick
+  if (sPowerInstance)
+    e5_display_async_action(sPowerInstance, nullptr, nullptr, nullptr,
+                            nullptr);
+  e5_dpu_tick(); // D2 v1: native scanout pattern + backlight pulse (timer ctx)
+  // v1.2: reschedule UNCONDITIONALLY. r138 proved the first fire lands
+  // ~100ms after the first pager echo — before display start() sets
+  // sPowerInstance — so the old guard killed the timer after one tick
+  // (one E5DPU print, wrapped out of the ring; one paint; no animation).
+  if (sFireTimer)
+    thread_call_enter1_delayed(sFireTimer, nullptr, 100 * NSEC_PER_MSEC);
+}
+extern "C" void e5_display_async_kick(void) {
+  if (!sFireTimer) {
+    sFireTimer = thread_call_allocate(&e5_fire_timer_fn, nullptr);
+    if (!sFireTimer) return;
+    thread_call_enter1_delayed(sFireTimer, nullptr, 100 * NSEC_PER_MSEC);
   }
-  return kIOReturnSuccess;
 }
 extern "C" void e5_display_async_fire(void) {
   if (!sPowerInstance) return;
