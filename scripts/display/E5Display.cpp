@@ -34,6 +34,7 @@ unsigned e5_display_pw_results = 0;
 unsigned e5_display_power_before_nuc = 0xFF;
 unsigned e5_display_power_after_nuc = 0xFF;
 }
+extern "C" unsigned e5_display_vsync_fires = 0; // v27 fake-vsync fire count
 extern "C" unsigned e5_display_power_last; // owned by E5DisplayProbe.cpp
 
 // The published instance whose +0x8c byte the family power dispatcher gates
@@ -47,6 +48,19 @@ extern "C" unsigned e5_display_power_read(void) {
 }
 
 extern "C" void *e5_display_service_instance() { return sPowerInstance; }
+// v27: fire the fake vsync event: bump the +0x16d0 token and clear the
+// +0x16e0 enabled flag, exactly what the concrete driver's event source
+// does (H9G power path writes the token at 0x6bf7ae4). Called from
+// frame_kick every 16th kick — pager activity proves continuous.
+extern "C" void e5_display_vsync_fire(void) {
+  void *svc = sPowerInstance;
+  if (!svc) return;
+  uint8_t *base = (uint8_t *)svc;
+  if (!*(volatile uint8_t *)(base + 0x16e0)) return; // no wait armed
+  *(volatile uint32_t *)(base + 0x16d0) =
+      __atomic_add_fetch(&e5_display_vsync_fires, 1U, __ATOMIC_RELAXED);
+  *(volatile uint8_t *)(base + 0x16e0) = 0;
+}
 
 // v16: one-line dump of the family wait/swap machinery state so the host can
 // see which gate is closed (members: +0x3c8 slot-213 cap, +0x1608 power helper,
@@ -71,9 +85,9 @@ extern "C" void e5_display_state_dump(void) {
     for (unsigned i = 0; i != 8; ++i) v |= (unsigned long long)b[off + i] << (8 * i);
     return v;
   };
-  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx",
+  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u",
          (const void *)b, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
-         q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0));
+         q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires);
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
@@ -289,11 +303,22 @@ public:
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
     return true;
   }
-  IOReturn opaque260() override { // power-on pending ack
+  // v27: slots 260/261 emulate the family's enable/disable event semantics
+  // (original enable_event 0x6797224: [this+0x16dc]=arg, [+0x16e0]=1). The
+  // frame_kick "vsync" fires by bumping the +0x16d0 token and clearing
+  // +0x16e0; slot 176 then answers success exactly like the original wait
+  // (mode3/mode4: enabled->Timeout, token!=0->0). No family internals are
+  // called: the client polls (r112 proved 3491x retries), polling suffices.
+  IOReturn opaque260() override { // enable event
+    uint8_t *base = (uint8_t *)this;
+    *(volatile uint32_t *)(base + 0x16dc) = 0;
+    *(volatile uint8_t *)(base + 0x16e0) = 1;
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
-  IOReturn opaque261() override { // power notification
+  IOReturn opaque261() override { // disable event
+    uint8_t *base = (uint8_t *)this;
+    *(volatile uint8_t *)(base + 0x16e0) = 0;
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
     __atomic_fetch_or(&e5_display_pw_results, 1U, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
@@ -306,12 +331,17 @@ public:
   IOReturn opaque176(uint32_t a, uint32_t b, uint32_t c) override {
     __atomic_fetch_add(&e5_display_wait_calls, 1U, __ATOMIC_RELAXED);
     __atomic_store_n(&e5_display_wait_last, (a & 0xFFFFu) | ((b & 0xFFu) << 16) | ((c & 0xFFu) << 24), __ATOMIC_RELAXED);
-    // v25: fake vsync cadence. r112 proved the client RETRIES on Timeout
-    // (3491x with the original stub); v17's unconditional success made it stop
-    // waiting entirely (u froze, SwapBegin never called). Alternate: ~3
-    // Timeout replies per one Success = a ~60Hz-ish "frame completed" pulse.
-    unsigned n = __atomic_load_n(&e5_display_wait_calls, __ATOMIC_RELAXED);
-    return (n % 2 == 0) ? kIOReturnSuccess : kIOReturnTimeout;
+    // v27: faithful original semantics (slot-176 wait, decoded from the
+    // family base): mode3/mode4 gate on [+0x16e0] (event enabled -> still
+    // waiting -> Timeout) then [+0x16d0] (token != 0 -> fired -> success).
+    // The frame_kick vsync fires the event by bumping the token.
+    uint32_t mode = a & 0x7fffffffu;
+    if (mode == 3u || mode == 4u) {
+      uint8_t *base = (uint8_t *)this;
+      if (*(volatile uint8_t *)(base + 0x16e0)) return kIOReturnTimeout;
+      if (*(volatile uint32_t *)(base + 0x16d0) == 0u) return kIOReturnTimeout;
+    }
+    return kIOReturnSuccess;
   }
   // v18: the swap/surface band. The Legacy base returns kIOReturnUnsupported
   // from every one of these (r114: sel 15/22/27/33/50/57/79/84 all rejected);

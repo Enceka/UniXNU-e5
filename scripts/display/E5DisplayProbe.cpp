@@ -98,6 +98,7 @@ extern "C" void e5_display_frame_kick(void) {
   static unsigned traceKicks;
   if ((traceKicks++ % 16) == 0) e5_iomfb_trace_dump();
   e5_display_state_dump(); // v16: wait-machinery state alongside the selector census
+  e5_display_vsync_fire();  // v27: fire the armed vsync event (token bump + clear)
   if (sPanelKicks == 0) {
     sPanelMemory = IODeviceMemory::withRange(0xBE000000ull, 0x4B000ull);
     if (sPanelMemory) sPanelMap = sPanelMemory->map();
