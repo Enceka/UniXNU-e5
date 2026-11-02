@@ -227,9 +227,9 @@ public:
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
-  IOReturn opaque255() override { // get power state: bit0 = on
+  IOReturn opaque255() override { // get power state: dispatcher tests bit0 (1 = on)
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
-    return kIOReturnSuccess;
+    return 1; // panel is powered by firmware scanout: state = ON
   }
   IOReturn opaque256(uint32_t state) override { // set power state
     (void)state;
