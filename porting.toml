@@ -434,6 +434,7 @@ kind = "device"
 reference = "docs/logs/display-async-round126.json"
 revision = "f62711cce8ad730d1cd7ae9c621f8bf897b14ac4"
 summary = "R126 / CI385 qualifies native async-reference initialization and 631 successful Mach sender returns; surface submission remains absent."
+command = "CI385/run41427462995; display-async-r126/build-payload.py; run-board-cycle.py board-r126; collect-evidence.py 126"
 result = "Full payload readback and nine independent FAT reads pass. ap=08/asend=631/aok=631/ar=0; all 51112 video-character calls are suppressed and scanout remains F=1:557a87bd. Selectors 3/4/5 have zero calls. No kernel panic; liveactivitiesd PID117 exception is retained. Fresh Android A returns after 665s; full 128 MiB Data c1744ab4 and protected OS/SystemOS metadata remain unchanged. Sender success does not prove userspace callback execution or physical presentation."
 components = ["display"]
 
