@@ -106,6 +106,12 @@ public:
     // exists. Ours is the inherited firmware scanout: UEFI already powered
     // the panel, so a power-state request completes without extra work.
     *(volatile uint8_t *)((uint8_t *)this + 0x8c) |= 1U;
+    // v22: the original start caches its AppleARMIODevice provider at +0x1640
+    // and bails early ("provider was not AppleARMIODevice") when the nub is a
+    // plain IOService — leaving +0x1640 NULL. Family internals (DefaultSurface
+    // creation 0x6792804 reads [this+0x1640] as x0 for the provider EDT calls)
+    // then see NULL. Cache our lcd nub there directly.
+    *(IOService * volatile *)((uint8_t *)this + 0x1640) = provider;
     sPowerInstance = this; // v14: let the echo probe poll the +0x8c byte.
     __atomic_fetch_or(&e5_display_lifecycle, 0x20000U, __ATOMIC_RELAXED);
     __atomic_fetch_or(&e5_display_lifecycle, 0x010U, __ATOMIC_RELAXED);
