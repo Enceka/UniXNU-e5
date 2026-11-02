@@ -41,6 +41,21 @@ public:
     surface->release();
     __atomic_fetch_or(&e5_display_lifecycle, 0x400U, __ATOMIC_RELAXED);
     if (!IOMobileFramebufferLegacy::start(provider)) return false;
+    // Power-change support contract: the original Legacy::start clears the
+    // family's power-support byte (family __TEXT_EXEC raw 0xfffffff006787e58,
+    // `strb wzr,[x8,#0x8c]`) and NOTHING inside the family ever sets it again
+    // (sole writer). Every power/readiness path gates on its bit0:
+    //   - request_power_change dispatcher 0xfffffff0067779fc returns
+    //     0xE00002C7 while clear, and only calls the power backend
+    //     (vtable slot 229 -> the +0x1608 sub-object the same start chain
+    //     allocated at 0xfffffff006786f0c) when it is set;
+    //   - the swap readiness check at 0xfffffff006792148 returns
+    //     0xE00002BC (kIOReturnNotReady) while clear.
+    // A concrete platform driver arms the byte once its power backend
+    // exists. Ours is the inherited firmware scanout: UEFI already powered
+    // the panel, so a power-state request completes without extra work.
+    *(volatile uint8_t *)((uint8_t *)this + 0x8c) |= 1U;
+    __atomic_fetch_or(&e5_display_lifecycle, 0x20000U, __ATOMIC_RELAXED);
     __atomic_fetch_or(&e5_display_lifecycle, 0x010U, __ATOMIC_RELAXED);
     unsigned resources = lifecycleResourceMask();
     __atomic_store_n(&e5_display_resources, resources, __ATOMIC_RELAXED);
