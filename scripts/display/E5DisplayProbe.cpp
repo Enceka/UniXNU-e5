@@ -19,7 +19,7 @@ extern "C" void e5_kputc(char);
 extern "C" void e5_iomfb_trace_dump(void);
 extern "C" void e5_display_state_dump(void);
 extern "C" void e5_display_vsync_fire(void); // v27
-extern "C" void e5_display_async_fire(void); // v28: real async-event delivery
+extern "C" void e5_display_async_kick(void); // v29.1: arm the delivery timer
 static void e5_display_tracef(const char *format, ...) {
   char line[256];
   va_list args;
@@ -101,7 +101,7 @@ extern "C" void e5_display_frame_kick(void) {
   if ((traceKicks++ % 16) == 0) e5_iomfb_trace_dump();
   e5_display_state_dump(); // v16: wait-machinery state alongside the selector census
   e5_display_vsync_fire();  // v27: fire the armed vsync event (token bump + clear)
-  e5_display_async_fire();  // v28: deliver vsync-class async notifications
+  e5_display_async_kick();   // v29.1: arm the delivery timer (fire moved off the echo thread)
   if (sPanelKicks == 0) {
     sPanelMemory = IODeviceMemory::withRange(0xBE000000ull, 0x4B000ull);
     if (sPanelMemory) sPanelMap = sPanelMemory->map();

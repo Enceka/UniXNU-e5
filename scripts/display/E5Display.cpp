@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 // Copyright (c) 2026, UniXNU contributors.
 // Published lifecycle probe. Hardware initialization remains unqualified.
+#include <kern/thread_call.h>
 #include "OriginalLegacyFramebufferABI.h"
 #include <stdarg.h>
 #include <IOKit/IOLib.h>
@@ -62,7 +63,24 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 
 // v28: deliver a vsync-style async notification through the bound kernel
 // export to every registered event context. Called from frame_kick.
-// v29: deliver through the FAMILY's own broadcast marshaling
+// v29.1: r135 proved firing the family broadcast INLINE from frame_kick
+// (NativeSd echo thread) stalls client service calls (C=0:e00002d8) — the
+// marshaling is far heavier than r126's raw send. Move delivery to a
+// self-rescheduling thread_call timer so the echo thread never blocks.
+extern "C" void e5_display_async_fire(void); // timer body below
+static thread_call_t sFireTimer = nullptr;
+static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
+  e5_display_async_fire();
+  if (sPowerInstance && sFireTimer)
+    thread_call_enter1_delayed(sFireTimer, nullptr, 100 * NSEC_PER_MSEC);
+}
+extern "C" void e5_display_async_kick(void) {
+  if (!sFireTimer) {
+    sFireTimer = thread_call_allocate(&e5_fire_timer_fn, nullptr);
+    if (!sFireTimer) return;
+    thread_call_enter1_delayed(sFireTimer, nullptr, 100 * NSEC_PER_MSEC);
+  }
+}
 // (0xfffffff0067778c0 raw: (obj, result, payload*, kind, 1) → GOT thunk →
 // sendAsyncResult64WithOptions). r126 proved raw kind-3 sends reach userland
 // but FREEZE the fallback drawer; this round isolates whether the family's
