@@ -356,6 +356,15 @@ extern "C" void e5_dpu_tick(void) {
   // continuous dynamic output: step the paint pattern; every 8th tick also
   // pulse the backlight to 1/4 duty and back (panel/backlight acceptance)
   e5_dpu_paint_step();
+  // v1.2: re-dump state every ~5s (50 ticks) so one-shot prints survive
+  // the 24KB E5TW ring (r138's first-tick lines wrapped out over 600s)
+  if ((sPaintTicks % 50) == 10) {
+    if (sDpuMap)
+      e5_display_tracef(
+          "E5DPU t=%u id=%03x ctrl=%x base=%08x duty=%x",
+          sPaintTicks, *dpuReg(0x000) & 0xFFF, *dpuReg(0x008),
+          *dpuReg(0x030), sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0);
+  }
   if (sPwmMap && sPwmOrigDuty) {
     unsigned phase = (sPaintTicks / 8) % 2;
     unsigned duty = phase ? (sPwmOrigDuty / 4) : sPwmOrigDuty;

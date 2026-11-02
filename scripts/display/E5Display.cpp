@@ -73,7 +73,11 @@ extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backligh
 static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
   e5_display_async_fire();
   e5_dpu_tick(); // D2 v1: native scanout pattern + backlight pulse (timer ctx)
-  if (sPowerInstance && sFireTimer)
+  // v1.2: reschedule UNCONDITIONALLY. r138 proved the first fire lands
+  // ~100ms after the first pager echo — before display start() sets
+  // sPowerInstance — so the old guard killed the timer after one tick
+  // (one E5DPU print, wrapped out of the ring; one paint; no animation).
+  if (sFireTimer)
     thread_call_enter1_delayed(sFireTimer, nullptr, 100 * NSEC_PER_MSEC);
 }
 extern "C" void e5_display_async_kick(void) {
