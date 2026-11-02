@@ -142,8 +142,8 @@ static void e5_beat_read(void) {
   char buf[40];
   memset(buf, 0, sizeof(buf));
   int resid = 0;
-  errno_t err = vn_rdwr(UIO_READ, vp, buf, (int)sizeof(buf) - 1, 0, UIO_SYSSPACE,
-                        0, vfs_context_ucred(ctx), &resid, vfs_context_proc(ctx));
+  errno_t err = vn_rdwr(UIO_READ, vp, buf, sizeof(buf) - 1, 0, UIO_SYSSPACE,
+                        0, vfs_context_ucred(ctx), &resid, ctx);
   vnode_put(vp);
   if (err == 0) e5_state_log("E5BEAT %s", buf);
   else e5_state_log("E5BEAT rdwr %d", err);
