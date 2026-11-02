@@ -29,6 +29,8 @@ unsigned e5_display_ok306_calls = 0;
 // v15 power-band override counters (slots 229/255/256/258/260/261).
 unsigned e5_display_pw_calls = 0;
 extern "C" unsigned e5_display_swap_mask = 0;
+extern "C" unsigned e5_display_vsync_edges(void); // D2 v2 (probe)
+static unsigned sWaitSeenEdges = 0;
 extern "C" unsigned e5_display_wait_calls = 0;
 extern "C" unsigned e5_display_wait_last = 0;
 unsigned e5_display_pw_results = 0;
@@ -429,15 +431,18 @@ public:
   IOReturn opaque176(uint32_t a, uint32_t b, uint32_t c) override {
     __atomic_fetch_add(&e5_display_wait_calls, 1U, __ATOMIC_RELAXED);
     __atomic_store_n(&e5_display_wait_last, (a & 0xFFFFu) | ((b & 0xFFu) << 16) | ((c & 0xFFu) << 24), __ATOMIC_RELAXED);
-    // v27: faithful original semantics (slot-176 wait, decoded from the
-    // family base): mode3/mode4 gate on [+0x16e0] (event enabled -> still
-    // waiting -> Timeout) then [+0x16d0] (token != 0 -> fired -> success).
-    // The frame_kick vsync fires the event by bumping the token.
+    // D2 v2: frame-locked wait. The dpu tick polls REG_DPU_INT_STS bit5
+    // (real scanout vsync); a mode3/mode4 wait succeeds exactly once per
+    // observed edge and times out otherwise, so the client's retry loop
+    // advances at true frame cadence instead of a synthetic count.
     uint32_t mode = a & 0x7fffffffu;
     if (mode == 3u || mode == 4u) {
-      uint8_t *base = (uint8_t *)this;
-      if (*(volatile uint8_t *)(base + 0x16e0)) return kIOReturnTimeout;
-      if (*(volatile uint32_t *)(base + 0x16d0) == 0u) return kIOReturnTimeout;
+      unsigned cur = e5_display_vsync_edges();
+      if (cur != sWaitSeenEdges) {
+        sWaitSeenEdges = cur;
+        return kIOReturnSuccess;
+      }
+      return kIOReturnTimeout;
     }
     return kIOReturnSuccess;
   }

@@ -301,6 +301,13 @@ static IODeviceMemory *sPwmMemory = nullptr;
 static IOMemoryMap *sPwmMap = nullptr;
 static uint32_t sPwmOrigDuty = 0;
 static unsigned sPaintTicks = 0;
+// D2 v2: poll DPU vsync (REG_DPU_INT_STS @0x1E8 bit5, Linux sprd_dpu.c
+// BIT_DPU_INT_VSYNC). A ~60Hz pulse here proves the scanout engine runs
+// and frame-locks the SwapWait completion path.
+extern "C" unsigned e5_display_vsync_edges(void);
+static bool sVsyncArmed = false;
+static uint32_t sVsyncEdges = 0, sVsyncLastSts = 0, sVsyncConsumed = 0;
+extern "C" unsigned e5_display_vsync_edges(void) { return sVsyncEdges; }
 
 static volatile uint32_t *dpuReg(unsigned off) {
   if (!sDpuMap) return nullptr;
@@ -359,6 +366,21 @@ extern "C" void e5_dpu_tick(void) {
   // continuous dynamic output: step the paint pattern; every 8th tick also
   // pulse the backlight to 1/4 duty and back (panel/backlight acceptance)
   e5_dpu_paint_step();
+
+  if (sDpuMap) {
+    volatile uint32_t *en =
+        (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x1E0 / 4;
+    volatile uint32_t *clr =
+        (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x1E4 / 4;
+    volatile uint32_t *sts =
+        (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x1E8 / 4;
+    if (!sVsyncArmed) { *clr = 0xffu; *en |= 0x20u; sVsyncArmed = true; }
+    uint32_t cur = *sts;
+    if ((cur & 0x20u) && !(sVsyncLastSts & 0x20u)) sVsyncEdges++;
+    if (cur) *clr = cur;
+    sVsyncLastSts = cur;
+  }
+
   // v1.3: 5s cadence kept but the line is minimal and self-verifying:
   // row0 crc computed right after paint proves the stripe advanced IN the
   // surviving line itself (r139's F= evidence was flooded out of the ring);
@@ -375,9 +397,10 @@ extern "C" void e5_dpu_tick(void) {
       for (unsigned x = 0; x < 320; ++x) rowCrc = rowCrc * 31 + px[x];
     }
     if (sDpuMap)
-      e5_display_tracef("E5DPU t=%u duty=%x crc=%08x wdt=%x:%04x%04x",
+      e5_display_tracef("E5DPU t=%u duty=%x crc=%08x v=%u wdt=%x:%04x%04x",
           sPaintTicks, sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc,
-          e5_pmic_peek(0x48), e5_pmic_peek(0x5c), e5_pmic_peek(0x58));
+          sVsyncEdges, e5_pmic_peek(0x48), e5_pmic_peek(0x5c),
+          e5_pmic_peek(0x58));
   }
   if (sPwmMap && sPwmOrigDuty) {
     // r141: %8 toggles every 4.4ms - invisible flicker. ~1.1s per phase.
