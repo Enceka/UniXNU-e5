@@ -7,11 +7,15 @@ do not establish that SpringBoard is running, unsuspended, or rendering.
 Add a bounded late census to the existing E5TW checkpoint. For PIDs 1..511,
 retain each process while sampling its name and selected task scalar fields.
 Record SpringBoard, backboardd, runningboardd, frontboardd, liveactivitiesd,
-launchd and WindowServer. Active/suspended, thread counts and stop counts
-are observations, not a coherent task snapshot or proof of forward progress.
+launchd and WindowServer. Active/suspended are observations from the
+available task getters, not proof of forward progress.
 An absent match applies only to the printed PID range. Do not take task/map
 locks, read user memory, suspend processes or send signals from this storage
 checkpoint.
+
+CI388 rejected the first diagnostic because exported IOKit headers leave
+`struct task` incomplete. Remove direct thread/stop-count field access;
+the revised census uses the available state getters. CI388 was not flashed.
 
 Sample published IOKit services through nonwaiting matches. The service
 mask bits 0..5 are IOGPU, IOAccelerator, AppleKeyStore, IOSurfaceRoot,

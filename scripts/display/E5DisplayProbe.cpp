@@ -52,13 +52,10 @@ static void e5_display_runtime_census() {
       seen |= 1u << i;
       const int exiting = proc_exiting(process);
       task_t task = exiting ? TASK_NULL : proc_task(process);
-      e5_display_tracef("E5PROC seq=%u pid=%d name=%s exit=%d active=%u suspended=%u threads=%d active_threads=%u stops=%d\n",
+      e5_display_tracef("E5PROC seq=%u pid=%d name=%s exit=%d active=%u suspended=%u\n",
           sample, pid, name, exiting,
           task ? (unsigned)task_is_active(task) : 0,
-          task ? (unsigned)task_is_app_suspended(task) : 0,
-          task ? __atomic_load_n(&task->thread_count, __ATOMIC_RELAXED) : 0,
-          task ? __atomic_load_n(&task->active_thread_count, __ATOMIC_RELAXED) : 0,
-          task ? __atomic_load_n(&task->user_stop_count, __ATOMIC_RELAXED) : 0);
+          task ? (unsigned)task_is_app_suspended(task) : 0);
       break;
     }
     proc_rele(process);
