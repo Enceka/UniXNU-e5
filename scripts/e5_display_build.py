@@ -19,7 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
-OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 184, 188, 229, 255, 256, 258, 260, 261, 288] + PURE)
+OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 176, 184, 188, 229, 255, 256, 258, 260, 261, 288] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -184,6 +184,10 @@ public:
             header += '  virtual bool isMainDisplay();\n'
         elif i == 188:
             header += '  virtual IOReturn getDotPitch(uint32_t *);\n'
+        elif i == 176:
+            # sel-6 wait (wrapper 0x6777390 -> vt+0x580): (a, b, mode) scalars;
+            # original gates on [+0x16d0] event token and times out.
+            header += '  virtual IOReturn opaque176(uint32_t, uint32_t, uint32_t);\n'
         elif i == 229:
             # request_power_change backend (dispatcher 0x67779fc tail calls it
             # with (uint32_t power_state, void *zero)); the legacy stub only

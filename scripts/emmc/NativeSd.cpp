@@ -42,6 +42,7 @@ extern "C" unsigned e5_display_lifecycle, e5_display_resources;
 extern "C" unsigned e5_display_frame_changes, e5_display_frame_crc;
 extern "C" unsigned e5_display_power_before_nuc, e5_display_power_after_nuc, e5_display_power_last;
 extern "C" unsigned e5_display_pw_calls, e5_display_pw_results;
+extern "C" unsigned e5_display_wait_calls, e5_display_wait_last;
 extern "C" void e5_display_frame_kick(void);
 extern int e5_display_metaclasses;
 extern int e5_display_kext_state;
@@ -954,7 +955,7 @@ public:
       e5_display_frame_kick();
       // r90: slot 213 left the soft-guard set for a real capability answer;
       // C=<calls>:<status> tracks it on the same echo line.
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
@@ -989,7 +990,9 @@ public:
             __atomic_load_n(&e5_display_power_after_nuc, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_display_power_last, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_display_pw_calls, __ATOMIC_RELAXED),
-            __atomic_load_n(&e5_display_pw_results, __ATOMIC_RELAXED));
+            __atomic_load_n(&e5_display_pw_results, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_display_wait_calls, __ATOMIC_RELAXED),
+            (unsigned)__atomic_load_n(&e5_display_wait_last, __ATOMIC_RELAXED));
     }
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,

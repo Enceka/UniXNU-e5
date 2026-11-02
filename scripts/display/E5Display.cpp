@@ -26,6 +26,8 @@ unsigned e5_display_ok211_calls = 0;
 unsigned e5_display_ok306_calls = 0;
 // v15 power-band override counters (slots 229/255/256/258/260/261).
 unsigned e5_display_pw_calls = 0;
+extern "C" unsigned e5_display_wait_calls = 0;
+extern "C" unsigned e5_display_wait_last = 0;
 unsigned e5_display_pw_results = 0;
 // v14 runtime bracket of the family power byte at +0x8c (see newUserClient).
 unsigned e5_display_power_before_nuc = 0xFF;
@@ -276,6 +278,16 @@ public:
   IOReturn opaque261() override { // power notification
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
     __atomic_fetch_or(&e5_display_pw_results, 1U, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  // v17: slot 176 = the event/vsync wait (sel 6 wrapper -> vt+0x580). The
+  // original gates on [+0x16d0] (event token written by the concrete
+  // driver's event source; r113 E5STATE showed it 0) and returns
+  // kIOReturnTimeout forever. With firmware scanout there is no vsync
+  // IRQ: treat every wait as immediately satisfied.
+  IOReturn opaque176(uint32_t a, uint32_t b, uint32_t c) override {
+    __atomic_fetch_add(&e5_display_wait_calls, 1U, __ATOMIC_RELAXED);
+    __atomic_store_n(&e5_display_wait_last, (a & 0xFFFFu) | ((b & 0xFFu) << 16) | ((c & 0xFFu) << 24), __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
   E5_GUARDED_SLOT(245)
