@@ -36,7 +36,11 @@ unsigned e5_display_pw_results = 0;
 unsigned e5_display_power_before_nuc = 0xFF;
 unsigned e5_display_power_after_nuc = 0xFF;
 }
-extern "C" unsigned e5_display_vsync_fires = 0; // v27 fake-vsync fire count
+extern "C" unsigned e5_display_vsync_fires = 0; // v30 observed native completion transitions
+extern "C" unsigned e5_display_wait_status = 0;
+extern "C" unsigned e5_display_event_calls = 0;
+extern "C" unsigned long long e5_display_event_argument = 0;
+extern "C" unsigned e5_display_event_status = 0;
 extern "C" unsigned e5_display_power_last; // owned by E5DisplayProbe.cpp
 // v28: the real async-event delivery. IOUserClient::sendAsyncResult64WithOptions
 // is a protected static of IOUserClient (iokit/IOKit/IOUserClient.h:341); the
@@ -108,18 +112,20 @@ extern "C" void e5_display_async_fire(void) {
   auto gate = *(IOCommandGate **)((uint8_t *)sPowerInstance + 0x1608);
   if (gate) gate->attemptAction(e5_display_async_action);
 }
-// v27: fire the fake vsync event: bump the +0x16d0 token and clear the
-// +0x16e0 enabled flag, exactly what the concrete driver's event source
-// does (H9G power path writes the token at 0x6bf7ae4). Called from
-// frame_kick every 16th kick — pager activity proves continuous.
+// v30: observe native token/completion transitions. The old v27 implementation
+// wrote the token itself, while its slot-176 ABI did not even inspect the
+// flags argument. Preserve the original slot-344 event source and its state.
 extern "C" void e5_display_vsync_fire(void) {
   void *svc = sPowerInstance;
   if (!svc) return;
-  uint8_t *base = (uint8_t *)svc;
-  if (!*(volatile uint8_t *)(base + 0x16e0)) return; // no wait armed
-  *(volatile uint32_t *)(base + 0x16d0) =
-      __atomic_add_fetch(&e5_display_vsync_fires, 1U, __ATOMIC_RELAXED);
-  *(volatile uint8_t *)(base + 0x16e0) = 0;
+  const uint8_t *base = (const uint8_t *)svc;
+  static uint32_t previous_token, previous_enabled;
+  uint32_t token = *(volatile const uint32_t *)(base + 0x16d0);
+  uint32_t enabled = *(volatile const uint32_t *)(base + 0x16e0);
+  if (token != previous_token || (previous_enabled && !enabled))
+    __atomic_add_fetch(&e5_display_vsync_fires, 1U, __ATOMIC_RELAXED);
+  previous_token = token;
+  previous_enabled = enabled;
 }
 
 // v16: one-line dump of the family wait/swap machinery state so the host can
@@ -129,7 +135,7 @@ extern "C" void e5_display_vsync_fire(void) {
 // +0x1868 lock, +0x16d0 reader-A object, +0x3c4 last power arg).
 extern "C" void e5_kputc(char);
 static void e5_state_log(const char *format, ...) {
-  char line[384];
+  char line[512];
   va_list args;
   va_start(args, format);
   vsnprintf(line, sizeof(line), format, args);
@@ -145,11 +151,13 @@ extern "C" void e5_display_state_dump(void) {
     for (unsigned i = 0; i != 8; ++i) v |= (unsigned long long)b[off + i] << (8 * i);
     return v;
   };
-  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u ap=%02x ar=%x am=%02x",
+  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u ap=%02x ar=%x am=%02x tok=%x ev=%u:%llx:%x wr=%x",
          (const void *)b, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
          q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires,
          e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok,
-         e5_display_async_ports, e5_display_async_last, e5_display_async_armed);
+         e5_display_async_ports, e5_display_async_last, e5_display_async_armed,
+         *(volatile const uint32_t *)(b + 0x16d0), e5_display_event_calls,
+         e5_display_event_argument, e5_display_event_status, e5_display_wait_status);
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
@@ -388,45 +396,22 @@ public:
   bool opaque336() override {
     return false;
   }
-  // v27: slots 260/261 emulate the family's enable/disable event semantics
-  // (original enable_event 0x6797224: [this+0x16dc]=arg, [+0x16e0]=1). The
-  // frame_kick "vsync" fires by bumping the +0x16d0 token and clearing
-  // +0x16e0; slot 176 then answers success exactly like the original wait
-  // (mode3/mode4: enabled->Timeout, token!=0->0). No family internals are
-  // called: the client polls (r112 proved 3491x retries), polling suffices.
-  IOReturn opaque260() override { // enable event
-    uint8_t *base = (uint8_t *)this;
-    *(volatile uint32_t *)(base + 0x16dc) = 0;
-    *(volatile uint8_t *)(base + 0x16e0) = 1;
-    __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
-    return kIOReturnSuccess;
+  // The real enable_event entry is slot 344, not the unrelated 260/261
+  // Legacy stubs. Retain the native argument, 32-bit enable word, timer
+  // arming and native return status; report calls without forcing readiness.
+  IOReturn opaque344(uint64_t token, void *context) override {
+    __atomic_fetch_add(&e5_display_event_calls, 1U, __ATOMIC_RELAXED);
+    __atomic_store_n(&e5_display_event_argument, token, __ATOMIC_RELAXED);
+    IOReturn status = IOMobileFramebufferLegacy::opaque344(token, context);
+    __atomic_store_n(&e5_display_event_status, (unsigned)status, __ATOMIC_RELAXED);
+    return status;
   }
-  IOReturn opaque261() override { // disable event
-    uint8_t *base = (uint8_t *)this;
-    *(volatile uint8_t *)(base + 0x16e0) = 0;
-    __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
-    __atomic_fetch_or(&e5_display_pw_results, 1U, __ATOMIC_RELAXED);
-    return kIOReturnSuccess;
-  }
-  // v17: slot 176 = the event/vsync wait (sel 6 wrapper -> vt+0x580). The
-  // original gates on [+0x16d0] (event token written by the concrete
-  // driver's event source; r113 E5STATE showed it 0) and returns
-  // kIOReturnTimeout forever. With firmware scanout there is no vsync
-  // IRQ: treat every wait as immediately satisfied.
-  IOReturn opaque176(uint32_t a, uint32_t b, uint32_t c) override {
+  IOReturn opaque176(void *client, uint32_t swap, uint32_t flags, uint32_t timeout) override {
     __atomic_fetch_add(&e5_display_wait_calls, 1U, __ATOMIC_RELAXED);
-    __atomic_store_n(&e5_display_wait_last, (a & 0xFFFFu) | ((b & 0xFFu) << 16) | ((c & 0xFFu) << 24), __ATOMIC_RELAXED);
-    // v27: faithful original semantics (slot-176 wait, decoded from the
-    // family base): mode3/mode4 gate on [+0x16e0] (event enabled -> still
-    // waiting -> Timeout) then [+0x16d0] (token != 0 -> fired -> success).
-    // The frame_kick vsync fires the event by bumping the token.
-    uint32_t mode = a & 0x7fffffffu;
-    if (mode == 3u || mode == 4u) {
-      uint8_t *base = (uint8_t *)this;
-      if (*(volatile uint8_t *)(base + 0x16e0)) return kIOReturnTimeout;
-      if (*(volatile uint32_t *)(base + 0x16d0) == 0u) return kIOReturnTimeout;
-    }
-    return kIOReturnSuccess;
+    __atomic_store_n(&e5_display_wait_last, (swap & 0xFFFFu) | ((flags & 0xFFu) << 16) | ((timeout & 0xFFu) << 24), __ATOMIC_RELAXED);
+    IOReturn status = IOMobileFramebufferLegacy::opaque176(client, swap, flags, timeout);
+    __atomic_store_n(&e5_display_wait_status, (unsigned)status, __ATOMIC_RELAXED);
+    return status;
   }
   // v18: the swap/surface band. The Legacy base returns kIOReturnUnsupported
   // from every one of these (r114: sel 15/22/27/33/50/57/79/84 all rejected);
