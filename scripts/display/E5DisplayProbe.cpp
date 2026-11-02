@@ -319,18 +319,49 @@ static volatile uint32_t *i2cReg(unsigned off) {
   return (volatile uint32_t *)((uint8_t *)sI2cMap->getVirtualAddress() + off);
 }
 
+// apahb gate block (live-fdt apahb-gate reg <0x0 0x3000> under ap-ahb
+// ranges -> PA 0x20003000). ums9621-clk.c: i2c3_eb = SC gate BIT(13) with
+// set-mirror at +0x1000 (write-1-to-set 0x20004000; status in 0x20003000).
+// r145 proved the controller answers nothing while gated (data abort on the
+// first register read), so the gate must be armed BEFORE any i2c access.
+static IODeviceMemory *sGateMemory = nullptr;
+static IOMemoryMap *sGateMap = nullptr;
+static unsigned sGateStatusBefore = 0xeeeeeeee, sGateStatusAfter = 0xeeeeeeee;
+
+static volatile uint32_t *gateReg(unsigned off) {
+  return (volatile uint32_t *)((uint8_t *)sGateMap->getVirtualAddress() + off);
+}
+
 extern "C" void e5_i2c3_tick(unsigned now) {
-  if (!sI2cMap) {
-    sI2cMemory = IODeviceMemory::withRange(0x22270000ull, 0x1000ull);
-    if (sI2cMemory) sI2cMap = sI2cMemory->map();
-    if (!sI2cMap) return;
+  if (!sGateMap) {
+    sGateMemory = IODeviceMemory::withRange(0x20003000ull, 0x2000ull);
+    if (sGateMemory) sGateMap = sGateMemory->map();
+    if (!sGateMap) return;
   }
   if (sI2cStage == 0) {
-    sI2cVersion = *i2cReg(0x1c); // I2C_VERSION
+    sGateStatusBefore = *gateReg(0x0);
+    *gateReg(0x1000) = (1u << 13); // set-mirror: i2c3_eb on
+    for (int i = 0; i < 50; ++i) { __asm__ volatile("" ::: "memory"); }
+    sGateStatusAfter = *gateReg(0x0);
+    if (sGateStatusAfter & (1u << 13)) {
+      sI2cMemory = IODeviceMemory::withRange(0x22270000ull, 0x1000ull);
+      if (sI2cMemory) sI2cMap = sI2cMemory->map();
+    }
     sI2cStage = 1;
     return;
   }
-  if (sI2cStage == 1 && (now % 5000) == 20) {
+  if (!sI2cMap) {
+    if ((now % 5000) == 30)
+      e5_display_tracef("E5I2C gate %x->%x (i2c3_eb still off)",
+                        sGateStatusBefore, sGateStatusAfter);
+    return;
+  }
+  if (sI2cStage == 1) {
+    sI2cVersion = *i2cReg(0x1c); // I2C_VERSION
+    sI2cStage = 2;
+    return;
+  }
+  if (sI2cStage == 2 && (now % 5000) == 20) {
     // 0-byte write probe of the TLSC6x address: ADDR_CFG=0x2e<<1,
     // COUNT=0, START. STATUS readback captures ACK/NACK state bits.
     uint32_t ctl = *i2cReg(0x00);
@@ -340,10 +371,11 @@ extern "C" void e5_i2c3_tick(unsigned now) {
     for (int i = 0; i < 200; ++i) { __asm__ volatile("" ::: "memory"); }
     sI2cProbeStatus = *i2cReg(0x14);
     *i2cReg(0x00) = ctl | (1u << 20); // STP releases the bus
-    sI2cStage = 2;
+    sI2cStage = 3;
   }
   if ((now % 5000) == 30)
-    e5_display_tracef("E5I2C ver=%x st=%x", sI2cVersion, sI2cProbeStatus);
+    e5_display_tracef("E5I2C gate %x->%x ver=%x st=%x", sGateStatusBefore,
+                      sGateStatusAfter, sI2cVersion, sI2cProbeStatus);
 }
 
 static bool sVsyncArmed = false;
