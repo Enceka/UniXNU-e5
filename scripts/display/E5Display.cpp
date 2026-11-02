@@ -112,6 +112,12 @@ public:
     // creation 0x6792804 reads [this+0x1640] as x0 for the provider EDT calls)
     // then see NULL. Cache our lcd nub there directly.
     *(IOService * volatile *)((uint8_t *)this + 0x1640) = provider;
+    // v23: display-online state the concrete driver owns: +0x1788 bit0 =
+    // panel online (readers 0x678b60c/0x678b748/0x678cd7c all skip when clear;
+    // the DefaultSurface fn 0x6792804 clears it at entry then gates on it);
+    // +0x16d4 nonzero = mode/format known (reader 0x678b624 skips when 0).
+    *(volatile uint8_t *)((uint8_t *)this + 0x1788) |= 1U;
+    *(volatile uint32_t *)((uint8_t *)this + 0x16d4) = 1;
     sPowerInstance = this; // v14: let the echo probe poll the +0x8c byte.
     __atomic_fetch_or(&e5_display_lifecycle, 0x20000U, __ATOMIC_RELAXED);
     __atomic_fetch_or(&e5_display_lifecycle, 0x010U, __ATOMIC_RELAXED);
