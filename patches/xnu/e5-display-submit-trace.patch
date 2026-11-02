@@ -1,0 +1,116 @@
+--- a/iokit/Kernel/IOUserClient.cpp
++++ b/iokit/Kernel/IOUserClient.cpp
+@@ -6459,10 +6459,60 @@
+ }
+ } /* extern "C" */
+ 
++// E5 diagnostic: observe the original UC2022 dispatch without editing it.
++// Records are approximate atomic snapshots; no frame bytes are interpreted.
++extern "C" void e5_panic_print(const char *);
++extern "C" unsigned e5_vc_calls, e5_vc_blocked;
++extern "C" uint32_t cons_ops_index;
++static unsigned e5_im_calls[256], e5_im_ok[256], e5_im_ret[256];
++static unsigned e5_im_pid[256], e5_im_out[256], e5_im_large_selector;
++
++extern "C" void
++e5_iomfb_trace_dump(void)
++{
++	char line[256];
++	snprintf(line, sizeof(line),
++	    "E5IMSUM vc=%u:%u:%u d=%u:%u:%x b=%u:%u:%x e=%u:%u:%x over=%u",
++	    cons_ops_index,
++	    __atomic_load_n(&e5_vc_calls, __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_vc_blocked, __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_calls[3], __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_ok[3], __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_ret[3], __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_calls[4], __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_ok[4], __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_ret[4], __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_calls[5], __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_ok[5], __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_ret[5], __ATOMIC_RELAXED),
++	    __atomic_load_n(&e5_im_large_selector, __ATOMIC_RELAXED));
++	e5_panic_print(line);
++	for (unsigned i = 0; i < 256; ++i) {
++		unsigned calls = __atomic_load_n(&e5_im_calls[i], __ATOMIC_RELAXED);
++		if (!calls) continue;
++		snprintf(line, sizeof(line), "E5IMSEL %u n=%u ok=%u ret=%x pid=%u out=%x",
++		    i, calls, __atomic_load_n(&e5_im_ok[i], __ATOMIC_RELAXED),
++		    __atomic_load_n(&e5_im_ret[i], __ATOMIC_RELAXED),
++		    __atomic_load_n(&e5_im_pid[i], __ATOMIC_RELAXED),
++		    __atomic_load_n(&e5_im_out[i], __ATOMIC_RELAXED));
++		e5_panic_print(line);
++	}
++}
++
+ IOReturn
+ IOUserClient::callExternalMethod(uint32_t selector, IOExternalMethodArguments * args)
+ {
+ 	IOReturn ret;
++	bool e5_observe = strcmp(getMetaClass()->getClassName(),
++	    "IOMobileFramebufferUserClient") == 0;
++	unsigned e5_count = 0;
++	if (e5_observe) {
++		if (selector < 256) {
++			e5_count = __atomic_add_fetch(&e5_im_calls[selector], 1U, __ATOMIC_RELAXED);
++		} else {
++			__atomic_fetch_add(&e5_im_large_selector, 1U, __ATOMIC_RELAXED);
++		}
++	}
+ 
+ 	ipcEnter(defaultLocking ? (defaultLockingSingleThreadExternalMethod ? kIPCLockWrite : kIPCLockRead) : kIPCLockNone);
+ 	if (uc2022) {
+@@ -6472,6 +6522,27 @@
+ 	}
+ 	ipcExit(defaultLocking ? (defaultLockingSingleThreadExternalMethod ? kIPCLockWrite : kIPCLockRead) : kIPCLockNone);
+ 
++	if (e5_observe && selector < 256) {
++		unsigned pid = proc_selfpid();
++		unsigned out = (ret == kIOReturnSuccess && (selector == 3 || selector == 4) &&
++		    args->scalarOutput && args->scalarOutputCount) ?
++		    (unsigned)args->scalarOutput[0] : 0;
++		unsigned previous = __atomic_exchange_n(&e5_im_ret[selector],
++		    (unsigned)ret, __ATOMIC_RELAXED);
++		unsigned previousPid = __atomic_exchange_n(&e5_im_pid[selector], pid, __ATOMIC_RELAXED);
++		__atomic_store_n(&e5_im_out[selector], out, __ATOMIC_RELAXED);
++		if (ret == kIOReturnSuccess)
++			__atomic_fetch_add(&e5_im_ok[selector], 1U, __ATOMIC_RELAXED);
++		if (e5_count <= 4 || previousPid != pid || previous != (unsigned)ret || (e5_count % 512) == 0) {
++			char line[256], name[32] = {};
++			proc_name(pid, name, sizeof(name));
++			snprintf(line, sizeof(line),
++			    "E5IMCALL pid=%u name=%s sel=%u n=%u ret=%x si=%u bi=%u so=%u out=%x",
++			    pid, name, selector, e5_count, (unsigned)ret, args->scalarInputCount,
++			    (unsigned)args->structureInputSize, args->scalarOutputCount, out);
++			e5_panic_print(line);
++		}
++	}
+ 	return ret;
+ }
+ 
+--- a/osfmk/console/video_console.c
++++ b/osfmk/console/video_console.c
+@@ -1242,9 +1242,22 @@
+ 	gc_ops.update_color(color, fore);
+ }
+ 
++unsigned e5_vc_calls, e5_vc_blocked;
++static int e5_vc_policy = -1;
++
+ void
+ vcputc_options(char c, __unused bool poll)
+ {
++	__atomic_fetch_add(&e5_vc_calls, 1U, __ATOMIC_RELAXED);
++	int policy = __atomic_load_n(&e5_vc_policy, __ATOMIC_RELAXED);
++	if (policy < 0) {
++		policy = PE_parse_boot_argn("e5-no-vc", NULL, 0) != 0;
++		__atomic_store_n(&e5_vc_policy, policy, __ATOMIC_RELAXED);
++	}
++	if (policy) {
++		__atomic_fetch_add(&e5_vc_blocked, 1U, __ATOMIC_RELAXED);
++		return;
++	}
+ 	if (boot_progress_active()) { boot_progress_putc(c); return; }
+ 	if (gc_initialized && gc_enabled) {
+ 		VCPUTC_LOCK_LOCK();

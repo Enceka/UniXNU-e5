@@ -5,6 +5,19 @@
 #include <libkern/c++/OSSymbol.h>
 #include <mach/kmod.h>
 
+// E5TW only: printf would change the framebuffer being measured.
+#include <stdarg.h>
+extern "C" void e5_kputc(char);
+extern "C" void e5_iomfb_trace_dump(void);
+static void e5_display_tracef(const char *format, ...) {
+  char line[256];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(line, sizeof(line), format, args);
+  va_end(args);
+  for (const char *p = line; *p; ++p) e5_kputc(*p);
+}
+
 extern kmod_info_t g_kernel_kmod_info;
 extern "C" void e5_display_static_init(void) __asm__("__GLOBAL__sub_I_E5Display.cpp");
 extern "C" unsigned e5_display_compiled_size(void);
@@ -42,7 +55,7 @@ extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
   __atomic_fetch_or(&e5_display_backend_slots, mask, __ATOMIC_RELAXED);
   __atomic_store_n(&e5_display_backend_last_slot, slot, __ATOMIC_RELAXED);
   __atomic_store_n(&e5_display_backend_last_sel, selector, __ATOMIC_RELAXED);
-  printf("E5Display: soft backend slot %u sel=%x b=%llx c=%llx d=%llx -> e00002f0\n",
+  e5_display_tracef("E5Display: soft backend slot %u sel=%x b=%llx c=%llx d=%llx -> e00002f0\n",
          slot, selector, (unsigned long long)b, (unsigned long long)c,
          (unsigned long long)d);
   return kIOReturnUnsupported;
@@ -71,15 +84,17 @@ static uint32_t e5_display_crc32(const volatile uint8_t *p, size_t n) {
 }
 
 extern "C" void e5_display_frame_kick(void) {
+  static unsigned traceKicks;
+  if ((traceKicks++ % 16) == 0) e5_iomfb_trace_dump();
   if (sPanelKicks == 0) {
     sPanelMemory = IODeviceMemory::withRange(0xBE000000ull, 0x4B000ull);
     if (sPanelMemory) sPanelMap = sPanelMemory->map();
     if (!sPanelMap) {
-      printf("E5Display: panel map failed - frame probe disabled\n");
+      e5_display_tracef("E5Display: panel map failed - frame probe disabled\n");
       sPanelKicks = 1; // never try again; crc stays 0
       return;
     }
-    printf("E5Display: panel mapped at %p (0xBE000000+0x4B000)\n",
+    e5_display_tracef("E5Display: panel mapped at %p (0xBE000000+0x4B000)\n",
            (void *)(uintptr_t)sPanelMap->getVirtualAddress());
   }
   if (!sPanelMap) return;
@@ -89,7 +104,7 @@ extern "C" void e5_display_frame_kick(void) {
   uint32_t crc = e5_display_crc32((const volatile uint8_t *)px, 0x4B000);
   if (crc != e5_display_frame_crc) {
     if (e5_display_frame_changes || e5_display_frame_crc)
-      printf("E5Display: panel crc %08x (was %08x) change #%u\n",
+      e5_display_tracef("E5Display: panel crc %08x (was %08x) change #%u\n",
              crc, e5_display_frame_crc, e5_display_frame_changes + 1);
     __atomic_store_n(&e5_display_frame_crc, crc, __ATOMIC_RELAXED);
     unsigned n = __atomic_fetch_add(&e5_display_frame_changes, 1U, __ATOMIC_RELAXED) + 1;
@@ -118,9 +133,9 @@ extern "C" void e5_display_frame_kick(void) {
       thumb[row * 5 + 4] = (uint8_t)((bits >> 32) & 0xff);
     }
     if ((n % 4) == 0 || n == 1) {
-      printf("E5PANELSNAP %u %08x ", n, crc);
-      for (unsigned i = 0; i < 300; ++i) printf("%02x", thumb[i]);
-      printf("\n");
+      e5_display_tracef("E5PANELSNAP %u %08x ", n, crc);
+      for (unsigned i = 0; i < 300; ++i) e5_display_tracef("%02x", thumb[i]);
+      e5_display_tracef("\n");
     }
     // r106: 4-bit-per-channel color histogram over a 4px grid (80x60 =
     // 4800 samples). Text = two dominant values (bg/fg); a wallpaper =
@@ -151,10 +166,10 @@ extern "C" void e5_display_frame_kick(void) {
                 break;
               }
           }
-      printf("E5PANELHIST %u", n);
+      e5_display_tracef("E5PANELHIST %u", n);
       for (unsigned k = 0; k < 8; ++k)
-        printf(" %03x:%u", top[k].rgb, top[k].cnt);
-      printf("\n");
+        e5_display_tracef(" %03x:%u", top[k].rgb, top[k].cnt);
+      e5_display_tracef("\n");
     }
     // r108: read the actual glyphs. Three 8x8 tiles at fixed anchors plus
     // a 16px-tall band across the full width at 4px/2px sampling; large UI
@@ -164,16 +179,16 @@ extern "C" void e5_display_frame_kick(void) {
       const unsigned anchors[3][2] = {{16, 240}, {160, 240}, {280, 240}};
       for (unsigned t = 0; t < 3; ++t) {
         unsigned ax = anchors[t][0], ay = anchors[t][1];
-        printf("E5TILE %u a%u,%u ", n, ax, ay);
+        e5_display_tracef("E5TILE %u a%u,%u ", n, ax, ay);
         for (unsigned y = 0; y < 8; ++y) {
           unsigned bits = 0;
           for (unsigned x = 0; x < 8; ++x)
             if (px[(ay + y) * 320 + ax + x]) bits |= 1u << x;
-          printf("%02x", bits);
+          e5_display_tracef("%02x", bits);
         }
-        printf("\n");
+        e5_display_tracef("\n");
       }
-      printf("E5BAND %u y238", n);
+      e5_display_tracef("E5BAND %u y238", n);
       for (unsigned y = 238; y < 254; y += 2) {
         unsigned char bits[40];
         for (unsigned xb = 0; xb < 40; ++xb) {
@@ -182,10 +197,10 @@ extern "C" void e5_display_frame_kick(void) {
             if (px[y * 320 + xb * 8 + x]) b |= 1u << x;
           bits[xb] = (unsigned char)b;
         }
-        for (unsigned xq = 0; xq < 40; ++xq) printf("%02x", bits[xq]);
-        printf(" ");
+        for (unsigned xq = 0; xq < 40; ++xq) e5_display_tracef("%02x", bits[xq]);
+        e5_display_tracef(" ");
       }
-      printf("\n");
+      e5_display_tracef("\n");
     }
   }
 }
@@ -234,7 +249,7 @@ extern "C" int e5_concrete_display_probe(void) {
   }
   object->release();
   if (owned->getInstanceCount() == instances) e5_display_construction |= 0x100;
-  printf("E5Display: construction v=%x size=%x registration=%x instances=%u/%u\n",
+  e5_display_tracef("E5Display: construction v=%x size=%x registration=%x instances=%u/%u\n",
          (unsigned)e5_display_construction, (unsigned)e5_display_original_size,
          (unsigned)e5_display_registration_result, instances, owned->getInstanceCount());
   return e5_display_construction == 0x1ff;

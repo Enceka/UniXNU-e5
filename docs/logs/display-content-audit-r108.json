@@ -1,0 +1,418 @@
+{
+  "schema": 1,
+  "scope": "static original binary and retained console audit; no new board cycle",
+  "kernel": {
+    "path": "uefi/build/e5-kernel-artifact-362-r108/kernel.macho",
+    "sha256": "cc0f848e9a38d9034216b31acf68e1ff5f729c225ab73f3e1ca217bd4dbd4ae5"
+  },
+  "consoles": {
+    "panel": {
+      "path": "uefi/build/watchdog-policy-r65/board-r108/decoded/console-readable.txt",
+      "sha256": "1adc049d1f6aff9c978eabdbfc6a231600bc4d67dd97c67ad77885c69b7df617"
+    },
+    "liveactivities": {
+      "path": "uefi/build/watchdog-policy-r65/board-r96/decoded/console-readable.txt",
+      "sha256": "f4c3512b2d5213e297af39c3e070a1163647192a1b3a691859ff1928460d7ca8"
+    }
+  },
+  "images": {
+    "IOMobileFramebuffer": {
+      "base": "0x1b63cf000",
+      "text_sha256": "512938e87d3d240fc9964064f6cfb51462a1353f5177437e43ec764df131cc79",
+      "uuid": "5154484B-B674-3285-AA23-A751A467D349"
+    },
+    "QuartzCore": {
+      "base": "0x189429000",
+      "text_sha256": "283f624cd7c97046c23e205a3a1f99b67ac35a7b5a65c75763ee245005c1ac10",
+      "uuid": "BCA74CF2-236A-30AC-BD05-8872B2C2262D"
+    },
+    "SessionSyncEngine": {
+      "base": "0x1c18d9000",
+      "text_sha256": "80da8b7750883ab032e8db1ab22cde589f2f378e2474ce490ea856bb4998d1bf",
+      "uuid": "9DA3DC67-FE33-362B-A5E4-9E1D0E81C273"
+    },
+    "MobileKeyBag": {
+      "base": "0x1b5191000",
+      "text_sha256": "11c8212bea99d5ea358f05e32be3ce3e095433ab21513fed6234fae1cfb6ba3d",
+      "uuid": "D327E16C-0AEC-3D2D-979A-74F0EDA37B43"
+    },
+    "SpringBoard": {
+      "base": "0x1cf99c000",
+      "text_sha256": "5a89a6ffa16fec27b252737f71f58b5208f383bd48e1d9e626e028b489223c48",
+      "uuid": "F8B79DC3-8FEB-32CB-B8FF-C05703EFB909"
+    },
+    "FrontBoard": {
+      "base": "0x1a7099000",
+      "text_sha256": "8793a36193a190e7916e5a8b986571fec496edf1d9c0a60f4140d6ac7284b2a5",
+      "uuid": "CA918D52-5DED-3F30-A688-D950A344BB1A"
+    }
+  },
+  "console_writer": {
+    "serial_init_returns_zero": true,
+    "serial_switch_skipped": true,
+    "initial_console_index": 1,
+    "video_console_index": 1,
+    "video_putc": "0xfffffff0073cc1fc",
+    "probe_printf_calls": [
+      "0xfffffff00798f7d8",
+      "0xfffffff00798f8e0",
+      "0xfffffff00798fa2c",
+      "0xfffffff00798fa60",
+      "0xfffffff00798fa7c",
+      "0xfffffff00798fa94",
+      "0xfffffff00798fdb0",
+      "0xfffffff00798fdc8",
+      "0xfffffff00798fdd8",
+      "0xfffffff00798fde8",
+      "0xfffffff00798fdf8",
+      "0xfffffff00798fe08",
+      "0xfffffff00798fe18",
+      "0xfffffff00798fe28",
+      "0xfffffff00798fe38",
+      "0xfffffff00798fe44",
+      "0xfffffff00798fec4",
+      "0xfffffff00798ffd4",
+      "0xfffffff00798ffe8",
+      "0xfffffff00799000c",
+      "0xfffffff0079900f0",
+      "0xfffffff007990108"
+    ],
+    "tiles": [
+      {
+        "tick": 113,
+        "x": 16,
+        "y": 240,
+        "bits": "00003c66061f0606",
+        "font_matches": [
+          {
+            "code": 102,
+            "character": "f",
+            "font_row": 0
+          }
+        ]
+      },
+      {
+        "tick": 113,
+        "x": 160,
+        "y": 240,
+        "bits": "00003c66061f0606",
+        "font_matches": [
+          {
+            "code": 102,
+            "character": "f",
+            "font_row": 0
+          }
+        ]
+      },
+      {
+        "tick": 113,
+        "x": 280,
+        "y": 240,
+        "bits": "00003c66061f0606",
+        "font_matches": [
+          {
+            "code": 102,
+            "character": "f",
+            "font_row": 0
+          }
+        ]
+      }
+    ],
+    "inference": "Kernel video-console output explains the samples; compositor submission is unqualified."
+  },
+  "histogram_limits": {
+    "sampled_pixels": 4800,
+    "panel_pixels": 153600,
+    "bucket_7ff_possible_raw_pixels": [
+      "0x77f8",
+      "0x77f9",
+      "0x77fa",
+      "0x77fb",
+      "0x77fc",
+      "0x77fd",
+      "0x77fe",
+      "0x77ff",
+      "0x7ff8",
+      "0x7ff9",
+      "0x7ffa",
+      "0x7ffb",
+      "0x7ffc",
+      "0x7ffd",
+      "0x7ffe",
+      "0x7fff"
+    ],
+    "exact_full_panel_two_colors_proved": false
+  },
+  "brightness": {
+    "capability_gate": [
+      "0x1b63d5160: adrp x8, #0x1ee8a5000",
+      "0x1b63d5164: ldrb w8, [x8, #0x270]",
+      "0x1b63d5168: cmp w8, #1",
+      "0x1b63d516c: b.ne #0x1b63d5194",
+      "0x1b63d5170: ldrb w8, [x19, #0xca9]",
+      "0x1b63d5174: cbz w8, #0x1b63d5194",
+      "0x1b63d5178: ldr x0, [x19, #0xce0]",
+      "0x1b63d517c: cbz x0, #0x1b63d5194",
+      "0x1b63d5180: adrp x8, #0x1ee8a5000",
+      "0x1b63d5184: ldr x1, [x8, #0x248]",
+      "0x1b63d5188: ldp x29, x30, [sp, #0x10]",
+      "0x1b63d518c: ldp x20, x19, [sp], #0x20",
+      "0x1b63d5190: br x1",
+      "0x1b63d5194: mov x0, #0",
+      "0x1b63d5198: ldp x29, x30, [sp, #0x10]",
+      "0x1b63d519c: ldp x20, x19, [sp], #0x20",
+      "0x1b63d51a0: ret "
+    ],
+    "disabled_setter": [
+      "0x1b63d0a7c: adrp x1, #0x1b63dc000",
+      "0x1b63d0a80: add x1, x1, #0xe49",
+      "0x1b63d0a84: mov w0, #5",
+      "0x1b63d0a88: bl #0x1ba64c9c8",
+      "0x1b63d0a8c: mov x0, x19",
+      "0x1b63d0a90: bl #0x1b63dc2f0",
+      "0x1b63d0a94: mov w0, #0",
+      "0x1b63d0a98: ldp x29, x30, [sp, #0x30]",
+      "0x1b63d0a9c: ldp x20, x19, [sp, #0x20]",
+      "0x1b63d0aa0: ldp d9, d8, [sp, #0x10]",
+      "0x1b63d0aa4: add sp, sp, #0x40",
+      "0x1b63d0aa8: ret "
+    ],
+    "framework": "/System/Library/PrivateFrameworks/BrightnessControl.framework/BrightnessControl",
+    "automatic_zero_brightness_on_missing_service_proved": false
+  },
+  "submission": {
+    "default_surface": {
+      "selector": 3,
+      "anchor": "0x1b63d6944"
+    },
+    "swap_begin": {
+      "selector": 4,
+      "anchor": "0x1b63d2f80"
+    },
+    "swap_end": {
+      "selector": 5,
+      "anchor": "0x1b63d1ef4"
+    },
+    "brightness_correction": {
+      "selector": 50,
+      "anchor": "0x1b63d09d4"
+    },
+    "splc_set_brightness": {
+      "selector": 66,
+      "anchor": "0x1b63d7c00"
+    },
+    "splc_get_brightness": {
+      "selector": 67,
+      "anchor": "0x1b63d7c78"
+    },
+    "frame_structure_bytes": "0x508",
+    "original_userclient_can_be_observed_at": "IOUserClient::callExternalMethod",
+    "scene_layers_observed": false,
+    "physical_scanout_ownership_proved": false
+  },
+  "default_surface": {
+    "creator": "0xfffffff005793694",
+    "gate_offset": "0x1780 bit 0",
+    "surface_pointer_offset": "0x1620",
+    "allocation_observed": false,
+    "animation_generator_found": false
+  },
+  "system_image": {
+    "root": "/Volumes/DawnUpdate21H461.J120J121J207J208OS",
+    "springboard_launcher_sha256": "62929b2b3c9080c83c43ee348bfc6abe2e1e27136dc4a34a633f5f42c8cbb24b",
+    "launcher_dependencies": [
+      "/System/Library/PrivateFrameworks/SpringBoard.framework/SpringBoard",
+      "/System/Library/Frameworks/Foundation.framework/Foundation",
+      "/usr/lib/libobjc.A.dylib",
+      "/usr/lib/libSystem.B.dylib"
+    ],
+    "services": {
+      "com.apple.SpringBoard.plist": {
+        "label": "com.apple.SpringBoard",
+        "program": [
+          "/System/Library/CoreServices/SpringBoard.app/SpringBoard"
+        ],
+        "mach_services": [
+          "com.apple.springboard.carditemscontroller",
+          "com.apple.notificationcenter.widgetcontrollerconnection",
+          "com.apple.usernotifications.usernotificationsettingsservice",
+          "com.apple.UIKit.KeyboardManagement.hosted",
+          "com.apple.UIKit.statusbarserver",
+          "com.apple.springboard.statusbarservices",
+          "com.apple.controlcenter.remoteservice",
+          "com.apple.proactive.UserEducationSuggestion.client-listener.xpc",
+          "com.apple.springboard.blockableservices",
+          "com.apple.frontboard.systemappservices",
+          "com.apple.systemstatus.publisher",
+          "com.apple.usernotifications.usernotificationservice",
+          "com.apple.bulletinboard.dataproviderconnection",
+          "com.apple.pegasus",
+          "com.apple.bulletinboard.settingsconnection",
+          "com.apple.springboard.backgroundappservices",
+          "com.apple.SBUserNotification",
+          "PurpleSystemAppPort",
+          "com.apple.usernotifications.remotenotificationservice",
+          "com.apple.DragUI.druid.system",
+          "com.apple.siri.activation",
+          "com.apple.springboard.services",
+          "com.apple.aps.usernotifications",
+          "com.apple.siri.activation.service",
+          "com.apple.springboard.oswatchdog",
+          "com.apple.bulletinboard.serverconduitconnection",
+          "com.apple.systemstatus",
+          "com.apple.posterboardui.services",
+          "com.apple.systemstatus.activityattribution",
+          "com.apple.usernotifications.delegate.com.apple.donotdisturb",
+          "com.apple.aps.usernotifications.dev",
+          "com.apple.siri.assessment-mode-restriction",
+          "com.apple.bulletinboard.observerconnection",
+          "com.apple.pencilkit.pktouchdetection",
+          "com.apple.hangtracermonitor",
+          "com.apple.proactive.HomeScreenSuggestion.xpc"
+        ],
+        "additional_properties": {
+          "RunningBoard": {
+            "UnderlyingAssertion": "UnderlyingDarwinRoleUI"
+          }
+        },
+        "sha256": "a071265c26b9415973c8bbab8d99fcff6e347d6b7831b9f059903ea63dd835fe",
+        "runtime_running_verified": false
+      },
+      "com.apple.backboardd.plist": {
+        "label": "com.apple.backboardd",
+        "program": [
+          "/usr/libexec/backboardd"
+        ],
+        "mach_services": [
+          "com.apple.accessibility.gax.backboard",
+          "com.apple.backboard.watchdog",
+          "com.apple.AttentionAwareness",
+          "com.apple.iohideventsystem",
+          "com.apple.backboard.oswatchdog",
+          "com.apple.libEDR.Notification",
+          "com.apple.backboard.altsysapp",
+          "com.apple.backboard.hid.services",
+          "com.apple.hid.PencilHaptics",
+          "com.apple.backboardd.virtualframebuffer",
+          "com.apple.backboard.hid-services.xpc",
+          "PurpleWorkspacePort",
+          "PurpleSystemEventPort",
+          "com.apple.backboard.display.services",
+          "com.apple.backboard.system-app-server",
+          "com.apple.accessibility.AXBackBoardServer",
+          "com.apple.backboard.TouchDeliveryPolicyServer",
+          "com.apple.iphone.axserver-systemwide",
+          "com.apple.backlightd",
+          "com.apple.CARenderServer"
+        ],
+        "additional_properties": {},
+        "sha256": "793aa63b46eed8507ecfbc61657b579acf98940584e3cd6886975e434a2f00fd",
+        "runtime_running_verified": false
+      },
+      "com.apple.runningboardd.plist": {
+        "label": "com.apple.runningboardd",
+        "program": "/usr/libexec/runningboardd",
+        "mach_services": [
+          "com.apple.runningboard.watchdog",
+          "com.apple.runningboard.resource_notify",
+          "com.apple.runningboard"
+        ],
+        "additional_properties": {},
+        "sha256": "acfb970df5653cbde0d6c251b5ecfc0234749e9aadbb46279d61cad0ebad2de1",
+        "runtime_running_verified": false
+      },
+      "com.apple.liveactivitiesd.plist": {
+        "label": "com.apple.liveactivitiesd",
+        "program": [
+          "/System/Library/PrivateFrameworks/SessionCore.framework/Support/liveactivitiesd"
+        ],
+        "mach_services": [
+          "com.apple.sessionservices",
+          "com.apple.aps.sessioncore.PushNotifications",
+          "com.apple.aps.sessioncore.PushNotifications.dev",
+          "com.apple.private.alloy.sessionkit-idswake"
+        ],
+        "additional_properties": {},
+        "sha256": "acf55d59345ed1121181e9c0c1ba915771c223faa5aeaf52d4ede9f45819a2e0",
+        "runtime_running_verified": false
+      },
+      "com.apple.mobile.keybagd.plist": {
+        "label": "com.apple.mobile.keybagd",
+        "program": [
+          "/usr/libexec/keybagd",
+          "-t",
+          "15"
+        ],
+        "mach_services": [
+          "com.apple.mobile.keybagd.mach",
+          "com.apple.mobile.keybagd.xpc"
+        ],
+        "additional_properties": {},
+        "sha256": "2271bbe918b68994cf7daa7534649912d08377efef08e9da47b11927c2daf8fd",
+        "runtime_running_verified": false
+      }
+    }
+  },
+  "liveactivities": {
+    "records": [
+      {
+        "pid": 119,
+        "slide": "0x1f50c000",
+        "pc": "0x1c18f64f8",
+        "lr": "0x1c18f64cc",
+        "frames": [
+          "0x1c18dc0ec",
+          "0x18f5b6cc0",
+          "0x18f5880e4",
+          "0x1c18dc0c0",
+          "0x1c1a49ec0",
+          "0x1c1a3c024"
+        ]
+      },
+      {
+        "pid": 122,
+        "slide": "0x1f50c000",
+        "pc": "0x1c18f64f8",
+        "lr": "0x1c18f64cc",
+        "frames": [
+          "0x1c18dc0ec",
+          "0x18f5b6cc0",
+          "0x18f5880e4",
+          "0x1c18dc0c0",
+          "0x1c1a49ec0",
+          "0x1c1a3c024"
+        ]
+      }
+    ],
+    "branch": [
+      "0x1c18f64b4: mov x0, x21",
+      "0x1c18f64b8: mov x1, x22",
+      "0x1c18f64bc: bl #0x1c798bc44",
+      "0x1c18f64c0: mov x20, x0",
+      "0x1c18f64c4: mov x0, x22",
+      "0x1c18f64c8: bl #0x1c798bc74",
+      "0x1c18f64cc: cbz x20, #0x1c18f64f8"
+    ],
+    "service_lookup": [
+      "0x1b51aa514: adrp x20, #0x1b51b4000",
+      "0x1b51aa518: add x20, x20, #0x980",
+      "0x1b51aa51c: mov x0, x20",
+      "0x1b51aa520: bl #0x1ba636fc0",
+      "0x1b51aa524: mov x1, x0",
+      "0x1b51aa528: mov x0, x19",
+      "0x1b51aa52c: bl #0x1ba636fb4",
+      "0x1b51aa530: cbz w0, #0x1b51aa604"
+    ],
+    "keybag_queue": "com.apple.liveactivitiesd.IOSKeybag.internal",
+    "null_api": "MKBEventsRegister",
+    "required_service": "AppleKeyStore",
+    "possible_failures": [
+      "missing AppleKeyStore",
+      "notification port allocation",
+      "callback allocation/copy",
+      "interest registration"
+    ],
+    "exact_registration_failure_branch_observed": false,
+    "display_property_validation": false
+  }
+}

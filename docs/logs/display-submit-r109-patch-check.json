@@ -1,0 +1,437 @@
+{
+  "result": "PASS",
+  "xnu_revision": "d8b80295118ef25ac3a784134bcf95cd8e88109f",
+  "patch_count": 86,
+  "patches": [
+    {
+      "name": "apple-only-cpu-tunables.patch",
+      "sha256": "91e431249a4d756bfca8b1800b4b283340c86d1899ec8196a2fe873e8d3c251e",
+      "applied": true
+    },
+    {
+      "name": "architectural-timer-entry.patch",
+      "sha256": "809b0c951545d889a2a37c730189283e7e890340894bab6d937c914dbd20b8e5",
+      "applied": true
+    },
+    {
+      "name": "armvirt-platform-personality.patch",
+      "sha256": "00e7054c9ff2ae82b66f27bfbefd7620e9000503ea5b38b80aa90aab1e4b7225",
+      "applied": true
+    },
+    {
+      "name": "cxx-flag-dependencies.patch",
+      "sha256": "a435e8797ed24a8338db53d0eaac49c163f90170c1fb7946d0c5cdee9d7d4b52",
+      "applied": true
+    },
+    {
+      "name": "disabled-deferred-reclaim.patch",
+      "sha256": "817a0b017aebb21f773aafe2b92a81be076abc66e29275d57220635339a407e1",
+      "applied": true
+    },
+    {
+      "name": "external-archive-dependencies.patch",
+      "sha256": "0a571de8361845266d7d419b0b3d5ebadbef986840c7e06eb981c0960d7fe374",
+      "applied": true
+    },
+    {
+      "name": "kernel-sdk-root.patch",
+      "sha256": "2bcf10f4bf171afbc358cb64e9bc742563dd21f5eadf0e7a17936e87fa8ba43d",
+      "applied": true
+    },
+    {
+      "name": "local-availability.patch",
+      "sha256": "a051857d524f8836068fd2f1182ebe9e9d9ccf28b9560fb27ad634b0cb93270e",
+      "applied": true
+    },
+    {
+      "name": "mockfs-intermediate-lookup.patch",
+      "sha256": "51a5b76873c2a39b777bd4f1f5e78730ce72e93d548de6fbe4655f107731fa00",
+      "applied": true
+    },
+    {
+      "name": "mockfs-memory-device-width.patch",
+      "sha256": "506f4ba36e30a700f0d27370d07abbde6e2c689d13fbad3400a6b940569ae30a",
+      "applied": true
+    },
+    {
+      "name": "mockfs-statfs.patch",
+      "sha256": "58c9a51909b12dca9cd1ac2fdb94be748b43be1c979383b9504a0304fb16a809",
+      "applied": true
+    },
+    {
+      "name": "mockfs-test-file.patch",
+      "sha256": "4a1ef86e0bdca7b633f59885961be1939574f8ba9814d1d75ebbfd0a7a8bd919",
+      "applied": true
+    },
+    {
+      "name": "mockfs-typed-allocation.patch",
+      "sha256": "44dfe8ea590336fae48a4d5f7b8fd478a435d591a34ba77fe1d0a961c630ad57",
+      "applied": true
+    },
+    {
+      "name": "native-4k-bootstrap-capacity.patch",
+      "sha256": "4ac39b497d88b28432bc7844c7137c8d2acc1992bef53f68c3512523a80b13a3",
+      "applied": true
+    },
+    {
+      "name": "native-4k-signature-hash-cache.patch",
+      "sha256": "a12be973c4eb525cb4309c759d5bae970b158f2928f284615ba6d6969f445eb4",
+      "applied": true
+    },
+    {
+      "name": "native-4k-user-abi.patch",
+      "sha256": "981ac483ae898426486aab475e22b2286bc1d820ad047c566182c3fbf435f6d4",
+      "applied": true
+    },
+    {
+      "name": "native-aes-personality.patch",
+      "sha256": "02fe52c87a6bd801e602d03b54ce51de1362a2f2c6f75f5fc08122d3901aefff",
+      "applied": true
+    },
+    {
+      "name": "native-arm-pan.patch",
+      "sha256": "7948f0ca8ad0ac5313a32bc8d9377290f88a7d64c880bbfac8e2b4c092e916f6",
+      "applied": true
+    },
+    {
+      "name": "native-dt-panic-region.patch",
+      "sha256": "b60c2a9a72ea23832f1e64348a5c5d1152cf05db6c156283dd8a93c804cd89cb",
+      "applied": true
+    },
+    {
+      "name": "native-lookup-trace.patch",
+      "sha256": "a9636d507e1d03fa87e79ec28d6f2007bb5f2563052e863a0de5b75cef21717f",
+      "applied": true
+    },
+    {
+      "name": "native-priv-work-interval.patch",
+      "sha256": "6250b487e67dd35e97da59cc79040aa5d73f11106fbe5bc07e81047c4c33e2ed",
+      "applied": true
+    },
+    {
+      "name": "native-quiet-managed-page-report.patch",
+      "sha256": "3044601dad4bcb731a46285e65e82129bbc3a6d5e85138e29543b06f18d13a3c",
+      "applied": true
+    },
+    {
+      "name": "native-text-fixup.patch",
+      "sha256": "c4dabb43d79fe23970ef24498f9cccaf15d1a9f6af23b7f2952bd75b3f248d9b",
+      "applied": true
+    },
+    {
+      "name": "native-trust-cache-runtime.patch",
+      "sha256": "19e000ca6f70a8ddfefa503d2936894dd8315fae3ca2fb3e50d666d65252de79",
+      "applied": true
+    },
+    {
+      "name": "native-union-getattrlistbulk.patch",
+      "sha256": "f5d665fd7250717cfacced8408a0b94f282eb2764e514f61a378f7d085c7a03b",
+      "applied": true
+    },
+    {
+      "name": "native-union-lower-directory.patch",
+      "sha256": "b39e077b190134caae1842d07758795bf15b408eb637701a41b603825e5d563b",
+      "applied": true
+    },
+    {
+      "name": "native-work-interval-soft-fail.patch",
+      "sha256": "b163b85e0340abf2da104527a3b5c3c4e72abe6cacabb3bacb6001e84a67f3fe",
+      "applied": true
+    },
+    {
+      "name": "native-work-interval-trace.patch",
+      "sha256": "f2c11511c172929572c3b075b0b0f3b8ae2c63d6f229c489c0339acc4f39815c",
+      "applied": true
+    },
+    {
+      "name": "native-work-interval-instance.patch",
+      "sha256": "807df62245701f999fb5c7033a9f03a4fab195e619a0c0607fd6481d19d4c1c8",
+      "applied": true
+    },
+    {
+      "name": "non-apple-cache-monitor.patch",
+      "sha256": "116ee4e61fb68e4a403049e349ceb23334e2eff0bec0eb11dc3bd5f3259fabdf",
+      "applied": true
+    },
+    {
+      "name": "non-apple-iommu-bootstrap.patch",
+      "sha256": "a53aaf1073976aed1561cb609763c7a4214e245a50fb534cc77b643808df9e70",
+      "applied": true
+    },
+    {
+      "name": "non-apple-pmap-field.patch",
+      "sha256": "82fe0a5021d59ddb766884f802f960ad67d61be63596f0bde136bf3875ff3ff8",
+      "applied": true
+    },
+    {
+      "name": "null-root-media.patch",
+      "sha256": "a67ce9afd5af8178e83089ace6ce5d21f5e820b69e4c70dfc2cdae1be274678a",
+      "applied": true
+    },
+    {
+      "name": "offline-component-load-probes.patch",
+      "sha256": "288ee8544fef056ebaf5da0d4740d0170788d3c14b6b3b78de140e7d966b8ecb",
+      "applied": true
+    },
+    {
+      "name": "offline-legacy-start.patch",
+      "sha256": "a6ed6012f215e2c13c09f1b89fe986616af0a0674b0f6e4afd2194d4b8de4c0c",
+      "applied": true
+    },
+    {
+      "name": "offline-native-gpu-broker.patch",
+      "sha256": "dc7590c3298ead78a843f098d3f47df57350e15b30746890b162a24b6eb182f5",
+      "applied": true
+    },
+    {
+      "name": "offline-owner-boot-manifest.patch",
+      "sha256": "840a73448459b0ddad1ad7d8525ffb3bd0826d58a7e732f8283a4222c2df175e",
+      "applied": true
+    },
+    {
+      "name": "offline-owner-cache-carrier.patch",
+      "sha256": "11b292274599c7161d5eaef627d11934166b136c5e8c31098bcabb2569da3d0e",
+      "applied": true
+    },
+    {
+      "name": "offline-owner-root-binding-audit.patch",
+      "sha256": "f77d07af625d8cf2404185717e58738841ff453735f260fd7dc3c4e8526a4e69",
+      "applied": true
+    },
+    {
+      "name": "offline-owner-root-crypto-probe.patch",
+      "sha256": "35415f0a13a2770d835f0e837ecc47e6fa51934a6faa1edfc6900e5f5d479e4d",
+      "applied": true
+    },
+    {
+      "name": "offline-owner-systemos-mount.patch",
+      "sha256": "42d5642e103d25955db2864ef4cb63a2c14ae94a43b71ac2418b1e587f8de46c",
+      "applied": true
+    },
+    {
+      "name": "offline-owner-z-air-init.patch",
+      "sha256": "5b1b1252a0614eee6926fb05def89c49008a6d891dc8760e7d126d1a444ac6d9",
+      "applied": true
+    },
+    {
+      "name": "offline-pgz-alignment-probe.patch",
+      "sha256": "632daaab2392352c69226670750285ead5bbf5aa90ea93198a7c79525a23ea0f",
+      "applied": true
+    },
+    {
+      "name": "pgz-aligned-validation.patch",
+      "sha256": "b1c0e2a78de033f9c9b234820e9be93756dcd6765af8a1ecb76b209476058f25",
+      "applied": true
+    },
+    {
+      "name": "public-entitlements-header.patch",
+      "sha256": "c6922bcfde308a02b39570f5f9af8d24e4cf4d88254a80e80218b6d410a784b8",
+      "applied": true
+    },
+    {
+      "name": "published-freezer-condition.patch",
+      "sha256": "644646451d10ea720414c8ed7b31a5aa63846018a3bb686b966565169fbc9688",
+      "applied": true
+    },
+    {
+      "name": "source-corecrypto14-bootstrap.patch",
+      "sha256": "041f0d0627e83f5c276cfa87130cec04907cdd02682428d069af2a9af2a16ebd",
+      "applied": true
+    },
+    {
+      "name": "source-machine-layer.patch",
+      "sha256": "1538783d2e5956f8ba65baeca4e9490711c43b8825123860847778b256291573",
+      "applied": true
+    },
+    {
+      "name": "source-pthread-bootstrap.patch",
+      "sha256": "1bbf00cc2b4e8f227dddf2807818d10e07325beea8e6c2c0b12106228d31d643",
+      "applied": true
+    },
+    {
+      "name": "zzw-native-adreno-sandbox-grant.patch",
+      "sha256": "07992b1f83014191fcf422d6924fa53b3008560d9eb73a4d2cf340941e564c56",
+      "applied": true
+    },
+    {
+      "name": "zzwb-native-sandbox-grant-set-properties.patch",
+      "sha256": "20ceb08c197d4da0f30e59a42db6a0ab8a2a3109218c3204e67ee2956423381b",
+      "applied": true
+    },
+    {
+      "name": "zzx-pmap-sync-64bit-pa.patch",
+      "sha256": "b8419e7779f49c9c5360a8ae8e9b52a78968511a9e24e43b9edb799793e04496",
+      "applied": true
+    },
+    {
+      "name": "zzy-native-gpu-addon-mount.patch",
+      "sha256": "f80e8c86eb8aad7da6fa1849ddb108c6a553f7d221d99f695a1e10198832adeb",
+      "applied": true
+    },
+    {
+      "name": "zzy-staged-system-apps.patch",
+      "sha256": "1103abc87d9611496d3458c9e5b36107fc27901739f19fec0de6da7cbd1c1844",
+      "applied": true
+    },
+    {
+      "name": "zzyb-native-cryptex-os-view.patch",
+      "sha256": "299b2c9b2e25168512e95340864b7ae728103164b942f18bb700285267e4836a",
+      "applied": true
+    },
+    {
+      "name": "zzyc-owner-skip-launch-constraints.patch",
+      "sha256": "2f7393ccac3f8e5edd49a4fadf834544a5c4d1fdaff2e1dd67c49567bb1f5e4b",
+      "applied": true
+    },
+    {
+      "name": "native-smp-secondary.patch",
+      "sha256": "cc16c2d53cbcc50eb2547e2c6f5b61f325348d07495378d9cdf187246b4d315c",
+      "applied": true
+    },
+    {
+      "name": "sheng-platform-power.patch",
+      "sha256": "6e68dbcdac670624f2a9806a61fef42110bfe6586029b3f1a0acb068c3a23ec2",
+      "applied": true
+    },
+    {
+      "name": "zzz-boot-progress.patch",
+      "sha256": "6e04d6ebe9035bb897920eceb3f6fddef1f5c6d0afa771a1f39dce741ee9b2be",
+      "applied": true
+    },
+    {
+      "name": "xnu-10063.141.1-security-init.patch",
+      "sha256": "f9ea76df15b01c8073c0fe8e38a1c05ac9db9202c393811756f6b616275b4675",
+      "applied": true
+    },
+    {
+      "name": "xnu-10063.141.1-sparse-index.patch",
+      "sha256": "d0a2da8ca1a0b4021629b0ecaadad20c0e6cf7b3205f8d780242a60034f44d91",
+      "applied": true
+    },
+    {
+      "name": "e5-ram-console-tee.patch",
+      "sha256": "bc47045def059080c91706bcea638603533c655d7c9413bb55a98745186c9c5f",
+      "applied": true
+    },
+    {
+      "name": "e5-start-markers.patch",
+      "sha256": "58a06f45bf39d73e8452b7f79b9deb7453186cdc3cf451f0bb9ebea08c76690b",
+      "applied": true
+    },
+    {
+      "name": "e5-no-platform-panic.patch",
+      "sha256": "e29213c421b5b8024c04b89dbb75b6089cd34edbda15a371e644a27fcfd8f720",
+      "applied": true
+    },
+    {
+      "name": "e5-no-pi3-uart.patch",
+      "sha256": "4917cf1009a7f231540cc3c391990c0172c9a548cb733102d9ee2bc281c790fd",
+      "applied": true
+    },
+    {
+      "name": "e5-ext-paniclog-safe.patch",
+      "sha256": "5d32fd63c58090c5623983ce3db8bdd9604e4403da1ca92136598f546ff6d74f",
+      "applied": true
+    },
+    {
+      "name": "e5-panic-info-init.patch",
+      "sha256": "20455a10d183fb76b77b819c512580e4ed910e59531e9c2f17c41a8f0879dfec",
+      "applied": true
+    },
+    {
+      "name": "e5-machine-init-markers.patch",
+      "sha256": "e06cd75d8e9c28abb5ec8fa0d2204e93d09bf61dd0421a0654fb132ce24ed1c6",
+      "applied": true
+    },
+    {
+      "name": "e5-serror-triangulate-debug.patch",
+      "sha256": "764a2617a5a0877abef83cf515dec5b3c91b59d326ea03f816676041b80fa318",
+      "applied": true
+    },
+    {
+      "name": "e5-serror-triangulate-scc.patch",
+      "sha256": "d6c6956c303209885e26594937da4ed0511d684ffdd7d6a5066b3ef980a5870c",
+      "applied": true
+    },
+    {
+      "name": "e5-serr-skip.patch",
+      "sha256": "bbe325d366236d2a7f7ea0dacd73e7c1b48b47712ac7082ff0d3699410c9862b",
+      "applied": true
+    },
+    {
+      "name": "e5-pmgr-nub.patch",
+      "sha256": "19c67de4df48276fa0fc2a0e84ba331f319a25260b9bdfd468dc57b4f93ff643",
+      "applied": true
+    },
+    {
+      "name": "e5-rootauth-defer.patch",
+      "sha256": "f9236faca0daca71a37efd80489c2ffa182b1c3719c57d52efb5f46588f1df7c",
+      "applied": true
+    },
+    {
+      "name": "e5-exec-policy-defer.patch",
+      "sha256": "0dab00be36cb8552e61ed7363867f416ca555ac77e694bd7d3de773c7f411d0b",
+      "applied": true
+    },
+    {
+      "name": "e5-uplink.patch",
+      "sha256": "926ba80b9a20778af9914b5f682184d9ca4fe87025102fb41a91050074a2fb51",
+      "applied": true
+    },
+    {
+      "name": "e5-emmc-personality.patch",
+      "sha256": "d2013b2be5bb0024d9e8e32aa74a4fa9c0a226073314a9ec2edbf304833d4d6b",
+      "applied": true
+    },
+    {
+      "name": "e5-fbconsole.patch",
+      "sha256": "5439779d10f496ac57b07a06cca453ab2d960918bc506c9be2cc3fbe518b639d",
+      "applied": true
+    },
+    {
+      "name": "e5-keys.patch",
+      "sha256": "c8ca52a59f2f6c546e10b4e6e4abfa2ff2ae7fa6ab4b95837307fc2ed65b3536",
+      "applied": true
+    },
+    {
+      "name": "e5-keys2.patch",
+      "sha256": "488e302eca1d92db63427944a598be503dfc0756444a0bc63b70a942a92f2a57",
+      "applied": true
+    },
+    {
+      "name": "e5-systemos-startup.patch",
+      "sha256": "38284cbcc7c8855856e4ebcf90c38aef019331ef3b8b69e3133d9f99264d4338",
+      "applied": true
+    },
+    {
+      "name": "e5-console-flight.patch",
+      "sha256": "e1e3f860d0b5943ffdc71f118efe2c29a5899ba0a8123ad0035d145eda5fd0ff",
+      "applied": true
+    },
+    {
+      "name": "e5-data-progress.patch",
+      "sha256": "59691fb6ce59d88f2ae35b3a7e6899ef52bb3292f9f7f955e6eab6699e1bdbe5",
+      "applied": true
+    },
+    {
+      "name": "e5-crash-reason.patch",
+      "sha256": "c47b2cd0bec3d26993034e86fff1bbb29d18d5e3ddd94da39eff946ccffa48e5",
+      "applied": true
+    },
+    {
+      "name": "e5-display-mode-crash.patch",
+      "sha256": "2b0c7e9322faf9d5df5c7d6488c0795a584d0e135dce28516e3fbd53ab7713b4",
+      "applied": true
+    },
+    {
+      "name": "e5-display-mode-keep.patch",
+      "sha256": "d0ab301cf19b1e5b9f3595b3d4477c929e289b7abd0aa88a4a5c169118e85f52",
+      "applied": true
+    },
+    {
+      "name": "e5-display-submit-trace.patch",
+      "sha256": "a46422ba52b0f86b54ff9e95b26702dc4d03c952357f1249f4f5f3741b3566b2",
+      "applied": true
+    }
+  ]
+}
