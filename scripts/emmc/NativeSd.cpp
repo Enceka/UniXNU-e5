@@ -66,6 +66,7 @@ static void dataCheckpoint(const char *phase, uint32_t detail = 0) {
 }
 
 
+class NativeSd;
 // D2 v1.3: file-scope ADI peek so the display DPU tick line can read the
 // UMP9620 watchdog state (r139 ticks spanned >600s with no wdt reboot).
 static NativeSd *sWdtPeekInstance = nullptr;
@@ -73,7 +74,7 @@ extern "C" unsigned e5_pmic_peek(unsigned off) {
   return (sWdtPeekInstance && off < 0x8000u) ? sWdtPeekInstance->pmicRead(off)
                                              : 0xeeeeeeeeu;
 }
-class NativeSd;
+
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
 static bool publishData(E5DataDevice *device, NativeSd *host);
