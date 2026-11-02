@@ -406,6 +406,16 @@ components = ["display"]
 
 [[area.evidence]]
 kind = "device"
+revision = "59140f2b3f2c58aa2d29f0983f7a2a49e6e3b6f9"
+status = "pass"
+summary = "r116-r122 walk-to-vsync arc: v20 (slot 200 zero-fill + 203) made ALL 18 external selectors green; v22 cached the provider at +0x1640 (original start bails non-AppleARMIODevice leaving it NULL); v23 armed +0x1788 bit0 and +0x16d4 producing the first non-null +0x16d0 event token (event_config executed); v24 A/B showed flag direction not decisive; v25 restored the sel-6 wait loop with a 3-timeouts-per-success vsync cadence (F 30 to 49, method volume +14%)"
+command = "run-board-cycle.py board-r116 board-r117 board-r118 board-r119 board-r120 board-r121 board-r122"
+result = "seven healthy windows, no panic; all 18 selectors ok; wait loop revived (sel-6 n=4 ok=1); DefaultSurface/SwapBegin counters still zero"
+reference = "docs/logs/display-vsync-cadence-rounds-116-122.json"
+components = ["display"]
+
+[[area.evidence]]
+kind = "device"
 revision = "24bd5719c555c296bca358db781c82ec95b68cb4"
 status = "pass"
 summary = "r113 wait-state round: E5STATE m16d0=0 (event token never written; concrete driver owns it), m1608/m1868 exist, m1640/m1658=0; sel-6 n=3491 kIOReturnTimeout decoded to slot 176 gating on +0x16d0; externalMethod + 90-entry dispatch table at 0x6f354c0 decoded; v17 ships slot-176 success override"
