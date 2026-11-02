@@ -26,6 +26,7 @@ unsigned e5_display_ok211_calls = 0;
 unsigned e5_display_ok306_calls = 0;
 // v15 power-band override counters (slots 229/255/256/258/260/261).
 unsigned e5_display_pw_calls = 0;
+extern "C" unsigned e5_display_swap_mask = 0;
 extern "C" unsigned e5_display_wait_calls = 0;
 extern "C" unsigned e5_display_wait_last = 0;
 unsigned e5_display_pw_results = 0;
@@ -288,6 +289,41 @@ public:
   IOReturn opaque176(uint32_t a, uint32_t b, uint32_t c) override {
     __atomic_fetch_add(&e5_display_wait_calls, 1U, __ATOMIC_RELAXED);
     __atomic_store_n(&e5_display_wait_last, (a & 0xFFFFu) | ((b & 0xFFu) << 16) | ((c & 0xFFu) << 24), __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  // v18: the swap/surface band. The Legacy base returns kIOReturnUnsupported
+  // from every one of these (r114: sel 15/22/27/33/50/57/79/84 all rejected);
+  // the concrete platform driver owns them. Firmware-scanout semantics: every
+  // surface/swap operation succeeds as a no-op (the DPU scans 0xBE000000
+  // continuously; buffers written by the compositor ARE the scanout).
+  IOReturn opaque180(uint32_t a, uint32_t b, void *out) override {
+    (void)a; (void)b; if (out) *(uint32_t *)out = 0;
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 0, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque183(uint32_t a) override {
+    (void)a;
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 1, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque199(void *out) override {
+    if (out) *(uint64_t *)out = 0; // 3084-byte info struct: zero head only
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 2, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque206(void *a) override {
+    (void)a;
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 3, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque207(uint32_t a) override {
+    (void)a;
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 4, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque232(uint32_t a) override {
+    (void)a;
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 5, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
   E5_GUARDED_SLOT(245)
