@@ -558,7 +558,7 @@ kind = "device"
 command = "board rounds 137-144 (D2 native DPU paint + PWM backlight + vsync poll + RUN bit)"
 reference = "docs/logs/display-dpu-rounds-143-144.json"
 result = "D2 VISUAL ACCEPTANCE PASS: user-confirmed RGB bands scrolling on panel (kernel paint via DPU scanout, 0 panic); vsync INT telemetry open"
-revision = "2ee6037ef10f59b112fdc84ca08edf62d2c78cf56d8aca0718d09e9858289c9a"
+revision = "f315730307f74efae1ab1472e441796fff305a19"
 
 [[area]]
 id = "input"
