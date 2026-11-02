@@ -56,6 +56,16 @@ send return status and explicit arm calls.
 
 Host ABI derivation passes against the pinned original: 358 virtual slots,
 nine original abstract leaves, unchanged constructor and family-text pins.
-CI compile/link/prelink, R126 flash and physical presentation remain pending.
+CI385 (run 41427462995) compiles, links and prelinks device f62711c.
+R126 qualifies native reference initialization and successful sender returns:
+`ap=08 asend=631 aok=631 ar=0`. This does not prove user callback execution.
+The explicit e5-no-vc control suppresses all 51,112 video-character calls;
+retained scanout stays at `F=1:557a87bd`. Original selectors 3/4/5 still have
+zero calls. One liveactivitiesd exception is retained; there is no kernel panic.
+
+All payload bytes match flash readback; fresh Android A returns after about
+665 seconds, the full 128 MiB Data hash remains c1744ab4 and protected
+OS/SystemOS metadata matches the retained installation. Physical UI remains
+unqualified. [Device evidence](logs/display-async-round126.json).
 The acceptance criterion remains the user's observation of SpringBoard UI
 on the physical panel. Successful notification delivery alone is insufficient.
