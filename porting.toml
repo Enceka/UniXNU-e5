@@ -400,6 +400,7 @@ revision = "8588b2f"
 status = "pass"
 summary = "r113 wait-state round: E5STATE m16d0=0 (event token never written; concrete driver owns it), m1608/m1868 exist, m1640/m1658=0; sel-6 n=3491 kIOReturnTimeout decoded to slot 176 gating on +0x16d0; externalMethod + 90-entry dispatch table at 0x6f354c0 decoded; v17 ships slot-176 success override"
 command = "run-board-cycle.py board-r113"
+result = "670s healthy window; P=1:1:1 Q=3:0 stable; no panic; wait wall root-caused to the +0x16d0 event token"
 reference = "docs/logs/display-wait-round113.json"
 components = ["display"]
 
