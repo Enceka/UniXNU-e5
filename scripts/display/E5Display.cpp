@@ -340,6 +340,23 @@ public:
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 7, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
+  // v20: r116 leftovers — sel 17 -> slot 200 (0x640/8; the 3084-byte
+  // display-info struct query), sel 84 -> slot 203 (0x658/8; earlier
+  // miscategorized as 207 — 0x658/8 IS 203, an unoverridden Unsupported
+  // stub). Zero-fill + success.
+  IOReturn opaque200(void *out) override {
+    if (out) {
+      uint64_t *q = (uint64_t *)out;
+      for (unsigned i = 0; i < 384; i++) q[i] = 0; // 3072B of the 3084B head
+    }
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 8, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque203(void *a) override {
+    (void)a;
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 9, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
   E5_GUARDED_SLOT(245)
   E5_GUARDED_SLOT(246)
   E5_GUARDED_SLOT(307)
