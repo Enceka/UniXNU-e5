@@ -330,7 +330,11 @@ extern "C" void e5_dpu_tick(void) {
   if (!sDpuMap) {
     sDpuMemory = IODeviceMemory::withRange(0x31000000ull, 0x3000ull);
     if (sDpuMemory) sDpuMap = sDpuMemory->map();
-    sPwmMemory = IODeviceMemory::withRange(0x30000ull, 0x20ull);
+    // pwm@30000 is a CHILD of /soc/aon whose ranges make children OFFSETS of
+    // 0x64000000 (same translation the ADI rounds taught us) — absolute PA of
+    // PWM channel 0 is 0x64030000; mapping 0x30000 directly = data abort
+    // (r137 panic, E5DPU dump had already proven the DPU side).
+    sPwmMemory = IODeviceMemory::withRange(0x64030000ull, 0x20ull);
     if (sPwmMemory) sPwmMap = sPwmMemory->map();
     if (sDpuMap) {
       e5_display_tracef(
