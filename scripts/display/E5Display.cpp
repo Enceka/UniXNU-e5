@@ -311,7 +311,7 @@ public:
     // waiting entirely (u froze, SwapBegin never called). Alternate: ~3
     // Timeout replies per one Success = a ~60Hz-ish "frame completed" pulse.
     unsigned n = __atomic_load_n(&e5_display_wait_calls, __ATOMIC_RELAXED);
-    return (n % 4 == 0) ? kIOReturnSuccess : kIOReturnTimeout;
+    return (n % 2 == 0) ? kIOReturnSuccess : kIOReturnTimeout;
   }
   // v18: the swap/surface band. The Legacy base returns kIOReturnUnsupported
   // from every one of these (r114: sel 15/22/27/33/50/57/79/84 all rejected);
