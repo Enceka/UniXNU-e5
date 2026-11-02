@@ -1,0 +1,22 @@
+{
+  "summary": "Display event-delivery arc r117-r124: client API fully green; wait machinery revived; vsync async delivery identified as the final kernel-side blocker.",
+  "rounds": {
+    "r117": {"kernel": "c23bb943", "device_rev": "b6d1a79", "result": "ALL 18 selectors green (6/8/12/15/17/22/27/28/29/33/50/57/72/73/74/79/84/88 ok ret=0)", "notes": "slot 200 display-info zero-fill + 203 fix; slot arithmetic bug 0x658/8=207 miscall fixed"},
+    "r118": {"kernel": "fa930aa4", "device_rev": "875742b", "result": "v21 fake-vsync no-op: m1810=0, no token registered; E5STATE line live"},
+    "r119": {"kernel": "eae29df0", "device_rev": "592f87d", "result": "v22 +0x1640 provider cache: m1640 NON-NULL; all green; d/b 0"},
+    "r120": {"kernel": "9e6de044", "device_rev": "e3b07cb", "result": "v23 +0x1788 online + 0x16d4: m16d0=0x100000000 event token FIRST NON-NULL; 0 E5EXC even LA absent"},
+    "r121": {"kernel": "d59309e7", "device_rev": "f6e3c51", "result": "v24 A/B clear 0x1788: no observable difference"},
+    "r122": {"kernel": "33e7fa36", "device_rev": "59140f2", "result": "v25 1-in-4 vsync cadence: sel6 n=4 ok=1 exact cadence, F=30->49, vc +14%"},
+    "r123": {"kernel": "4d5d3dc6", "device_rev": "35b00e3", "result": "v26 1-in-2 cadence: sel6 n=2 ok=1, F back to 30 — cadence saturated"},
+    "r124": {"kernel": "f60cd3d5", "device_rev": "f50c357", "result": "v27 faithful 260/261 enable semantics + 176 wait: sel6 n=1 ok=1, e16e0 never armed, d/b 0, 1 E5EXC = liveactivitiesd pid 117"}
+  },
+  "decisive_decodes": {
+    "sum_counters": "E5IMSUM d/b/e = user trace sel 3/4/5: sel3 DefaultSurface (slots 174+242), sel4 SwapBegin (slot 177), sel5 SwapEnd (0x508 struct)",
+    "vsync_enable": "EnableVSyncNotifications (framework 0x1b63d409c) = conn->[0x8e8](conn,5) -> kernel sel 72 4-scalar {5,0,0,0} -> slots 208 (register, x2=ctx+8=OSAsyncReference64) + 210 (arm)",
+    "client_array": "family client struct: async ctx entries at client+0x110+subop*0xb0, 6 subops",
+    "delivery": "family broadcast 0x67778c0 -> GOT 0x6f33978 -> IOUserClient::sendAsyncResult64WithOptions(ref, result, args, n, options) static, mangled _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj; kinds observed 2/3/6",
+    "compositor": "backboardd imports ONLY _IOMobileFramebufferOpen + _SetDebugFlags + QuartzCore + Metal = the compositor; SpringBoard has ZERO IOMFB imports"
+  },
+  "v28_shipped": {"device_rev": "23c67de", "changes": "slots 208/210 save OSAsyncReference64 per subop; e5_display_async_fire() from frame_kick calls bound sendAsyncResult64WithOptions(ref, 0, {mach_absolute_time,0}, 2, 1); E5STATE ak=/asend=/aok= fields"},
+  "open": ["CI 383 (run 41418471297) building v28 kernel", "board r125 = async fire round: watch ak=/asend=/aok + sel3/4 first calls + F", "LA abort liveactivitiesd pid 117 fixed site"]
+}

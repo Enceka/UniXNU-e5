@@ -1,0 +1,56 @@
+# R127: correct SwapWait arguments and observe the native event source
+
+The R126 notification-registration experiment exposed additional errors in
+the earlier v27 event interpretation. This is a separate experiment based
+on the same pinned original kernelcache and family-text hashes documented
+in [R126](display-async-reference-r126.md).
+
+Original UserClient wrapper `0xfffffff006777390` calls service slot 176
+with **client in x1**, swap id in w2, flags in w3 and timeout in w4.
+The old three-u32 prototype discarded timeout, treated the client pointer
+as the mode and could return success without inspecting the actual flags.
+Restore this four-argument ABI and forward to the original slot-176 code,
+retaining its native Busy/error/success result. The telemetry now records
+the actual scalar inputs and returned status.
+
+The original slot-176 function at `0xfffffff00678d998` inspects the flags'
+high bit. Modes 3 and 4 test a **32-bit** enable word at +0x16e0 and a
+**32-bit** token at +0x16d0. R125's qword `m16d0=100000000` means token=0
+and the adjacent +0x16d4 word=1; that adjacent word was explicitly written
+by v23. It does not establish a token write, event_config invocation or
+completed display readiness. Withdraw that earlier inference.
+
+The original enable_event function at `0xfffffff006797224` is virtual
+**slot 344**. It records its argument at +0x16dc, writes the complete
+32-bit enable word and arms the inherited event source at +0x1638. Slots
+260/261 are unrelated Legacy success/false stubs. Restore those inherited
+stubs and instrument slot 344 while forwarding its exact arguments and
+return value. Periodic sampling observes native token/completion changes
+without writing tokens or clearing the enable word.
+
+Original power-request backend slot 229 at `0xfffffff0067973b8` enters the
+native command gate using virtual slot 344 as its action. The v15 success
+override bypassed that arm entirely. Restore forwarding through slot 229
+as well so a power request can enter the real event source, while the
+concrete firmware-scanout power hooks remain in place.
+
+New state fields are `tok` (the actual u32 token), `ev` (slot-344 call
+count, argument and result), and `wr` (native wait result). `W` retains the
+packed swap-id/flags/timeout observation with the corrected positions.
+
+Host ABI derivation and the 13-area porting record checker pass. CI387
+(run 41429533907) compiles, links and prelinks c5553be. R127 qualifies the
+native path: `ev=1:1:0 tok=1 vfire=1 wr=0`, with a 32-bit powered word
+written by the original slot-354 state setter. This field satisfies the
+original mode-3 wait; it is not a synthetic incrementing event counter.
+
+All 62,926,860 flash bytes and nine independent FAT reads pass. Mach sender
+returns remain successful (`asend=663 aok=663`). All 52,022 character draws
+are suppressed; retained scanout is `F=1:557a87bd`, and selectors 3/4/5 are
+still uncalled. Fresh Android A returns after about 665 seconds. Data and
+protected metadata remain unchanged. No panic or exception is retained;
+this does not prove continuous SpringBoard liveness.
+[Device evidence](logs/display-native-event-round127.json). The immediate hardware question is
+whether native notification delivery lets userspace request a real event,
+and whether the native token subsequently changes. No UI, frame-submission
+or physical-presentation result is claimed by this source change.

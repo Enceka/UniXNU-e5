@@ -1,0 +1,313 @@
+{
+  "round": 127,
+  "collected_at": "2026-11-02T10:56:57.485966+00:00",
+  "cycle": {
+    "payload": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-policy-r65/board-r127/payload/e5-uefi.bin",
+    "boot_wait_seconds": 1500,
+    "payload_size": 62926860,
+    "payload_sha256": "9bc6bcbdf16a00eadb46695b95aefea560d439ba706791f3efd34c90bd77678e",
+    "stage": "complete",
+    "updated_at": "2026-11-02T10:55:28.106326+00:00",
+    "full_readback_verified": true,
+    "reboot_requested": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-185526.txt"
+    ]
+  },
+  "android_after": {
+    "boot_id": "c310f0d6-4764-4158-949e-c4a1332eab7d",
+    "slot": "_a",
+    "boot_completed": "1"
+  },
+  "data_sha256_unchanged": "c1744ab42d3baac3baaf50742afbf64fc51159d13620a2f5fef4e2655fe4ec47",
+  "protected_metadata_matches_r125_install": {
+    "os-gpt": "813cf9e0ec5dbc68e6e038359bdb6ae619a7956ceaf2b260e39b29ff26410342",
+    "os-backup": "b362f5f90062e2a5ae2b7d2ec47483337861b0f62cb4cc3544a1abf951e9d618",
+    "os-apfs": "e977165f7b0a6d8485297ca4e235105e507dff6f435b8ba66e044cac74e63d03",
+    "systemos-head": "557802857a9dbf401af64d4ea28f83b16a556a75642c1644aded536657757726",
+    "systemos-tail": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+  },
+  "dispatch": {
+    "schema": 1,
+    "complete_summaries": 3,
+    "console": {
+      "index": 1,
+      "calls": 52022,
+      "blocked": 52022
+    },
+    "key_methods": {
+      "3": {
+        "name": "default_surface",
+        "calls": 0,
+        "successes": 0,
+        "last_status": "0x0"
+      },
+      "4": {
+        "name": "swap_begin",
+        "calls": 0,
+        "successes": 0,
+        "last_status": "0x0"
+      },
+      "5": {
+        "name": "swap_end",
+        "calls": 0,
+        "successes": 0,
+        "last_status": "0x0"
+      },
+      "6": {
+        "name": "swap_wait",
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "12": {
+        "name": "request_power_change",
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      }
+    },
+    "selectors": {
+      "6": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "8": {
+        "calls": 2,
+        "successes": 2,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "12": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "15": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "17": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "22": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "27": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "28": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 92,
+        "scalar_output": "0x0"
+      },
+      "29": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "33": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "50": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "57": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "72": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "73": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "74": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "79": {
+        "calls": 2,
+        "successes": 2,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "84": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      },
+      "88": {
+        "calls": 1,
+        "successes": 1,
+        "last_status": "0x0",
+        "last_pid": 56,
+        "scalar_output": "0x0"
+      }
+    },
+    "events": [],
+    "power_request_unsupported": false,
+    "swap_wait_busy": false,
+    "out_of_range_calls": 0,
+    "finding": "No SwapEnd reached the observed dispatch gateway.",
+    "physical_presentation_verified": false,
+    "limits": [
+      "Counters are approximate concurrent snapshots.",
+      "Calls rejected before the gateway are not counted.",
+      "Retained event lines may have wrapped out."
+    ]
+  },
+  "event_samples": 45,
+  "last_state": {
+    "svc": "0xfffffff437ad2000",
+    "m3c8": "0",
+    "m1608": "fffffff437889a60",
+    "m1640": "fffffff51ddaf920",
+    "m1658": "0",
+    "m1810": "0",
+    "m1858": "0",
+    "f1860": "0000",
+    "m1868": "fffffff26a83c8e0",
+    "m16d0": "100000001",
+    "e16e0": "00",
+    "vfire": "1",
+    "ak": "08",
+    "asend": "663",
+    "aok": "663",
+    "ap": "08",
+    "ar": "0",
+    "am": "00",
+    "tok": "1",
+    "ev": "1:1:0",
+    "wr": "0"
+  },
+  "panic": null,
+  "exceptions": [],
+  "frame_samples": [
+    "F=1:557a87bd"
+  ],
+  "physical_presentation_verified": false,
+  "source": {
+    "run_id": 41429533907,
+    "run_number": 387,
+    "conclusion": "success",
+    "artifact_id": 13134386932,
+    "artifact_name": "e5-kernel-04573c510c5fd4892ca6948739389141cc9e05f5-387",
+    "zip_sha256": "6c32e5811cffeac181e0d7e9f1c0bab8219dfe91138c79972c13f63755f1b7d8",
+    "kernel_sha256": "54f24585ed2d1f227660f59bb969e598b4fecbcc57caafe595c8e5167ef84d3d",
+    "kernel_size": 52133888,
+    "checkout_pins_verified": true,
+    "unixnu_revision": "04573c510c5fd4892ca6948739389141cc9e05f5",
+    "device_revision": "c5553be8170c26364777d89e54fc0722080e1ea4"
+  },
+  "payload_verification": {
+    "payload_sha256": "9bc6bcbdf16a00eadb46695b95aefea560d439ba706791f3efd34c90bd77678e",
+    "payload_bytes": 62926860,
+    "fat_mirrors_identical": true,
+    "mtools_verified_files": [
+      {
+        "path": "kernel.macho",
+        "size": 52133888,
+        "sha256": "54f24585ed2d1f227660f59bb969e598b4fecbcc57caafe595c8e5167ef84d3d"
+      },
+      {
+        "path": "kernel.macho.adt",
+        "size": 14312,
+        "sha256": "0fea719d31cfe95092ee8576d41264c47548cec89e12911a85c031b44c637fd0"
+      },
+      {
+        "path": "seed.dbr",
+        "size": 585936,
+        "sha256": "d633984f596c32d0fb3e84a7970dc2898e4cb08201841a809660a4e297f979c5"
+      },
+      {
+        "path": "kernel.macho.trustcache",
+        "size": 61356,
+        "sha256": "7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7"
+      },
+      {
+        "path": "E5BootMenu.efi",
+        "size": 45056,
+        "sha256": "8e5cdc024eb7f79775df1f0fd6794431a5c2c6f0440af8afebdf7ee61924b05b"
+      },
+      {
+        "path": "DarwinBoot.efi",
+        "size": 49152,
+        "sha256": "2da0c8688e0f21c423122015371396c68713a8921bd30d2f2924f4d9d84d8632"
+      },
+      {
+        "path": "UniXNU.efi",
+        "size": 126976,
+        "sha256": "1a29a249419ef03a2bc6db287505fe055cdc5497c53cfd4036ab83a20a1039d1"
+      },
+      {
+        "path": "startup.nsh",
+        "size": 57,
+        "sha256": "5041880f6623c6e2659648ab91a26ae6696754b63e2ab33b78ce7052a235a52e"
+      },
+      {
+        "path": "EFI/UniXNU/unixnu.toml",
+        "size": 741,
+        "sha256": "fc8d36f052140adba163bdebcf4810c6ea417cef02edbee3d451338eb9713fe5"
+      }
+    ],
+    "data_fixture_sha256": "c1744ab42d3baac3baaf50742afbf64fc51159d13620a2f5fef4e2655fe4ec47",
+    "video_console_suppression_requested": true
+  },
+  "report": "e5-xnu/dumps/uefi-report-185526.txt",
+  "console_sha256": "3778a9c9ee68b460703a2e2710b30d945ba81498de3387bd2d03fb2a54e3571f"
+}

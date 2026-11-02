@@ -2,8 +2,82 @@
 // Copyright (c) 2026, UniXNU contributors.
 #include "OriginalLegacyFramebufferABI.h"
 #include <IOKit/IOLib.h>
+// v21: fake vsync via the family completion entry. Fixed runtime VA
+// (KC slide is a build constant): notify(svc, expected=[svc+0x1810]).
+extern "C" {
+  unsigned e5_display_vsync_ticks = 0;
+  unsigned e5_display_vsync_delivered = 0;
+}
+using e5_notify_fn = void (*)(void *, void *);
+
 #include <libkern/c++/OSSymbol.h>
 #include <mach/kmod.h>
+#include <sys/proc.h>
+#include <kern/task.h>
+
+// E5TW only: printf would change the framebuffer being measured.
+#include <stdarg.h>
+extern "C" void e5_kputc(char);
+extern "C" void e5_iomfb_trace_dump(void);
+extern "C" void e5_display_state_dump(void);
+extern "C" void e5_display_vsync_fire(void); // v27
+extern "C" void e5_display_async_fire(void); // v28: real async-event delivery
+static void e5_display_tracef(const char *format, ...) {
+  char line[256];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(line, sizeof(line), format, args);
+  va_end(args);
+  for (const char *p = line; *p; ++p) e5_kputc(*p);
+}
+
+// R128: a bounded process/registry snapshot after native readiness completed
+// without any surface calls. No task_info/map locks, user-memory reads,
+// suspension or signals from this media-read checkpoint. A proc reference
+// protects each process while the pinned task's scalar state is sampled.
+static void e5_display_runtime_census() {
+  static unsigned sequence;
+  const unsigned sample = ++sequence;
+  static const char *const targets[] = {
+      "SpringBoard", "backboardd", "runningboardd", "frontboardd",
+      "liveactivitiesd", "launchd", "WindowServer"};
+  unsigned seen = 0;
+  for (int pid = 1; pid < 512; ++pid) {
+    proc_t process = proc_find(pid);
+    if (!process) continue;
+    char name[32] = {};
+    proc_name(pid, name, sizeof(name));
+    for (unsigned i = 0; i < sizeof(targets) / sizeof(targets[0]); ++i) {
+      if (strcmp(name, targets[i]) != 0) continue;
+      seen |= 1u << i;
+      const int exiting = proc_exiting(process);
+      task_t task = exiting ? TASK_NULL : proc_task(process);
+      e5_display_tracef("E5PROC seq=%u pid=%d name=%s exit=%d active=%u suspended=%u\n",
+          sample, pid, name, exiting,
+          task ? (unsigned)task_is_active(task) : 0,
+          task ? (unsigned)task_is_app_suspended(task) : 0);
+      break;
+    }
+    proc_rele(process);
+  }
+  static const char *const services[] = {
+      "IOGPU", "IOAccelerator", "AppleKeyStore", "IOSurfaceRoot",
+      "IOMobileFramebuffer", "IOCoreSurfaceRoot"};
+  unsigned published = 0;
+  for (unsigned i = 0; i < sizeof(services) / sizeof(services[0]); ++i) {
+    OSDictionary *matching = i == 5 ? IOService::nameMatching(services[i])
+                                   : IOService::serviceMatching(services[i]);
+    if (!matching) continue;
+    auto service = IOService::copyMatchingService(matching);
+    if (service) published |= 1u << i;
+#if !defined(IOKIT_ENABLE_SHARED_PTR)
+    OSSafeReleaseNULL(service);
+#endif
+    matching->release();
+  }
+  e5_display_tracef("E5LIVE seq=%u pid_limit=512 seen=%02x services=%02x\n",
+      sample, seen, published);
+}
 
 extern kmod_info_t g_kernel_kmod_info;
 extern "C" void e5_display_static_init(void) __asm__("__GLOBAL__sub_I_E5Display.cpp");
@@ -25,6 +99,8 @@ extern "C" unsigned e5_display_backend_total = 0;
 extern "C" unsigned e5_display_backend_slots = 0;
 extern "C" unsigned e5_display_backend_last_slot = 0;
 extern "C" unsigned e5_display_backend_last_sel = 0;
+extern "C" unsigned e5_display_power_last = 0xFF; // owned here
+extern "C" unsigned e5_display_power_read(void);
 
 extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
                                             void *b, void *c, void *d) {
@@ -42,7 +118,7 @@ extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
   __atomic_fetch_or(&e5_display_backend_slots, mask, __ATOMIC_RELAXED);
   __atomic_store_n(&e5_display_backend_last_slot, slot, __ATOMIC_RELAXED);
   __atomic_store_n(&e5_display_backend_last_sel, selector, __ATOMIC_RELAXED);
-  printf("E5Display: soft backend slot %u sel=%x b=%llx c=%llx d=%llx -> e00002f0\n",
+  e5_display_tracef("E5Display: soft backend slot %u sel=%x b=%llx c=%llx d=%llx -> e00002f0\n",
          slot, selector, (unsigned long long)b, (unsigned long long)c,
          (unsigned long long)d);
   return kIOReturnUnsupported;
@@ -71,17 +147,26 @@ static uint32_t e5_display_crc32(const volatile uint8_t *p, size_t n) {
 }
 
 extern "C" void e5_display_frame_kick(void) {
+  static unsigned traceKicks;
+  if ((traceKicks++ % 16) == 0) {
+    e5_iomfb_trace_dump();
+    e5_display_runtime_census();
+  }
+  e5_display_state_dump(); // v16: wait-machinery state alongside the selector census
+  e5_display_vsync_fire();  // v27: fire the armed vsync event (token bump + clear)
+  e5_display_async_fire();  // v28: deliver vsync-class async notifications
   if (sPanelKicks == 0) {
     sPanelMemory = IODeviceMemory::withRange(0xBE000000ull, 0x4B000ull);
     if (sPanelMemory) sPanelMap = sPanelMemory->map();
     if (!sPanelMap) {
-      printf("E5Display: panel map failed - frame probe disabled\n");
+      e5_display_tracef("E5Display: panel map failed - frame probe disabled\n");
       sPanelKicks = 1; // never try again; crc stays 0
       return;
     }
-    printf("E5Display: panel mapped at %p (0xBE000000+0x4B000)\n",
+    e5_display_tracef("E5Display: panel mapped at %p (0xBE000000+0x4B000)\n",
            (void *)(uintptr_t)sPanelMap->getVirtualAddress());
   }
+  __atomic_store_n(&e5_display_power_last, e5_display_power_read(), __ATOMIC_RELAXED);
   if (!sPanelMap) return;
   sPanelKicks++;
   if ((sPanelKicks % 16) != 2) return; // ~every 16th big-read echo batch
@@ -89,7 +174,7 @@ extern "C" void e5_display_frame_kick(void) {
   uint32_t crc = e5_display_crc32((const volatile uint8_t *)px, 0x4B000);
   if (crc != e5_display_frame_crc) {
     if (e5_display_frame_changes || e5_display_frame_crc)
-      printf("E5Display: panel crc %08x (was %08x) change #%u\n",
+      e5_display_tracef("E5Display: panel crc %08x (was %08x) change #%u\n",
              crc, e5_display_frame_crc, e5_display_frame_changes + 1);
     __atomic_store_n(&e5_display_frame_crc, crc, __ATOMIC_RELAXED);
     unsigned n = __atomic_fetch_add(&e5_display_frame_changes, 1U, __ATOMIC_RELAXED) + 1;
@@ -118,9 +203,9 @@ extern "C" void e5_display_frame_kick(void) {
       thumb[row * 5 + 4] = (uint8_t)((bits >> 32) & 0xff);
     }
     if ((n % 4) == 0 || n == 1) {
-      printf("E5PANELSNAP %u %08x ", n, crc);
-      for (unsigned i = 0; i < 300; ++i) printf("%02x", thumb[i]);
-      printf("\n");
+      e5_display_tracef("E5PANELSNAP %u %08x ", n, crc);
+      for (unsigned i = 0; i < 300; ++i) e5_display_tracef("%02x", thumb[i]);
+      e5_display_tracef("\n");
     }
     // r106: 4-bit-per-channel color histogram over a 4px grid (80x60 =
     // 4800 samples). Text = two dominant values (bg/fg); a wallpaper =
@@ -151,10 +236,10 @@ extern "C" void e5_display_frame_kick(void) {
                 break;
               }
           }
-      printf("E5PANELHIST %u", n);
+      e5_display_tracef("E5PANELHIST %u", n);
       for (unsigned k = 0; k < 8; ++k)
-        printf(" %03x:%u", top[k].rgb, top[k].cnt);
-      printf("\n");
+        e5_display_tracef(" %03x:%u", top[k].rgb, top[k].cnt);
+      e5_display_tracef("\n");
     }
     // r108: read the actual glyphs. Three 8x8 tiles at fixed anchors plus
     // a 16px-tall band across the full width at 4px/2px sampling; large UI
@@ -164,16 +249,16 @@ extern "C" void e5_display_frame_kick(void) {
       const unsigned anchors[3][2] = {{16, 240}, {160, 240}, {280, 240}};
       for (unsigned t = 0; t < 3; ++t) {
         unsigned ax = anchors[t][0], ay = anchors[t][1];
-        printf("E5TILE %u a%u,%u ", n, ax, ay);
+        e5_display_tracef("E5TILE %u a%u,%u ", n, ax, ay);
         for (unsigned y = 0; y < 8; ++y) {
           unsigned bits = 0;
           for (unsigned x = 0; x < 8; ++x)
             if (px[(ay + y) * 320 + ax + x]) bits |= 1u << x;
-          printf("%02x", bits);
+          e5_display_tracef("%02x", bits);
         }
-        printf("\n");
+        e5_display_tracef("\n");
       }
-      printf("E5BAND %u y238", n);
+      e5_display_tracef("E5BAND %u y238", n);
       for (unsigned y = 238; y < 254; y += 2) {
         unsigned char bits[40];
         for (unsigned xb = 0; xb < 40; ++xb) {
@@ -182,10 +267,22 @@ extern "C" void e5_display_frame_kick(void) {
             if (px[y * 320 + xb * 8 + x]) b |= 1u << x;
           bits[xb] = (unsigned char)b;
         }
-        for (unsigned xq = 0; xq < 40; ++xq) printf("%02x", bits[xq]);
-        printf(" ");
+        for (unsigned xq = 0; xq < 40; ++xq) e5_display_tracef("%02x", bits[xq]);
+        e5_display_tracef(" ");
       }
-      printf("\n");
+      e5_display_tracef("\n");
+    }
+  }
+  {
+    extern void *e5_display_service_instance();
+    void *svc = e5_display_service_instance();
+    if (svc) {
+      __atomic_fetch_add(&e5_display_vsync_ticks, 1, __ATOMIC_RELAXED);
+      void *expected = *(void **)((uint8_t *)svc + 0x1810);
+      if (expected) {
+        ((e5_notify_fn)0xfffffff006798018ull)(svc, expected);
+        __atomic_fetch_add(&e5_display_vsync_delivered, 1, __ATOMIC_RELAXED);
+      }
     }
   }
 }
@@ -234,7 +331,7 @@ extern "C" int e5_concrete_display_probe(void) {
   }
   object->release();
   if (owned->getInstanceCount() == instances) e5_display_construction |= 0x100;
-  printf("E5Display: construction v=%x size=%x registration=%x instances=%u/%u\n",
+  e5_display_tracef("E5Display: construction v=%x size=%x registration=%x instances=%u/%u\n",
          (unsigned)e5_display_construction, (unsigned)e5_display_original_size,
          (unsigned)e5_display_registration_result, instances, owned->getInstanceCount());
   return e5_display_construction == 0x1ff;

@@ -19,7 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
-OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 184, 188, 288] + PURE)
+OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 176, 180, 183, 184, 188, 199, 200, 201, 203, 206, 207, 208, 210, 224, 229, 232, 255, 256, 258, 288, 336, 344] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -184,10 +184,64 @@ public:
             header += '  virtual bool isMainDisplay();\n'
         elif i == 188:
             header += '  virtual IOReturn getDotPitch(uint32_t *);\n'
+        elif i == 176:
+            # The wrapper passes client in x1, then swap id, flags, timeout.
+            header += '  virtual IOReturn opaque176(void *, uint32_t, uint32_t, uint32_t);\n'
+        elif i == 200:
+            header += '  virtual IOReturn opaque200(void *);\n'
+        elif i == 203:
+            header += '  virtual IOReturn opaque203(void *);\n'
+        elif i == 201:
+            header += '  virtual IOReturn opaque201(uint32_t, void *);\n'
+        elif i == 224:
+            header += '  virtual IOReturn opaque224(void *, uint32_t, uint64_t, void *, uint32_t, void *, uint32_t);\n'
+        elif i == 180:
+            header += '  virtual IOReturn opaque180(uint32_t, uint32_t, void *);\n'
+        elif i == 183:
+            header += '  virtual IOReturn opaque183(uint32_t);\n'
+        elif i == 199:
+            header += '  virtual IOReturn opaque199(void *);\n'
+        elif i == 206:
+            header += '  virtual IOReturn opaque206(void *);\n'
+        elif i == 207:
+            header += '  virtual IOReturn opaque207(uint32_t);\n'
+        elif i == 208:
+            header += '  virtual IOReturn opaque208(uint32_t, void *, void *);\n'
+        elif i == 210:
+            header += '  virtual IOReturn opaque210(uint32_t, void *, uint32_t);\n'
+        elif i == 211:
+            header += '  virtual IOReturn opaque211(uint32_t, void *, uint32_t) = 0;\n'
+        elif i == 213:
+            header += '  virtual IOReturn opaque213(uint32_t, uint32_t *, char *, uint32_t *) = 0;\n'
+        elif i == 232:
+            header += '  virtual IOReturn opaque232(uint32_t);\n'
+        elif i == 229:
+            # request_power_change backend (dispatcher 0x67779fc tail calls it
+            # with (uint32_t power_state, void *zero)); the legacy stub only
+            # forwards to the +0x1608 sub-object. Client-visible IOReturn.
+            header += '  virtual IOReturn opaque229(uint32_t, void *);\n'
+        elif i == 255:
+            # get power state; dispatcher tests bit0 of the return (1 = on).
+            header += '  virtual IOReturn opaque255();\n'
+        elif i == 256:
+            # set power state (arg&1); dispatcher treats 0 as success.
+            header += '  virtual IOReturn opaque256(uint32_t);\n'
+        elif i == 258:
+            # power controllable bool; dispatcher tests bit0.
+            header += '  virtual bool opaque258();\n'
+        elif i == 260:
+            # Original Legacy leaf is a no-argument success stub.
+            header += '  virtual IOReturn opaque260();\n'
+        elif i == 261:
+            header += '  virtual bool opaque261();\n'
         elif i == 249:
             header += '  virtual void getDisplayDimensions(uint32_t *, uint32_t *);\n'
         elif i == 288:
             header += '  virtual bool startHardware();\n'
+        elif i == 336:
+            header += '  virtual bool opaque336();\n'
+        elif i == 344:
+            header += '  virtual IOReturn opaque344(uint64_t, void *);\n'
         elif i in PURE:
             header += f'  virtual IOReturn opaque{i}(uint32_t, void *, void *, void *) = 0;\n'
         else:
