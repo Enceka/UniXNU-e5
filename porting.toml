@@ -441,8 +441,8 @@ components = ["display"]
 [[area.evidence]]
 kind = "source"
 reference = "docs/display-liveness-r128.md"
-summary = "R128 adds bounded process and published-service observations after the native display wait is qualified but surface calls remain absent."
-result = "Retain process references and sample selected task scalar fields for PIDs below 512. No task/map locks, signals or user-memory reads at the media checkpoint. Report exact process/service mask definitions and range limits. Preserve the R127 display behavior and enabled-SB Data; CI and R128 device acceptance are pending."
+summary = "R128 adds bounded process/service observations and corrects selector-74 FrameInfo capability output after native wait qualification."
+result = "Retain process references and sample selected task scalar fields for PIDs below 512, without task/map locks, signals or user-memory reads. Slot 213 is the optional FrameInfo query: initialize count=0, key[64]=0 and transport=0, return Unsupported instead of advertising an unimplemented shared queue with an uninitialized key. Preserve R127 native events and enabled-SB Data. CI and R128 device acceptance are pending."
 components = ["display"]
 
 [[area.evidence]]

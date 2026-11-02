@@ -211,6 +211,8 @@ public:
             header += '  virtual IOReturn opaque210(uint32_t, void *, uint32_t);\n'
         elif i == 211:
             header += '  virtual IOReturn opaque211(uint32_t, void *, uint32_t) = 0;\n'
+        elif i == 213:
+            header += '  virtual IOReturn opaque213(uint32_t, uint32_t *, char *, uint32_t *) = 0;\n'
         elif i == 232:
             header += '  virtual IOReturn opaque232(uint32_t);\n'
         elif i == 229:

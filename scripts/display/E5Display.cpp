@@ -321,19 +321,20 @@ public:
   IOReturn opaque##n(uint32_t selector, void *b, void *c, void *d) override { \
     return e5_display_backend_soft(n, selector, b, c, d); \
   }
-  // Slot 213 (r89: the walk's single gate, selector 0): the family wrapper at
-  // 0x6778688 passes (&out1, structureOutput, &out2) and caches out2 at
-  // service+0x3c8. Answer success with a minimal capability pair so the
-  // backboardd open sequence can advance past the first backend query.
-  IOReturn opaque213(uint32_t selector, void *b, void *c, void *d) override {
-    (void)selector;
-    (void)c;
+  // Selector 74 asks for (index, count, key[64], transport), not a pair
+  // of generic capabilities. Transport 1 advertises a shared FrameInfo
+  // queue that this driver has never implemented. Until real frame reports
+  // are implemented, decline the optional query with fully initialized
+  // outputs and transport 0, the existing Mach-notification selection.
+  IOReturn opaque213(uint32_t index, uint32_t *count, char *key, uint32_t *transport) override {
+    (void)index;
     __atomic_fetch_add(&e5_display_cap213_calls, 1U, __ATOMIC_RELAXED);
     IOReturn status = kIOReturnBadArgument;
-    if (b && d) {
-      *static_cast<uint32_t *>(b) = 1;
-      *static_cast<uint32_t *>(d) = 1;
-      status = kIOReturnSuccess;
+    if (count && key && transport) {
+      *count = 0;
+      *transport = 0;
+      bzero(key, 64);
+      status = kIOReturnUnsupported;
     }
     __atomic_store_n(&e5_display_cap213_status, (unsigned)status, __ATOMIC_RELAXED);
     return status;

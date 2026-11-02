@@ -20,10 +20,28 @@ mask bits 0..6 follow the process list above. Dictionaries and retained
 service references are released after the snapshot.
 
 Preserve the R127 event implementation, firmware, ADT, enabled-SB Data and
-e5-no-vc control. The change adds observation only; it does not manufacture
+e5-no-vc control. The census adds observation only; it does not manufacture
 surface calls, enable a GPU, publish a replacement KeyStore or alter scene
 state. CI and R128 hardware evidence are pending. Physical SpringBoard UI
 remains the acceptance criterion.
+
+## Correct the optional FrameInfo capability response
+
+Original selector 74 has one scalar input, two scalar outputs and a 64-byte
+structure output. Its wrapper at raw `0xfffffff00677a718` enters
+`0xfffffff006778688`, which calls slot 213 with index, count pointer, key
+buffer and transport pointer. The transport is cached at **client**+0x3c8,
+not service+0x3c8. The previous count=1/transport=1 stub left the key
+uninitialized and advertised a shared queue, contradicting slot 336's Mach
+fallback. A successful return from that stub did not qualify the ABI.
+
+Use the typed four-argument signature, zero every output and return
+Unsupported for this optional capability until actual frame reports are
+implemented. This matches the no-FrameInfo firmware/CPU path in
+RigoLigoRLC/unixnu-nativemobiledisplay at
+31833aa2ad8b1faae9c3fa9752830d4271d46979. Its transport-zero and shared-queue
+semantics are independently consistent with the pinned E5 family wrapper.
+Runtime compatibility of the optional rejection remains to be tested.
 
 The retained R126 liveactivitiesd trap is independently located in
 SessionSyncEngine Keybag.shared: MKBEventsRegister returned NULL before a
