@@ -2,6 +2,14 @@
 // Copyright (c) 2026, UniXNU contributors.
 #include "OriginalLegacyFramebufferABI.h"
 #include <IOKit/IOLib.h>
+// v21: fake vsync via the family completion entry. Fixed runtime VA
+// (KC slide is a build constant): notify(svc, expected=[svc+0x1810]).
+extern "C" {
+  unsigned e5_display_vsync_ticks = 0;
+  unsigned e5_display_vsync_delivered = 0;
+}
+using e5_notify_fn = void (*)(void *, void *);
+
 #include <libkern/c++/OSSymbol.h>
 #include <mach/kmod.h>
 
@@ -206,6 +214,18 @@ extern "C" void e5_display_frame_kick(void) {
         e5_display_tracef(" ");
       }
       e5_display_tracef("\n");
+    }
+  }
+  {
+    extern void *e5_display_service_instance();
+    void *svc = e5_display_service_instance();
+    if (svc) {
+      __atomic_fetch_add(&e5_display_vsync_ticks, 1, __ATOMIC_RELAXED);
+      void *expected = *(void **)((uint8_t *)svc + 0x1810);
+      if (expected) {
+        ((e5_notify_fn)0xfffffff006798018ull)(svc, expected);
+        __atomic_fetch_add(&e5_display_vsync_delivered, 1, __ATOMIC_RELAXED);
+      }
     }
   }
 }
