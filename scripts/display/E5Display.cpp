@@ -107,6 +107,9 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
       }
       node = *(uint8_t **)node;
     }
+  }
+  return kIOReturnSuccess;
+}
 
 // v28: deliver a vsync-style async notification through the bound kernel
 // export to every registered event context. Called from frame_kick.
