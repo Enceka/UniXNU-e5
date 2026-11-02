@@ -19,7 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
-OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 176, 180, 183, 184, 188, 199, 200, 201, 203, 206, 207, 208, 210, 224, 229, 232, 255, 256, 258, 260, 261, 288] + PURE)
+OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 176, 180, 183, 184, 188, 199, 200, 201, 203, 206, 207, 208, 210, 224, 229, 232, 255, 256, 258, 260, 261, 288, 336] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -207,9 +207,11 @@ public:
         elif i == 207:
             header += '  virtual IOReturn opaque207(uint32_t);\n'
         elif i == 208:
-            header += '  virtual IOReturn opaque208(uint32_t, void *);\n'
+            header += '  virtual IOReturn opaque208(uint32_t, void *, void *);\n'
         elif i == 210:
             header += '  virtual IOReturn opaque210(uint32_t, void *, uint32_t);\n'
+        elif i == 211:
+            header += '  virtual IOReturn opaque211(uint32_t, void *, uint32_t) = 0;\n'
         elif i == 232:
             header += '  virtual IOReturn opaque232(uint32_t);\n'
         elif i == 229:
@@ -236,6 +238,8 @@ public:
             header += '  virtual void getDisplayDimensions(uint32_t *, uint32_t *);\n'
         elif i == 288:
             header += '  virtual bool startHardware();\n'
+        elif i == 336:
+            header += '  virtual bool opaque336();\n'
         elif i in PURE:
             header += f'  virtual IOReturn opaque{i}(uint32_t, void *, void *, void *) = 0;\n'
         else:

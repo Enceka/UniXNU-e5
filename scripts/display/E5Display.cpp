@@ -4,6 +4,7 @@
 #include "OriginalLegacyFramebufferABI.h"
 #include <stdarg.h>
 #include <IOKit/IOLib.h>
+#include <IOKit/IOCommandGate.h>
 #include <libkern/c++/OSData.h>
 #include <pexpert/pexpert.h>
 #include <mach/mach_time.h>
@@ -43,10 +44,12 @@ extern "C" unsigned e5_display_power_last; // owned by E5DisplayProbe.cpp
 extern "C" int _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
     unsigned long long *asyncRef, int result, const unsigned long long *args,
     unsigned int numArgs, unsigned int options);
-extern "C" void *e5_display_async_ctx[6] = {}; // per-subop OSAsyncReference64 (slot 208 x2)
 extern "C" unsigned e5_display_async_kinds = 0; // bitmask of registered subops
 extern "C" unsigned e5_display_async_sends = 0; // deliveries attempted
 extern "C" unsigned e5_display_async_send_ok = 0; // deliveries returning 0
+extern "C" unsigned e5_display_async_ports = 0;
+extern "C" unsigned e5_display_async_last = 0;
+extern "C" unsigned e5_display_async_armed = 0;
 
 // The published instance whose +0x8c byte the family power dispatcher gates
 // on. Set by start(); read by e5_display_power_read() from the echo probe.
@@ -60,20 +63,50 @@ extern "C" unsigned e5_display_power_read(void) {
 
 extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 
-// v28: deliver a vsync-style async notification through the bound kernel
-// export to every registered event context. Called from frame_kick.
-extern "C" void e5_display_async_fire(void) {
-  for (unsigned k = 0; k < 6; ++k) {
-    unsigned long long *ref =
-        (unsigned long long *)__atomic_load_n(&e5_display_async_ctx[k], __ATOMIC_RELAXED);
-    if (!ref || !*ref) continue;
-    unsigned long long payload[2] = {0, 0};
-    payload[0] = mach_absolute_time();
-    int r = _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
-        ref, 0 /* kIOReturnSuccess */, payload, 2, 1);
-    __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
-    if (r == 0) __atomic_add_fetch(&e5_display_async_send_ok, 1U, __ATOMIC_RELAXED);
+// v29: x2 of slot 208 is an event-list node, NOT an async reference.
+// The pinned registration action at raw 0x6795ec0 initializes the reference
+// at node+0x18 and links the node at service+0x1588+kind*16. Use that native
+// list, including native unregistration, under its command gate. A media
+// read must never block acquiring the display gate: display setup can itself
+// need a media read. attemptAction skips that sample if the gate is busy.
+static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
+  uint8_t *base = (uint8_t *)owner;
+  const unsigned long long now = mach_absolute_time();
+  for (unsigned kind = 3; kind <= 5; kind += 2) {
+    uint8_t *node = *(uint8_t **)(base + 0x1588 + kind * 16);
+    for (unsigned visited = 0; node && visited < 64; ++visited) {
+      unsigned long long *ref = (unsigned long long *)(node + 0x18);
+      if (*ref) {
+        __atomic_fetch_or(&e5_display_async_ports, 1u << kind, __ATOMIC_RELAXED);
+        // FrameInfoNotifyFunc accepts {property-mask, status}; an empty mask
+        // reports no changed properties. VsyncNotifyFunc requires SIX words:
+        // three u64 values split low/high, as in the original broadcaster
+        // at raw 0x6796720. The v28 two-word timestamp could overrun that
+        // callback's input and must never be used for kind 5.
+        unsigned long long payload[6] = {0, 0, 0, 0, 0, 0};
+        unsigned count = 2;
+        if (kind == 5) {
+          payload[0] = (uint32_t)now;
+          payload[1] = now >> 32;
+          payload[2] = (uint32_t)now;
+          payload[3] = now >> 32;
+          count = 6;
+        }
+        int r = _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
+            ref, 0, payload, count, 1);
+        __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
+        __atomic_store_n(&e5_display_async_last, (unsigned)r, __ATOMIC_RELAXED);
+        if (r == 0) __atomic_add_fetch(&e5_display_async_send_ok, 1U, __ATOMIC_RELAXED);
+      }
+      node = *(uint8_t **)node;
+    }
   }
+  return kIOReturnSuccess;
+}
+extern "C" void e5_display_async_fire(void) {
+  if (!sPowerInstance) return;
+  auto gate = *(IOCommandGate **)((uint8_t *)sPowerInstance + 0x1608);
+  if (gate) gate->attemptAction(e5_display_async_action);
 }
 // v27: fire the fake vsync event: bump the +0x16d0 token and clear the
 // +0x16e0 enabled flag, exactly what the concrete driver's event source
@@ -96,7 +129,7 @@ extern "C" void e5_display_vsync_fire(void) {
 // +0x1868 lock, +0x16d0 reader-A object, +0x3c4 last power arg).
 extern "C" void e5_kputc(char);
 static void e5_state_log(const char *format, ...) {
-  char line[288];
+  char line[384];
   va_list args;
   va_start(args, format);
   vsnprintf(line, sizeof(line), format, args);
@@ -112,10 +145,11 @@ extern "C" void e5_display_state_dump(void) {
     for (unsigned i = 0; i != 8; ++i) v |= (unsigned long long)b[off + i] << (8 * i);
     return v;
   };
-  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u",
+  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u ap=%02x ar=%x am=%02x",
          (const void *)b, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
          q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires,
-         e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok);
+         e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok,
+         e5_display_async_ports, e5_display_async_last, e5_display_async_armed);
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
@@ -299,8 +333,12 @@ public:
   // Slot 211 (r90: generic 3-scalar backend entry, sel=3) and slot 306
   // (r90: set/clear boolean pair at 0x6796094/0x67963e4) answered with
   // success to reveal the next walk gate; the other guards stay loud.
-  IOReturn opaque211(uint32_t selector, void *b, void *c, void *d) override {
-    (void)selector; (void)b; (void)c; (void)d;
+  IOReturn opaque211(uint32_t kind, void *node, uint32_t on) override {
+    (void)node;
+    if (kind < 6) {
+      if (on) __atomic_fetch_or(&e5_display_async_armed, 1u << kind, __ATOMIC_RELAXED);
+      else __atomic_fetch_and(&e5_display_async_armed, ~(1u << kind), __ATOMIC_RELAXED);
+    }
     __atomic_fetch_add(&e5_display_ok211_calls, 1U, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
@@ -331,21 +369,24 @@ public:
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
     return true;
   }
-  // v28: slots 208/210 = register-event + arm-event (sel-72 wrapper decoded:
-  // ctx = client+0x110+subop*0xb0, x2 = ctx+8 = OSAsyncReference64; the family
-  // delivers via sendAsyncResult64WithOptions(ref, 0, payload, n, 1)). Save the
-  // reference and fire it from e5_display_async_fire() (frame_kick cadence).
-  IOReturn opaque208(uint32_t kind, void *ref) override {
-    if (kind < 6 && ref) {
-      e5_display_async_ctx[kind] = ref;
+  // Preserve the native gate, setAsyncReference64, list insertion and removal.
+  // x3 is the registration record {client, reserved, callback, refcon}.
+  IOReturn opaque208(uint32_t kind, void *node, void *registration) override {
+    IOReturn status = IOMobileFramebufferLegacy::opaque208(kind, node, registration);
+    if (status == kIOReturnSuccess && kind < 6 && node) {
       __atomic_fetch_or(&e5_display_async_kinds, 1u << kind, __ATOMIC_RELAXED);
     }
-    return kIOReturnSuccess;
+    return status;
   }
-  IOReturn opaque210(uint32_t kind, void *ref, uint32_t on) override {
-    (void)kind; (void)ref; (void)on;
+  IOReturn opaque210(uint32_t kind, void *node, uint32_t on) override {
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 8, __ATOMIC_RELAXED);
-    return kIOReturnSuccess;
+    return IOMobileFramebufferLegacy::opaque210(kind, node, on);
+  }
+  // Original slot 336 defaults to true, skipping setAsyncReference64 for
+  // FrameInfo (kind 3) in favor of an unimplemented shared-queue backend.
+  // Select the family's existing Mach-notification fallback explicitly.
+  bool opaque336() override {
+    return false;
   }
   // v27: slots 260/261 emulate the family's enable/disable event semantics
   // (original enable_event 0x6797224: [this+0x16dc]=arg, [+0x16e0]=1). The

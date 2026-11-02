@@ -413,8 +413,13 @@ command = "run-board-cycle.py board-r116 board-r117 board-r118 board-r119 board-
 result = "seven healthy windows, no panic; all 18 selectors ok; wait loop revived (sel-6 n=4 ok=1); DefaultSurface/SwapBegin counters still zero"
 reference = "docs/logs/display-vsync-cadence-rounds-116-122.json"
 
-# v28 async-event delivery: slots 208/210 save OSAsyncReference64, fire via bound
-# IOUserClient::sendAsyncResult64WithOptions (family broadcast decoded 0x67778c0).
+components = ["display"]
+
+[[area.evidence]]
+kind = "source"
+reference = "docs/display-async-reference-r126.md"
+summary = "R125 retained ak=08/asend=0/aok=0 is explained by a v28 event-node/async-reference ABI error. V29 restores original registration and selects its existing Mach fallback instead of an unimplemented FrameInfo shared queue."
+result = "Pinned original audit passes: event node x2, registration record x3, async reference node+0x18, native event heads service+0x1588+kind*16, slot 336 true skips kind-3 reference setup, kind-5 callback requires six split timestamp words. Preserve native unregister; use a nonblocking gate attempt for media-triggered delivery. CI, R126 hardware validation and physical UI acceptance are pending."
 components = ["display"]
 
 [[area.evidence]]
