@@ -70,10 +70,7 @@ class NativeSd;
 // D2 v1.3: file-scope ADI peek so the display DPU tick line can read the
 // UMP9620 watchdog state (r139 ticks spanned >600s with no wdt reboot).
 static NativeSd *sWdtPeekInstance = nullptr;
-extern "C" unsigned e5_pmic_peek(unsigned off) {
-  return (sWdtPeekInstance && off < 0x8000u) ? sWdtPeekInstance->pmicRead(off)
-                                             : 0xeeeeeeeeu;
-}
+extern "C" unsigned e5_pmic_peek(unsigned off); // defined after the class
 
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
@@ -1015,6 +1012,11 @@ public:
     return kIOReturnSuccess;
   }
 };
+extern "C" unsigned e5_pmic_peek(unsigned off) {
+  return (sWdtPeekInstance && off < 0x8000u) ? sWdtPeekInstance->pmicRead(off)
+                                             : 0xeeeeeeeeu;
+}
+
 OSDefineMetaClassAndStructors(NativeSd, IOBlockStorageDevice)
 
 // A second storage device shares the host's lock, DMA buffer and error handling.
