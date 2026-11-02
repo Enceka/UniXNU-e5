@@ -412,6 +412,9 @@ summary = "r116-r122 walk-to-vsync arc: v20 (slot 200 zero-fill + 203) made ALL 
 command = "run-board-cycle.py board-r116 board-r117 board-r118 board-r119 board-r120 board-r121 board-r122"
 result = "seven healthy windows, no panic; all 18 selectors ok; wait loop revived (sel-6 n=4 ok=1); DefaultSurface/SwapBegin counters still zero"
 reference = "docs/logs/display-vsync-cadence-rounds-116-122.json"
+
+# v28 async-event delivery: slots 208/210 save OSAsyncReference64, fire via bound
+# IOUserClient::sendAsyncResult64WithOptions (family broadcast decoded 0x67778c0).
 components = ["display"]
 
 [[area.evidence]]
