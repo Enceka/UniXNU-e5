@@ -319,7 +319,9 @@ extern "C" void e5_dpu_paint_step(void) {
   if (!sPanelMap) return;
   volatile uint16_t *px = (volatile uint16_t *)sPanelMap->getVirtualAddress();
   const unsigned W = 320, H = 480;
-  unsigned stripe = (sPaintTicks++ % 8) * 40;
+  // r141: tick rate ~1.8kHz means %8 = 4.4ms per stripe step - invisible.
+  // Human-visible: advance the stripe every 4096 ticks (~2.3s per step).
+  unsigned stripe = ((sPaintTicks++ / 4096) % 8) * 40;
   for (unsigned y = 0; y < H; ++y) {
     uint16_t band = (y < 120) ? 0xF800 : (y < 240) ? 0x07E0 : (y < 360) ? 0x001F : 0xFFFF;
     for (unsigned x = 0; x < W; ++x) px[y * W + x] = (x >= stripe && x < stripe + 40) ? 0x0000 : band;
@@ -378,7 +380,8 @@ extern "C" void e5_dpu_tick(void) {
           e5_pmic_peek(0x48), e5_pmic_peek(0x5c), e5_pmic_peek(0x58));
   }
   if (sPwmMap && sPwmOrigDuty) {
-    unsigned phase = (sPaintTicks / 8) % 2;
+    // r141: %8 toggles every 4.4ms - invisible flicker. ~1.1s per phase.
+    unsigned phase = (sPaintTicks / 2048) % 2;
     unsigned duty = phase ? (sPwmOrigDuty / 4) : sPwmOrigDuty;
     // pwm-sprd.c: writing DUTY applies MOD+DUTY to the output; keep ENABLE
     // untouched so the channel keeps running.
