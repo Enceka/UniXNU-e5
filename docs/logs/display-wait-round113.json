@@ -1,0 +1,21 @@
+{
+  "round": 113,
+  "kernel": {"ci_run": 41378087454, "kernel_sha256_prefix": "bcdb3169", "device_rev": "70a980c", "adt_sha256_prefix": "0fea719d", "adt_bytes": 14312},
+  "payload": {"sha256_prefix": "54ec8da3", "bytes": 62926860, "data_fixture": "headless fe0619f0"},
+  "runtime": {
+    "echo_last": "a=130055 u=3:3:0:0 h=204ff:3f g=2:0 B=0.0.0.0 C=1:0 D=1:1 F=32:d252c27b P=1:1:1 Q=3:0",
+    "e5state": "svc=0xfffffff34d607000 m3c8=0 m1608=fffffff266a3e470 m1640=0 m1658=0 m1810=0 m1858=0 f1860=0000 m1868=fffffff266a69fd0 m16d0=0",
+    "e5imsel_live": {"sel6": "n=3491 ok=0 ret=e00002d5 pid=56", "sel15": "n=1 ret=e00002bc", "sel22": "n=1 ret=e00002c7", "sel33": "n=1 ret=e00002c7", "sel57": "n=1 ret=e00002c7", "sel79": "n=2 ret=e00002c7", "ok": [8, 12, 28, 29, 72, 73, 74, 88]},
+    "e5imsum": "d=0:0:0 b=0:0:0 (DefaultSurface/SwapBegin still zero)",
+    "panic": null, "e5exc": "none in window", "adb_back_s": "~670"
+  },
+  "decode": {
+    "externalMethod": "IOMobileFramebufferUserClient::externalMethod @ raw 0xfffffff006778d44: selector range-check <90; pre-check vcall service slot 182 (vt+0x5b0) on EVERY selector; jump table for selectors 68-85; dispatch table 90 x 0x18 entries @ __DATA_CONST 0x6f354c0 {fn, scalarsIn/out, structSizes} - POINTERS ARE PLAIN PREBOUND VAs in raw KC (no chained-fixup obfuscation)",
+    "sel6": "marshal 0x6779518 (3 scalars) -> wrapper 0x6777390: stores arg at [client+0xf8], clears byte [client+0x100], calls service vt+0x580 = SLOT 176(this,a,b,c); if [client+0x100] got set during the call -> kIOReturnOffline else returns slot-176 result verbatim",
+    "slot176_original": "0xfffffff00678d998: mode = arg&0x7fffffff; mode3: [+0x16e0]!=0 -> Timeout; else [+0x16d0]!=0 -> success else Timeout. mode4 mirrored. So the 3491x Timeout = event token +0x16d0 never written",
+    "event_machinery": "0x67970d0 event_config(this, cfg*): copies cfg->[0xc] into [this+0x16d0] (token) and cfg->[4] into [this+0x16cc], on change vcalls slot 298 (vt+0x950). 0x6797224 enable_event: [this+0x16dc]=arg, [+0x16e0]=1, vcall [+0x1638]->vt+0xf8(0,0,0) = the timer/event source arm. The token writers expect the concrete driver's EVENT SOURCE callback to deliver cfg objects",
+    "state_read": "with the full original start chain running (v12), +0x1608 helper and +0x1868 lock EXIST; +0x1640 provider cache, +0x1658 wait sub-object, +0x16d0 token are all ZERO at runtime"
+  },
+  "action": "v17 (8588b2f): E5Display::opaque176(uint32_t,uint32_t,uint32_t) override returns kIOReturnSuccess (firmware scanout has no vsync IRQ; waits treated as immediately satisfied) + W=<calls>:<last-args> echo field; OWNED += 176; ABI header slot 176 typed 3-u32",
+  "open": ["sel 15 e00002bc reader-B gate (surface NULL path)", "sel 22/33/57/79 e00002c7 other wrapper gates", "DefaultSurface creation path once waits succeed", "LA abort"]
+}
