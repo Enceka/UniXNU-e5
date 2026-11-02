@@ -537,6 +537,22 @@ revision = "91fbceb4fcb011387eb295125c5974f273169ea9"
 command = "From e5-xnu: CI336; kernel-only/FAT-chain growth and mtools reads; detached e5-uefi-cycle.sh flash/collect; full payload readback; e5-console-tee-read.py; full 128 MiB Data readback"
 result = "PASS for construction: R81/CI336 at device91fbceb has 173 complete late samples all c=12 m=15 k=3f l=0 a=3 v=1ff s=18a0 r=0. Original metadata size/identity/ancestry, owned late registration, real concrete factory, instance ancestry, original init and release/instance-count balance all pass. Nine backend leaves remain guarded and start refuses activation; no service publication, userclient, frame or UI qualification."
 
+
+[[area.evidence]]
+name = "dpu-native-read-backlight-rounds-137-139"
+kind = "device"
+command = "run-board-cycle.py board-r137..r139 with kernels 398/400/401 (D2 v1.x)"
+revision = "cedc1328553c605010bbf055aa569dabba00b124"
+reference = "docs/logs/display-dpu-rounds-137-139.json"
+result = "DPU 0x31000000 id 0x601 layer0 base be000000 ctrl 44 pitch 140 readable all window; PWM 0x64030000 duty 25<->6 pulse live (backlight modulation); aon-ranges offset lesson second occurrence; wdt >600s anomaly open"
+
+[[area.evidence]]
+name = "dpu-pwm-physical-address-fix"
+kind = "source"
+command = "grep -n 0x64030000 scripts/display/E5DisplayProbe.cpp"
+revision = "ad3cd04e11c74c2dd48619d0188ba0b4e21b1d80"
+reference = "scripts/display/E5DisplayProbe.cpp"
+result = "PWM channel 0 PA = aon base 0x64000000 + child offset 0x30000 = 0x64030000; mapping the raw offset aborts (r137 panic)"
 [[area]]
 id = "input"
 status = "implemented"
