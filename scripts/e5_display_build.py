@@ -19,7 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
-OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 176, 180, 183, 184, 188, 199, 206, 207, 229, 232, 255, 256, 258, 260, 261, 288] + PURE)
+OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 176, 180, 183, 184, 188, 199, 201, 206, 207, 224, 229, 232, 255, 256, 258, 260, 261, 288] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -188,6 +188,10 @@ public:
             # sel-6 wait (wrapper 0x6777390 -> vt+0x580): (a, b, mode) scalars;
             # original gates on [+0x16d0] event token and times out.
             header += '  virtual IOReturn opaque176(uint32_t, uint32_t, uint32_t);\n'
+        elif i == 201:
+            header += '  virtual IOReturn opaque201(uint32_t, void *);\n'
+        elif i == 224:
+            header += '  virtual IOReturn opaque224(void *, uint32_t, uint64_t, void *, uint32_t, void *, uint32_t);\n'
         elif i == 180:
             header += '  virtual IOReturn opaque180(uint32_t, uint32_t, void *);\n'
         elif i == 183:

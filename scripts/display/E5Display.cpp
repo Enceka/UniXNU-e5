@@ -326,6 +326,20 @@ public:
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 5, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
+  // v19: r115 leftovers — sel 84 -> slot 201 (w1, ptr), sel 79 -> slot 224
+  // (the set-block marshaling: client-handles + counts). Base Legacy returns
+  // Unsupported from both. No-op success.
+  IOReturn opaque201(uint32_t a, void *b) override {
+    (void)a; (void)b;
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 6, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque224(void *a, uint32_t b, uint64_t c, void *d, uint32_t e,
+                     void *f, uint32_t g) override {
+    (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g;
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 7, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
   E5_GUARDED_SLOT(245)
   E5_GUARDED_SLOT(246)
   E5_GUARDED_SLOT(307)
