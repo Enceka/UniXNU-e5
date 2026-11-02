@@ -1,6 +1,6 @@
 --- a/bsd/kern/kern_exec.c
 +++ b/bsd/kern/kern_exec.c
-@@ -8142,6 +8142,142 @@
+@@ -8142,6 +8142,143 @@
  	"/sbin/launchd",
  };
  
