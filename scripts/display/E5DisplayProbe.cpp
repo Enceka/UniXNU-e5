@@ -362,7 +362,10 @@ extern "C" void e5_dpu_tick(void) {
   // surviving line itself (r139's F= evidence was flooded out of the ring);
   // wdt peek (PMIC ADI cnt@0x50/ctrl@0x48 via NativeSd helper) tests the
   // r139 anomaly where ticks spanned >600s without a watchdog reboot.
-  if ((sPaintTicks % 50) == 10) {
+  // r140 measured the real tick rate at ~1.8 kHz (thread_call interval
+  // unit mismatch vs assumption): %50 printed ~40 Hz and flooded the ring
+  // again. %5000 = one line every ~3 s.
+  if ((sPaintTicks % 5000) == 10) {
     unsigned rowCrc = 0;
     if (sPanelMap) {
       volatile uint16_t *px =
