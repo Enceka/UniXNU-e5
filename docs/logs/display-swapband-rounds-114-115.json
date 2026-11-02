@@ -1,0 +1,14 @@
+{
+  "rounds": [114, 115],
+  "kernel_114": {"ci_run": 41380708550, "sha256_prefix": "250a9692", "device_rev": "8588b2f"},
+  "kernel_115": {"ci_run": 41383140323, "sha256_prefix": "9e22a7f7", "device_rev": "06a0e73"},
+  "payload_115": {"sha256_prefix": "7e997ca8", "bytes": 62926860, "growth": 57344, "data_fixture": "headless fe0619f0"},
+  "r114_result": "slot-176 override (sel-6 wait): sel 6 n=1 ok=1 ret=0 (was n=3491 all kIOReturnTimeout); W=1:3007e80 (one call, mode-3 args); u 3:3 -> 4:4; no panic; DefaultSurface/SwapBegin still 0; sel 15/22/27/33/50/57/79/84 still failing",
+  "r115_result": "swap band v18 (slots 180/183/199/206/207/232): sel 15/22/27/33/50/57 ALL n=1 ok=1 ret=0; u 4:4 -> 5:5 (new consumers); F=33:3d31db4a; no panic; remaining fails sel 79 n=2 e00002c7 + sel 84 n=1 e00002c7; E5IMSUM d=0:0:0 b=0:0:0 still zero",
+  "decode": {
+    "failing_band_map": "sel 15->slot 180 (w1,w2,out-ptr), sel 22->183 (w1), sel 27->199 (ptr; 3084B info struct), sel 33->232 (w1), sel 50/84->207 (w1/ptr), sel 57->206 (ptr), sel 79->224 (8-arg set-block marshaling from [client+0xe8] handles), sel 84 second path->201 (w1,ptr)",
+    "original_stubs": "Legacy base slots 183/199/207/224/201 are unconditional return kIOReturnUnsupported; slot 180 = real readiness fn returning 0x2bc; slot 176 = event-token wait"
+  },
+  "action": "v19 (91e2c04): overrides slots 201 (uint32_t,void*) + 224 (7-arg set-block) -> no-op success; swap_mask echo bits 6/7 (echo field lands in the NEXT kernel)",
+  "open": ["DefaultSurface creation (E5IMSUM d= still 0)", "SwapBegin (b= still 0)", "sel 79/84 verification on r116", "LA abort"]
+}

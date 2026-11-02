@@ -396,6 +396,16 @@ next_action = ["Preserve the qualified R109 gateway and no-vc control. Capture s
 
 [[area.evidence]]
 kind = "device"
+revision = "91e2c049f63948a560ce82d01d50499f8694c8f8"
+status = "pass"
+summary = "r114-r115 swap-band rounds: slot-176 wait override turned the sel-6 3491x Timeout loop into first-call success; v18 swap band (180/183/199/206/207/232) turned sel 15/22/27/33/50/57 all green and u climbed to 5:5; v19 (201/224) dispatched for the sel 79/84 leftovers"
+command = "run-board-cycle.py board-r114 board-r115"
+result = "two 670s healthy windows, no panic, u 4:4 then 5:5, remaining selector fails only 79/84"
+reference = "docs/logs/display-swapband-rounds-114-115.json"
+components = ["display"]
+
+[[area.evidence]]
+kind = "device"
 revision = "24bd5719c555c296bca358db781c82ec95b68cb4"
 status = "pass"
 summary = "r113 wait-state round: E5STATE m16d0=0 (event token never written; concrete driver owns it), m1608/m1868 exist, m1640/m1658=0; sel-6 n=3491 kIOReturnTimeout decoded to slot 176 gating on +0x16d0; externalMethod + 90-entry dispatch table at 0x6f354c0 decoded; v17 ships slot-176 success override"
