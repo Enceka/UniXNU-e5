@@ -407,14 +407,14 @@ extern "C" void e5_dpu_tick(void) {
           (volatile uint16_t *)sPanelMap->getVirtualAddress();
       for (unsigned x = 0; x < 320; ++x) rowCrc = rowCrc * 31 + px[x];
     }
-    if (sDpuMap)
+    if (sDpuMap) {
       volatile uint32_t *ctl2 =
-          sDpuMap ? (volatile uint32_t *)sDpuMap->getVirtualAddress() + 1
-                  : nullptr;
+          (volatile uint32_t *)sDpuMap->getVirtualAddress() + 1;
       e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x",
-          sPaintTicks, ctl2 ? *ctl2 : 0,
+          sPaintTicks, *ctl2,
           sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc, sVsyncEdges,
           e5_pmic_peek(0x48));
+    }
   }
   if (sPwmMap && sPwmOrigDuty) {
     // r141: %8 toggles every 4.4ms - invisible flicker. ~1.1s per phase.
