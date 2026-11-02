@@ -7,9 +7,6 @@
 #include <libkern/c++/OSData.h>
 #include <pexpert/pexpert.h>
 #include <mach/mach_time.h>
-#include <sys/vnode.h>
-#include <sys/uio.h>
-#include <sys/vfs_context.h>
 
 extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
                                             void *b, void *c, void *d);
@@ -109,7 +106,6 @@ static void e5_state_log(const char *format, ...) {
   for (const char *p = line; *p; ++p) e5_kputc(*p);
   e5_kputc('\n');
 }
-static void e5_beat_read(void);
 extern "C" void e5_display_state_dump(void) {
   if (!sPowerInstance) return;
   const volatile uint8_t *b = (const volatile uint8_t *)sPowerInstance;
@@ -124,29 +120,6 @@ extern "C" void e5_display_state_dump(void) {
          q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires,
          e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok,
          (void *)a3, a3 ? a3[0] : 0ULL, a3 ? a3[1] : 0ULL, a3 ? a3[2] : 0ULL, a3 ? a3[3] : 0ULL);
-  e5_beat_read();
-}
-
-/* Heartbeat reader: the e5diag telemetry orphan (userspace, spawned by the
- * init wrapper) rewrites /private/var/e5diag.beat every tick. Reading it here
- * rides the always-captured E5STATE cadence, so agent liveness is visible
- * even when the write(229) console uplink is broken. */
-static void e5_beat_read(void) {
-  vnode_t vp = NULLVP;
-  vfs_context_t ctx = vfs_context_kernel();
-  if (!ctx) { e5_state_log("E5BEAT noctx"); return; }
-  if (vnode_lookup("/private/var/e5diag.beat", 0, &vp, ctx) != 0) {
-    e5_state_log("E5BEAT absent");
-    return;
-  }
-  char buf[40];
-  memset(buf, 0, sizeof(buf));
-  int resid = 0;
-  errno_t err = vn_rdwr(UIO_READ, vp, buf, sizeof(buf) - 1, 0, UIO_SYSSPACE,
-                        0, vfs_context_ucred(ctx), &resid, ctx);
-  vnode_put(vp);
-  if (err == 0) e5_state_log("E5BEAT %s", buf);
-  else e5_state_log("E5BEAT rdwr %d", err);
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
