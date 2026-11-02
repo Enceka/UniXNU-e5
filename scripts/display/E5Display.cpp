@@ -306,7 +306,12 @@ public:
   IOReturn opaque176(uint32_t a, uint32_t b, uint32_t c) override {
     __atomic_fetch_add(&e5_display_wait_calls, 1U, __ATOMIC_RELAXED);
     __atomic_store_n(&e5_display_wait_last, (a & 0xFFFFu) | ((b & 0xFFu) << 16) | ((c & 0xFFu) << 24), __ATOMIC_RELAXED);
-    return kIOReturnSuccess;
+    // v25: fake vsync cadence. r112 proved the client RETRIES on Timeout
+    // (3491x with the original stub); v17's unconditional success made it stop
+    // waiting entirely (u froze, SwapBegin never called). Alternate: ~3
+    // Timeout replies per one Success = a ~60Hz-ish "frame completed" pulse.
+    unsigned n = __atomic_load_n(&e5_display_wait_calls, __ATOMIC_RELAXED);
+    return (n % 4 == 0) ? kIOReturnSuccess : kIOReturnTimeout;
   }
   // v18: the swap/surface band. The Legacy base returns kIOReturnUnsupported
   // from every one of these (r114: sel 15/22/27/33/50/57/79/84 all rejected);
