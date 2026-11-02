@@ -306,7 +306,7 @@ static unsigned sPaintTicks = 0;
 // and frame-locks the SwapWait completion path.
 extern "C" unsigned e5_display_vsync_edges(void);
 static bool sVsyncArmed = false;
-static uint32_t sVsyncEdges = 0, sVsyncLastSts = 0, sVsyncConsumed = 0;
+static uint32_t sVsyncEdges = 0, sVsyncLastSts = 0;
 extern "C" unsigned e5_display_vsync_edges(void) { return sVsyncEdges; }
 
 static volatile uint32_t *dpuReg(unsigned off) {
