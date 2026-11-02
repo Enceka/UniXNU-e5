@@ -38,8 +38,19 @@ New state fields are `tok` (the actual u32 token), `ev` (slot-344 call
 count, argument and result), and `wr` (native wait result). `W` retains the
 packed swap-id/flags/timeout observation with the corrected positions.
 
-Host ABI derivation and the 13-area porting record checker pass. CI and
-R127 device evidence remain pending. The immediate hardware question is
+Host ABI derivation and the 13-area porting record checker pass. CI387
+(run 41429533907) compiles, links and prelinks c5553be. R127 qualifies the
+native path: `ev=1:1:0 tok=1 vfire=1 wr=0`, with a 32-bit powered word
+written by the original slot-354 state setter. This field satisfies the
+original mode-3 wait; it is not a synthetic incrementing event counter.
+
+All 62,926,860 flash bytes and nine independent FAT reads pass. Mach sender
+returns remain successful (`asend=663 aok=663`). All 52,022 character draws
+are suppressed; retained scanout is `F=1:557a87bd`, and selectors 3/4/5 are
+still uncalled. Fresh Android A returns after about 665 seconds. Data and
+protected metadata remain unchanged. No panic or exception is retained;
+this does not prove continuous SpringBoard liveness.
+[Device evidence](logs/display-native-event-round127.json). The immediate hardware question is
 whether native notification delivery lets userspace request a real event,
 and whether the native token subsequently changes. No UI, frame-submission
 or physical-presentation result is claimed by this source change.

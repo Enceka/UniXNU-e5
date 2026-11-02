@@ -426,7 +426,23 @@ components = ["display"]
 kind = "source"
 reference = "docs/display-wait-abi-r127.md"
 summary = "V30 corrects the missing client argument in the slot-176 SwapWait ABI and restores the native slot-229 command-gate path into the real slot-344 enable_event entry."
-result = "Original wrapper passes client plus swap id, flags and timeout. R125 m16d0=100000000 has a zero u32 token and an explicitly written adjacent mode word; earlier event-token/readiness inference is withdrawn. Restore native 260/261 stubs, native wait and native event-source arming; periodic diagnostics no longer manufacture token writes. CI and R127 hardware acceptance are pending."
+result = "Original wrapper passes client plus swap id, flags and timeout. R125 m16d0=100000000 has a zero u32 token and an explicitly written adjacent mode word; earlier event-token/readiness inference is withdrawn. Restore native 260/261 stubs, native wait and native event-source arming; periodic diagnostics no longer manufacture token writes. R127 hardware evidence qualifies this native path below; physical presentation remains unqualified."
+components = ["display"]
+
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/display-native-event-round127.json"
+revision = "c5553be8170c26364777d89e54fc0722080e1ea4"
+command = "CI387/run41429533907; display-wait-r127-native/build-payload.py; run-board-cycle.py board-r127; collect-evidence.py 127"
+summary = "R127 qualifies the original request gate, timer completion, 32-bit powered word and native SwapWait result."
+result = "ev=1:1:0/tok=1/vfire=1/wr=0; original setter publishes powered=1. asend=663/aok=663. All 52022 character calls are suppressed; F=1:557a87bd and selectors 3/4/5 remain zero. Complete payload/FAT checks pass; fresh Android A and unchanged Data/protected metadata are verified. No retained panic/exception. Continuous SB liveness and physical presentation remain unqualified."
+components = ["display"]
+
+[[area.evidence]]
+kind = "source"
+reference = "docs/display-liveness-r128.md"
+summary = "R128 adds bounded process and published-service observations after the native display wait is qualified but surface calls remain absent."
+result = "Retain process references and sample selected task scalar fields for PIDs below 512. No task/map locks, signals or user-memory reads at the media checkpoint. Report exact process/service mask definitions and range limits. Preserve the R127 display behavior and enabled-SB Data; CI and R128 device acceptance are pending."
 components = ["display"]
 
 [[area.evidence]]

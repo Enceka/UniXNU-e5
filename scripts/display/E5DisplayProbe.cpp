@@ -12,6 +12,8 @@ using e5_notify_fn = void (*)(void *, void *);
 
 #include <libkern/c++/OSSymbol.h>
 #include <mach/kmod.h>
+#include <sys/proc.h>
+#include <kern/task.h>
 
 // E5TW only: printf would change the framebuffer being measured.
 #include <stdarg.h>
@@ -27,6 +29,57 @@ static void e5_display_tracef(const char *format, ...) {
   vsnprintf(line, sizeof(line), format, args);
   va_end(args);
   for (const char *p = line; *p; ++p) e5_kputc(*p);
+}
+
+// R128: a bounded process/registry snapshot after native readiness completed
+// without any surface calls. No task_info/map locks, user-memory reads,
+// suspension or signals from this media-read checkpoint. A proc reference
+// protects each process while the pinned task's scalar state is sampled.
+static void e5_display_runtime_census() {
+  static unsigned sequence;
+  const unsigned sample = ++sequence;
+  static const char *const targets[] = {
+      "SpringBoard", "backboardd", "runningboardd", "frontboardd",
+      "liveactivitiesd", "launchd", "WindowServer"};
+  unsigned seen = 0;
+  for (int pid = 1; pid < 512; ++pid) {
+    proc_t process = proc_find(pid);
+    if (!process) continue;
+    char name[32] = {};
+    proc_name(pid, name, sizeof(name));
+    for (unsigned i = 0; i < sizeof(targets) / sizeof(targets[0]); ++i) {
+      if (strcmp(name, targets[i]) != 0) continue;
+      seen |= 1u << i;
+      const int exiting = proc_exiting(process);
+      task_t task = exiting ? TASK_NULL : proc_task(process);
+      e5_display_tracef("E5PROC seq=%u pid=%d name=%s exit=%d active=%u suspended=%u threads=%d active_threads=%u stops=%d\n",
+          sample, pid, name, exiting,
+          task ? (unsigned)task_is_active(task) : 0,
+          task ? (unsigned)task_is_app_suspended(task) : 0,
+          task ? __atomic_load_n(&task->thread_count, __ATOMIC_RELAXED) : 0,
+          task ? __atomic_load_n(&task->active_thread_count, __ATOMIC_RELAXED) : 0,
+          task ? __atomic_load_n(&task->user_stop_count, __ATOMIC_RELAXED) : 0);
+      break;
+    }
+    proc_rele(process);
+  }
+  static const char *const services[] = {
+      "IOGPU", "IOAccelerator", "AppleKeyStore", "IOSurfaceRoot",
+      "IOMobileFramebuffer", "IOCoreSurfaceRoot"};
+  unsigned published = 0;
+  for (unsigned i = 0; i < sizeof(services) / sizeof(services[0]); ++i) {
+    OSDictionary *matching = i == 5 ? IOService::nameMatching(services[i])
+                                   : IOService::serviceMatching(services[i]);
+    if (!matching) continue;
+    auto service = IOService::copyMatchingService(matching);
+    if (service) published |= 1u << i;
+#if !defined(IOKIT_ENABLE_SHARED_PTR)
+    OSSafeReleaseNULL(service);
+#endif
+    matching->release();
+  }
+  e5_display_tracef("E5LIVE seq=%u pid_limit=512 seen=%02x services=%02x\n",
+      sample, seen, published);
 }
 
 extern kmod_info_t g_kernel_kmod_info;
@@ -98,7 +151,10 @@ static uint32_t e5_display_crc32(const volatile uint8_t *p, size_t n) {
 
 extern "C" void e5_display_frame_kick(void) {
   static unsigned traceKicks;
-  if ((traceKicks++ % 16) == 0) e5_iomfb_trace_dump();
+  if ((traceKicks++ % 16) == 0) {
+    e5_iomfb_trace_dump();
+    e5_display_runtime_census();
+  }
   e5_display_state_dump(); // v16: wait-machinery state alongside the selector census
   e5_display_vsync_fire();  // v27: fire the armed vsync event (token bump + clear)
   e5_display_async_fire();  // v28: deliver vsync-class async notifications

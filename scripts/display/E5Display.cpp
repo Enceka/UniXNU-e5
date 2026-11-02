@@ -82,7 +82,7 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
       unsigned long long *ref = (unsigned long long *)(node + 0x18);
       if (*ref) {
         __atomic_fetch_or(&e5_display_async_ports, 1u << kind, __ATOMIC_RELAXED);
-        // FrameInfoNotifyFunc accepts {property-mask, status}; an empty mask
+        // FrameInfoNotifyFunc accepts {property-mask, frame-id}; an empty mask
         // reports no changed properties. VsyncNotifyFunc requires SIX words:
         // three u64 values split low/high, as in the original broadcaster
         // at raw 0x6796720. The v28 two-word timestamp could overrun that
