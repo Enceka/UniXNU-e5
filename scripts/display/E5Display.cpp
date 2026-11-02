@@ -66,7 +66,9 @@ extern "C" void e5_display_async_fire(void) {
   for (unsigned k = 0; k < 6; ++k) {
     unsigned long long *ref =
         (unsigned long long *)__atomic_load_n(&e5_display_async_ctx[k], __ATOMIC_RELAXED);
-    if (!ref || !*ref) continue;
+    if (!ref) continue;
+    // v28.1: send unconditionally — r125 showed ctx[0]==0 (asend=0 with the
+    // old !*ref guard); let the kernel delivery itself judge the reference.
     unsigned long long payload[2] = {0, 0};
     payload[0] = mach_absolute_time();
     int r = _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
@@ -112,10 +114,12 @@ extern "C" void e5_display_state_dump(void) {
     for (unsigned i = 0; i != 8; ++i) v |= (unsigned long long)b[off + i] << (8 * i);
     return v;
   };
-  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u",
+  unsigned long long *a3 = (unsigned long long *)e5_display_async_ctx[3];
+  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u a3=%p w=%llx %llx %llx %llx",
          (const void *)b, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
          q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires,
-         e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok);
+         e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok,
+         (void *)a3, a3 ? a3[0] : 0ULL, a3 ? a3[1] : 0ULL, a3 ? a3[2] : 0ULL, a3 ? a3[3] : 0ULL);
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
