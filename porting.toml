@@ -396,6 +396,15 @@ next_action = ["Preserve the qualified R109 gateway and no-vc control. Capture s
 
 [[area.evidence]]
 kind = "device"
+revision = "8588b2f"
+status = "pass"
+summary = "r113 wait-state round: E5STATE m16d0=0 (event token never written; concrete driver owns it), m1608/m1868 exist, m1640/m1658=0; sel-6 n=3491 kIOReturnTimeout decoded to slot 176 gating on +0x16d0; externalMethod + 90-entry dispatch table at 0x6f354c0 decoded; v17 ships slot-176 success override"
+command = "run-board-cycle.py board-r113"
+reference = "docs/logs/display-wait-round113.json"
+components = ["display"]
+
+[[area.evidence]]
+kind = "device"
 reference = "docs/logs/display-submit-round109.json"
 revision = "e5b241f370628875d2a6fa68ab213fc7ed7accf2"
 command = "CI363; retained r108 ADT; explicit e5-no-vc; nine independent FAT reads; full boot_b payload readback; detached e5-uefi-cycle.sh; E5TW gateway decode; full Data and protected-metadata readback"
