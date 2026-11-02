@@ -29,11 +29,10 @@ unsigned e5_display_power_after_nuc = 0xFF;
 }
 extern "C" unsigned e5_display_power_last; // owned by E5DisplayProbe.cpp
 
-namespace {
 // The published instance whose +0x8c byte the family power dispatcher gates
 // on. Set by start(); read by e5_display_power_read() from the echo probe.
-E5Display *sPowerInstance = nullptr;
-}
+class E5Display;
+static E5Display *sPowerInstance = nullptr;
 
 extern "C" unsigned e5_display_power_read(void) {
   if (!sPowerInstance) return 0xFF;
