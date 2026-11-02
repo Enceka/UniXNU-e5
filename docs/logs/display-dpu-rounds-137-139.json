@@ -1,0 +1,29 @@
+{
+  "phase": "D2 native DPU/DSI scanout",
+  "rounds": [
+    {
+      "round": 137, "kernel_ci": 398, "kernel_sha_prefix": "5d90deb9",
+      "device_commit": "ca45dd0", "verdict": "PARTIAL_PASS_PANIC",
+      "evidence": "E5DPU id=601 ctrl=0 panel=01e00140 layen=1 base=be000000 layctrl=44 pitch=140 all match M0 decode; PWM mapped at raw 0x30000 (unmapped) -> E5PANIC data abort at first PWM access",
+      "report": "board-r137 decoded"
+    },
+    {
+      "round": 138, "kernel_ci": 399_redispatch_41489258294, "kernel_sha_prefix": "0fb606a9",
+      "device_commit": "ad3cd04", "verdict": "HEALTHY_NO_DATA",
+      "evidence": "PWM PA fixed 0x64030000; boot healthy 0 panic but zero E5DPU lines: thread_call fired once before display start() set sPowerInstance, guard killed reschedule; one-shot print wrapped out of 24KB ring over the window",
+      "report": "board-r138 decoded"
+    },
+    {
+      "round": 139, "kernel_ci": 401, "kernel_sha_prefix": "585ed557",
+      "device_commit": "1c52476", "verdict": "DPU_READS_LIVE_BACKLIGHT_PULSING",
+      "evidence": "477 E5DPU t-lines at correct 5s cadence (t=k tick counter, +50 per line): DPU regs readable for the whole window, PWM duty alternating 6<->19 (=25/4 default duty pulse) = backlight modulation at PA 0x64030000 CONFIRMED; ring fully consumed by t-lines so F= evidence lost; anomaly: tick span implies uptime >600s without wdt reboot (unverified)",
+      "report": "board-r139 decoded, dmesg c9c63568"
+    }
+  ],
+  "hardware_facts": {
+    "dpu": {"pa": "0x31000000", "window": "0x3000", "id_reg_0x000": "0x601", "panel_size_0x018": "0x1e00140 (480<<16|320)", "layer_enable_0x02c": "1", "layer0_base_0x030": "0xbe000000", "layer0_ctrl_0x040": "0x44 (RGB565)", "layer0_pitch_0x04c": "0x140 (320*2)"},
+    "pwm": {"pa": "0x64030000 (aon child offset of 0x64000000)", "prescale_0x0": null, "mod_0x4": "0x9c40 (25kHz)", "duty_0x8": "default 25 (0xfa expected family default; observed 25 decimal)", "enable_0x18": "1", "driver_ref": "drivers/pwm/pwm-sprd.c duty-write-applies, UMS9620 channel stride 16KiB"},
+    "lesson": "aon-ranges children are OFFSETS of 0x64000000 — second occurrence of the ranges-translation trap (first was PMIC ADI 0x64400000->0x64420000)"
+  },
+  "next": "v1.3 (cedc132): minimal self-verifying 5s line t/duty/row0-crc/wdt-peek via e5_pmic_peek; distinguishes paint-reaches-panel vs cached-writes, and explains the >600s wdt anomaly"
+}
