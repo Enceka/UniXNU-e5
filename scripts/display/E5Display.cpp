@@ -6,6 +6,7 @@
 #include <IOKit/IOLib.h>
 #include <libkern/c++/OSData.h>
 #include <pexpert/pexpert.h>
+#include <mach/mach_time.h>
 
 extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
                                             void *b, void *c, void *d);
@@ -36,6 +37,16 @@ unsigned e5_display_power_after_nuc = 0xFF;
 }
 extern "C" unsigned e5_display_vsync_fires = 0; // v27 fake-vsync fire count
 extern "C" unsigned e5_display_power_last; // owned by E5DisplayProbe.cpp
+// v28: the real async-event delivery. IOUserClient::sendAsyncResult64WithOptions
+// is a protected static of IOUserClient (iokit/IOKit/IOUserClient.h:341); the
+// family reaches it through a GOT thunk. Bind the mangled export directly.
+extern "C" int _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
+    unsigned long long *asyncRef, int result, const unsigned long long *args,
+    unsigned int numArgs, unsigned int options);
+extern "C" void *e5_display_async_ctx[6]; // per-subop OSAsyncReference64 (slot 208 x2)
+extern "C" unsigned e5_display_async_kinds; // bitmask of registered subops
+extern "C" unsigned e5_display_async_sends; // deliveries attempted
+extern "C" unsigned e5_display_async_send_ok; // deliveries returning 0
 
 // The published instance whose +0x8c byte the family power dispatcher gates
 // on. Set by start(); read by e5_display_power_read() from the echo probe.
@@ -48,6 +59,22 @@ extern "C" unsigned e5_display_power_read(void) {
 }
 
 extern "C" void *e5_display_service_instance() { return sPowerInstance; }
+
+// v28: deliver a vsync-style async notification through the bound kernel
+// export to every registered event context. Called from frame_kick.
+extern "C" void e5_display_async_fire(void) {
+  for (unsigned k = 0; k < 6; ++k) {
+    unsigned long long *ref =
+        (unsigned long long *)__atomic_load_n(&e5_display_async_ctx[k], __ATOMIC_RELAXED);
+    if (!ref || !*ref) continue;
+    unsigned long long payload[2] = {0, 0};
+    payload[0] = mach_absolute_time();
+    int r = _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
+        ref, 0 /* kIOReturnSuccess */, payload, 2, 1);
+    __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
+    if (r == 0) __atomic_add_fetch(&e5_display_async_send_ok, 1U, __ATOMIC_RELAXED);
+  }
+}
 // v27: fire the fake vsync event: bump the +0x16d0 token and clear the
 // +0x16e0 enabled flag, exactly what the concrete driver's event source
 // does (H9G power path writes the token at 0x6bf7ae4). Called from
@@ -85,9 +112,10 @@ extern "C" void e5_display_state_dump(void) {
     for (unsigned i = 0; i != 8; ++i) v |= (unsigned long long)b[off + i] << (8 * i);
     return v;
   };
-  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u",
+  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u",
          (const void *)b, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
-         q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires);
+         q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires,
+         e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok);
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
@@ -302,6 +330,22 @@ public:
   bool opaque258() override { // power controllable
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
     return true;
+  }
+  // v28: slots 208/210 = register-event + arm-event (sel-72 wrapper decoded:
+  // ctx = client+0x110+subop*0xb0, x2 = ctx+8 = OSAsyncReference64; the family
+  // delivers via sendAsyncResult64WithOptions(ref, 0, payload, n, 1)). Save the
+  // reference and fire it from e5_display_async_fire() (frame_kick cadence).
+  IOReturn opaque208(uint32_t kind, void *ref) override {
+    if (kind < 6 && ref) {
+      e5_display_async_ctx[kind] = ref;
+      __atomic_fetch_or(&e5_display_async_kinds, 1u << kind, __ATOMIC_RELAXED);
+    }
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque210(uint32_t kind, void *ref, uint32_t on) override {
+    (void)kind; (void)ref; (void)on;
+    __atomic_fetch_or(&e5_display_swap_mask, 1u << 8, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
   }
   // v27: slots 260/261 emulate the family's enable/disable event semantics
   // (original enable_event 0x6797224: [this+0x16dc]=arg, [+0x16e0]=1). The
