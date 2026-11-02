@@ -19,7 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
-OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 184, 188, 288] + PURE)
+OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 184, 188, 229, 255, 256, 258, 260, 261, 288] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -184,6 +184,26 @@ public:
             header += '  virtual bool isMainDisplay();\n'
         elif i == 188:
             header += '  virtual IOReturn getDotPitch(uint32_t *);\n'
+        elif i == 229:
+            # request_power_change backend (dispatcher 0x67779fc tail calls it
+            # with (uint32_t power_state, void *zero)); the legacy stub only
+            # forwards to the +0x1608 sub-object. Client-visible IOReturn.
+            header += '  virtual IOReturn opaque229(uint32_t, void *);\n'
+        elif i == 255:
+            # get power state; dispatcher tests bit0 of the return (1 = on).
+            header += '  virtual IOReturn opaque255();\n'
+        elif i == 256:
+            # set power state (arg&1); dispatcher treats 0 as success.
+            header += '  virtual IOReturn opaque256(uint32_t);\n'
+        elif i == 258:
+            # power controllable bool; dispatcher tests bit0.
+            header += '  virtual bool opaque258();\n'
+        elif i == 260:
+            # called after "set power on pending"; return success.
+            header += '  virtual IOReturn opaque260();\n'
+        elif i == 261:
+            # power notification hook; return success.
+            header += '  virtual IOReturn opaque261();\n'
         elif i == 249:
             header += '  virtual void getDisplayDimensions(uint32_t *, uint32_t *);\n'
         elif i == 288:

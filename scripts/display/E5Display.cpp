@@ -23,6 +23,9 @@ unsigned e5_display_cap213_calls = 0;
 unsigned e5_display_cap213_status = (unsigned)kIOReturnNotReady;
 unsigned e5_display_ok211_calls = 0;
 unsigned e5_display_ok306_calls = 0;
+// v15 power-band override counters (slots 229/255/256/258/260/261).
+unsigned e5_display_pw_calls = 0;
+unsigned e5_display_pw_results = 0;
 // v14 runtime bracket of the family power byte at +0x8c (see newUserClient).
 unsigned e5_display_power_before_nuc = 0xFF;
 unsigned e5_display_power_after_nuc = 0xFF;
@@ -213,6 +216,37 @@ public:
   IOReturn opaque306(uint32_t selector, void *b, void *c, void *d) override {
     (void)selector; (void)b; (void)c; (void)d;
     __atomic_fetch_add(&e5_display_ok306_calls, 1U, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  // v15: the family power band. The inherited Legacy stubs make
+  // request_power_change reject every caller (r109/r110 telemetry:
+  // SwapWait >= 11911 x Busy, RequestPowerChange Unsupported). The
+  // firmware scanout is already powered: apply = acknowledge.
+  IOReturn opaque229(uint32_t state, void *zero) override {
+    (void)state; (void)zero;
+    __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque255() override { // get power state: bit0 = on
+    __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque256(uint32_t state) override { // set power state
+    (void)state;
+    __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  bool opaque258() override { // power controllable
+    __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
+    return true;
+  }
+  IOReturn opaque260() override { // power-on pending ack
+    __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
+    return kIOReturnSuccess;
+  }
+  IOReturn opaque261() override { // power notification
+    __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
+    __atomic_fetch_or(&e5_display_pw_results, 1U, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
   E5_GUARDED_SLOT(245)
