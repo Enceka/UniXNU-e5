@@ -62,13 +62,39 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 
 // v28: deliver a vsync-style async notification through the bound kernel
 // export to every registered event context. Called from frame_kick.
+// v29: deliver through the FAMILY's own broadcast marshaling
+// (0xfffffff0067778c0 raw: (obj, result, payload*, kind, 1) → GOT thunk →
+// sendAsyncResult64WithOptions). r126 proved raw kind-3 sends reach userland
+// but FREEZE the fallback drawer; this round isolates whether the family's
+// marshaling (obj identity + payload shape) changes the client's reaction.
+// Runtime slide solved from an un-overridden inherited vtable entry.
+typedef int (*e5_family_broadcast_fn)(void *, int, const unsigned long long *,
+                                      unsigned, unsigned);
 extern "C" void e5_display_async_fire(void) {
+  static e5_family_broadcast_fn sBroadcast = nullptr;
+  if (!sBroadcast && sPowerInstance) {
+    void **vt = *(void ***)sPowerInstance;      // our compiled vtable (runtime)
+    unsigned long long entry175 = (unsigned long long)vt[175];
+    unsigned long long raw175 = 0xfffffff006792774; // original slot-175 family fn
+    long long slide = (long long)(raw175 - entry175);
+    sBroadcast = (e5_family_broadcast_fn)(0xfffffff0067778c0 - slide);
+  }
   for (unsigned k = 0; k < 6; ++k) {
     unsigned long long *ref =
         (unsigned long long *)__atomic_load_n(&e5_display_async_ctx[k], __ATOMIC_RELAXED);
     if (!ref) continue;
-    // v28.1: send unconditionally — r125 showed ctx[0]==0 (asend=0 with the
-    // old !*ref guard); let the kernel delivery itself judge the reference.
+    if (sBroadcast && sPowerInstance) {
+      unsigned long long payload[2] = {0, 0};
+      payload[0] = mach_absolute_time();
+      void *helper = *(void **)((uint8_t *)sPowerInstance + 0x1608);
+      if (helper) {
+        int r = sBroadcast(helper, 0, payload, 3 /*kind*/, 1);
+        (void)r;
+        __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&e5_display_async_send_ok, 1U, __ATOMIC_RELAXED);
+        continue;
+      }
+    }
     unsigned long long payload[2] = {0, 0};
     payload[0] = mach_absolute_time();
     int r = _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
