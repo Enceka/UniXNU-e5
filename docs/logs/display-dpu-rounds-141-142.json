@@ -1,0 +1,12 @@
+{
+  "rounds": [141, 142],
+  "kernel": "LOCAL BUILD v1.4 = 8b309400 (payload 5acb17fd), v1.5 = 93633827 (payload fdd2c32f)",
+  "verdict": "D2 v1 HUMAN-VISIBLE PAINT ROUND HEALTHY",
+  "facts": [
+    "r141: 220 E5DPU lines at ~3s cadence (%5000), echo lines survive (9, all early-boot), wdt armed counting down, 0 crashes",
+    "r142 (v1.5 human cadence): duty histogram 111/109 two phases = backlight breathing ~1.1s/phase; crc transitions 219/219 = stripe stepping (~2.3s/step); 0 E5EXC, 0 panic, wdt ctrl=0xa counting 0x5d5d3->0x7741",
+    "screen during window should show RGB bands + stepping black stripe + breathing backlight (visual acceptance pending user eyes; morning re-arm scheduled)",
+    "local build iterations: v1.3 two compile fixes (fwd-decl order, definition after class), v1.4 print cadence, v1.5 human cadence, v2 unused-var -Werror"
+  ],
+  "dpu_v2_design": "poll REG_DPU_INT_STS@0x1E8 bit5 (BIT_DPU_INT_VSYNC, Linux sprd_dpu.c:96/47-49) at 1.8kHz tick; ~60Hz pulse proves scanout engine runs; frame-locks opaque176 SwapWait (success once per observed edge)"
+}
