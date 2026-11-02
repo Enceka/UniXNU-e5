@@ -193,3 +193,34 @@
  SYSCTL_INT(_vm, OID_AUTO, fbdp_no_panic, CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_ANYBODY, &fbdp_no_panic, 0, "");
  #endif /* MACH_ASSERT */
 -
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -7180,9 +7180,28 @@
+ 				printf("load_init_program: failed loading %s: errno %d\n", launchd_path, error);
+ 			}
+ 		}
+ 	}
+ #endif
+ 
++/*
++ * E5 userspace diagnostics wrapper: if the writable Data volume provides
++ * /private/var/e5diag, exec it as init first; it forks a telemetry orphan
++ * (write(229,...) uplink) and then execs /sbin/launchd in place, keeping
++ * pid 1. Removing the file restores the stock init path.
++ */
++	if (PE_parse_boot_argn("e5-systemos-boot", NULL, 0)) {
++		vnode_t e5diag_vp = NULLVP;
++		if (vnode_lookup("/private/var/e5diag", 0, &e5diag_vp, vfs_context_current()) == 0) {
++			vnode_put(e5diag_vp);
++			printf("load_init_program: attempting e5 diag wrapper /private/var/e5diag\n");
++			error = load_init_program_at_path(p, (user_addr_t)scratch_addr, "/private/var/e5diag");
++			if (!error) {
++				return;
++			}
++			printf("load_init_program: e5 diag wrapper failed: errno %d\n", error);
++		}
++	}
++
+ 	error = ENOENT;
+ 	for (i = 0; i < sizeof(init_programs) / sizeof(init_programs[0]); i++) {
+ 		printf("load_init_program: attempting to load %s\n", init_programs[i]);
