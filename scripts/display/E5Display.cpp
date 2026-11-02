@@ -43,10 +43,10 @@ extern "C" unsigned e5_display_power_last; // owned by E5DisplayProbe.cpp
 extern "C" int _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
     unsigned long long *asyncRef, int result, const unsigned long long *args,
     unsigned int numArgs, unsigned int options);
-extern "C" void *e5_display_async_ctx[6]; // per-subop OSAsyncReference64 (slot 208 x2)
-extern "C" unsigned e5_display_async_kinds; // bitmask of registered subops
-extern "C" unsigned e5_display_async_sends; // deliveries attempted
-extern "C" unsigned e5_display_async_send_ok; // deliveries returning 0
+extern "C" void *e5_display_async_ctx[6] = {}; // per-subop OSAsyncReference64 (slot 208 x2)
+extern "C" unsigned e5_display_async_kinds = 0; // bitmask of registered subops
+extern "C" unsigned e5_display_async_sends = 0; // deliveries attempted
+extern "C" unsigned e5_display_async_send_ok = 0; // deliveries returning 0
 
 // The published instance whose +0x8c byte the family power dispatcher gates
 // on. Set by start(); read by e5_display_power_read() from the echo probe.
