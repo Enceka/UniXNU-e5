@@ -337,7 +337,7 @@ extern "C" void e5_i2c3_tick(unsigned now) {
     *i2cReg(0x04) = (0x2e << 1);
     *i2cReg(0x08) = 0;
     *i2cReg(0x00) = (ctl | 1u) & ~(1u << 20);
-    for (volatile int i = 0; i < 200; ++i) {}
+    for (int i = 0; i < 200; ++i) { __asm__ volatile("" ::: "memory"); }
     sI2cProbeStatus = *i2cReg(0x14);
     *i2cReg(0x00) = ctl | (1u << 20); // STP releases the bus
     sI2cStage = 2;
