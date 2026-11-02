@@ -283,3 +283,80 @@ extern "C" int e5_concrete_display_probe(void) {
          (unsigned)e5_display_registration_result, instances, owned->getInstanceCount());
   return e5_display_construction == 0x1ff;
 }
+
+// ---------------------------------------------------------------------------
+// D2 v1: native DPU takeover probe + paint + backlight modulation.
+// The plan (display-touch-gpu-plan.md D2) wants E5-owned scanout BEFORE the
+// GPU phase: continuous dynamic output and panel/backlight control, with the
+// UEFI-programmed pipeline as the starting point. All register facts come
+// from the M0 live decode (docs/m0-bringup-report.md): DPU core
+// 0x31000000+0x3000 (PANEL_SIZE@0x18, LAYER_ENABLE@0x2c, LAY0_BASE@0x30,
+// LAY0_CTRL@0x40, LAY0_PITCH@0x4c), PWM ch0 at 0x30000 (PRESCALE@0, MOD@4,
+// DUTY@8, ENABLE@0x18, 16KiB channel stride, pwm-sprd.c).
+// ---------------------------------------------------------------------------
+static IODeviceMemory *sDpuMemory = nullptr;
+static IOMemoryMap *sDpuMap = nullptr;
+static IODeviceMemory *sPwmMemory = nullptr;
+static IOMemoryMap *sPwmMap = nullptr;
+static uint32_t sPwmOrigDuty = 0;
+static unsigned sPaintTicks = 0;
+
+static volatile uint32_t *dpuReg(unsigned off) {
+  if (!sDpuMap) return nullptr;
+  return (volatile uint32_t *)((uint8_t *)sDpuMap->getVirtualAddress() + off);
+}
+static volatile uint32_t *pwmReg(unsigned off) {
+  if (!sPwmMap) return nullptr;
+  return (volatile uint32_t *)((uint8_t *)sPwmMap->getVirtualAddress() + off);
+}
+
+// Paint the M0 acceptance pattern into the live scanout window: red / green
+// / blue / white horizontal bands with a black vertical stripe whose x
+// position rotates — one stripe step per call. Called from the delivery
+// timer (thread context, never the echo thread).
+extern "C" void e5_dpu_paint_step(void) {
+  if (!sPanelMap) return;
+  volatile uint16_t *px = (volatile uint16_t *)sPanelMap->getVirtualAddress();
+  const unsigned W = 320, H = 480;
+  unsigned stripe = (sPaintTicks++ % 8) * 40;
+  for (unsigned y = 0; y < H; ++y) {
+    uint16_t band = (y < 120) ? 0xF800 : (y < 240) ? 0x07E0 : (y < 360) ? 0x001F : 0xFFFF;
+    for (unsigned x = 0; x < W; ++x) px[y * W + x] = (x >= stripe && x < stripe + 40) ? 0x0000 : band;
+  }
+}
+
+extern "C" void e5_dpu_tick(void) {
+  // first entry: map + dump + take a baseline of the backlight duty
+  if (!sDpuMap) {
+    sDpuMemory = IODeviceMemory::withRange(0x31000000ull, 0x3000ull);
+    if (sDpuMemory) sDpuMap = sDpuMemory->map();
+    sPwmMemory = IODeviceMemory::withRange(0x30000ull, 0x20ull);
+    if (sPwmMemory) sPwmMap = sPwmMemory->map();
+    if (sDpuMap) {
+      e5_display_tracef(
+          "E5DPU id=%03x ctrl=%x panel=%08x layen=%x base=%08x layctrl=%x pitch=%03x",
+          *dpuReg(0x000) & 0xFFF, *dpuReg(0x008), *dpuReg(0x018),
+          *dpuReg(0x02c), *dpuReg(0x030), *dpuReg(0x040), *dpuReg(0x04c));
+    } else {
+      e5_display_tracef("E5DPU map failed");
+    }
+    if (sPwmMap) {
+      sPwmOrigDuty = *pwmReg(0x08) & 0xFFFF;
+      e5_display_tracef("E5PWM prescale=%x mod=%x duty=%x enable=%x",
+                           *pwmReg(0x0), *pwmReg(0x4), sPwmOrigDuty,
+                           *pwmReg(0x18));
+    } else {
+      e5_display_tracef("E5PWM map failed");
+    }
+  }
+  // continuous dynamic output: step the paint pattern; every 8th tick also
+  // pulse the backlight to 1/4 duty and back (panel/backlight acceptance)
+  e5_dpu_paint_step();
+  if (sPwmMap && sPwmOrigDuty) {
+    unsigned phase = (sPaintTicks / 8) % 2;
+    unsigned duty = phase ? (sPwmOrigDuty / 4) : sPwmOrigDuty;
+    // pwm-sprd.c: writing DUTY applies MOD+DUTY to the output; keep ENABLE
+    // untouched so the channel keeps running.
+    *pwmReg(0x08) = duty;
+  }
+}

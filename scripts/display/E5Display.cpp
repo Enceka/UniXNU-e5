@@ -69,8 +69,10 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 // self-rescheduling thread_call timer so the echo thread never blocks.
 extern "C" void e5_display_async_fire(void); // timer body below
 static thread_call_t sFireTimer = nullptr;
+extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backlight
 static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
   e5_display_async_fire();
+  e5_dpu_tick(); // D2 v1: native scanout pattern + backlight pulse (timer ctx)
   if (sPowerInstance && sFireTimer)
     thread_call_enter1_delayed(sFireTimer, nullptr, 100 * NSEC_PER_MSEC);
 }
