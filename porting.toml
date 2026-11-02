@@ -425,7 +425,7 @@ components = ["display"]
 [[area.evidence]]
 kind = "source"
 reference = "docs/display-wait-abi-r127.md"
-summary = "V30 corrects the missing client argument in the slot-176 SwapWait ABI and observes the real slot-344 enable_event entry while preserving native results."
+summary = "V30 corrects the missing client argument in the slot-176 SwapWait ABI and restores the native slot-229 command-gate path into the real slot-344 enable_event entry."
 result = "Original wrapper passes client plus swap id, flags and timeout. R125 m16d0=100000000 has a zero u32 token and an explicitly written adjacent mode word; earlier event-token/readiness inference is withdrawn. Restore native 260/261 stubs, native wait and native event-source arming; periodic diagnostics no longer manufacture token writes. CI and R127 hardware acceptance are pending."
 components = ["display"]
 

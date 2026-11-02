@@ -355,14 +355,12 @@ public:
     __atomic_fetch_add(&e5_display_ok306_calls, 1U, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
-  // v15: the family power band. The inherited Legacy stubs make
-  // request_power_change reject every caller (r109/r110 telemetry:
-  // SwapWait >= 11911 x Busy, RequestPowerChange Unsupported). The
-  // firmware scanout is already powered: apply = acknowledge.
+  // v30: original slot 229 enters the command gate with virtual slot 344
+  // as its action. Bypassing it also bypasses the event-source arm, so an
+  // acknowledged power request cannot produce a native completion token.
   IOReturn opaque229(uint32_t state, void *zero) override {
-    (void)state; (void)zero;
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);
-    return kIOReturnSuccess;
+    return IOMobileFramebufferLegacy::opaque229(state, zero);
   }
   IOReturn opaque255() override { // get power state: dispatcher tests bit0 (1 = on)
     __atomic_fetch_add(&e5_display_pw_calls, 1U, __ATOMIC_RELAXED);

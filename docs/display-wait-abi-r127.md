@@ -28,6 +28,12 @@ stubs and instrument slot 344 while forwarding its exact arguments and
 return value. Periodic sampling observes native token/completion changes
 without writing tokens or clearing the enable word.
 
+Original power-request backend slot 229 at `0xfffffff0067973b8` enters the
+native command gate using virtual slot 344 as its action. The v15 success
+override bypassed that arm entirely. Restore forwarding through slot 229
+as well so a power request can enter the real event source, while the
+concrete firmware-scanout power hooks remain in place.
+
 New state fields are `tok` (the actual u32 token), `ev` (slot-344 call
 count, argument and result), and `wr` (native wait result). `W` retains the
 packed swap-id/flags/timeout observation with the corrected positions.
