@@ -31,7 +31,6 @@ unsigned e5_display_ok306_calls = 0;
 unsigned e5_display_pw_calls = 0;
 extern "C" unsigned e5_display_swap_mask = 0;
 extern "C" unsigned e5_display_vsync_edges(void); // D2 v2 (probe)
-static unsigned sWaitSeenEdges = 0;
 extern "C" unsigned e5_display_wait_calls = 0;
 extern "C" unsigned e5_display_wait_last = 0;
 unsigned e5_display_pw_results = 0;
