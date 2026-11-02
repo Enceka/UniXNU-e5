@@ -16,6 +16,7 @@ using e5_notify_fn = void (*)(void *, void *);
 // E5TW only: printf would change the framebuffer being measured.
 #include <stdarg.h>
 extern "C" void e5_kputc(char);
+extern "C" unsigned e5_pmic_peek(unsigned off); // NativeSd.cpp: PMIC ADI read for wdt probe
 extern "C" void e5_iomfb_trace_dump(void);
 extern "C" void e5_display_state_dump(void);
 extern "C" void e5_display_vsync_fire(void); // v27
@@ -356,14 +357,22 @@ extern "C" void e5_dpu_tick(void) {
   // continuous dynamic output: step the paint pattern; every 8th tick also
   // pulse the backlight to 1/4 duty and back (panel/backlight acceptance)
   e5_dpu_paint_step();
-  // v1.2: re-dump state every ~5s (50 ticks) so one-shot prints survive
-  // the 24KB E5TW ring (r138's first-tick lines wrapped out over 600s)
+  // v1.3: 5s cadence kept but the line is minimal and self-verifying:
+  // row0 crc computed right after paint proves the stripe advanced IN the
+  // surviving line itself (r139's F= evidence was flooded out of the ring);
+  // wdt peek (PMIC ADI cnt@0x50/ctrl@0x48 via NativeSd helper) tests the
+  // r139 anomaly where ticks spanned >600s without a watchdog reboot.
   if ((sPaintTicks % 50) == 10) {
+    unsigned rowCrc = 0;
+    if (sPanelMap) {
+      volatile uint16_t *px =
+          (volatile uint16_t *)sPanelMap->getVirtualAddress();
+      for (unsigned x = 0; x < 320; ++x) rowCrc = rowCrc * 31 + px[x];
+    }
     if (sDpuMap)
-      e5_display_tracef(
-          "E5DPU t=%u id=%03x ctrl=%x base=%08x duty=%x",
-          sPaintTicks, *dpuReg(0x000) & 0xFFF, *dpuReg(0x008),
-          *dpuReg(0x030), sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0);
+      e5_display_tracef("E5DPU t=%u duty=%x crc=%08x wdt=%x:%04x%04x",
+          sPaintTicks, sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc,
+          e5_pmic_peek(0x48), e5_pmic_peek(0x5c), e5_pmic_peek(0x58));
   }
   if (sPwmMap && sPwmOrigDuty) {
     unsigned phase = (sPaintTicks / 8) % 2;

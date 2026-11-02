@@ -65,12 +65,21 @@ static void dataCheckpoint(const char *phase, uint32_t detail = 0) {
   __atomic_store_n(&dataPublication, phase, __ATOMIC_RELEASE);
 }
 
+
+// D2 v1.3: file-scope ADI peek so the display DPU tick line can read the
+// UMP9620 watchdog state (r139 ticks spanned >600s with no wdt reboot).
+static NativeSd *sWdtPeekInstance = nullptr;
+extern "C" unsigned e5_pmic_peek(unsigned off) {
+  return (sWdtPeekInstance && off < 0x8000u) ? sWdtPeekInstance->pmicRead(off)
+                                             : 0xeeeeeeeeu;
+}
 class NativeSd;
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
 static bool publishData(E5DataDevice *device, NativeSd *host);
 
 class NativeSd : public IOBlockStorageDevice {
+  friend unsigned e5_pmic_peek(unsigned off);
   OSDeclareDefaultStructors(NativeSd)
   struct Region {
     IOMemoryDescriptor *md = nullptr;
@@ -787,6 +796,7 @@ public:
   }
   bool start(IOService *provider) override {
     if (!IOBlockStorageDevice::start(provider)) return false;
+    sWdtPeekInstance = this; // D2 v1.3: wdt peek for the display tick line
     sdlog("NativeSd: v1 start, independent SDIO0 host\n");
     if (!ahb.open(0x20000000, 0x2000) || !aon.open(0x64900000, 0x3000) ||
         !clocks.open(0x64920000, 0x1000) || !adi.open(0x64400000, 0x1000) ||
