@@ -38,6 +38,8 @@ extern "C" unsigned e5_display_backend_total = 0;
 extern "C" unsigned e5_display_backend_slots = 0;
 extern "C" unsigned e5_display_backend_last_slot = 0;
 extern "C" unsigned e5_display_backend_last_sel = 0;
+extern "C" unsigned e5_display_power_last = 0xFF; // owned here
+extern "C" unsigned e5_display_power_read(void);
 
 extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
                                             void *b, void *c, void *d) {
@@ -97,6 +99,7 @@ extern "C" void e5_display_frame_kick(void) {
     e5_display_tracef("E5Display: panel mapped at %p (0xBE000000+0x4B000)\n",
            (void *)(uintptr_t)sPanelMap->getVirtualAddress());
   }
+  __atomic_store_n(&e5_display_power_last, e5_display_power_read(), __ATOMIC_RELAXED);
   if (!sPanelMap) return;
   sPanelKicks++;
   if ((sPanelKicks % 16) != 2) return; // ~every 16th big-read echo batch

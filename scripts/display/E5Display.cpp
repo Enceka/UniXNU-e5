@@ -23,6 +23,21 @@ unsigned e5_display_cap213_calls = 0;
 unsigned e5_display_cap213_status = (unsigned)kIOReturnNotReady;
 unsigned e5_display_ok211_calls = 0;
 unsigned e5_display_ok306_calls = 0;
+// v14 runtime bracket of the family power byte at +0x8c (see newUserClient).
+unsigned e5_display_power_before_nuc = 0xFF;
+unsigned e5_display_power_after_nuc = 0xFF;
+}
+extern "C" unsigned e5_display_power_last; // owned by E5DisplayProbe.cpp
+
+namespace {
+// The published instance whose +0x8c byte the family power dispatcher gates
+// on. Set by start(); read by e5_display_power_read() from the echo probe.
+E5Display *sPowerInstance = nullptr;
+}
+
+extern "C" unsigned e5_display_power_read(void) {
+  if (!sPowerInstance) return 0xFF;
+  return *(volatile uint8_t *)((uint8_t *)sPowerInstance + 0x8c);
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
@@ -55,6 +70,7 @@ public:
     // exists. Ours is the inherited firmware scanout: UEFI already powered
     // the panel, so a power-state request completes without extra work.
     *(volatile uint8_t *)((uint8_t *)this + 0x8c) |= 1U;
+    sPowerInstance = this; // v14: let the echo probe poll the +0x8c byte.
     __atomic_fetch_or(&e5_display_lifecycle, 0x20000U, __ATOMIC_RELAXED);
     __atomic_fetch_or(&e5_display_lifecycle, 0x010U, __ATOMIC_RELAXED);
     unsigned resources = lifecycleResourceMask();
@@ -116,9 +132,19 @@ public:
     __atomic_fetch_add(&e5_display_client_calls, 1U, __ATOMIC_RELAXED);
     __atomic_store_n(&e5_display_client_type, type, __ATOMIC_RELAXED);
     IOReturn status = IOMobileFramebufferLegacy::newUserClient(task, security, type, client);
+    // v14: the family power-support byte at +0x8c is armed in start() and
+    // re-cleared by *something* between start and the first power dispatch
+    // (r110: selectors return 0xE00002C7 although start armed bit0). Read it
+    // before and after the original newUserClient to bracket the clear.
+    __atomic_store_n(&e5_display_power_before_nuc,
+                     (unsigned)*(volatile uint8_t *)((uint8_t *)this + 0x8c),
+                     __ATOMIC_RELAXED);
     if (status == kIOReturnSuccess && client && *client)
       __atomic_fetch_add(&e5_display_client_successes, 1U, __ATOMIC_RELAXED);
     __atomic_store_n(&e5_display_client_status, (unsigned)status, __ATOMIC_RELAXED);
+    __atomic_store_n(&e5_display_power_after_nuc,
+                     (unsigned)*(volatile uint8_t *)((uint8_t *)this + 0x8c),
+                     __ATOMIC_RELAXED);
     return status;
   }
   // Original slot 188 takes one uint32_t output and returns an IOReturn.
