@@ -10,6 +10,7 @@
 +/* Echoed by NativeSd rw-done lines: -999 unreached, -1 absent device,
 + * -2 copyout fail, -3 in mount(), >=0 mount errno, 100 mounted+verified. */
 +int e5_data_mount_state = -999;
++int e5_diag_stage = -999; /* -999 unreached, 1 file found, 2 exec ok, 3 absent, 1000+errno exec fail */
 +extern void commpage_update_dyld_flags(uint64_t);
 +
 +/* Explicit bring-up mode for the two unchanged IPSW images. This is separate
@@ -212,12 +213,17 @@
 +		vnode_t e5diag_vp = NULLVP;
 +		if (vnode_lookup("/private/var/e5diag", 0, &e5diag_vp, vfs_context_current()) == 0) {
 +			vnode_put(e5diag_vp);
++			e5_diag_stage = 1; /* file present */
 +			printf("load_init_program: attempting e5 diag wrapper /private/var/e5diag\n");
 +			error = load_init_program_at_path(p, (user_addr_t)scratch_addr, "/private/var/e5diag", init_envp);
 +			if (!error) {
++				e5_diag_stage = 2; /* exec succeeded; process now userspace */
 +				return;
 +			}
++			e5_diag_stage = 1000 + (error & 0xff); /* exec failed: stage encodes errno */
 +			printf("load_init_program: e5 diag wrapper failed: errno %d\n", error);
++		} else {
++			e5_diag_stage = (int)(vfs_context_current() ? 3 : 3); /* lookup failed: absent */
 +		}
 +	}
 +
