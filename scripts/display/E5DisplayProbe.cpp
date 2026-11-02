@@ -374,7 +374,18 @@ extern "C" void e5_dpu_tick(void) {
         (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x1E4 / 4;
     volatile uint32_t *sts =
         (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x1E8 / 4;
-    if (!sVsyncArmed) { *clr = 0xffu; *en |= 0x20u; sVsyncArmed = true; }
+    if (!sVsyncArmed) {
+      *clr = 0xffu;
+      *en |= 0x20u;
+      // r143: ctrl=0 (STOPPED) with zero vsync edges the whole window -
+      // the firmware handoff left the DPU not scanning. Linux
+      // sprd_dpu_run() = REG_DPU_CTRL(0x4) |= BIT_DPU_RUN(bit0); resume
+      // the firmware-era scanout (layer base 0xbe000000 = logo buffer).
+      volatile uint32_t *ctl =
+          (volatile uint32_t *)sDpuMap->getVirtualAddress() + 0x04 / 4;
+      *ctl |= 0x01u;
+      sVsyncArmed = true;
+    }
     uint32_t cur = *sts;
     if ((cur & 0x20u) && !(sVsyncLastSts & 0x20u)) sVsyncEdges++;
     if (cur) *clr = cur;
@@ -397,10 +408,13 @@ extern "C" void e5_dpu_tick(void) {
       for (unsigned x = 0; x < 320; ++x) rowCrc = rowCrc * 31 + px[x];
     }
     if (sDpuMap)
-      e5_display_tracef("E5DPU t=%u duty=%x crc=%08x v=%u wdt=%x:%04x%04x",
-          sPaintTicks, sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc,
-          sVsyncEdges, e5_pmic_peek(0x48), e5_pmic_peek(0x5c),
-          e5_pmic_peek(0x58));
+      volatile uint32_t *ctl2 =
+          sDpuMap ? (volatile uint32_t *)sDpuMap->getVirtualAddress() + 1
+                  : nullptr;
+      e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x",
+          sPaintTicks, ctl2 ? *ctl2 : 0,
+          sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc, sVsyncEdges,
+          e5_pmic_peek(0x48));
   }
   if (sPwmMap && sPwmOrigDuty) {
     // r141: %8 toggles every 4.4ms - invisible flicker. ~1.1s per phase.
