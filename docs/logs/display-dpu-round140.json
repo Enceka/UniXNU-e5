@@ -1,0 +1,14 @@
+{
+  "round": 140, "kernel": "LOCAL BUILD (Xcode 27.1) sha 8e6b9cfb (padded copy a065e728)",
+  "payload": "51fe9f73 board-r141 chain", "device_commit": "e6b04ce lineage + v1.3",
+  "verdict": "PAINT LIVE, WDT LIVE, TICK RATE MEASURED",
+  "facts": [
+    "row0 crc cycles through exactly 4 values (ed740000/35740000/5d740000/a5740000) = stripe phases advancing = paint writes land and read back",
+    "wdt peek ctrl=0x0a armed, counter 0x12e1->0x0191 counting down across samples = watchdog healthy",
+    "tick counter t reached 1,090,560 in one 600s window => real tick rate ~1.8kHz (thread_call interval unit is NOT what was assumed; 100*NSEC_PER_MSEC arg yields ~0.55ms)",
+    "r139's '>600s uptime' reading was the same unit error - no wdt anomaly existed",
+    "print at %50 ticks = ~40Hz still flooded the ring (486 lines, 0 echo lines survived) -> v1.4 %5000",
+    "LOCAL KERNEL BUILD IS VIABLE: full framework at uefi/build/e5tw-validation/UniXNU-066c8d8*/ builds kernel with Xcode 27.1 + /tmp/py3bin python3 shim (tomllib); needs framework drivers/{ArmDTPlatform,ArmCpu,SoftwareAES,RamBlock} cloned at components.toml pins + device kits/XnuPrelink full clone; python3-on-PATH must have tomllib"
+  ],
+  "ci": "run 41503238401 cancelled (runner offline overnight; local build superseded)"
+}
