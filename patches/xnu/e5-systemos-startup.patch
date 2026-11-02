@@ -213,7 +213,7 @@
 +		if (vnode_lookup("/private/var/e5diag", 0, &e5diag_vp, vfs_context_current()) == 0) {
 +			vnode_put(e5diag_vp);
 +			printf("load_init_program: attempting e5 diag wrapper /private/var/e5diag\n");
-+			error = load_init_program_at_path(p, (user_addr_t)scratch_addr, "/private/var/e5diag");
++			error = load_init_program_at_path(p, (user_addr_t)scratch_addr, "/private/var/e5diag", init_envp);
 +			if (!error) {
 +				return;
 +			}
