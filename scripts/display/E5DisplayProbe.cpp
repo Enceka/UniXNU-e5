@@ -305,6 +305,47 @@ static unsigned sPaintTicks = 0;
 // BIT_DPU_INT_VSYNC). A ~60Hz pulse here proves the scanout engine runs
 // and frame-locks the SwapWait completion path.
 extern "C" unsigned e5_display_vsync_edges(void);
+// D3 v0: I2C3 controller probe. i2c@2270000 is a child of ap-ahb whose
+// ranges are <0 0 0x20000000 0x22f0000> (live-fdt) -> controller PA
+// 0x22270000. tlsc6x@2e (X320 Y480, irq gpio13, reset gpio14) rides it.
+// Android used this bus until the handoff: first probe reads VERSION with
+// NO gate/clock/pinmux touches to test the hot-state shortcut.
+static IODeviceMemory *sI2cMemory = nullptr;
+static IOMemoryMap *sI2cMap = nullptr;
+static unsigned sI2cStage = 0;
+static unsigned sI2cVersion = 0xeeeeeeee, sI2cProbeStatus = 0xeeeeeeee;
+
+static volatile uint32_t *i2cReg(unsigned off) {
+  return (volatile uint32_t *)((uint8_t *)sI2cMap->getVirtualAddress() + off);
+}
+
+extern "C" void e5_i2c3_tick(unsigned now) {
+  if (!sI2cMap) {
+    sI2cMemory = IODeviceMemory::withRange(0x22270000ull, 0x1000ull);
+    if (sI2cMemory) sI2cMap = sI2cMemory->map();
+    if (!sI2cMap) return;
+  }
+  if (sI2cStage == 0) {
+    sI2cVersion = *i2cReg(0x1c); // I2C_VERSION
+    sI2cStage = 1;
+    return;
+  }
+  if (sI2cStage == 1 && (now % 5000) == 20) {
+    // 0-byte write probe of the TLSC6x address: ADDR_CFG=0x2e<<1,
+    // COUNT=0, START. STATUS readback captures ACK/NACK state bits.
+    uint32_t ctl = *i2cReg(0x00);
+    *i2cReg(0x04) = (0x2e << 1);
+    *i2cReg(0x08) = 0;
+    *i2cReg(0x00) = (ctl | 1u) & ~(1u << 20);
+    for (volatile int i = 0; i < 200; ++i) {}
+    sI2cProbeStatus = *i2cReg(0x14);
+    *i2cReg(0x00) = ctl | (1u << 20); // STP releases the bus
+    sI2cStage = 2;
+  }
+  if ((now % 5000) == 30)
+    e5_display_tracef("E5I2C ver=%x st=%x", sI2cVersion, sI2cProbeStatus);
+}
+
 static bool sVsyncArmed = false;
 static uint32_t sVsyncEdges = 0, sVsyncLastSts = 0;
 extern "C" unsigned e5_display_vsync_edges(void) { return sVsyncEdges; }
@@ -366,6 +407,7 @@ extern "C" void e5_dpu_tick(void) {
   // continuous dynamic output: step the paint pattern; every 8th tick also
   // pulse the backlight to 1/4 duty and back (panel/backlight acceptance)
   e5_dpu_paint_step();
+  e5_i2c3_tick(sPaintTicks);
 
   if (sDpuMap) {
     volatile uint32_t *en =
