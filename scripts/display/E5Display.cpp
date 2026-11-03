@@ -467,7 +467,10 @@ public:
     IOReturn status = kIOReturnBadArgument;
     if (count && key && transport) {
       *count = 1;
-      *transport = 0;
+      *transport = 1; // r164: v18/r125-era answer was 1 — the wrapper caches
+                      // this at +0x3c8 and the client's kind-3 registration
+                      // only carries an async port when transport is armed
+      
       bzero(key, 64);
       key[0] = 'e'; key[1] = '5'; // benign identifier, zero-padded to 64
       status = kIOReturnSuccess;
