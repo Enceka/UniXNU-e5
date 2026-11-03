@@ -126,9 +126,12 @@ extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backligh
 // client (u=0:0:0:e00002d8 in ALL D2 rounds r137+; r128 with no D2 timer
 // had u=4:4). Compute a real 100ms deadline.
 static uint64_t e5_fire_deadline(void) {
-  uint64_t deadline;
-  clock_interval_to_deadline(100, NSEC_PER_SEC / 1000, &deadline); // 100 x 1ms = 100ms
-  return deadline;
+  // r151: two-step canonical conversion; r150's one-step still yielded
+  // ~1.8kHz (t=1,095,010 over the 600s window). Guarded additionally by
+  // the wall-clock throttle in the timer body.
+  uint64_t iv = 0;
+  clock_interval_to_absolutetime_interval(100, NSEC_PER_SEC / 1000, &iv);
+  return mach_absolute_time() + iv;
 }
 static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
   // r149: r146/r147/r148 all-timeout regression root-caused to this timer:
@@ -138,11 +141,20 @@ static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
   // healthy. Rate-limit the gate entry: probe every 4096 ticks (~2.3s)
   // until a context registers (async_ports nonzero), then fire per tick
   // only while contexts exist (they unregister on close).
-  static uint32_t sFireDivider = 0;
-  const bool registered = __atomic_load_n(&e5_display_async_ports, __ATOMIC_RELAXED) != 0;
-  if (registered || (++sFireDivider & 0xFFFu) == 0)
-    e5_display_async_fire();
-  e5_dpu_tick(); // D2 v1: native scanout pattern + backlight pulse (timer ctx)
+  static uint64_t sLastWorkAbstime = 0, sHalfInterval = 0;
+  if (!sHalfInterval)
+    clock_interval_to_absolutetime_interval(50, NSEC_PER_SEC / 1000, &sHalfInterval);
+  const uint64_t nowAbs = mach_absolute_time();
+  const bool timeToWork = (nowAbs - sLastWorkAbstime) >= sHalfInterval;
+  if (timeToWork) {
+    sLastWorkAbstime = nowAbs;
+    static uint32_t sFireDivider = 0;
+    const bool registered =
+        __atomic_load_n(&e5_display_async_ports, __ATOMIC_RELAXED) != 0;
+    if (registered || (++sFireDivider & 0x3Fu) == 0)
+      e5_display_async_fire();
+    e5_dpu_tick(); // D2 v1: native scanout pattern + backlight pulse (timer ctx)
+  }
   // v1.2: reschedule UNCONDITIONALLY. r138 proved the first fire lands
   // ~100ms after the first pager echo — before display start() sets
   // sPowerInstance — so the old guard killed the timer after one tick

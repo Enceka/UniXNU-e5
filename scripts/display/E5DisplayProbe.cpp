@@ -453,8 +453,10 @@ extern "C" void e5_dpu_paint_step(void) {
   volatile uint16_t *px = (volatile uint16_t *)sPanelMap->getVirtualAddress();
   const unsigned W = 320, H = 480;
   // r141: tick rate ~1.8kHz means %8 = 4.4ms per stripe step - invisible.
-  // Human-visible: advance the stripe every 4096 ticks (~2.3s per step).
-  unsigned stripe = ((sPaintTicks++ / 4096) % 8) * 40;
+  // r151: work now runs ~20Hz (50ms wall throttle) instead of 1.8kHz.
+  // Stripe step every 20 ticks = 1s per step; same visual cadence as the
+  // r144-accepted pattern.
+  unsigned stripe = ((sPaintTicks++ / 20) % 8) * 40;
   for (unsigned y = 0; y < H; ++y) {
     uint16_t band = (y < 120) ? 0xF800 : (y < 240) ? 0x07E0 : (y < 360) ? 0x001F : 0xFFFF;
     for (unsigned x = 0; x < W; ++x) px[y * W + x] = (x >= stripe && x < stripe + 40) ? 0x0000 : band;
@@ -527,7 +529,7 @@ extern "C" void e5_dpu_tick(void) {
   // r140 measured the real tick rate at ~1.8 kHz (thread_call interval
   // unit mismatch vs assumption): %50 printed ~40 Hz and flooded the ring
   // again. %5000 = one line every ~3 s.
-  if ((sPaintTicks % 5000) == 10) {
+  if ((sPaintTicks % 100) == 10) { // every ~5s at 20Hz
     unsigned rowCrc = 0;
     if (sPanelMap) {
       volatile uint16_t *px =
@@ -545,7 +547,7 @@ extern "C" void e5_dpu_tick(void) {
   }
   if (sPwmMap && sPwmOrigDuty) {
     // r141: %8 toggles every 4.4ms - invisible flicker. ~1.1s per phase.
-    unsigned phase = (sPaintTicks / 2048) % 2;
+    unsigned phase = (sPaintTicks / 10) % 2; // ~0.5s per duty phase at 20Hz
     unsigned duty = phase ? (sPwmOrigDuty / 4) : sPwmOrigDuty;
     // pwm-sprd.c: writing DUTY applies MOD+DUTY to the output; keep ENABLE
     // untouched so the channel keeps running.
