@@ -77,12 +77,26 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 // read must never block acquiring the display gate: display setup can itself
 // need a media read. attemptAction skips that sample if the gate is busy.
 static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
+  static bool sNodeDumped = false;
   uint8_t *base = (uint8_t *)owner;
   const unsigned long long now = mach_absolute_time();
   for (unsigned kind = 3; kind <= 5; kind += 2) {
     uint8_t *node = *(uint8_t **)(base + 0x1588 + kind * 16);
     for (unsigned visited = 0; node && visited < 64; ++visited) {
       unsigned long long *ref = (unsigned long long *)(node + 0x18);
+      if (!*ref && !sNodeDumped) {
+        sNodeDumped = true;
+        // r152: node exists (ak bits prove it) but +0x18 ref is zero —
+        // dump the node head once to find where the wake ref lives.
+        e5_state_log("E5NODE k=%u node=%p w0=%llx w1=%llx w2=%llx w3=%llx w4=%llx w5=%llx",
+                     kind, node,
+                     ((unsigned long long *)node)[0],
+                     ((unsigned long long *)node)[1],
+                     ((unsigned long long *)node)[2],
+                     ((unsigned long long *)node)[3],
+                     ((unsigned long long *)node)[4],
+                     ((unsigned long long *)node)[5]);
+      }
       if (*ref) {
         __atomic_fetch_or(&e5_display_async_ports, 1u << kind, __ATOMIC_RELAXED);
         // FrameInfoNotifyFunc accepts {property-mask, frame-id}; an empty mask
