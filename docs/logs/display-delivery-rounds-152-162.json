@@ -61,5 +61,12 @@
   "h9g_template": "0xfffffff006c07d38 re-read: IS arm64 CODE (fill function pointer, not data template) \u2014 H9G-dependent, dead end for a copyable blob.",
   "implication": "sel-17 zero-fill reaches the client parser through BOTH sel 17 and sel 27. To find which fields matter we need the parser image (QuartzCore) \u2014 needs the dyld cache image-table decoded first (different entry format than the .01 walk assumed; header field 0x270 first-image ptr + entry size probe needed).",
   "tooling_note": "e5_dyld_cache.Cache.maps = (start,end,name,off,flag) per cache FILE. Image list walk at file 0x1010 stride 0x20 gives addrs but pathOff wrong \u2014 investigate header layout (dyld v21 format?) before more cache work."
+ },
+ "r170": {
+  "change": "slot 200 (sel-17 display-info) DECLINED with kIOReturnUnsupported (A/B vs zero-fill)",
+  "result": "**CLIENT BEHAVIOR IDENTICAL**: same 18 selectors, u=4:4, asend 9/9 ok, F unchanged, sel 17 shows ret=e00002c7 once. Crashes = the usual 2 LA-abort lines (pid 116). E5LIVE seen=27 services=38.",
+  "conclusion": "**EMPTY-SCENE-BY-DISPLAY-INFO HYPOTHESIS DEAD** \u2014 the client does not distinguish zero-fill from failure on the 0xc0c query; its content is not consulted for the swap-band decision. Eliminated so far: power (green), wait (green), delivery (green), display-info content (indifferent), walk (18/18 green).",
+  "remaining_candidates": "(1) vsync registration never happens (sel-72 subop-5 absent \u2014 EnableVSyncNotifications uncalled by backboardd); (2) SB layer production stalled upstream of the framebuffer stack (SB userclient open but no scene); (3) conn-table pool A (legacy sync-only) selected at Open via [conn+0xca8] profile byte \u2014 the pool binds GetVSyncRLS to a no-op stub.",
+  "next": "decode what SETS [conn+0xca8] (the Open pool-select byte): trace conn constructor 0x1b63d1c4c + the property parse 0x1ba64c734 \u2014 if it reads a KERNEL SERVICE PROPERTY (name?), we can publish that property on E5Display and flip the pool."
  }
 }
