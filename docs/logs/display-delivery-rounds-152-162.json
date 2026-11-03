@@ -75,5 +75,11 @@
   "result": "**CLIENT TOOK POOL B \u2014 BEHAVIOR TRANSFORMED**: selector set now {8,12,15,17,22,27,28,29,33,50,57,79,84,88} ALL GREEN (sel 6 SwapWait GONE, sel 72 registration GONE ak=00, sel 74 FrameInfo GONE) = the direct/benchmark profile; sel 15 ReadyForSwap ok; sel 17+27 display-info ok; u=5:5 (five clients incl SB); **0 crashes \u2014 liveactivitiesd abort ABSENT for the first time**; F=96; d/b still 0.",
   "install_procedure_learned": "expected-prefix-sha256 must equal the hash of the tool-OWN backup read (my exec-out dd reads get CRLF-mangled; always read the fresh backup dir the failed attempt created) \u2014 correct diag5 prefix 3d844d3102bcb6f88fcce8807182ab6b9784ec0665f50eb5017f62f6fec06472; new r172 image /tmp/data-r172.raw prefix b080f7c7\u2026",
   "next": "(1) kernel r173: DISABLE the DPU paint stripes (or shrink to a corner) so the panel shows compositor output \u2014 then the morning visual round: user wakes, device in window, SCREEN CHECK decides whether the benchmark pool renders UI; (2) if still nothing, decode pool-B swap submission selectors (which sel the benchmark profile uses to push frames \u2014 none of 3/4/5 seen yet, maybe driven by an actual scene)."
+ },
+ "r173": {
+  "change": "paint OFF (tick counter kept) + backlight steady at firmware duty \u2014 panel now shows whatever the compositor draws",
+  "result": "pool B preserved (14 selectors green), u=4:4 (one client fewer than r172; LA aborts back = r172 zero-crash was timing), 2 crashes = LA fixed site. E5DPU lines pushed out of ring by E5STATE/E5IMSEL/E5PROC volume \u2014 row0 crc not captured this round.",
+  "visual_window": "device back in Android; morning reminder set (07:10) to re-arm boot_b so the 600s window covers ~07:20-07:35 for the user to LOOK \u2014 the decisive check for pool-B rendering.",
+  "payload": "board-r173/e5-uefi.bin (kernel 2c064686 padded), Data = r172 image (benchmark pref) unchanged on card."
  }
 }
