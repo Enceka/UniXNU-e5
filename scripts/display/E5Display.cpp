@@ -78,6 +78,8 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 // need a media read. attemptAction skips that sample if the gate is busy.
 static void e5_state_log(const char *fmt, ...);
 static void *sAsyncNode = nullptr; // r153: kind-3 node captured at registration
+extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
+                                            unsigned long long payload0);
 static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
   static bool sNodeDumped = false;
   uint8_t *base = (uint8_t *)owner;
