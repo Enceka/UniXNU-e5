@@ -108,5 +108,10 @@
   ],
   "wall": "typeinfo-name refs and vtable headers use CHAINED-FIXUP placeholders in the KC file \u2014 pointer-chase route dead (3rd time this project: b186/b193/b210).",
   "next_options": "(a) morning visual decides everything first; (b) if black: instrument at the IOConnectMapMemory kernel entry (IOUserClient::mapMemory? not virtual \u2014 clientMemoryForType slot 179 IS the extension point: our newUserClient-created family UC could be wrapped by an E5 UC subclass overriding slot 179 to LOG type codes and delegate) \u2014 needs UC-class construction knowledge we have (slot 141 path)."
+ },
+ "r174_built": {
+  "kernel": "r174 = r173 lineage + UC vtable capture: newUserClient stores family UC vtable ptr + slot179/slot180 into globals; E5STATE extended ucv=%llx ucm=%llx:%llx (padded sha 6bee422c, payload board-r174 f1ce9f1e 62926860B \u2014 STAGED NOT FLASHED; morning round = r173 first).",
+  "reads": "slot179 runtime addr vs family text (0xfffffff00576c000-0x57b0000 slid) = family override (map path exists) vs IOUserClient base 0xfffffff0068ff3d0 slid (no map path, direct-map theory dead).",
+  "build_fix": "first build failed: globals added to wrong block (extern decl needed before class; definitions in extern C block at line 19ff) \u2014 compile log checked via archive-11 error: line."
  }
 }
