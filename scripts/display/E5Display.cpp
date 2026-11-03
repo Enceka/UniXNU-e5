@@ -120,9 +120,17 @@ extern "C" void e5_display_async_fire(void); // timer body below
 static thread_call_t sFireTimer = nullptr;
 extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backlight
 static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
-  // merged main: native-list delivery (r126 semantics, gate-protected in
-  // fire()) + D2 dpu tick
-  e5_display_async_fire();
+  // r149: r146/r147/r148 all-timeout regression root-caused to this timer:
+  // the REAL tick rate is ~1.8kHz (r140 measurement), and calling
+  // gate->attemptAction (display workloop gate close/open) at that rate
+  // starves every client call (u=0:0:0:e00002d8). r144 proved paint-only
+  // healthy. Rate-limit the gate entry: probe every 4096 ticks (~2.3s)
+  // until a context registers (async_ports nonzero), then fire per tick
+  // only while contexts exist (they unregister on close).
+  static uint32_t sFireDivider = 0;
+  const bool registered = __atomic_load_n(&e5_display_async_ports, __ATOMIC_RELAXED) != 0;
+  if (registered || (++sFireDivider & 0xFFFu) == 0)
+    e5_display_async_fire();
   e5_dpu_tick(); // D2 v1: native scanout pattern + backlight pulse (timer ctx)
   // v1.2: reschedule UNCONDITIONALLY. r138 proved the first fire lands
   // ~100ms after the first pager echo — before display start() sets
