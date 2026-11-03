@@ -92,5 +92,10 @@
   "census": "E5PROC (user census in kernel): r172+r173 both show pid=1 launchd, pid=26/98 SpringBoard (exit=0 active=1 NOT suspended), pid=27 runningboardd, pid=56 backboardd, r173 also liveactivitiesd pid=120 \u2014 ALL SCENE PRODUCERS ALIVE AND ACTIVE under pool B.",
   "framework_sel17_site": "framework sel-17 caller 0x1b63d753c uses w3=2 (2 scalar outputs, NOT the 0xc0c struct path) then chains sel-19 \u2014 a different consumer than backboardd\u2019s struct call (which our zero-fill answers ok since r117).",
   "morning_window_decision_tree": "screen shows UI \u2192 objective essentially achieved (photo + finish). Black/blank \u2192 SB layer production gate: next hypotheses in order: (a) CA render needs mode data \u2014 our sel-17 0xc0c answer is all-zero (H9G fills it with panel sub-object state incl. mode table); (b) CA software renderer missing \u2192 layers never rasterized (backboardd links Metal, no GPU driver, no software fallback for GLS); (c) SB suppresses UI without a valid display configuration (scale 1 set, but brightness/mode events missing)."
+ },
+ "r176_prep": {
+  "backboardd_search": "bb-disasm has ZERO refs to the framework IOConnect wrapper (0x1ba64c5fc: 0 hits) and zero 0xc0c constant \u2014 backboardd never calls IOConnect directly; ALL display calls ride the framework conn dispatch (indirect blr). The sel-17 struct consumer is inside the framework pools or QuartzCore, not greppable this way.",
+  "decision": "NO blind mode-struct kernel pre-built (layout unknown; wrong guess = same silence). Morning window result picks the branch: UI \u2192 done; black \u2192 decode framework pool-B entry that issues the 0xc0c struct call (find it via the conn-offset map, then read which fields it copies), THEN craft the fill.",
+  "disk": "freed r164-r167/r170 board dirs (4.0Gi free); morning assets verified: board-r173 payload + /tmp/data-r172.raw + reminder 07:10."
  }
 }
