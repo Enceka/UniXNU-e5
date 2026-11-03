@@ -547,11 +547,12 @@ extern "C" void e5_dpu_tick(void) {
       unsigned long long *w3 = (unsigned long long *)n3;
       { unsigned long long *rw = (unsigned long long *)e5_display_async_reg3();
         e5_display_tracef("E5REG3 %p %llx %llx %llx %llx", rw ? rw[0] : 0, rw ? rw[1] : 0, rw ? rw[2] : 0, rw ? rw[3] : 0, rw ? rw[4] : 0); }
-      e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x af=%u gl=%d n3=%p %llx %llx %llx",
+      e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x af=%u gl=%d n3=%p %llx %llx %llx %llx %llx %llx",
           sPaintTicks, *ctl2,
           sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc, sVsyncEdges,
           e5_pmic_peek(0x48), e5_display_fire_calls, e5_display_gate_last,
-          n3, w3 ? w3[0] : 0, w3 ? w3[1] : 0, w3 ? w3[2] : 0);
+          n3, w3 ? w3[0] : 0, w3 ? w3[1] : 0, w3 ? w3[2] : 0,
+          w3 ? w3[3] : 0, w3 ? w3[4] : 0, w3 ? w3[5] : 0);
     }
   }
   if (sPwmMap && sPwmOrigDuty) {
