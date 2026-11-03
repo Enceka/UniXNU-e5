@@ -113,5 +113,6 @@
   "kernel": "r174 = r173 lineage + UC vtable capture: newUserClient stores family UC vtable ptr + slot179/slot180 into globals; E5STATE extended ucv=%llx ucm=%llx:%llx (padded sha 6bee422c, payload board-r174 f1ce9f1e 62926860B \u2014 STAGED NOT FLASHED; morning round = r173 first).",
   "reads": "slot179 runtime addr vs family text (0xfffffff00576c000-0x57b0000 slid) = family override (map path exists) vs IOUserClient base 0xfffffff0068ff3d0 slid (no map path, direct-map theory dead).",
   "build_fix": "first build failed: globals added to wrong block (extern decl needed before class; definitions in extern C block at line 19ff) \u2014 compile log checked via archive-11 error: line."
- }
+ },
+ "morning_brief": "e5-xnu uefi/build/watchdog-policy-r65/MORNING-BRIEF.md \u2014 visual acceptance sequence: r173 look \u2192 black? \u2192 r174 ucm= probe \u2192 interpretation table included."
 }
