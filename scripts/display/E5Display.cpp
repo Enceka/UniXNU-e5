@@ -238,7 +238,7 @@ extern "C" void e5_display_state_dump(void) {
          e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok,
          e5_display_async_ports, e5_display_async_last, e5_display_async_armed,
          *(volatile const uint32_t *)(b + 0x16d0), e5_display_event_calls,
-         e5_display_event_argument, e5_display_event_status, e5_display_wait_status);
+         e5_display_event_argument, e5_display_fire_calls, e5_display_gate_last);
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
