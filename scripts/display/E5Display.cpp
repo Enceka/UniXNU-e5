@@ -81,6 +81,13 @@ static void *sAsyncNode = nullptr; // r153: kind-3 node captured at registration
 static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
   static bool sNodeDumped = false;
   uint8_t *base = (uint8_t *)owner;
+  if (!sNodeDumped) {
+    sNodeDumped = true;
+    e5_state_log("E5ACT base=%p node3=%p ak=%02x", owner,
+                 __atomic_load_n(&sAsyncNode, __ATOMIC_RELAXED)
+                     ? *(void **)&sAsyncNode : nullptr,
+                 e5_display_async_kinds);
+  }
   const unsigned long long now = mach_absolute_time();
   for (unsigned kind = 3; kind <= 5; kind += 2) {
     // r153: +0x1588 list head was NEVER populated (r152 proved: ak set, no
