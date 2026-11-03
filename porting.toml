@@ -597,6 +597,13 @@ reference = "docs/logs/display-dpu-rounds-143-144.json"
 result = "D2 VISUAL ACCEPTANCE PASS: user-confirmed RGB bands scrolling on panel (kernel paint via DPU scanout, 0 panic); vsync INT telemetry open"
 revision = "f315730307f74efae1ab1472e441796fff305a19"
 
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/display-throttle-round151.json"
+result = "PASS: 1.8kHz thread_call spin (relative delay passed as absolute deadline since r137) starved all display clients; 20Hz wall-clock throttle restored u=3:3 client connects, ak=08 kind-3 FrameInfo registration, F=96 panel changes; SwapBegin band still uncalled."
+command = "python3 run-board-cycle.py board-r151"
+revision = "706ba471d5b8ff00989de80d66cc44b25fb889e1"
+
 [[area]]
 id = "input"
 status = "implemented"
@@ -667,13 +674,6 @@ kind = "source"
 revision = "24098c2"
 reference = "docs/logs/android-wcn-source-candidate.json"
 result = "Pinned candidate source files and hashes for SC2355 SDIO, command/event handling, board configuration, command versions and WCN boot. Channel definitions and XPE selection agree with the observed interfaces; exact equivalence to the dirty vendor modules is not claimed."
-
-[[area.evidence]]
-kind = "device"
-reference = "docs/logs/display-throttle-round151.json"
-result = "PASS: 1.8kHz thread_call spin (relative delay passed as absolute deadline since r137) starved all display clients; 20Hz wall-clock throttle restored u=3:3 client connects, ak=08 kind-3 FrameInfo registration, F=96 panel changes; SwapBegin band still uncalled."
-command = "python3 run-board-cycle.py board-r151"
-revision = "706ba471d5b8ff00989de80d66cc44b25fb889e1"
 
 [[area]]
 id = "audio"
