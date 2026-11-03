@@ -469,12 +469,11 @@ public:
     IOReturn status = kIOReturnBadArgument;
     if (count && key && transport) {
       *count = 1;
-      *transport = 1; // r164: v18/r125-era answer was 1 — the wrapper caches
-                      // this at +0x3c8 and the client's kind-3 registration
-                      // only carries an async port when transport is armed
-      
-      bzero(key, 64);
-      key[0] = 'e'; key[1] = '5'; // benign identifier, zero-padded to 64
+      *transport = 1; // r164: v18/r125-era answer (cached at +0x3c8)
+      bzero(key, 64); // r166: v18 left the key buffer UNTOUCHED (caller
+                      // zeros); a non-empty unknown transport key may make
+                      // the client disable the async path. Empty key = the
+                      // exact last-known-good (r125/r126) behavior.
       status = kIOReturnSuccess;
     }
     __atomic_store_n(&e5_display_cap213_status, (unsigned)status, __ATOMIC_RELAXED);
