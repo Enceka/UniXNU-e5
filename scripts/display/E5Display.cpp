@@ -240,7 +240,7 @@ extern "C" void e5_display_state_dump(void) {
     for (unsigned i = 0; i != 8; ++i) v |= (unsigned long long)b[off + i] << (8 * i);
     return v;
   };
-  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u ap=%02x ar=%x am=%02x tok=%x ev=%u:%llx:%x af=%u gl=%d",
+  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u ap=%02x ar=%x am=%02x ev=%u:%llx:%x af=%u gl=%d",
          (const void *)b, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
          q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires,
          e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok,

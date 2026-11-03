@@ -539,10 +539,12 @@ extern "C" void e5_dpu_tick(void) {
     if (sDpuMap) {
       volatile uint32_t *ctl2 =
           (volatile uint32_t *)sDpuMap->getVirtualAddress() + 1;
-      e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x",
+      extern unsigned e5_display_fire_calls;
+      extern int e5_display_gate_last;
+      e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x af=%u gl=%d",
           sPaintTicks, *ctl2,
           sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc, sVsyncEdges,
-          e5_pmic_peek(0x48));
+          e5_pmic_peek(0x48), e5_display_fire_calls, e5_display_gate_last);
     }
   }
   if (sPwmMap && sPwmOrigDuty) {
