@@ -114,5 +114,9 @@
   "reads": "slot179 runtime addr vs family text (0xfffffff00576c000-0x57b0000 slid) = family override (map path exists) vs IOUserClient base 0xfffffff0068ff3d0 slid (no map path, direct-map theory dead).",
   "build_fix": "first build failed: globals added to wrong block (extern decl needed before class; definitions in extern C block at line 19ff) \u2014 compile log checked via archive-11 error: line."
  },
- "morning_brief": "e5-xnu uefi/build/watchdog-policy-r65/MORNING-BRIEF.md \u2014 visual acceptance sequence: r173 look \u2192 black? \u2192 r174 ucm= probe \u2192 interpretation table included."
+ "morning_brief": "e5-xnu uefi/build/watchdog-policy-r65/MORNING-BRIEF.md \u2014 visual acceptance sequence: r173 look \u2192 black? \u2192 r174 ucm= probe \u2192 interpretation table included.",
+ "r175_built": {
+  "kernel": "r175 = r174 + E5STATE text anchor anch=<runtime addr of e5_display_frame_kick> (raw addr known from the SAME local dSYM) \u2192 boot slide = anch - raw \u2192 ucm= slot179 judgment works under KASLR. padded 3d3230f8, payload 2e2f215a staged board-r175 (NOT flashed).",
+  "morning_sequence_final": "r173 visual \u2192 black? \u2192 r175 (NOT r174 \u2014 supersedes it, anchor makes interpretation self-contained); r174 payload kept as fallback."
+ }
 }
