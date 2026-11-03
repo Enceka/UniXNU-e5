@@ -450,6 +450,12 @@ static volatile uint32_t *pwmReg(unsigned off) {
 // position rotates — one stripe step per call. Called from the delivery
 // timer (thread context, never the echo thread).
 extern "C" void e5_dpu_paint_step(void) {
+  // r173: paint DISABLED — the D2 acceptance round (r144) proved the kernel
+  // scanout path; the panel must now show the COMPOSITOR's output (pool B
+  // benchmark profile). Keep the tick counter for telemetry only.
+  ++sPaintTicks;
+  return;
+#if 0
   if (!sPanelMap) return;
   volatile uint16_t *px = (volatile uint16_t *)sPanelMap->getVirtualAddress();
   const unsigned W = 320, H = 480;
@@ -462,6 +468,7 @@ extern "C" void e5_dpu_paint_step(void) {
     uint16_t band = (y < 120) ? 0xF800 : (y < 240) ? 0x07E0 : (y < 360) ? 0x001F : 0xFFFF;
     for (unsigned x = 0; x < W; ++x) px[y * W + x] = (x >= stripe && x < stripe + 40) ? 0x0000 : band;
   }
+#endif
 }
 
 extern "C" void e5_dpu_tick(void) {
@@ -556,11 +563,8 @@ extern "C" void e5_dpu_tick(void) {
     }
   }
   if (sPwmMap && sPwmOrigDuty) {
-    // r141: %8 toggles every 4.4ms - invisible flicker. ~1.1s per phase.
-    unsigned phase = (sPaintTicks / 10) % 2; // ~0.5s per duty phase at 20Hz
-    unsigned duty = phase ? (sPwmOrigDuty / 4) : sPwmOrigDuty;
-    // pwm-sprd.c: writing DUTY applies MOD+DUTY to the output; keep ENABLE
-    // untouched so the channel keeps running.
-    *pwmReg(0x08) = duty;
+    // r173: backlight held at the firmware's original duty (no pulsing) —
+    // stable brightness for the compositor-output visual round.
+    *pwmReg(0x08) = sPwmOrigDuty;
   }
 }
