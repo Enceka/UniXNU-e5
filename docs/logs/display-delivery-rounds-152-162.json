@@ -117,6 +117,12 @@
  "morning_brief": "e5-xnu uefi/build/watchdog-policy-r65/MORNING-BRIEF.md \u2014 visual acceptance sequence: r173 look \u2192 black? \u2192 r174 ucm= probe \u2192 interpretation table included.",
  "r175_built": {
   "kernel": "r175 = r174 + E5STATE text anchor anch=<runtime addr of e5_display_frame_kick> (raw addr known from the SAME local dSYM) \u2192 boot slide = anch - raw \u2192 ucm= slot179 judgment works under KASLR. padded 3d3230f8, payload 2e2f215a staged board-r175 (NOT flashed).",
-  "morning_sequence_final": "r173 visual \u2192 black? \u2192 r175 (NOT r174 \u2014 supersedes it, anchor makes interpretation self-contained); r174 payload kept as fallback."
+  "morning_sequence_final": "r173 visual \u2192 black? \u2192 r175 (NOT r174 \u2014 supersedes it, anchor makes interpretation self-contained); r174 payload kept as fallback.",
+  "anchor_constants": {
+   "frame_kick_final_va": "0xfffffff00698cd38 (= dSYM raw 0xfffffff00798cd38 - prelink slide 0x1000000)",
+   "family_text_final": "0xfffffff00676c000-0xfffffff0067b0000",
+   "iouc_clientMemoryForType_final": "0xfffffff0068ff3d0",
+   "decode": "S = anch - 0xfffffff00698cd38; slot179_final = ucm[0] - S; compare to the ranges above"
+  }
  }
 }
