@@ -19,6 +19,9 @@ extern "C" {
 unsigned e5_display_client_calls = 0;
 unsigned e5_display_client_successes = 0;
 unsigned e5_display_client_type = 0;
+unsigned long long e5_display_uc_vtable = 0;
+unsigned long long e5_display_uc_slot179 = 0;
+unsigned long long e5_display_uc_slot180 = 0;
 unsigned e5_display_client_status = (unsigned)kIOReturnNotReady;
 unsigned e5_display_pitch_calls = 0;
 unsigned e5_display_pitch_status = (unsigned)kIOReturnNotReady;
