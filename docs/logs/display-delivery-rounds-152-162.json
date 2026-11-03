@@ -1,17 +1,29 @@
 {
-  "rounds": "152-162",
-  "date": "2026-11-03",
-  "branch": "fix/display-frameinfo-enable-r147",
-  "arc": "kind-3 FrameInfo DELIVERY attempts from the registered node (r151 restored registration ak=08)",
-  "findings": [
-    "r152: +0x1588+kind*16 list head NEVER populated (no E5NODE despite ak set) — the walk base was wrong",
-    "r153/r158: captured node at opaque208 registration — PERIODIC n3= line proves node non-null with words w0=0 w1=<kernel ptr> w2=<kernel ptr>; node+0x18 (assumed ref) stays ZERO",
-    "r154: af=0 — the r151 fire gate `++sFireDivider & 0x3Fu == 0` parsed as `x & (0x3F==0)` = always false; classic precedence trap; fixed r155 (af=90/91, gl=0 = attemptAction succeeds every ~6.6s)",
-    "r155/r156: E5STATE had 25 conversions vs 24 args (duplicate tok=%x + m16d0=%llx) — af/gl printed garbage until fixed",
-    "r159: delivering via node+0x8 pointer PANICKED: zone_require expected ipc ports — node+0x8 is NOT the OSAsyncReference64 array; sendAsyncResult64WithOptions zone-validates the port HARD (no soft error)",
-    "r161: calling the family broadcaster 0xfffffff0067778c0 directly from our thread_call action PANICKED (zone_require address not in a zone 0xfffffff0071c1ca8) — the broadcaster's object expectations differ from our call shape; NOT safe from this context with these args",
-    "r160/r162 (broadcast gated on never-true *ref / reverted): healthy baseline preserved — u=3:3-4:4, 0 crashes, F=95-98, ak=08, asend=0"
-  ],
-  "conclusion": "Manual/raw kind-3 delivery is closed off. The correct route = the family's NATIVE event machinery (user's r127 lineage: slot-344 event source + ev=/tok= counters already show native token registration and one completion). Next: arm the native event path so the family itself delivers (decode the [+0x1638] event source object and its enable flow).",
-  "health_baseline_r162": {"u": "3:3->4:4", "crashes": 0, "F": 97, "ak": "08", "asend": 0}
+ "rounds": "152-162",
+ "date": "2026-11-03",
+ "branch": "fix/display-frameinfo-enable-r147",
+ "arc": "kind-3 FrameInfo DELIVERY attempts from the registered node (r151 restored registration ak=08)",
+ "findings": [
+  "r152: +0x1588+kind*16 list head NEVER populated (no E5NODE despite ak set) \u2014 the walk base was wrong",
+  "r153/r158: captured node at opaque208 registration \u2014 PERIODIC n3= line proves node non-null with words w0=0 w1=<kernel ptr> w2=<kernel ptr>; node+0x18 (assumed ref) stays ZERO",
+  "r154: af=0 \u2014 the r151 fire gate `++sFireDivider & 0x3Fu == 0` parsed as `x & (0x3F==0)` = always false; classic precedence trap; fixed r155 (af=90/91, gl=0 = attemptAction succeeds every ~6.6s)",
+  "r155/r156: E5STATE had 25 conversions vs 24 args (duplicate tok=%x + m16d0=%llx) \u2014 af/gl printed garbage until fixed",
+  "r159: delivering via node+0x8 pointer PANICKED: zone_require expected ipc ports \u2014 node+0x8 is NOT the OSAsyncReference64 array; sendAsyncResult64WithOptions zone-validates the port HARD (no soft error)",
+  "r161: calling the family broadcaster 0xfffffff0067778c0 directly from our thread_call action PANICKED (zone_require address not in a zone 0xfffffff0071c1ca8) \u2014 the broadcaster's object expectations differ from our call shape; NOT safe from this context with these args",
+  "r160/r162 (broadcast gated on never-true *ref / reverted): healthy baseline preserved \u2014 u=3:3-4:4, 0 crashes, F=95-98, ak=08, asend=0"
+ ],
+ "conclusion": "Manual/raw kind-3 delivery is closed off. The correct route = the family's NATIVE event machinery (user's r127 lineage: slot-344 event source + ev=/tok= counters already show native token registration and one completion). Next: arm the native event path so the family itself delivers (decode the [+0x1638] event source object and its enable flow).",
+ "health_baseline_r162": {
+  "u": "3:3->4:4",
+  "crashes": 0,
+  "F": 97,
+  "ak": "08",
+  "asend": 0
+ },
+ "r163": {
+  "change": "opaque176 serves v25-proven 1-in-4 success cadence (Timeout x3 + Success x1) instead of native pass-through from empty structures",
+  "result": "sel 6 n=4 ok=1 (wait loop ALIVE, cadence exact); F=100 (new record); u=3:3; 2 crashes (LA known); E5IMSUM d/b STILL 0",
+  "conclusion": "SwapWait cadence alone does not open the swap band. Remaining suspects: (a) vsync subop-5 registration never happens (ak bit5 never set \u2014 client registers only kind 3), (b) CADisplay link start gated elsewhere in CA render server.",
+  "next": "instrument sel-72 scalar[0] subop values (which kinds the client actually registers); decode GetVSyncRunLoopSource client-side polling; check whether EnableVSyncNotifications is ever called by backboardd on this profile"
+ }
 }
