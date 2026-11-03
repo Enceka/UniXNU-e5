@@ -2,6 +2,7 @@
 // Copyright (c) 2026, UniXNU contributors.
 // Published lifecycle probe. Hardware initialization remains unqualified.
 #include <kern/thread_call.h>
+#include <kern/clock.h>
 #include "OriginalLegacyFramebufferABI.h"
 #include <stdarg.h>
 #include <IOKit/IOLib.h>
@@ -119,6 +120,16 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
 extern "C" void e5_display_async_fire(void); // timer body below
 static thread_call_t sFireTimer = nullptr;
 extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backlight
+// r150: thread_call_enter1_delayed takes an ABSOLUTE deadline, not a
+// relative delay. Passing 100ms as a deadline fired the timer ~1.8kHz
+// (r140 measured 1,090,560 ticks in 600s); that spin starved every display
+// client (u=0:0:0:e00002d8 in ALL D2 rounds r137+; r128 with no D2 timer
+// had u=4:4). Compute a real 100ms deadline.
+static uint64_t e5_fire_deadline(void) {
+  uint64_t deadline;
+  clock_interval_to_deadline(100, NSEC_PER_SEC / 1000, &deadline); // 100 x 1ms = 100ms
+  return deadline;
+}
 static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
   // r149: r146/r147/r148 all-timeout regression root-caused to this timer:
   // the REAL tick rate is ~1.8kHz (r140 measurement), and calling
@@ -137,13 +148,13 @@ static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
   // sPowerInstance — so the old guard killed the timer after one tick
   // (one E5DPU print, wrapped out of the ring; one paint; no animation).
   if (sFireTimer)
-    thread_call_enter1_delayed(sFireTimer, nullptr, 100 * NSEC_PER_MSEC);
+    thread_call_enter1_delayed(sFireTimer, nullptr, e5_fire_deadline());
 }
 extern "C" void e5_display_async_kick(void) {
   if (!sFireTimer) {
     sFireTimer = thread_call_allocate(&e5_fire_timer_fn, nullptr);
     if (!sFireTimer) return;
-    thread_call_enter1_delayed(sFireTimer, nullptr, 100 * NSEC_PER_MSEC);
+    thread_call_enter1_delayed(sFireTimer, nullptr, e5_fire_deadline());
   }
 }
 extern "C" void e5_display_async_fire(void) {
