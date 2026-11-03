@@ -541,10 +541,14 @@ extern "C" void e5_dpu_tick(void) {
           (volatile uint32_t *)sDpuMap->getVirtualAddress() + 1;
       extern unsigned e5_display_fire_calls;
       extern int e5_display_gate_last;
-      e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x af=%u gl=%d",
+      extern void *e5_display_async_node3(void);
+      void *n3 = e5_display_async_node3();
+      unsigned long long *w3 = (unsigned long long *)n3;
+      e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x af=%u gl=%d n3=%p %llx %llx %llx",
           sPaintTicks, *ctl2,
           sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc, sVsyncEdges,
-          e5_pmic_peek(0x48), e5_display_fire_calls, e5_display_gate_last);
+          e5_pmic_peek(0x48), e5_display_fire_calls, e5_display_gate_last,
+          n3, w3 ? w3[0] : 0, w3 ? w3[1] : 0, w3 ? w3[2] : 0);
     }
   }
   if (sPwmMap && sPwmOrigDuty) {

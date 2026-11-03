@@ -144,6 +144,7 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
 // marshaling is far heavier than r126's raw send. Move delivery to a
 // self-rescheduling thread_call timer so the echo thread never blocks.
 extern "C" void e5_display_async_fire(void); // timer body below
+extern "C" void *e5_display_async_node3(void) { return sAsyncNode; }
 static thread_call_t sFireTimer = nullptr;
 extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backlight
 // r150: thread_call_enter1_delayed takes an ABSOLUTE deadline, not a
