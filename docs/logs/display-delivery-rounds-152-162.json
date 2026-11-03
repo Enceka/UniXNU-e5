@@ -124,5 +124,9 @@
    "iouc_clientMemoryForType_final": "0xfffffff0068ff3d0",
    "decode": "S = anch - 0xfffffff00698cd38; slot179_final = ucm[0] - S; compare to the ranges above"
   }
+ },
+ "r173x": {
+  "discovery": "r173 boot args CONTAIN e5-fb (toml at 0x36a5be0) \u2014 the r173 single F transition = kernel fb console text growth, NOT compositor. The morning visual on stock r173 would show CONSOLE TEXT, masking compositor output.",
+  "fix": "board-r173x = r173 payload + length-preserving byte patch b\"e5-uplink e5-fb e5-systemos\" -> b\"e5-uplink e5-xx e5-systemos\" at 0x36a5be0 (unique-selector verified) -> sha a6d9f58d. MORNING SEQUENCE NOW: r173x first (console off, pure compositor), black -> r175 probe."
  }
 }
