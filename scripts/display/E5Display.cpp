@@ -170,7 +170,9 @@ static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
     static uint32_t sFireDivider = 0;
     const bool registered =
         __atomic_load_n(&e5_display_async_ports, __ATOMIC_RELAXED) != 0;
-    if (registered || (++sFireDivider & 0x3Fu) == 0)
+    // r155: the r151 form parsed as `++sFireDivider & (0x3F == 0)` —
+    // always false, so the probe fire NEVER ran (r154 af=0 proved it).
+    if (registered || (((++sFireDivider) & 0x3Fu) == 0))
       e5_display_async_fire();
     e5_dpu_tick(); // D2 v1: native scanout pattern + backlight pulse (timer ctx)
   }
