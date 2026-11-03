@@ -76,6 +76,7 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 // list, including native unregistration, under its command gate. A media
 // read must never block acquiring the display gate: display setup can itself
 // need a media read. attemptAction skips that sample if the gate is busy.
+static void e5_state_log(const char *fmt, ...);
 static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
   static bool sNodeDumped = false;
   uint8_t *base = (uint8_t *)owner;
