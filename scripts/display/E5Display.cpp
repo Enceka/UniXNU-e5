@@ -77,12 +77,16 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 // read must never block acquiring the display gate: display setup can itself
 // need a media read. attemptAction skips that sample if the gate is busy.
 static void e5_state_log(const char *fmt, ...);
+static void *sAsyncNode = nullptr; // r153: kind-3 node captured at registration
 static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
   static bool sNodeDumped = false;
   uint8_t *base = (uint8_t *)owner;
   const unsigned long long now = mach_absolute_time();
   for (unsigned kind = 3; kind <= 5; kind += 2) {
-    uint8_t *node = *(uint8_t **)(base + 0x1588 + kind * 16);
+    // r153: +0x1588 list head was NEVER populated (r152 proved: ak set, no
+    // node, no E5NODE dump). Deliver through the node captured in opaque208.
+    uint8_t *node = (kind == 3) ? (uint8_t *)sAsyncNode
+                                : *(uint8_t **)(base + 0x1588 + kind * 16);
     for (unsigned visited = 0; node && visited < 64; ++visited) {
       unsigned long long *ref = (unsigned long long *)(node + 0x18);
       if (!*ref && !sNodeDumped) {
@@ -463,6 +467,12 @@ public:
     IOReturn status = IOMobileFramebufferLegacy::opaque208(kind, node, registration);
     if (status == kIOReturnSuccess && kind < 6 && node) {
       __atomic_fetch_or(&e5_display_async_kinds, 1u << kind, __ATOMIC_RELAXED);
+      if (kind == 3) {
+        sAsyncNode = node; // r153: deliver through the node the client handed us
+        unsigned long long *w = (unsigned long long *)node;
+        e5_state_log("E5REG k=3 node=%p reg=%p w0=%llx w1=%llx w2=%llx w3=%llx w4=%llx",
+                     node, registration, w[0], w[1], w[2], w[3], w[4]);
+      }
     }
     return status;
   }
