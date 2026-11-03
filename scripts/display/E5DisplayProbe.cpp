@@ -492,7 +492,7 @@ extern "C" void e5_dpu_tick(void) {
   // continuous dynamic output: step the paint pattern; every 8th tick also
   // pulse the backlight to 1/4 duty and back (panel/backlight acceptance)
   e5_dpu_paint_step();
-  e5_i2c3_tick(sPaintTicks);
+  // r148: i2c tick disabled (r147 regression bisect: keep D2 paint only)
 
   if (sDpuMap) {
     volatile uint32_t *en =

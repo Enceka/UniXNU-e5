@@ -424,12 +424,8 @@ public:
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 8, __ATOMIC_RELAXED);
     return IOMobileFramebufferLegacy::opaque210(kind, node, on);
   }
-  // Original slot 336 defaults to true, skipping setAsyncReference64 for
-  // FrameInfo (kind 3) in favor of an unimplemented shared-queue backend.
-  // Select the family's existing Mach-notification fallback explicitly.
-  bool opaque336() override {
-    return false;
-  }
+  // r148: opaque336 override REMOVED (r147 regression bisect). Original
+  // default true stood in every healthy round through r144/r128.
   // The real enable_event entry is slot 344, not the unrelated 260/261
   // Legacy stubs. Retain the native argument, 32-bit enable word, timer
   // arming and native return status; report calls without forcing readiness.
