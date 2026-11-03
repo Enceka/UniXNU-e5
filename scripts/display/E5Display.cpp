@@ -633,12 +633,14 @@ public:
   // miscategorized as 207 — 0x658/8 IS 203, an unoverridden Unsupported
   // stub). Zero-fill + success.
   IOReturn opaque200(void *out) override {
-    if (out) {
-      uint64_t *q = (uint64_t *)out;
-      for (unsigned i = 0; i < 384; i++) q[i] = 0; // 3072B of the 3084B head
-    }
+    (void)out;
+    // r170 A/B: DECLINE the display-info query instead of zero-filling it.
+    // If the client distinguishes failure from an empty-but-valid struct,
+    // its behavior (selector set / userclients / F) will shift; identical
+    // behavior would mean the 0xc0c content is not consulted at all and
+    // the empty-scene hypothesis dies.
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 8, __ATOMIC_RELAXED);
-    return kIOReturnSuccess;
+    return kIOReturnUnsupported;
   }
   IOReturn opaque203(void *a) override {
     (void)a;
