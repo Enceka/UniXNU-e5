@@ -1,0 +1,30 @@
+{
+  "round": 151,
+  "date": "2026-11-03",
+  "kernel": {"padded_sha256_prefix": "93930521", "payload_prefix": "a0720a57", "adt": "0fea719d", "lineage": "merged main + fix/display-frameinfo-enable-r147 tip (r149 rate-limit + r150 deadline attempt + r151 20Hz wall-clock throttle)"},
+  "root_cause_chain": [
+    "r137 shipped thread_call_enter1_delayed(timer, param, 100*NSEC_PER_MSEC) treating a RELATIVE delay as the ABSOLUTE deadline parameter",
+    "result: timer self-rescheduled at ~1.8kHz (r140 measured 1,095,010 ticks / 600s); every fire did DPU MMIO paint + INT poll",
+    "that spin starved ALL display client calls: u=0:0:0:e00002d8 in every D2 round r137-r150; misread as early-boot-normal because DPU prints + E5STATE hex dumps pushed late echo lines out of the 24KB ring",
+    "r147/r148 (drop 336, drop i2c) and r149 (rate-limit attemptAction) were wrong theories; r146 merged-main kernel was never at fault",
+    "r151 fixed BOTH: wall-clock throttle (work only if >=50ms since last) + paint/print constants retuned for 20Hz + print every ~5s (ring pressure)",
+    "r150's clock_interval_to_deadline one-step still spun (deadline math wrong); r151 mach_absolute_time()+interval is the working form",
+    "r151 first flash was an EMPTY payload (disk 100%, OSError Errno 28; harness readback compares empty==empty - KNOWN FLAW from r144); freed 1.6GB, rebuilt, reflashed"
+  ],
+  "result": {
+    "clients": "u=3:3:0:0 x44 (backboardd pid 57 + pid 93 connected, zero failures)",
+    "selectors": "18/18 green incl sel 74 (SupportedFrameInfo) ok",
+    "registration": "ak=08 kind-3 FrameInfo context REGISTERED (first since r125)",
+    "events": "tok=1 ev=1:1:0 (native token + one completion)",
+    "panel_activity": "F=96 changes (was 30-35) = most compositor activity ever observed",
+    "lifecycle": "a=130055 h=204ff:3f C=1:0 D=1:1 P=1:1:1 G=2 d=100 q=ready",
+    "deliveries": "asend=0 aok=0 - async probe fires every ~3.2s but found no live ref yet (node+0x18 zero until enabled?)",
+    "swap_band": "E5IMSUM d=0 b=0 e=0 - DefaultSurface/SwapBegin/SwapEnd still uncalled",
+    "crashes": "1 E5EXC liveactivitiesd pid 120 (known fixed site); no panic"
+  },
+  "next": [
+    "why asend=0 despite ak=08: walk base+0x1588+3*16 list, inspect node+0x18 ref; maybe enable (slot 344/event) must run first",
+    "kind-3 payload delivery with correct {mask, frame-id} shape; watch E5IMSUM d=/b= for SwapBegin unlock",
+    "LA abort remains the only crasher"
+  ]
+}
