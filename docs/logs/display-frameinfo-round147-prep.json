@@ -1,28 +1,35 @@
 {
-  "rounds": "r146-r147 (staged, not yet flashed — device with user)",
-  "date": "2026-11-03",
-  "context": "main consolidated (user r109-r128 chain + r110 line merged, build-verified); device taken by user temporarily",
-  "r146_merged_main_payload": {
-    "kernel": "681a35994b5b (padded 52076544, from merged main @ fix commits)",
-    "payload": "5448b47766fc 62926860B",
-    "purpose": "first merged-main board round: D3 v1 gate-first i2c probe + native wait/async lineage + D2 paint together",
-    "adt": "0fea719d (r97 chain, display-scale=1)"
-  },
-  "r147_frameinfo_experiment": {
-    "branch": "fix/display-frameinfo-enable-r147",
-    "change": "opaque213 un-declined: count=1 transport=0 key='e5' — r125/r126 proved count=1 lets the client register kind-3 FrameInfo via NATIVE slot-208; merged async_action delivers correct {mask=0, frame-id} Mach shapes (opaque336=false forces Mach path, never the unimplemented shared queue)",
-    "kernel": "3bb386ae7394 (padded, local build 2d1f2605d1b3 raw)",
-    "payload": "08656e77fcaa 62926860B",
-    "acceptance": "ak!=00 (registration), asend/aok climbing, drawer behavior (r126 froze it with WRONG payload; correct {0,frame-id} mask-empty should not), any new selector (5/72-with-5 = vsync band)"
-  },
-  "framework_static_decode": {
-    "IOMobileFramebufferOpen": "0x1b63d12c0; conn-table filled from static pools 0x1b63d0xxx-0x1b63d6xxx; Open itself does NOT issue UC sel 3 (earlier attribution wrong — the mov w1,#3 feeds wrapper 0x1ba64c530 = different API, followed by IOObjectRelease)",
-    "selector_const_extraction": "IOConnectCallMethod wrappers {0x1ba64c5fc, 0x1ba64c56c, 0x1ba64c7d0, 0x1ba64c9c8}; selectors ride w1 set before each call; full site map extracted across framework __TEXT; sub-selector scalars {0=hotplug 1=power 3=frameinfo 4=crc 5=vsync} confirmed from API clusters (EnableVSyncNotifications/GetVSyncRLS = 5)",
-    "conclusion": "vsync Enable comes only when a CADisplay link starts in the render server; registration path exists (sel 72 scalar 5 -> slot 208 kind 5); no framework API calls UC sel 3 outside GetLayerDefaultSurface band"
-  },
-  "open_questions": [
-    "what gates CADisplay display-link start (display online from zero-filled sel-17 0xc0c struct?)",
-    "does correct-mask FrameInfo delivery change compositor behavior vs r126 freeze",
-    "D3 v1 i2c gate probe result (r146 when flashed)"
-  ]
+ "rounds": "r146-r147 (staged, not yet flashed \u2014 device with user)",
+ "date": "2026-11-03",
+ "context": "main consolidated (user r109-r128 chain + r110 line merged, build-verified); device taken by user temporarily",
+ "r146_merged_main_payload": {
+  "kernel": "681a35994b5b (padded 52076544, from merged main @ fix commits)",
+  "payload": "5448b47766fc 62926860B",
+  "purpose": "first merged-main board round: D3 v1 gate-first i2c probe + native wait/async lineage + D2 paint together",
+  "adt": "0fea719d (r97 chain, display-scale=1)"
+ },
+ "r147_frameinfo_experiment": {
+  "branch": "fix/display-frameinfo-enable-r147",
+  "change": "opaque213 un-declined: count=1 transport=0 key='e5' \u2014 r125/r126 proved count=1 lets the client register kind-3 FrameInfo via NATIVE slot-208; merged async_action delivers correct {mask=0, frame-id} Mach shapes (opaque336=false forces Mach path, never the unimplemented shared queue)",
+  "kernel": "3bb386ae7394 (padded, local build 2d1f2605d1b3 raw)",
+  "payload": "08656e77fcaa 62926860B",
+  "acceptance": "ak!=00 (registration), asend/aok climbing, drawer behavior (r126 froze it with WRONG payload; correct {0,frame-id} mask-empty should not), any new selector (5/72-with-5 = vsync band)"
+ },
+ "framework_static_decode": {
+  "IOMobileFramebufferOpen": "0x1b63d12c0; conn-table filled from static pools 0x1b63d0xxx-0x1b63d6xxx; Open itself does NOT issue UC sel 3 (earlier attribution wrong \u2014 the mov w1,#3 feeds wrapper 0x1ba64c530 = different API, followed by IOObjectRelease)",
+  "selector_const_extraction": "IOConnectCallMethod wrappers {0x1ba64c5fc, 0x1ba64c56c, 0x1ba64c7d0, 0x1ba64c9c8}; selectors ride w1 set before each call; full site map extracted across framework __TEXT; sub-selector scalars {0=hotplug 1=power 3=frameinfo 4=crc 5=vsync} confirmed from API clusters (EnableVSyncNotifications/GetVSyncRLS = 5)",
+  "conclusion": "vsync Enable comes only when a CADisplay link starts in the render server; registration path exists (sel 72 scalar 5 -> slot 208 kind 5); no framework API calls UC sel 3 outside GetLayerDefaultSurface band"
+ },
+ "open_questions": [
+  "what gates CADisplay display-link start (display online from zero-filled sel-17 0xc0c struct?)",
+  "does correct-mask FrameInfo delivery change compositor behavior vs r126 freeze",
+  "D3 v1 i2c gate probe result (r146 when flashed)"
+ ],
+ "export_map_insight": {
+  "source": "framework full export list (178 syms) vs board selector histogram",
+  "sel_74": "IOMobileFramebufferSupportedFrameInfo-class capability query (wrapper 0x6778688 -> slot 213) \u2014 r125 answered ok -> kind-3 registered (ak=08); r128 declined -> ak=00; r147 re-enables count=1/transport=0",
+  "sel_15": "likely IOMobileFramebufferReadyForSwap (was e00002bc NotReady pre-override; now success via slot 180 override) \u2014 client-ready gate passes",
+  "swap_band": "SwapBegin/SwapEnd (sels 4/5 per user trace counters d=/b=) STILL zero calls \u2014 gated behind the render loop producing a frame, which needs the CADisplay link = vsync/FrameInfo registration path",
+  "coherence": "r147 un-decline is the single-variable experiment for the whole chain: registration -> display link -> render -> SwapBegin"
+ }
 }
