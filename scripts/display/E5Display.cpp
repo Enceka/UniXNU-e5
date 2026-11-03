@@ -96,6 +96,13 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
                                 : *(uint8_t **)(base + 0x1588 + kind * 16);
     for (unsigned visited = 0; node && visited < 64; ++visited) {
       unsigned long long *ref = (unsigned long long *)(node + 0x18);
+      // r159: r158 proved node+0x18 is EMPTY while node+0x8 holds a kernel
+      // pointer (the OSAsyncReference64 array the family registered). Try
+      // BOTH candidates; sendAsyncResult64WithOptions validates and simply
+      // returns an error for a wrong array (tracked in ar=).
+      unsigned long long *refAlt =
+          (unsigned long long *)(*(unsigned long long *)(node + 0x8));
+      if (!*ref && refAlt && (unsigned long)refAlt > 0x1000) ref = refAlt;
       if (!*ref && !sNodeDumped) {
         sNodeDumped = true;
         // r152: node exists (ak bits prove it) but +0x18 ref is zero —
