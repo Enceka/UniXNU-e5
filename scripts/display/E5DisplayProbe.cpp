@@ -18,6 +18,7 @@ using e5_notify_fn = void (*)(void *, void *);
 // E5TW only: printf would change the framebuffer being measured.
 #include <stdarg.h>
 extern "C" void e5_kputc(char);
+extern "C" void *e5_display_async_reg3(void);
 extern "C" unsigned e5_pmic_peek(unsigned off); // NativeSd.cpp: PMIC ADI read for wdt probe
 extern "C" void e5_iomfb_trace_dump(void);
 extern "C" void e5_display_state_dump(void);
@@ -544,6 +545,8 @@ extern "C" void e5_dpu_tick(void) {
       extern void *e5_display_async_node3(void);
       void *n3 = e5_display_async_node3();
       unsigned long long *w3 = (unsigned long long *)n3;
+      { unsigned long long *rw = (unsigned long long *)e5_display_async_reg3();
+        e5_display_tracef("E5REG3 %p %llx %llx %llx %llx", rw ? rw[0] : 0, rw ? rw[1] : 0, rw ? rw[2] : 0, rw ? rw[3] : 0, rw ? rw[4] : 0); }
       e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x af=%u gl=%d n3=%p %llx %llx %llx",
           sPaintTicks, *ctl2,
           sPwmMap ? (*pwmReg(0x08) & 0xFFFF) : 0, rowCrc, sVsyncEdges,

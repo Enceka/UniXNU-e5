@@ -78,6 +78,7 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 // need a media read. attemptAction skips that sample if the gate is busy.
 static void e5_state_log(const char *fmt, ...);
 static void *sAsyncNode = nullptr; // r153: kind-3 node captured at registration
+static void *sAsyncReg = nullptr;  // r165: kind-3 registration record (port lives at +8 if async)
 extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
                                             unsigned long long payload0);
 static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
@@ -161,6 +162,7 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
 // self-rescheduling thread_call timer so the echo thread never blocks.
 extern "C" void e5_display_async_fire(void); // timer body below
 extern "C" void *e5_display_async_node3(void) { return sAsyncNode; }
+extern "C" void *e5_display_async_reg3(void) { return sAsyncReg; }
 extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
                                             unsigned long long payload0);
 
@@ -523,6 +525,7 @@ public:
       __atomic_fetch_or(&e5_display_async_kinds, 1u << kind, __ATOMIC_RELAXED);
       if (kind == 3) {
         sAsyncNode = node; // r153: deliver through the node the client handed us
+        sAsyncReg = registration; // r165: the registration record outlives the call
         unsigned long long *w = (unsigned long long *)node;
         e5_state_log("E5REG k=3 node=%p reg=%p w0=%llx w1=%llx w2=%llx w3=%llx w4=%llx",
                      node, registration, w[0], w[1], w[2], w[3], w[4]);
