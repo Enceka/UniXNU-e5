@@ -96,13 +96,16 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
     // node, no E5NODE dump). Deliver through the node captured in opaque208.
     uint8_t *node = (kind == 3) ? (uint8_t *)sAsyncNode
                                 : *(uint8_t **)(base + 0x1588 + kind * 16);
+    // r161: node+0x18 stays EMPTY on this family build (r158), so the
+    // manual ref send never engages. The family broadcaster resolves the
+    // registration itself — fire whenever the kind-3 node exists.
+    if (kind == 3 && node) {
+      e5_display_family_broadcast(base, 3, 0);
+      __atomic_fetch_or(&e5_display_async_ports, 1u << kind, __ATOMIC_RELAXED);
+      __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
+    }
     for (unsigned visited = 0; node && visited < 64; ++visited) {
       unsigned long long *ref = (unsigned long long *)(node + 0x18);
-      // r159: r158 proved node+0x18 is EMPTY while node+0x8 holds a kernel
-      // pointer (the OSAsyncReference64 array the family registered). Try
-      // BOTH candidates; sendAsyncResult64WithOptions validates and simply
-      // returns an error for a wrong array (tracked in ar=).
-
       if (!*ref && !sNodeDumped) {
         sNodeDumped = true;
         // r152: node exists (ak bits prove it) but +0x18 ref is zero —
@@ -118,15 +121,6 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
       }
       if (*ref) {
         __atomic_fetch_or(&e5_display_async_ports, 1u << kind, __ATOMIC_RELAXED);
-        if (kind == 3) {
-          // r160: the family's own broadcaster (raw 0xfffffff0067778c0)
-          // resolves the registered ref internally; r136 proved it safe from
-          // this thread_call context (asend counted 630/630 ok in that era).
-          e5_display_family_broadcast(base, 3, 0);
-          __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
-          node = nullptr; // manual send below is dead for kind 3
-          break;
-        }
         // FrameInfoNotifyFunc accepts {property-mask, frame-id}; an empty mask
         // reports no changed properties. VsyncNotifyFunc requires SIX words:
         // three u64 values split low/high, as in the original broadcaster
