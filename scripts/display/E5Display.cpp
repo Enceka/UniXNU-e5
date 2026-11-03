@@ -117,6 +117,20 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
                      ((unsigned long long *)node)[4],
                      ((unsigned long long *)node)[5]);
       }
+      if (!*ref && kind == 3) {
+        // r168: v28/r126 delivered 630/630 through the NODE ITSELF as the
+        // OSAsyncReference64 (the sel-72 wrapper hands slot 208 a pointer at
+        // ctx+8 that IS the reference array; node[0]==0 is fine — the kernel
+        // delivery re-derives the port). Replicate exactly that call.
+        unsigned long long v28payload[2] = {mach_absolute_time(), 0};
+        int r = _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
+            (unsigned long long *)node, 0, v28payload, 2, 1);
+        __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
+        __atomic_store_n(&e5_display_async_last, (unsigned)r, __ATOMIC_RELAXED);
+        if (r == 0) __atomic_add_fetch(&e5_display_async_send_ok, 1U, __ATOMIC_RELAXED);
+        break; // one delivery per fire; r159 taught wrong-array = zone panic,
+               // but v28's array is the registered pointer itself (r126-proven)
+      }
       if (*ref) {
         __atomic_fetch_or(&e5_display_async_ports, 1u << kind, __ATOMIC_RELAXED);
         if (kind == 3) {
