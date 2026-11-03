@@ -37,5 +37,11 @@
   "result": "E5REG3 landed: w0=0x8000 w1=0xba592bda5a732cc w2=0xb36bf457a657e346 w3=0x9f308964183cabbe w4=0xb0992b0d217b9f89 \u2014 the registration record contains REAL 64-bit data (userspace tokens/port-name array shape, NOT kernel pointers, NOT zeros). u=4:4, ak=08, 0 crashes, healthy.",
   "interpretation": "the client DID hand an async-capable structure; reg+0 bit15=0x8000 may be a mode/flags word (polling vs push). The native marshal still leaves node+0x18=0 \u2014 either gated on a reg+0 flag or the write target differs. NEXT LEVERS: (a) treat reg+1.. as the OSAsyncReference64 and send directly with it (v28/r126 shape \u2014 but r159 taught wrong-array = zone panic; try ONLY if array validates as port+token), (b) NEW HYPOTHESIS: sel-17 0xc0c display-info ZERO-FILL = \"no modes/layers\" reported to backboardd = empty scene, no surfaces, no swap regardless of events. Decode what H9G writes into its 0xc0c source blob (panel sub-object +0x10, built by its init chain) and fill ours with a minimal real mode table.",
   "priority": "(b) first \u2014 it explains every observed symptom with one cause (compositor has nothing to compose)."
+ },
+ "r166": {
+  "change": "FrameInfo key emptied (v18 untouched-buffer replication)",
+  "result": "REGISTRATION RECORD TRANSFORMED: w0=0x8000->0xbd78, w1..w4 now KERNEL POINTERS (0xfffffff005a05de0 family-region fn, 0xfffffff005f8e978, 0xfffffffbf217f7d0/f6e0) \u2014 the empty key routed the client through a DIFFERENT (kernel-mediated, native) registration path. Node w0 still 0 (but node+0x18 = w3 NOT printed \u2014 dump too short). Client behavior unchanged: u=4:4, F=96, sel 3/4/5 still 0, asend=0, ak=08, 0 crashes.",
+  "conclusion": "the FrameInfo transport key STRING gates the client registration variant (non-empty unknown key -> degraded userspace-token path; empty -> native kernel path with callbacks). This is the r125/r126 vs merge delta candidate CONFIRMED at the registration layer.",
+  "next": "(a) extend node dump to w3..w6 (is +0x18 ref filled now?); (b) re-check base+0x1588+3*16 head population; (c) if the native action walk now finds the node, deliveries should start on the fire probe \u2014 run a LONGER window round and watch asend/aok."
  }
 }
