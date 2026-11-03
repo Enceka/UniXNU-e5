@@ -352,20 +352,24 @@ public:
   IOReturn opaque##n(uint32_t selector, void *b, void *c, void *d) override { \
     return e5_display_backend_soft(n, selector, b, c, d); \
   }
-  // Selector 74 asks for (index, count, key[64], transport), not a pair
-  // of generic capabilities. Transport 1 advertises a shared FrameInfo
-  // queue that this driver has never implemented. Until real frame reports
-  // are implemented, decline the optional query with fully initialized
-  // outputs and transport 0, the existing Mach-notification selection.
+  // Selector 74 asks for (index, count, key[64], transport). r125/r126
+  // proved that answering this query with count 1 lets the client register
+  // the kind-3 FrameInfo context through the NATIVE slot-208 path, and the
+  // merged async action delivers correctly shaped {mask=0, frame-id} Mach
+  // notifications (opaque336 forces the Mach fallback, never the unimple-
+  // mented shared queue). Transport stays 0 for the same reason. This is
+  // the r147 experiment: un-decline and watch ak=/asend= plus the panel
+  // drawer reaction.
   IOReturn opaque213(uint32_t index, uint32_t *count, char *key, uint32_t *transport) override {
     (void)index;
     __atomic_fetch_add(&e5_display_cap213_calls, 1U, __ATOMIC_RELAXED);
     IOReturn status = kIOReturnBadArgument;
     if (count && key && transport) {
-      *count = 0;
+      *count = 1;
       *transport = 0;
       bzero(key, 64);
-      status = kIOReturnUnsupported;
+      key[0] = 'e'; key[1] = '5'; // benign identifier, zero-padded to 64
+      status = kIOReturnSuccess;
     }
     __atomic_store_n(&e5_display_cap213_status, (unsigned)status, __ATOMIC_RELAXED);
     return status;
