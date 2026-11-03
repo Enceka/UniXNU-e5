@@ -25,5 +25,10 @@
   "result": "sel 6 n=4 ok=1 (wait loop ALIVE, cadence exact); F=100 (new record); u=3:3; 2 crashes (LA known); E5IMSUM d/b STILL 0",
   "conclusion": "SwapWait cadence alone does not open the swap band. Remaining suspects: (a) vsync subop-5 registration never happens (ak bit5 never set \u2014 client registers only kind 3), (b) CADisplay link start gated elsewhere in CA render server.",
   "next": "instrument sel-72 scalar[0] subop values (which kinds the client actually registers); decode GetVSyncRunLoopSource client-side polling; check whether EnableVSyncNotifications is ever called by backboardd on this profile"
+ },
+ "r164": {
+  "change": "FrameInfo transport=1 (v18/r125-era value)",
+  "result": "NO behavioral change: m3c8 still 0 (the +0x3c8 cache was ALSO 0 in r125 when delivery worked \u2014 it is not the transport cache), ak=08 same, node+0x18 still empty, F=93, u=3:3, 0 crashes",
+  "conclusion": "transport bit is not the registration-shape gate. Next levers: (1) instrument sel-72 scalar[0] subop directly (confirm client always registers kind 3, never 5); (2) trace the marshal 0x6777904 inputs inside native registration 0x6795ec0 \u2014 if [registration+8..0x18] are zero, the client-side call used the SYNC IOConnect variant and NO async port exists to deliver to; (3) check framework Open conn-table variant selection (two pools) \u2014 which wrapper EnableVSyncNotifications actually binds."
  }
 }
