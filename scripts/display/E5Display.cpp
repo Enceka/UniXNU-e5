@@ -188,10 +188,16 @@ extern "C" void e5_display_async_kick(void) {
     thread_call_enter1_delayed(sFireTimer, nullptr, e5_fire_deadline());
   }
 }
+extern "C" unsigned e5_display_fire_calls = 0;
+extern "C" int e5_display_gate_last = -99;
 extern "C" void e5_display_async_fire(void) {
   if (!sPowerInstance) return;
   auto gate = *(IOCommandGate **)((uint8_t *)sPowerInstance + 0x1608);
-  if (gate) gate->attemptAction(e5_display_async_action);
+  __atomic_add_fetch(&e5_display_fire_calls, 1U, __ATOMIC_RELAXED);
+  if (gate)
+    __atomic_store_n(&e5_display_gate_last,
+                     (int)gate->attemptAction(e5_display_async_action),
+                     __ATOMIC_RELAXED);
 }
 // v30: observe native token/completion transitions. The old v27 implementation
 // wrote the token itself, while its slot-176 ABI did not even inspect the
