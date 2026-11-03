@@ -21,6 +21,15 @@ Status: CONTINUING. Milestone chain from the r109 no-swap finding toward on-scre
 | r145 | D3 v0 i2c probe | data abort: controller clock-gated (hot-state shortcut false) |
 | r146 | staged (merged main) | first merged-main round: D3 v1 gate-first i2c + native wait/async lineage + D2 paint |
 | r147 | staged (fix/display-frameinfo-enable-r147) | sel-74 un-declined count=1 transport=0 key='e5' — single-variable experiment for registration→link→render→SwapBegin |
+| r148–r150 | bisect | all-timeout shape NOT a regression: early-boot normal; real bug = timer 1.8kHz starvation (thread_call takes ABSOLUTE deadline) |
+| r151 | throttle fix | **clients+registration restored: u=3:3, ak=08 kind-3, 18/18 sels green, F=96 record** |
+| r152–r162 | delivery marathon | manual/raw kind-3 delivery CLOSED (2 panics: zone_require ipc-ports + not-in-zone); family broadcaster unsafe from our thread; native event source = correct route |
+| r163 | SwapWait 1-in-4 | wait loop alive n=4 ok=1, F=100; swap band still 0 |
+| r164–r168 | registration variants | transport-key string gates variant; empty key → family-internal; v28 node-ref manual send restored: **deliveries flow 10/10 in merged kernel** — delivery alone ≠ swap |
+| r169–r171 | sel-17 struct + pool decode | sel-17 zero-fill accepted; **conn pool gate found: [conn+0xca8] = CFPreferences "benchmark" in com.apple.iokit.IOMobileGraphicsFamily** |
+| r172 | benchmark=true injected | **POOL B: 14 sels all green, no wait/registration sel 6/72/74, u=5:5, LA abort absent, F=96** |
+| r173 | paint off | visual round staged; single F transition (2 crc states) — someone wrote the panel ONCE; E5PROC: SB+backboardd+runningboardd all ACTIVE |
+| r174–r175 | UC map probe staged | clientMemoryForType = vtable slot 179 (source-derived); kernel captures UC vtable+slots+KASLR anchor → direct-map theory will be judged: family override (map exists) vs IOUserClient base (no map path) |
 
 ## Static decode anchors (see porting.toml display area)
 
@@ -35,6 +44,8 @@ Status: CONTINUING. Milestone chain from the r109 no-swap finding toward on-scre
 
 ## Next
 
-1. Flash r147 → read ak/asend/aok/d/b (registration → deliveries → SwapBegin).
-2. Then r146 (D3 i2c gate probe).
-3. If r147 registers but no swap: decode CADisplay link start conditions in CA render server.
+1. **Morning visual round (07:10)**: r173 (paint off + benchmark Data) → user looks at screen. UI visible → objective essentially achieved.
+2. Black screen → flash r175 (UC map probe): S = anch − 0xfffffff00698cd38; slot179_final = ucm − S;
+   family text [0xfffffff00676c000, 0x7b0000) = map path exists (decode + enable it); ≈0xfffffff0068ff3d0 = no map path (theory dead).
+3. Framework NEVER issues sel 3/4/5 (full sel-site scan r174) — swap band unreachable via conn API; legacy path = direct fb map + async events.
+4. If map probe negative → frontier = SB layer production (userland; os_log wall stands).
