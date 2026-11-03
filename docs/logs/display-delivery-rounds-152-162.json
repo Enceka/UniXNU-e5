@@ -81,5 +81,11 @@
   "result": "pool B preserved (14 selectors green), u=4:4 (one client fewer than r172; LA aborts back = r172 zero-crash was timing), 2 crashes = LA fixed site. E5DPU lines pushed out of ring by E5STATE/E5IMSEL/E5PROC volume \u2014 row0 crc not captured this round.",
   "visual_window": "device back in Android; morning reminder set (07:10) to re-arm boot_b so the 600s window covers ~07:20-07:35 for the user to LOOK \u2014 the decisive check for pool-B rendering.",
   "payload": "board-r173/e5-uefi.bin (kernel 2c064686 padded), Data = r172 image (benchmark pref) unchanged on card."
+ },
+ "r174_static": {
+  "finding": "Full framework sel-site scan (0x1b63d0000-0x1b63d8000, all IOConnect wrapper call sites): the framework ONLY ever issues selectors {0xA,0xB,0xC,0xD,0xE,0xF,0x10,0x13,0x14,0x16,0x17,0x18,0x19,0x1B,0x1C,0x1D,0x1E,0x1F,0x21,0x22,0x23,0x2F,0x30}. **NO framework code path issues selector 3 (DefaultSurface), 4 (SwapBegin), or 5 (SwapEnd) \u2014 they have no wrappers at all.**",
+  "implication": "The swap band is NOT reachable through the framework conn API on this class. Legacy IOMobileFramebuffer hardware path = the client MAPS the framebuffer (IOConnectMapMemory \u2014 not a method call, invisible to E5IMSEL) and writes pixels directly; vsync rides the async events. This matches every observation: compositor draws (F counts, two-color dither = software clear), no swap calls ever, deliveries accepted and ignored.",
+  "consequence": "The remaining gate for visible UI is NOT kernel-side at all \u2014 it is SCENE CONTENT: backboardd/CA composite an empty scene because SpringBoard never produces layers (or produces them after a gate we have not touched). The morning visual window (pool B, paint off) will show the compositor output as-is; if blank/black, the frontier moves to SB layer production (userland diagnosis; os_log wall stands).",
+  "poolB_map_partial": "conn 0x808->0x1b63d5c78, 0x7e0->0x1b63d2824, 0x7e8->0x1b63d5c84, 0x7f0->0x1b63d5cd0, 0x7f8->0x1b63d5d04, 0x810->0x1b63d5d50, 0x830->0x1b63d5dd8, 0x838->0x1b63d0a10, 0x840->0x1b63d5f04, 0x848->0x1b63d5f8c, 0x850->0x1b63d0aac, 0x858->0x1b63d5fd0, 0x860->0x1b63d603c, 0x868->0x1b63d60a8, 0x870->0x1b63d0b18, 0x878->0x1b63d0b68."
  }
 }
