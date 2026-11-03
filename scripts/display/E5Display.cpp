@@ -120,8 +120,6 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
           // r160: the family's own broadcaster (raw 0xfffffff0067778c0)
           // resolves the registered ref internally; r136 proved it safe from
           // this thread_call context (asend counted 630/630 ok in that era).
-          extern void e5_display_family_broadcast(void *helper, unsigned kind,
-                                                 unsigned long long payload0);
           e5_display_family_broadcast(base, 3, 0);
           __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
           node = nullptr; // manual send below is dead for kind 3
@@ -161,6 +159,8 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
 // self-rescheduling thread_call timer so the echo thread never blocks.
 extern "C" void e5_display_async_fire(void); // timer body below
 extern "C" void *e5_display_async_node3(void) { return sAsyncNode; }
+extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
+                                            unsigned long long payload0);
 
 // r160: call the family's own event broadcaster. Raw KC VA 0xfffffff0067778c0;
 // runtime slide derived from the un-overridden vtable entry at slot 175
