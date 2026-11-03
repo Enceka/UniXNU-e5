@@ -100,9 +100,7 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
       // pointer (the OSAsyncReference64 array the family registered). Try
       // BOTH candidates; sendAsyncResult64WithOptions validates and simply
       // returns an error for a wrong array (tracked in ar=).
-      unsigned long long *refAlt =
-          (unsigned long long *)(*(unsigned long long *)(node + 0x8));
-      if (!*ref && refAlt && (unsigned long)refAlt > 0x1000) ref = refAlt;
+
       if (!*ref && !sNodeDumped) {
         sNodeDumped = true;
         // r152: node exists (ak bits prove it) but +0x18 ref is zero —
@@ -118,6 +116,17 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
       }
       if (*ref) {
         __atomic_fetch_or(&e5_display_async_ports, 1u << kind, __ATOMIC_RELAXED);
+        if (kind == 3) {
+          // r160: the family's own broadcaster (raw 0xfffffff0067778c0)
+          // resolves the registered ref internally; r136 proved it safe from
+          // this thread_call context (asend counted 630/630 ok in that era).
+          extern void e5_display_family_broadcast(void *helper, unsigned kind,
+                                                 unsigned long long payload0);
+          e5_display_family_broadcast(base, 3, 0);
+          __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
+          node = nullptr; // manual send below is dead for kind 3
+          break;
+        }
         // FrameInfoNotifyFunc accepts {property-mask, frame-id}; an empty mask
         // reports no changed properties. VsyncNotifyFunc requires SIX words:
         // three u64 values split low/high, as in the original broadcaster
@@ -152,6 +161,23 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
 // self-rescheduling thread_call timer so the echo thread never blocks.
 extern "C" void e5_display_async_fire(void); // timer body below
 extern "C" void *e5_display_async_node3(void) { return sAsyncNode; }
+
+// r160: call the family's own event broadcaster. Raw KC VA 0xfffffff0067778c0;
+// runtime slide derived from the un-overridden vtable entry at slot 175
+// (raw 0xfffffff006792774): slide = *(void **)(*(void **)svc + 175*8) - raw.
+extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
+                                            unsigned long long payload0) {
+  if (!sPowerInstance) return;
+  unsigned long long vtEntry =
+      *(unsigned long long *)(*(unsigned long long **)svcRaw + 175);
+  const long long slide = (long long)vtEntry - 0xfffffff006792774LL;
+  void (*broadcast)(void *, int, unsigned long long, int, int) =
+      (void (*)(void *, int, unsigned long long, int, int))(
+          (unsigned long long)0xfffffff0067778c0 + slide);
+  unsigned long long payload[1] = {payload0};
+  broadcast(*(void **)((unsigned long long)svcRaw + 0x1608), 0,
+            (unsigned long long)payload, (int)kind, 1);
+}
 static thread_call_t sFireTimer = nullptr;
 extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backlight
 // r150: thread_call_enter1_delayed takes an ABSOLUTE deadline, not a
