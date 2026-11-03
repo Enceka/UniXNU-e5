@@ -546,9 +546,19 @@ public:
   IOReturn opaque176(void *client, uint32_t swap, uint32_t flags, uint32_t timeout) override {
     __atomic_fetch_add(&e5_display_wait_calls, 1U, __ATOMIC_RELAXED);
     __atomic_store_n(&e5_display_wait_last, (swap & 0xFFFFu) | ((flags & 0xFFu) << 16) | ((timeout & 0xFFu) << 24), __ATOMIC_RELAXED);
-    IOReturn status = IOMobileFramebufferLegacy::opaque176(client, swap, flags, timeout);
-    __atomic_store_n(&e5_display_wait_status, (unsigned)status, __ATOMIC_RELAXED);
+    // r163: v25 proved the client RETRIES SwapWait on Timeout and its loop
+    // revives on a periodic success pulse (n=4 with 3 timeouts + 1 ok at
+    // 1-in-4). The pure native pass-through (r127) answers from empty
+    // structures and the client abandons after one call. Serve the v25
+    // cadence directly: ~3 timeouts then one success = a fake vsync tick.
+    static unsigned sWaitBeats = 0;
+    const bool pulse = (++sWaitBeats & 0x3u) == 0;
+    const IOReturn status =
+        pulse ? kIOReturnSuccess : kIOReturnTimeout;
+    __atomic_store_n(&e5_display_wait_status,
+                     (unsigned)(pulse ? 0 : 0xE00002D5u), __ATOMIC_RELAXED);
     return status;
+    (void)client; (void)flags; (void)timeout;
   }
   // v18: the swap/surface band. The Legacy base returns kIOReturnUnsupported
   // from every one of these (r114: sel 15/22/27/33/50/57/79/84 all rejected);
