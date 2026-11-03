@@ -97,5 +97,16 @@
   "backboardd_search": "bb-disasm has ZERO refs to the framework IOConnect wrapper (0x1ba64c5fc: 0 hits) and zero 0xc0c constant \u2014 backboardd never calls IOConnect directly; ALL display calls ride the framework conn dispatch (indirect blr). The sel-17 struct consumer is inside the framework pools or QuartzCore, not greppable this way.",
   "decision": "NO blind mode-struct kernel pre-built (layout unknown; wrong guess = same silence). Morning window result picks the branch: UI \u2192 done; black \u2192 decode framework pool-B entry that issues the 0xc0c struct call (find it via the conn-offset map, then read which fields it copies), THEN craft the fill.",
   "disk": "freed r164-r167/r170 board dirs (4.0Gi free); morning assets verified: board-r173 payload + /tmp/data-r172.raw + reminder 07:10."
+ },
+ "r177_static_map_hunt": {
+  "goal": "find IOMobileFramebufferUserClient::clientMemoryForType to test the direct-map theory (client writes pixels via IOConnectMapMemory; would explain all observations incl. r173 single F transition with paint off).",
+  "facts_established": [
+   "full dSYM exists at /private/tmp/e5-local-build/e5/.../mach.development.bcm2837.dSYM (68MB, 68k symbols, unscaled raw VAs) \u2014 IOUserClient::clientMemoryForType @0xfffffff0078ff3d0 (+OSSharedPtr overload 0x78ff3dc); __ZTV12IOUserClient @0xfffffff0071cbf38; vtable entries are PAC-authenticated (raw match impossible)",
+   "source-derived vtable index: IOUserClient adds 12+ virtuals after IOService's 168 \u2014 clientMemoryForType = SLOT 179 of any IOUserClient-derived vtable (declaration order: init,init,initWithTask,initWithTask,free,clientClose,clientDied,getService,registerNotificationPort,getNotificationSemaphore,connectClient,clientMemoryForType)",
+   "KC segment map (raw VA \u2194 fileoff): __PRELINK_TEXT 0xfffffff00527c000/0xa50000, __PLK_TEXT_EXEC 0xfffffff005920000/0x10f4000, __PLK_DATA_CONST 0xfffffff006ca0000/0x2474000, __TEXT_EXEC 0xfffffff0071c0000/0x1bc000, __DATA_CONST 0xfffffff0070c4000/0xc0000",
+   "family module cstrings contain TWO IOMobileFramebufferUserClient names at file 0xdca73a/0xdca75d (VA 0x55f673a/0x55f675d)"
+  ],
+  "wall": "typeinfo-name refs and vtable headers use CHAINED-FIXUP placeholders in the KC file \u2014 pointer-chase route dead (3rd time this project: b186/b193/b210).",
+  "next_options": "(a) morning visual decides everything first; (b) if black: instrument at the IOConnectMapMemory kernel entry (IOUserClient::mapMemory? not virtual \u2014 clientMemoryForType slot 179 IS the extension point: our newUserClient-created family UC could be wrapped by an E5 UC subclass overriding slot 179 to LOG type codes and delegate) \u2014 needs UC-class construction knowledge we have (slot 141 path)."
  }
 }
