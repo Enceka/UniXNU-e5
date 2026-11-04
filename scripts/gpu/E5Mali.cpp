@@ -50,7 +50,8 @@ static void rmw(volatile uint32_t *base, uint32_t reg, uint32_t mask, uint32_t v
     base[reg / 4] = v;
 }
 
-static IOMemoryMap *sMmioMap, *sApbMap, *sDvfsMap, *sPmuMap;
+static IOMemoryMap *sMmioMap, *sApbMap, *sDvfsMap, *sPmuMap, *sAonApbMap;
+static volatile uint32_t *sAonApb;
 
 static bool mapWindow(uint64_t pa, uint32_t len, volatile uint32_t **out,
                       IOMemoryMap **mapOut)
@@ -78,10 +79,25 @@ static bool mapWindow(uint64_t pa, uint32_t len, volatile uint32_t **out,
 
 void e5_mali_probe(void)
 {
+    // v0.5: the GPU's first clock (FDT clocks[0]) = aonapb-gate idx 8 =
+    // bit 8 of the AON_APB APB_EB register at syscon@64900000+0x0. r194
+    // proved 0x64910000 maps+reads while 0x23140000/0x23000000 fault on
+    // first touch: the GPU APB/MEM windows sit behind that AON gate bit.
+    if (!mapWindow(0x64900000, 0x3000, &sAonApb, &sAonApbMap)) { e5_mali_stage = 14; return; }
+    printf("E5MALI aonapb w0=%08x (bit8=%u) -> set\n", sAonApb[0], (sAonApb[0] >> 8) & 1u);
+    // v0.8: real driver decode (ums512-clk.c lineage, DT indices match our
+    // FDT exactly: CLK_GPU_EB=8): gpu_eb = aon-apb gate 0x64900000 word 0x0
+    // BIT(11), SET mirror +0x1000; mm_eb = BIT(9). The DT "idx 8" is the
+    // dt-bindings index, NOT the bit (r195-r197 wrote bit 8 = nothing).
+    sAonApb[0x1000 / 4] = (0x1u << 11) | (0x1u << 9) | (0x1u << 8);
+    IOSleep(2);
+    printf("E5MALI aonapb w0 after set = %08x (want bit11/9/8)\n", sAonApb[0]);
     if (!mapWindow(0x64910000, 0x3000, &sPmu, &sPmuMap))   { e5_mali_stage = 13; return; }
-    if (!mapWindow(0x23140000, 0x4000, &sMmio, &sMmioMap)) { e5_mali_stage = 10; return; }
-    if (!mapWindow(0x23000000, 0x3000, &sApb, &sApbMap))   { e5_mali_stage = 11; return; }
-    if (!mapWindow(0x23014000, 0x3000, &sDvfs, &sDvfsMap)) { e5_mali_stage = 12; return; }
+    // v0.6: the GPU MMIO (0x23140000) and GPU APB syscon (0x23000000/0x23014000)
+    // windows live INSIDE the GPU power island — mapping them (or touching page0)
+    // before the island is powered faults with a level-3 translation abort
+    // (r194/r195: PMU 0x64910000 maps fine, 0x23140000 faults at map-probe time
+    // even with the aonapb GPU APB gate bit set). Power up FIRST, map LAST.
     e5_mali_stage = 1;
 
     printf("E5MALI step1 gpll enter\n");
@@ -108,9 +124,18 @@ void e5_mali_probe(void)
     // revisit with the pmu_apb clock gate if the ID readback misbehaves.
     e5_mali_stage = 5;
 
-    // 5. Core clock gate: APB 0x0 bit2 -> 1.
-    printf("E5MALI step5 apb w0=%08x\n", sApb[0]);
-    rmw(sApb, 0x0, 0x4, 0x4);
+    // v0.6: island is up — NOW the GPU-side windows become readable.
+    if (!mapWindow(0x23000000, 0x3000, &sApb, &sApbMap))   { e5_mali_stage = 11; return; }
+    if (!mapWindow(0x23014000, 0x3000, &sDvfs, &sDvfsMap)) { e5_mali_stage = 12; return; }
+    if (!mapWindow(0x23140000, 0x4000, &sMmio, &sMmioMap)) { e5_mali_stage = 10; return; }
+
+    // 5. GPU clock controller (syscon@23000000, opened by gpu_eb): per
+    // ums512 gpu section — core gate+clk 0x4, mem 0x8, sys 0xc; mux bit[8:10]
+    // parent 1 = twpll_384m, div bit[4:6] = 0.
+    printf("E5MALI step5 gpu-clk w0=%08x\n", sApb[0]);
+    sApb[0x4 / 4] = (1u << 0) | (1u << 8);   // gpu_core: gate on, mux=384m
+    sApb[0x8 / 4] = (1u << 0) | (1u << 8);   // gpu_mem: gate on, mux=384m
+    sApb[0xc / 4] = (1u << 0);               // gpu_sys: gate on, div 1/1
     IOSleep(1);
     e5_mali_stage = 6;
 

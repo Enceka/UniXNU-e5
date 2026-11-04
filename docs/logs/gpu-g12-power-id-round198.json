@@ -1,0 +1,24 @@
+{
+ "round": "r198",
+ "date": "2025-11-05T01:25+08:00",
+ "kernel": "v0.8 local 1c1af5f8 (padded 52076544)",
+ "payload": "board-r198 7a4f0ce5, args e5-mali-on",
+ "result": "G1.2 PASS — stage 100, GPU_ID 0x90910010 (Mali-G57 family), SHADER_PRESENT 0x5, pmic201c=0 (rail on), NO panic",
+ "root_cause_of_r177_197": [
+  "GPU windows (0x23140000, 0x23000000, 0x23014000) sit behind the aon-apb gate gpu_eb = 0x64900000 word 0x0 BIT(11), SET mirror +0x1000 (ums512-clk.c lineage; FDT clocks[0] idx 8 = CLK_GPU_EB dt-binding index, NOT the bit)",
+  "r195/196 wrote BIT(8) (wrong); r197 wrote BIT(8) via set-mirror (still wrong bit); v0.8 wrote BIT(11)|BIT(9)|BIT(8) — w0 flipped to 0x2063cac1 and ALL windows opened",
+  "island power must precede nothing — the gate alone opens register access; power sequence (gpll/PMIC/top_force_shutdown) still required for top_state and ID readback sanity"
+ ],
+ "sequence_proven": [
+  "1. aonapb set-mirror 0x64900000+0x1000 = BIT(11)|BIT(9)|BIT(8)",
+  "2. gpll: PMU 0xa20 bit1 clear then bit0 set",
+  "3. PMIC ADI 0x201c bit3 clear (dcdc_gpu on)",
+  "4. PMU 0x2c4 bit25 clear (top_force_shutdown off)",
+  "5. gpu clk ctl 0x23000000: 0x4 = gate|mux(1=twpll_384m); 0x8 same; 0xc = gate",
+  "6. poll PMU 0x500 bits 20:16 == 0 (top state up)",
+  "7. DVFS 0x23014000: 0x9ac |=1, 0x794 =3 (384MHz index)",
+  "8. GPU_ID 0x23140000+0x00 = 0x90910010; SHADER_PRESENT +0x100 = 0x5"
+ ],
+ "echo_format": "M=<stage>:<gpu_id>:<shader> (not yet wired into rw-done; stage/id visible in E5MALI CAP line)",
+ "next": "G1.3: keep windows mapped at module scope, wire M= echo, then MMU/BO bring-up per display-touch-gpu-plan.md G1"
+}
