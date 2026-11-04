@@ -1,0 +1,13 @@
+{
+ "round": "r202",
+ "date": "2026-11-05T07:35+08:00",
+ "kernel": "user worktree fix/ca-state-r202 (uncommitted) built by me: /tmp/e5-local-build-r202 b116c286 padded 7437a54d; NOTE user's own kernel-r202.macho (25e91cba) was built from the r198 tree = r200/r201 kernel WITHOUT the fix — my rebuild from their worktree is the real r202 binary",
+ "payload": "board-r202 463bf4ca (r201 baseline f7441cec + my kernel swap + args e5-mali-on..->e5-ca-state e5-no-vc zz, length-preserved 36B anchor patch)",
+ "results": [
+  "r201 crash GONE: e5_dpu_tick no longer faults (stack-snapshot fix verified on board); full healthy 600s window, E5STATE alive, ak=08 kind-3 registered",
+  "E5CA first live data: pid=56 backboardd, dyld slide 0xb360000, windowserver 0x153d21e50 -> display array 0x153d2e620 (n=6, NSArrayM cls refcount churn = LIVE) -> server 0x153f04240 -> C++ display 0x153e09000",
+  "E5CAX ALL ZERO: mode=0 fl=0 en=0 pwr=0 bm=0 sw=0 ctx=0 gpu=0 timer=0 src=0 fi=0 — CA::Display constructed but NEVER CONFIGURED (no mode/enable/power/renderer-context/timer/vsync-source/FrameInfo)",
+  "INTERPRETATION: client-side display object sits at constructor zeros; configuration path never runs. Consistent with kernel-side sel 17 (display-info 0xc0c) = the only failing selector (e00002c7)"
+ ],
+ "next": "v43: satisfy sel 17 honestly = grow E5Display instance to 0x2110 (legacy_instance_bytes + ABI assert in lockstep), fake panel sub-object at +0x1e88 (vtable 0x2110-aware), let slot 200 memcpy a real 0xc0c panel-state blob; expect client configure -> E5CAX mode/en/ctx nonzero -> timer/event-source created -> CADisplay link arms"
+}
