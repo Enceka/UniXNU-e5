@@ -27,6 +27,7 @@ extern "C" void e5_display_state_dump(void);
 extern "C" void e5_display_vsync_fire(void); // v27
 extern "C" void e5_display_async_kick(void); // v29.1: arm the delivery timer
 static void e5_display_tracef(const char *format, ...) {
+  if (e5_quiet) return;
   char line[256];
   va_list args;
   va_start(args, format);
