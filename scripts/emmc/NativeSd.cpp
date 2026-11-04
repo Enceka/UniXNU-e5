@@ -965,6 +965,11 @@ public:
       e5_display_frame_kick();
       // r90: slot 213 left the soft-guard set for a real capability answer;
       // C=<calls>:<status> tracks it on the same echo line.
+      // r176: throttle the echo line itself — the video console paints every
+      // printf onto the panel, burying compositor output under telemetry text.
+      // Print 1-in-64 ticks; the E5TW ring keeps the fast history regardless.
+      static unsigned sEchoThrottle = 0;
+      if ((++sEchoThrottle & 0x3Fu) == 0u)
       sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
