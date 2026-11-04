@@ -43,17 +43,6 @@ static volatile uint32_t *sApb;    // GPU APB syscon
 static volatile uint32_t *sDvfs;   // GPU DVFS APB
 static volatile uint32_t *sPmu;    // PMU APB syscon
 
-static bool mapWindow(uint64_t pa, uint32_t len, volatile uint32_t **out)
-{
-    IODeviceMemory *mem = IODeviceMemory::withRange(pa, len);
-    if (!mem) return false;
-    IOMemoryMap *map = mem->map();
-    if (!map) { mem->release(); return false; }
-    *out = (volatile uint32_t *)map->getVirtualAddress();
-    // keep both alive for the life of the probe window
-    return true;
-}
-
 static void rmw(volatile uint32_t *base, uint32_t reg, uint32_t mask, uint32_t val)
 {
     uint32_t v = base[reg / 4];
@@ -61,14 +50,41 @@ static void rmw(volatile uint32_t *base, uint32_t reg, uint32_t mask, uint32_t v
     base[reg / 4] = v;
 }
 
+static IOMemoryMap *sMmioMap, *sApbMap, *sDvfsMap, *sPmuMap;
+
+static bool mapWindow(uint64_t pa, uint32_t len, volatile uint32_t **out,
+                      IOMemoryMap **mapOut)
+{
+    IODeviceMemory *mem = IODeviceMemory::withRange(pa, len);
+    if (!mem) return false;
+    IOMemoryMap *map = mem->map();
+    if (!map) { mem->release(); return false; }
+    // v0.3: a zero-length or short map is the fault signature we chased in
+    // r177/r178 (translation fault on first touch). Log it and refuse.
+    if (map->getLength() < len) {
+        printf("E5MALI map pa=%llx want=%x got=%llx REFUSED\n",
+               (unsigned long long)pa, len,
+               (unsigned long long)map->getLength());
+        map->release(); mem->release();
+        return false;
+    }
+    *out = (volatile uint32_t *)map->getVirtualAddress();
+    *mapOut = map;
+    printf("E5MALI map pa=%llx len=%llx va=%p w0=%08x\n",
+           (unsigned long long)pa, (unsigned long long)map->getLength(),
+           *out, (*out)[0]);
+    return true;
+}
+
 void e5_mali_probe(void)
 {
-    if (!mapWindow(0x23140000, 0x4000, &sMmio))  { e5_mali_stage = 10; return; }
-    if (!mapWindow(0x23000000, 0x3000, &sApb))   { e5_mali_stage = 11; return; }
-    if (!mapWindow(0x23014000, 0x3000, &sDvfs))  { e5_mali_stage = 12; return; }
-    if (!mapWindow(0x64910000, 0x3000, &sPmu))   { e5_mali_stage = 13; return; }
+    if (!mapWindow(0x64910000, 0x3000, &sPmu, &sPmuMap))   { e5_mali_stage = 13; return; }
+    if (!mapWindow(0x23140000, 0x4000, &sMmio, &sMmioMap)) { e5_mali_stage = 10; return; }
+    if (!mapWindow(0x23000000, 0x3000, &sApb, &sApbMap))   { e5_mali_stage = 11; return; }
+    if (!mapWindow(0x23014000, 0x3000, &sDvfs, &sDvfsMap)) { e5_mali_stage = 12; return; }
     e5_mali_stage = 1;
 
+    printf("E5MALI step1 gpll enter\n");
     // 1. GPLL: clear force-off (bit1), then force-on (bit0) at 0xa20.
     rmw(sPmu, 0xa20, 0x2, 0);
     IOSleep(1);
@@ -93,6 +109,7 @@ void e5_mali_probe(void)
     e5_mali_stage = 5;
 
     // 5. Core clock gate: APB 0x0 bit2 -> 1.
+    printf("E5MALI step5 apb w0=%08x\n", sApb[0]);
     rmw(sApb, 0x0, 0x4, 0x4);
     IOSleep(1);
     e5_mali_stage = 6;
