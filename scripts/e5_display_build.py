@@ -363,7 +363,7 @@ public:
         return data[sec['fileoff']:sec['fileoff'] + sec['size']]
     require(code(blob, image) == code(late.read_bytes(), later), 'late-init staging modified owned instructions')
     probe = compile_source('E5DisplayProbe')
-    mali = compile_source_at('gpu/E5Mali', SOURCE.parent / 'gpu' / 'E5Mali.cpp')
+    mali = compile_source_at('E5Mali', SOURCE.parent / 'gpu' / 'E5Mali.cpp')
     archive = ROOT / 'build/e5-emmc/libE5Emmc.a'
     require(archive.is_file(), 'storage archive must be built first')
     run(['ar', 'rcs', archive, late, OUT / 'E5DisplayBindings.o', probe, mali])
