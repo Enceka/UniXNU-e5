@@ -158,7 +158,11 @@ static void *const e5FakeFamilyVt[128] = {
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
 };
 static void *sAsyncNode = nullptr; // r153: kind-3 node captured at registration
-static void *sAsyncReg = nullptr;  // r165: kind-3 registration record (port lives at +8 if async)
+// Registration arguments can live on the caller's stack. Retain only bounded
+// diagnostic copies; r201 faulted while the DPU timer reread that dead stack.
+static unsigned long long sAsyncRegSnapshot[4] = {};
+static unsigned long long sAsyncNodeSnapshot[6] = {};
+static unsigned sAsyncDiagnosticValid = 0;
 extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
                                             unsigned long long payload0);
 static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
@@ -255,8 +259,12 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
 // marshaling is far heavier than r126's raw send. Move delivery to a
 // self-rescheduling thread_call timer so the echo thread never blocks.
 extern "C" void e5_display_async_fire(void); // timer body below
-extern "C" void *e5_display_async_node3(void) { return sAsyncNode; }
-extern "C" void *e5_display_async_reg3(void) { return sAsyncReg; }
+extern "C" void *e5_display_async_node3(void) {
+  return __atomic_load_n(&sAsyncDiagnosticValid, __ATOMIC_ACQUIRE) ? sAsyncNodeSnapshot : nullptr;
+}
+extern "C" void *e5_display_async_reg3(void) {
+  return __atomic_load_n(&sAsyncDiagnosticValid, __ATOMIC_ACQUIRE) ? sAsyncRegSnapshot : nullptr;
+}
 extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
                                             unsigned long long payload0);
 
@@ -684,7 +692,11 @@ public:
       __atomic_fetch_or(&e5_display_async_kinds, 1u << kind, __ATOMIC_RELAXED);
       if (kind == 3) {
         sAsyncNode = node; // r153: deliver through the node the client handed us
-        sAsyncReg = registration; // r165: the registration record outlives the call
+        __atomic_store_n(&sAsyncDiagnosticValid, 0U, __ATOMIC_RELEASE);
+        bzero(sAsyncRegSnapshot, sizeof(sAsyncRegSnapshot));
+        if (registration) memcpy(sAsyncRegSnapshot, registration, sizeof(sAsyncRegSnapshot));
+        memcpy(sAsyncNodeSnapshot, node, sizeof(sAsyncNodeSnapshot));
+        __atomic_store_n(&sAsyncDiagnosticValid, 1U, __ATOMIC_RELEASE);
         unsigned long long *w = (unsigned long long *)node;
         e5_state_log("E5REG k=3 node=%p reg=%p w0=%llx w1=%llx w2=%llx w3=%llx w4=%llx",
                      node, registration, w[0], w[1], w[2], w[3], w[4]);
