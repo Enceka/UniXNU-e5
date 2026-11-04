@@ -1378,6 +1378,6 @@ extern "C" int e5_display_start(void) {
   }
   // G0: power the Mali up and read its identity once, after the display
   // service is up so probe MMIO never interleaves with early boot.
-  if (!PE_parse_boot_argn("e5-mali-off", nullptr, 0)) e5_mali_probe();
+  if (PE_parse_boot_argn("e5-mali-on", nullptr, 0)) e5_mali_probe();
   return 0;
 }
