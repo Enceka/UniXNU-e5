@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "round": "r177-prep",
-  "revision": "a25099ab7274255a39d12563f40707d82c1375ab",
-  "summary": "E5Mali v0 probe authored+built: vendor power sequence (GPLL frc-off/on PMU 0xa20, PMIC dcdc ADI 0x201c bit3, top_force_shutdown 0x2c4 bit25, soft rst 0xb98 bit2, clk_core_gpu_eb APB reg0 bit2, top-state poll 0x500 mask 0x1f0000, DVFS 0x9ac=1+0x794=3) + identity readback GPU_ID@0x00 SHADER_PRESENT@0x100; M=<stage>:<id>:<shader> echo; kernel 8aaf216a padded, payload d28612f3 staged board-r177.",
+  "revision": "4ef58c9efa1682319374d5be8edfe1cf54a4dc6a",
+  "summary": "E5Mali v0.1: vendor power sequence + identity readback GPU_ID@0x00 SHADER_PRESENT@0x100 + capability snapshot same power-up (L2/TILER/MEM/MMU features 0x04-0x10, AS regs 0x2008/0x2010, JS 0x140). M=<stage>:<id>:<shader> echo. Kernel 1ecef6fc padded, payload 50aa258a staged board-r177.",
   "acceptance": "stage=100 + GPU_ID 0x9091-family + shader 0x5 (plan G1.2)",
   "status": "built-awaiting-device"
 }
