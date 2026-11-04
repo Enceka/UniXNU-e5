@@ -11,6 +11,8 @@
 #include <pexpert/pexpert.h>
 #include <mach/mach_time.h>
 
+extern "C" unsigned e5_quiet;
+
 extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
                                             void *b, void *c, void *d);
 extern "C" void e5_display_frame_kick(void);
@@ -296,7 +298,6 @@ static void e5_state_log(const char *format, ...) {
   e5_kputc('\n');
 }
 extern "C" void e5_display_state_dump(void) {
-  extern unsigned e5_quiet;
   if (e5_quiet) return;
   if (!sPowerInstance) return;
   const volatile uint8_t *b = (const volatile uint8_t *)sPowerInstance;
