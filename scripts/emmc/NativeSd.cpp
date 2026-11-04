@@ -71,6 +71,9 @@ class NativeSd;
 // UMP9620 watchdog state (r139 ticks spanned >600s with no wdt reboot).
 static NativeSd *sWdtPeekInstance = nullptr;
 extern "C" unsigned e5_pmic_peek(unsigned off); // defined after the class
+extern "C" int e5_pmic_rmw(unsigned off, unsigned mask, unsigned val);
+extern "C" void e5_mali_probe(void);
+extern "C" unsigned e5_mali_stage, e5_mali_gpu_id, e5_mali_shader;
 
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
@@ -78,6 +81,7 @@ static bool publishData(E5DataDevice *device, NativeSd *host);
 
 class NativeSd : public IOBlockStorageDevice {
   friend unsigned e5_pmic_peek(unsigned off);
+  friend int e5_pmic_rmw(unsigned off, unsigned mask, unsigned val);
   OSDeclareDefaultStructors(NativeSd)
   struct Region {
     IOMemoryDescriptor *md = nullptr;
@@ -970,7 +974,7 @@ public:
       // Print 1-in-64 ticks; the E5TW ring keeps the fast history regardless.
       static unsigned sEchoThrottle = 0;
       if ((++sEchoThrottle & 0x3Fu) == 0u)
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d M=%u:%08x:%08x\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
@@ -1009,7 +1013,10 @@ public:
             __atomic_load_n(&e5_display_wait_calls, __ATOMIC_RELAXED),
             (unsigned)__atomic_load_n(&e5_display_wait_last, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_display_swap_mask, __ATOMIC_RELAXED),
-            __atomic_load_n(&e5_diag_stage, __ATOMIC_RELAXED));
+            __atomic_load_n(&e5_diag_stage, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_mali_stage, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_mali_gpu_id, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_mali_shader, __ATOMIC_RELAXED));
     }
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
@@ -1020,6 +1027,18 @@ public:
 extern "C" unsigned e5_pmic_peek(unsigned off) {
   return (sWdtPeekInstance && off < 0x8000u) ? sWdtPeekInstance->pmicRead(off)
                                              : 0xeeeeeeeeu;
+}
+
+// r176/G0: ADI read-modify-write for PMIC-internal blocks the vendor DT
+// points at as placeholders (GPU DCDC at 0x201c bit3).
+extern "C" int e5_pmic_rmw(unsigned off, unsigned mask, unsigned val) {
+  if (!sWdtPeekInstance || off >= 0x8000u) return -1;
+  NativeSd *sd = sWdtPeekInstance;
+  if (off == 0x23d0u) return -2; // protect the write-protect key.
+  uint32_t cur = sd->pmicRead(off);
+  uint32_t nv = (cur & ~mask) | (val & mask);
+  if (nv != cur && !sd->pmicWrite(off, nv)) return -3;
+  return 0;
 }
 
 OSDefineMetaClassAndStructors(NativeSd, IOBlockStorageDevice)
@@ -1354,5 +1373,8 @@ extern "C" int e5_display_start(void) {
   } else {
     sdlog("NativeSd: display construction not qualified; publish skipped\n");
   }
+  // G0: power the Mali up and read its identity once, after the display
+  // service is up so probe MMIO never interleaves with early boot.
+  if (!PE_parse_boot_argn("e5-mali-off", nullptr, 0)) e5_mali_probe();
   return 0;
 }

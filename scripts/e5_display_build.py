@@ -258,6 +258,30 @@ public:
         return
     record = json.loads((ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json').read_text().strip().rstrip(','))
 
+    def compile_source_at(out_name, src_path):
+        args, i = [], 0
+        original_args = record['arguments']
+        while i < len(original_args):
+            arg = original_args[i]
+            if arg == record['file']:
+                args.append(src_path)
+            elif arg == '-o':
+                args += ['-o', OUT / (out_name + '.o')]
+                i += 1
+            elif arg in ('-MF', '-MJ'):
+                i += 1
+            elif arg == '-Xclang' and original_args[i + 1].startswith('-W'):
+                i += 1
+            elif not arg.startswith('-W') and arg not in ('-MD', '-MMD', '-MP'):
+                args.append(arg)
+            i += 1
+        args += ['-I', OUT, '-I', ROOT / '.cache/xnu-work/osfmk', '-Wall', '-Wextra', '-Werror',
+                 '-Wno-unused-parameter', '-Wno-unnecessary-virtual-specifier', '-Wno-c99-designator',
+                 '-Wno-reorder-init-list', '-Wno-deprecated-enum-enum-conversion']
+        (OUT / (out_name + '-command.json')).write_text(json.dumps([str(a) for a in args], indent=2) + '\n')
+        run(args, cwd=record['directory'])
+        return OUT / (out_name + '.o')
+
     def compile_source(name):
         args, i = [], 0
         original_args = record['arguments']
@@ -339,9 +363,10 @@ public:
         return data[sec['fileoff']:sec['fileoff'] + sec['size']]
     require(code(blob, image) == code(late.read_bytes(), later), 'late-init staging modified owned instructions')
     probe = compile_source('E5DisplayProbe')
+    mali = compile_source_at('gpu/E5Mali', SOURCE.parent / 'gpu' / 'E5Mali.cpp')
     archive = ROOT / 'build/e5-emmc/libE5Emmc.a'
     require(archive.is_file(), 'storage archive must be built first')
-    run(['ar', 'rcs', archive, late, OUT / 'E5DisplayBindings.o', probe])
+    run(['ar', 'rcs', archive, late, OUT / 'E5DisplayBindings.o', probe, mali])
     report = dict(schema=1, original_kernelcache_sha256=digest(kc), original_family_text_sha256=FAMILY_HASH,
                   original_slide=slide, legacy_instance_bytes=0x18a0, virtual_entries=358,
                   guarded_backend_slots=PURE, owned_slots=owned_slots, inherited_native_slots=native_slots,
