@@ -447,16 +447,18 @@ public:
     // nothing to do". Registration then proceeds and the waiter vtable lands
     // at +0x1810 for our notify timer to complete (v37).
     if (!*(void * volatile *)((uint8_t *)this + 0x1638)) {
-      void *obj = kalloc(0x40, Z_ZERO);
+      void *obj = IOMalloc(0x40);
       if (obj) {
+        bzero(obj, 0x40);
         *(void * volatile *)obj = (void *)&e5FakeFamilyVt[0];
         *(void * volatile *)((uint8_t *)this + 0x1638) = obj;
         __atomic_fetch_or(&e5_display_lifecycle, 0x40000U, __ATOMIC_RELAXED);
       }
     }
     if (!*(void * volatile *)((uint8_t *)this + 0x1658)) {
-      void *obj = kalloc(0x40, Z_ZERO);
+      void *obj = IOMalloc(0x40);
       if (obj) {
+        bzero(obj, 0x40);
         *(void * volatile *)obj = (void *)&e5FakeFamilyVt[0];
         *(void * volatile *)((uint8_t *)this + 0x1658) = obj;
         __atomic_fetch_or(&e5_display_lifecycle, 0x80000U, __ATOMIC_RELAXED);
