@@ -83,6 +83,76 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 // read must never block acquiring the display gate: display setup can itself
 // need a media read. attemptAction skips that sample if the gate is busy.
 static void e5_state_log(const char *fmt, ...);
+// v36: universal return-0 thunk + hand-built vtable for the fake family
+// sub-objects (+0x1638 event source, +0x1658 swap-wait helper). arm64 KC =
+// plain blr vtable dispatch (no PAC), so raw function pointers are safe.
+extern "C" unsigned long e5FakeFamilyThunk(void) { return 0; }
+static void *const e5FakeFamilyVt[128] = {
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+};
 static void *sAsyncNode = nullptr; // r153: kind-3 node captured at registration
 static void *sAsyncReg = nullptr;  // r165: kind-3 registration record (port lives at +8 if async)
 extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
@@ -306,7 +376,10 @@ extern "C" void e5_display_state_dump(void) {
     for (unsigned i = 0; i != 8; ++i) v |= (unsigned long long)b[off + i] << (8 * i);
     return v;
   };
-  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u ap=%02x ar=%x am=%02x ev=%u:%llx:%x af=%u gl=%d ucv=%llx ucm=%llx:%llx anch=%llx",
+  unsigned long long e5_s175 = 0;
+  if (e5_display_uc_vtable)
+    e5_s175 = ((unsigned long long *)e5_display_uc_vtable)[175];
+  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u ap=%02x ar=%x am=%02x ev=%u:%llx:%x af=%u gl=%d ucv=%llx ucm=%llx:%llx anch=%llx s175=%llx",
          (const void *)b, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
          q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires,
          e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok,
@@ -314,7 +387,7 @@ extern "C" void e5_display_state_dump(void) {
          *(volatile const uint32_t *)(b + 0x16d0), e5_display_event_calls,
          e5_display_event_argument, e5_display_fire_calls, e5_display_gate_last,
          e5_display_uc_vtable, e5_display_uc_slot179, e5_display_uc_slot180,
-         (unsigned long long)(void *)&e5_display_frame_kick);
+         (unsigned long long)(void *)&e5_display_frame_kick, e5_s175);
 }
 
 class E5Display : public IOMobileFramebufferLegacy {
@@ -363,6 +436,32 @@ public:
     *(volatile uint8_t *)((uint8_t *)this + 0x1788) &= (uint8_t)~1U;
     *(volatile uint32_t *)((uint8_t *)this + 0x16d4) = 1;
     sPowerInstance = this; // v14: let the echo probe poll the +0x8c byte.
+    // v36 A-line: the family's enable_event 0x6797224 delegates its arm to the
+    // sub-object at [+0x1638] (vt+0xf8(0,0,0)) and the sel-6 swap-wait fn A
+    // 0x679795c NULL-checks [+0x1658] before registering the client waiter at
+    // +0x1810. H9G builds both via internal factories we do not own; without
+    // them enable_event arms nothing (+0x16e0 stays set forever, no waiter is
+    // ever registered, no notify ever fires). The kernelcache is arm64 (plain
+    // blr vtable calls, no PAC — b182 lesson), so a hand-built vtable of
+    // return-0 thunks is safe: the family treats the fake as "source exists,
+    // nothing to do". Registration then proceeds and the waiter vtable lands
+    // at +0x1810 for our notify timer to complete (v37).
+    if (!*(void * volatile *)((uint8_t *)this + 0x1638)) {
+      void *obj = kalloc(0x40, Z_ZERO);
+      if (obj) {
+        *(void * volatile *)obj = (void *)&e5FakeFamilyVt[0];
+        *(void * volatile *)((uint8_t *)this + 0x1638) = obj;
+        __atomic_fetch_or(&e5_display_lifecycle, 0x40000U, __ATOMIC_RELAXED);
+      }
+    }
+    if (!*(void * volatile *)((uint8_t *)this + 0x1658)) {
+      void *obj = kalloc(0x40, Z_ZERO);
+      if (obj) {
+        *(void * volatile *)obj = (void *)&e5FakeFamilyVt[0];
+        *(void * volatile *)((uint8_t *)this + 0x1658) = obj;
+        __atomic_fetch_or(&e5_display_lifecycle, 0x80000U, __ATOMIC_RELAXED);
+      }
+    }
     __atomic_fetch_or(&e5_display_lifecycle, 0x20000U, __ATOMIC_RELAXED);
     __atomic_fetch_or(&e5_display_lifecycle, 0x010U, __ATOMIC_RELAXED);
     unsigned resources = lifecycleResourceMask();
