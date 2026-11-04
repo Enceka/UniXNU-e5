@@ -1212,6 +1212,22 @@ E5DataDevice *NativeSd::prepareDataDevice() {
       dataCheckpoint("loading");
       loaded = fillDataImage(destination);
     }
+    if (loaded) {
+      // v40: r184-r188 fsck hash mismatches at 85-104MiB while the card
+      // window is byte-verified clean from Android — verify the RAM copy
+      // against fresh card reads before publishing. Answers "is the fill
+      // loop/SDMA corrupt, or does it happen later?"
+      unsigned bad = 0;
+      for (uint64_t off = 0; off < E5Data::sectors; off += 1024) {
+        if (!readSectors((uint32_t)(E5Data::base + off), 16)) { sdlog("NativeSd: data verify read fail @%llu\n", off); bad = 2; break; }
+        if (memcmp(destination + off * 512, buffer, 16 * 512) != 0) {
+          sdlog("NativeSd: data verify MISMATCH @off %llu (%llu MiB) sectors %llu\n",
+                off, off / 2048u, E5Data::sectors);
+          bad = 1; break;
+        }
+      }
+      if (!bad) sdlog("NativeSd: data verify clean, window %llu sectors\n", E5Data::sectors);
+    }
     if (!loaded) {
       sdlog("NativeSd: data image load failed\n");
       if (device->image) device->image->release();
