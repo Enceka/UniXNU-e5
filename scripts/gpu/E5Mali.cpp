@@ -85,11 +85,11 @@ void e5_mali_probe(void)
     rmw(sPmu, 0x2c4, (0x1u << 25), 0);
     e5_mali_stage = 4;
 
-    // 4. GPU soft reset: assert 0xb98 bit2, 10us, deassert.
-    rmw(sPmu, 0x0b98, 0x4, 0x4);
-    IODelay(10);
-    rmw(sPmu, 0x0b98, 0x4, 0x0);
-    IODelay(10);
+    // 4. GPU soft reset SKIPPED (v0.2): the reset-controller sub-region at
+    // 0x64910000+0xb98 data-aborts while 0x2c4/0xa20 in the same window are
+    // fine — that sub-block carries its own clock/power gate (r177 panic at
+    // E5Mali.cpp:96). A freshly powered block tolerates no explicit reset;
+    // revisit with the pmu_apb clock gate if the ID readback misbehaves.
     e5_mali_stage = 5;
 
     // 5. Core clock gate: APB 0x0 bit2 -> 1.
