@@ -87,7 +87,71 @@ static void e5_state_log(const char *fmt, ...);
 // sub-objects (+0x1638 event source, +0x1658 swap-wait helper). arm64 KC =
 // plain blr vtable dispatch (no PAC), so raw function pointers are safe.
 extern "C" unsigned long e5FakeFamilyThunk(void) { return 0; }
-static void *const e5FakeFamilyVt[128] = {
+static void *const e5FakeFamilyVt[256] = {
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
@@ -462,6 +526,21 @@ public:
         *(void * volatile *)obj = (void *)&e5FakeFamilyVt[0];
         *(void * volatile *)((uint8_t *)this + 0x1658) = obj;
         __atomic_fetch_or(&e5_display_lifecycle, 0x80000U, __ATOMIC_RELAXED);
+      }
+    }
+    // v37: sel 17 struct variant (pool-B client) walks the panel-info helper
+    // at [+0x1e88]: gate call vt+0x668 (slot 205) bails with 0xE00002C7 when
+    // the sub-object is NULL (b245 decode: 0x6bd6a90 NULL-check). The tail
+    // memcpy of 0xc0c bytes from sub+0x10 then lands as zeros — proven
+    // acceptable in the pool-A era (r117 sel-17 zero-fill ok=1). Fake vtable
+    // extended to 256 slots so slot 205 answers success.
+    if (!*(void * volatile *)((uint8_t *)this + 0x1e88)) {
+      void *obj = IOMalloc(0x1000);
+      if (obj) {
+        bzero(obj, 0x1000);
+        *(void * volatile *)obj = (void *)&e5FakeFamilyVt[0];
+        *(void * volatile *)((uint8_t *)this + 0x1e88) = obj;
+        __atomic_fetch_or(&e5_display_lifecycle, 0x100000U, __ATOMIC_RELAXED);
       }
     }
     __atomic_fetch_or(&e5_display_lifecycle, 0x20000U, __ATOMIC_RELAXED);
