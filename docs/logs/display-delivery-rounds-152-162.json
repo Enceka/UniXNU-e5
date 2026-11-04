@@ -128,5 +128,13 @@
  "r173x": {
   "discovery": "r173 boot args CONTAIN e5-fb (toml at 0x36a5be0) \u2014 the r173 single F transition = kernel fb console text growth, NOT compositor. The morning visual on stock r173 would show CONSOLE TEXT, masking compositor output.",
   "fix": "board-r173x = r173 payload + length-preserving byte patch b\"e5-uplink e5-fb e5-systemos\" -> b\"e5-uplink e5-xx e5-systemos\" at 0x36a5be0 (unique-selector verified) -> sha a6d9f58d. MORNING SEQUENCE NOW: r173x first (console off, pure compositor), black -> r175 probe."
+ },
+ "r175_morning": {
+  "visual": "user saw RUNNING CODE on screen through whole window = KERNEL VIDEO CONSOLE (PE_video) paints printf text \u2014 panel pipeline fully alive; compositor invisible under console text; r173x e5-fb patch only killed the fd-hook console, not the kernel printf->video path",
+  "probe_data": "anch=fffffff00798cd38 (= dSYM raw, kernel zero extra slide; PLK slide -0x1000000); UC vtable runtime 0xfffffff005f34dd0 (kext data = family UC subclass); slot179 runtime 0xfffffff0078ff510 -> raw 0x68ff510 = MID-FUNCTION code (no prologue at +-16) inside module labeled com.apple.driver.AppleBSDKextStarter TEXT_EXEC [0x68d2000,0x69d06ec] +0x2d510 (label suspect: sequential name association may misattribute; the +0x118-adjacent slot180 value suggests the two methods belong to one class compiled adjacently \u2014 likely the family UC code region, module boundary record incomplete)",
+  "module_table_regen": "/tmp/mods.txt rebuilt: __PRELINK_INFO = headerless XML plist at file 0x292c000 (wrap with doctype failed on IDREF ints; regex pairs on _PrelinkExecutableLoadAddr + nearest preceding CFBundleIdentifier with IDREF table) = 225 modules; containment needs per-module mach-o __TEXT_EXEC walk (module load addr = __TEXT header only)",
+  "r176_shipped": "echo throttle 1-in-64 (video console buries compositor; E5TW ring keeps fast history) \u2014 kernel c062d3d3 raw / padded 20b73625; r176x payload f8a8466d = r176 kernel + e5-fb->e5-xx args patch (console fd-hook off) + ADT 0fea719d; BOARD-READY when device returns",
+  "build_fixes": "incremental local build: (1) .DS_Store in refer/corecrypto-2023 trips the immutability guard \u2014 rm it; (2) PATH=/tmp/py3bin:$PATH shim needed (subprocess python3 lacks tomllib)",
+  "next_flash_order": "r176x FIRST (kernel printf throttle = only a few console lines at top; rest of panel = compositor or black -> USER LOOKS), then continue map-path archaeology from the captured vtable data"
  }
 }
