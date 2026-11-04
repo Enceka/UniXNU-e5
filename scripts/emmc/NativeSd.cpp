@@ -73,6 +73,8 @@ static NativeSd *sWdtPeekInstance = nullptr;
 extern "C" unsigned e5_pmic_peek(unsigned off); // defined after the class
 extern "C" int e5_pmic_rmw(unsigned off, unsigned mask, unsigned val);
 extern "C" void e5_mali_probe(void);
+extern "C" unsigned e5_quiet;
+unsigned e5_quiet = 0;
 extern "C" unsigned e5_mali_stage, e5_mali_gpu_id, e5_mali_shader;
 
 static bool publishSystemOS(NativeSd *host);
@@ -797,6 +799,7 @@ public:
     return true;
   }
   bool start(IOService *provider) override {
+    if (PE_parse_boot_argn("e5-quiet", &e5_quiet, sizeof(e5_quiet))) e5_quiet = 1;
     if (!IOBlockStorageDevice::start(provider)) return false;
     sWdtPeekInstance = this; // D2 v1.3: wdt peek for the display tick line
     sdlog("NativeSd: v1 start, independent SDIO0 host\n");
@@ -973,7 +976,7 @@ public:
       // printf onto the panel, burying compositor output under telemetry text.
       // Print 1-in-64 ticks; the E5TW ring keeps the fast history regardless.
       static unsigned sEchoThrottle = 0;
-      if ((++sEchoThrottle & 0x3Fu) == 0u)
+      if (e5_quiet == 0 && (++sEchoThrottle & 0x3Fu) == 0u)
       sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d M=%u:%08x:%08x\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,

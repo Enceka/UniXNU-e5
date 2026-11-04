@@ -296,6 +296,8 @@ static void e5_state_log(const char *format, ...) {
   e5_kputc('\n');
 }
 extern "C" void e5_display_state_dump(void) {
+  extern unsigned e5_quiet;
+  if (e5_quiet) return;
   if (!sPowerInstance) return;
   const volatile uint8_t *b = (const volatile uint8_t *)sPowerInstance;
   auto q = [&](unsigned off) -> unsigned long long {
