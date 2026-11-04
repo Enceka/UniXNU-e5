@@ -862,7 +862,7 @@ public:
 };
 
 OSDefineMetaClassAndStructors(E5Display, IOMobileFramebufferLegacy)
-static_assert(sizeof(E5Display) == 0x18a8, "Only owned lifecycle flags extend Legacy");
+static_assert(sizeof(E5Display) == 0x2108, "Only owned lifecycle flags extend Legacy");
 
 extern "C" unsigned e5_display_compiled_size(void) { return sizeof(E5Display); }
 
