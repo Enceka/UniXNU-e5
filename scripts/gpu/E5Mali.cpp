@@ -112,7 +112,7 @@ void e5_mali_probe(void)
     rmw(sDvfs, 0x794, 0x7, 0x3);
     e5_mali_stage = 8;
 
-    // 8. Identity readback.
+    // 8. Identity + capability readback (single power-up snapshot).
     e5_mali_gpu_id = sMmio[0x00 / 4];
     e5_mali_shader = sMmio[0x100 / 4];
     e5_mali_stage = 100;
@@ -120,4 +120,11 @@ void e5_mali_probe(void)
     printf("E5MALI stage %u id %08x shader %08x pmic201c %08x\n",
            e5_mali_stage, e5_mali_gpu_id, e5_mali_shader,
            e5_pmic_peek(0x201c));
+    // Capability snapshot for the G0 matrix (panfrost_regs.h offsets):
+    // L2 0x04 TILER 0x08 MEM 0x0C MMU 0x10; AS_{TRANSTAB,MEMATTR} 0x2000+;
+    // JOBJS 0x140.. shader-ready 0x140 present-lo 0x100.
+    printf("E5MALI CAP l2 %08x tiler %08x mem %08x mmu %08x as %08x:%08x js %08x\n",
+           sMmio[0x04 / 4], sMmio[0x08 / 4], sMmio[0x0c / 4], sMmio[0x10 / 4],
+           sMmio[(0x2000 + 0x08) / 4], sMmio[(0x2000 + 0x10) / 4],
+           sMmio[0x140 / 4]);
 }
