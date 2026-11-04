@@ -23,8 +23,10 @@ unsigned e5_display_client_calls = 0;
 unsigned e5_display_client_successes = 0;
 unsigned e5_display_client_type = 0;
 unsigned long long e5_display_uc_vtable = 0;
-static unsigned e5_fake_e88_disabled = 0; // v38 A/B: set 1 to skip the +0x1e88 fake
-extern "C" void e5_display_set_fake_e88(int off) { e5_fake_e88_disabled = (unsigned)off; }
+static unsigned e5_fake_e88_disabled = 1; // v39 A/B: e88 fake OFF unless e5-fake-e88 boot arg
+static void e5_fake_gate_init(void) {
+  if (PE_parse_boot_argn("e5-fake-e88", nullptr, 0)) e5_fake_e88_disabled = 0;
+}
 unsigned long long e5_display_uc_slot179 = 0;
 unsigned long long e5_display_uc_slot180 = 0;
 unsigned e5_display_client_status = (unsigned)kIOReturnNotReady;
@@ -536,6 +538,7 @@ public:
     // memcpy of 0xc0c bytes from sub+0x10 then lands as zeros — proven
     // acceptable in the pool-A era (r117 sel-17 zero-fill ok=1). Fake vtable
     // extended to 256 slots so slot 205 answers success.
+    e5_fake_gate_init();
     if (!e5_fake_e88_disabled && !*(void * volatile *)((uint8_t *)this + 0x1e88)) {
       void *obj = IOMalloc(0x1000);
       if (obj) {
