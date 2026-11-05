@@ -102,8 +102,10 @@ struct ThreadSnap {
   Word ret[24];
 };
 struct ProcSnap {
-  unsigned pid, threads, uid;
+  unsigned pid, threads, uid, images;
   char name[20];
+  Word imageLoad[16], imagePath[16];
+  char imageText[16][48];
   Word slide, dyldStatus, lockBefore, lockAfter, lockReadBefore, lockReadAfter;
   Word stamp, seedGroup, seedIsa, seedBefore, seedAfter, seedReadBefore, seedReadAfter;
   ThreadSnap thread[12];
@@ -580,6 +582,30 @@ static void snapshotThreads(ProcSnaps &out) {
         if (p.slide >= 0x40000000 || memcmp(infos + 0xa0, cacheUuid, 16)) p.dyldStatus = 0x10005;
       } else if (!p.dyldStatus) p.dyldStatus = 0x10002;
       if (!p.dyldStatus) {
+        // r231: lsd's pinned scan threads run in PRIVATELY loaded modules
+        // (r230b: slid pc 0x1d312abdc -> unslid 0x15976abdc, below the cache
+        // base). all_image_infos (user64 layout) keeps infoArrayCount at +0x8
+        // and infoArray at +0x10; each entry leads with the image load
+        // address at +0x0 and the path pointer at +0x28. Record the array so
+        // the host maps the pinned pc to a module; this is the branch point
+        // between "sqlite row I/O (preseed/speed up storage)" and "lock spin
+        // (name the owner)" — the UI goal has no use for another window.
+        Word arrayPtr = 0, arrayCount = 0;
+        if (memcpy(&arrayCount, infos + 8, 8), memcpy(&arrayPtr, infos + 0x10, 8),
+            arrayPtr && arrayCount && arrayCount < 512) {
+          for (unsigned e = 0; e < arrayCount && p.images < 16; ++e) {
+            Word entry = arrayPtr + 21 * e * 8;  // dyld_image_info: 3 pointers
+            Word loadAddress = 0, pathPtr = 0;
+            if (!r.probeBytes(entry, &loadAddress, 8)) break;
+            if (!r.probeBytes(entry + 0x10, &pathPtr, 8)) pathPtr = 0;
+            p.imageLoad[p.images] = loadAddress;
+            p.imagePath[p.images] = pathPtr;
+            for (unsigned c = 0; c != sizeof(p.imageText[0]); ++c)
+              p.imageText[p.images][c] = 0;
+            if (pathPtr) r.probeBytes(pathPtr, p.imageText[p.images], sizeof(p.imageText[0]) - 1);
+            ++p.images;
+          }
+        }
         p.lockReadBefore = r.probeBytes(0x1f4884878ULL + p.slide, &p.lockBefore, 8);
         // Original LSDatabaseGetSeedingGroup global. The object's first word
         // is the OS_dispatch_group CLASS at 0x1f4844bf0+slide — r228 compared
@@ -814,6 +840,9 @@ extern "C" void e5_ca_probe_dump(void) {
     if (lsd)
       log("E5LSD pid=%u uid=%u sl=%llx kr=%llx gp=%llx isa=%llx rd=%llu:%llu raw=%llx:%llx lk=%llx:%llx",
           p.pid,p.uid,p.slide,p.dyldStatus,p.seedGroup,p.seedIsa,p.seedReadBefore,p.seedReadAfter,p.seedBefore,p.seedAfter,p.lockBefore,p.lockAfter);
+    for (unsigned e = 0; e != p.images && e != 16; ++e)
+      log("E5LSDI pid=%u e=%u a=%llx p=%llx t=%.44s",
+          p.pid, e, p.imageLoad[e], p.imagePath[e], p.imageText[e][0] ? p.imageText[e] : "-");
     if (springboard)
       log("E5LS pid=%u sl=%llx kr=%llx rd=%llu:%llu raw=%llx:%llx",
           p.pid, p.slide, p.dyldStatus, p.lockReadBefore, p.lockReadAfter, p.lockBefore, p.lockAfter);
