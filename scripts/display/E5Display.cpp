@@ -975,6 +975,13 @@ static void e5PublishModeTable(IOService *service) {
   // panic formatter then data-aborted inside ctid_get_thread_unsafe — the
   // exec/publish path holds locks that property publication must not
   // re-acquire.
+  // r226: DisplayAttributes is a SEPARATE top-level property the r209 audit
+  // describes as "used for native pixel counts and other display attributes"
+  // (consumers 0x1896e22e8/0x1896e2300 read NativeFormatHorizontalPixels /
+  // NativeFormatVerticalPixels from it). SpringBoard's terminal BKS
+  // GetMainScreenInfo wait plausibly needs it; the values are the panel's
+  // real native geometry.
+  OSDictionary *attributes = OSDictionary::withCapacity(4);
   OSDictionary *color = OSDictionary::withCapacity(6);
   OSDictionary *timing = OSDictionary::withCapacity(7);
   OSDictionary *horizontal = OSDictionary::withCapacity(2);
@@ -982,7 +989,9 @@ static void e5PublishModeTable(IOService *service) {
   OSArray *colors = OSArray::withCapacity(1);
   OSArray *timings = OSArray::withCapacity(1);
   do {
-    if (!color || !timing || !horizontal || !vertical || !colors || !timings) break;
+    if (!attributes || !color || !timing || !horizontal || !vertical || !colors || !timings) break;
+    attributes->setObject("NativeFormatHorizontalPixels", OSNumber::withNumber((uint32_t)320, 32));
+    attributes->setObject("NativeFormatVerticalPixels", OSNumber::withNumber((uint32_t)480, 32));
     color->setObject("ID", OSNumber::withNumber((uint32_t)1, 32));
     color->setObject("PixelEncoding", OSNumber::withNumber((uint32_t)3, 32));
     color->setObject("Depth", OSNumber::withNumber((uint32_t)16, 32));
@@ -1004,10 +1013,12 @@ static void e5PublishModeTable(IOService *service) {
     timings->setObject(timing);
     // OSNumber::withNumber / the sub-dictionaries are retained by their
     // collections; release only our own creation references below.
+    service->setProperty("DisplayAttributes", attributes);
     service->setProperty("ColorElements", colors);
     service->setProperty("TimingElements", timings);
     __atomic_fetch_or(&e5_display_lifecycle, 0x400000U, __ATOMIC_RELAXED);
   } while (false);
+  if (attributes) attributes->release();
   if (colors) colors->release();
   if (timings) timings->release();
   if (color) color->release();
