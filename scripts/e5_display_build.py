@@ -365,16 +365,25 @@ public:
     probe = compile_source('E5DisplayProbe')
     ca_probe = compile_source('E5CAProbe')
     mali = compile_source_at('E5Mali', SOURCE.parent / 'gpu' / 'E5Mali.cpp')
+    # r213: the AppleKeyStore stand-in host plus the pinned component service
+    # (board.toml fetches UniXNU/AppleKeyStoreState at 42ff83e into
+    # drivers/AppleKeyStoreState). Inert without the e5-aks boot argument.
+    keystore = compile_source('E5KeyStore')
+    component = ROOT / 'drivers/AppleKeyStoreState/NativeKeyStoreEvents.cpp'
+    require(component.is_file(), 'AppleKeyStoreState component source missing (check board.toml components.include)')
+    keystore_component = compile_source_at('NativeKeyStoreEvents', component)
     archive = ROOT / 'build/e5-emmc/libE5Emmc.a'
     require(archive.is_file(), 'storage archive must be built first')
-    run(['ar', 'rcs', archive, late, OUT / 'E5DisplayBindings.o', probe, ca_probe, mali])
+    run(['ar', 'rcs', archive, late, OUT / 'E5DisplayBindings.o', probe, ca_probe, mali,
+         keystore, keystore_component])
     report = dict(schema=1, original_kernelcache_sha256=digest(kc), original_family_text_sha256=FAMILY_HASH,
                   original_slide=slide, legacy_instance_bytes=0x2110, virtual_entries=358,
                   guarded_backend_slots=PURE, owned_slots=owned_slots, inherited_native_slots=native_slots,
                   bindings={name: hex(va) for name, va in sorted(bindings.items())},
                   generated_header_sha256=digest(header.encode()), object_sha256=digest(blob),
                   source_sha256={p.name: digest(p.read_bytes()) for p in
-                                 [SOURCE / 'E5Display.cpp', SOURCE / 'E5DisplayProbe.cpp', SOURCE / 'E5CAProbe.cpp', Path(__file__)]},
+                                 [SOURCE / 'E5Display.cpp', SOURCE / 'E5DisplayProbe.cpp', SOURCE / 'E5CAProbe.cpp',
+                                  SOURCE / 'E5KeyStore.cpp', component, Path(__file__)]},
                   late_object_sha256=digest(late.read_bytes()), archive_sha256=digest(archive.read_bytes()),
                   automatic_initializer_removed=True, owned_instructions_unchanged=True,
                   runtime_registration_verified=False, runtime_construction_verified=False,

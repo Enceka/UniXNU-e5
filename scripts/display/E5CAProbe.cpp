@@ -70,6 +70,11 @@ struct EntryState {
   // IOMFBServer::add_runloop_source's thread stores CFRunLoopGetCurrent),
   // and the Render context list +0x70/+0x80 filled by context_insert.
   Word s1f0, s1f8, s2e0, s2e8, ctxList, ctxCount;
+  // r213: the context list entries (16 bytes {ctx, order float}); context
+  // flags at ctx+0xc — bit 0x8000 is the definesDisplayBounds option that
+  // only a finished SpringBoard startup sets.
+  struct CtxEntry { Word entry, ptr, w8, flags, w10; };
+  CtxEntry ctxEntry[4];
   TimerState timer;
 };
 struct SlotState {
@@ -232,6 +237,17 @@ static void inspectEntry(Reader &r, Word slide, Word wrapper, EntryState &e) {
     r.word(e.server + 0x2e8, e.s2e8);
     r.word(e.server + 0x70, e.ctxList);
     r.word(e.server + 0x80, e.ctxCount);
+    for (unsigned k = 0; k != 4 && k < e.ctxCount; ++k) {
+      Word entry = e.ctxList + (Word)k * 0x10;
+      Word ctxPtr = 0;
+      if (!r.word(entry, ctxPtr) || !ctxPtr) break;
+      CtxEntry &t = e.ctxEntry[k];
+      t.entry = entry;
+      t.ptr = ctxPtr;
+      r.word(ctxPtr + 8, t.w8);
+      r.u32(ctxPtr + 0xc, t.flags);
+      r.u32(ctxPtr + 0x10, t.w10);
+    }
     if (e.stimer) { r.u8(e.stimer + 0xc9, e.tc9); }
     if (e.stimer) {
       TimerState &t = e.timer;
@@ -555,6 +571,12 @@ extern "C" void e5_ca_probe_dump(void) {
           i,e.s398,e.s39c,e.s39d,e.s338,e.s360,e.s370,e.latch);
       log("E5CASR i=%u th=%llx:%llx rl=%llx:%llx cxs=%llx:%llx",
           i,e.s1f0,e.s1f8,e.s2e0,e.s2e8,e.ctxList,e.ctxCount);
+      for (unsigned k = 0; k != 4 && k < e.ctxCount; ++k) {
+        const CtxEntry &t = e.ctxEntry[k];
+        if (!t.entry) break;
+        log("E5CAC i=%u k=%u e=%llx p=%llx c8=%llx fc=%llx d10=%llx",
+            i,k,t.entry,t.ptr,t.w8,t.flags,t.w10);
+      }
       if (e.stimer) {
         const TimerState &t = e.timer;
         log("E5CAT i=%u pn=%llx cfp=%llx x3=%llx hook=%llx c8=%llx c9=%llx d0=%llx d8=%llx e0=%llx e8=%llx",

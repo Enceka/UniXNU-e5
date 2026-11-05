@@ -76,6 +76,10 @@ extern "C" void e5_mali_probe(void);
 extern "C" unsigned e5_quiet;
 unsigned e5_quiet = 0;
 extern "C" unsigned e5_mali_stage, e5_mali_gpu_id, e5_mali_shader;
+// r213: AppleKeyStore stand-in host (scripts/display/E5KeyStore.cpp). Called
+// first inside e5_display_start() so the service exists before launchd
+// starts daemons; independent of display qualification and of e5-display-off.
+extern "C" int e5_keystore_start(void);
 
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
@@ -1364,6 +1368,7 @@ extern "C" int e5_display_probe(void) {
 }
 
 extern "C" int e5_display_start(void) {
+  e5_keystore_start();  // r213: publish before any daemon opens AppleKeyStore.
   if (PE_parse_boot_argn("e5-display-off", nullptr, 0)) return 0;
   e5_display_attach = 0;
   mach_timespec_t ts = {20, 0};
