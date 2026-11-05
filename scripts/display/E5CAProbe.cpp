@@ -42,6 +42,8 @@ extern "C" kern_return_t vm_map_read_user(vm_map_t, vm_map_address_t, void *, vm
 // keeps no thread references.
 extern "C" void task_lock(task_t);
 extern "C" void task_unlock(task_t);
+extern "C" vm_size_t ml_nofault_copy(vm_offset_t, vm_offset_t, vm_size_t);
+extern "C" uint64_t mach_absolute_time(void);
 
 namespace {
 using Word = unsigned long long;
@@ -93,16 +95,27 @@ struct PoolState { Word virtCount, refFB, actFB, infoCount, timerSerial; SlotSta
 // frame walk for the first threads of SpringBoard/liveactivitiesd/chronod,
 // symbolicated offline against the pinned cache (the kernel-side analogue
 // of UniXNU-qemu's snapshot-ui-threads).
-struct ThreadSnap { Word pc, lr, sp; Word ret[6]; };
-struct ProcSnap { unsigned pid, threads; char name[20]; ThreadSnap thread[12]; };
-static const unsigned kMaxProcs = 4;
+struct ThreadSnap {
+  Word pc, lr, sp, fp, tid, tsd, port, savedState, flavor, copied, status, cpu;
+  Word kernelState, waitEvent, continuation;
+  Word arg[8];
+  Word ret[24];
+};
+struct ProcSnap {
+  unsigned pid, threads, uid;
+  char name[20];
+  Word slide, dyldStatus, lockBefore, lockAfter, lockReadBefore, lockReadAfter;
+  Word stamp, seedGroup, seedIsa, seedBefore, seedAfter, seedReadBefore, seedReadAfter;
+  ThreadSnap thread[12];
+};
+static const unsigned kMaxProcs = 6;
 static const unsigned kMaxThreads = 12;
-static const unsigned kFrames = 6;
+static const unsigned kFrames = 24;
 struct ProcSnaps { unsigned count; ProcSnap proc[kMaxProcs]; };
 // r219: rolling sample of each proc's first-thread pc across worker runs —
 // distinguishes a CPU spin (varying pc) from a frozen/stuck thread (constant).
-struct PcSample { unsigned pid; Word pc, lr; };
-static const unsigned kPcHistory = 24;
+struct PcSample { unsigned pid; Word tid, pc, lr, cpu, stamp; };
+static const unsigned kPcHistory = 16;
 struct PcHistory { unsigned count; PcSample sample[kPcHistory]; };
 // Kernel-side IPC census of the probed task: how many mk_timer ports exist,
 // whether any fired-but-undrained messages sit in their queues, and the
@@ -493,28 +506,39 @@ static void ipcCensus(task_t task, Word caPortName, IpcState &out) {
   out.entries = out.ports;  // live ports seen (table size is kalloc-private)
   for (unsigned w = 0; w < 4; ++w) out.top[w] = worst[w];
 }
+// r227: kernel stacks can lie outside the old kalloc-window predicate. Copy
+// only translated, wired kernel bytes, while task_lock keeps list members live.
+// The helper never faults in a page or treats a failed read as valid zero state.
+static bool kernelRead(Word address, void *out, unsigned size) {
+  return address >= 0xffffff8000000000ULL && size && size <= 0x200 &&
+         address <= ~0ULL - size &&
+         ml_nofault_copy((vm_offset_t)address, (vm_offset_t)out, size) == size;
+}
 static void recordPcHistory(const ProcSnaps &snaps) {
   static PcHistory buffer;
-  bzero(&buffer, sizeof(buffer));
   for (unsigned i = 0; i != snaps.count && i != kMaxProcs; ++i) {
-    if (i >= kPcHistory) break;
-    buffer.sample[buffer.count++] = PcSample{snaps.proc[i].pid,
-                                             snaps.proc[i].thread[0].pc,
-                                             snaps.proc[i].thread[0].lr};
+    const ProcSnap &p = snaps.proc[i];
+    const bool springboard = !strcmp(p.name, "SpringBoard");
+    const bool lsd = !strcmp(p.name, "lsd");
+    if (!springboard && !lsd) continue;
+    // The SB main thread plus lsd's first four threads — the lsd scan
+    // workers are TH_RUN and only their pc/cpu trajectory distinguishes
+    // forward progress from a spin or a scheduling stall.
+    unsigned limit = springboard ? 1u : 4u;
+    if (limit > p.threads) limit = p.threads;
+    for (unsigned j = 0; j < limit; ++j) {
+      if (buffer.count == kPcHistory) {
+        for (unsigned k = 1; k != kPcHistory; ++k) buffer.sample[k - 1] = buffer.sample[k];
+        --buffer.count;
+      }
+      buffer.sample[buffer.count++] = PcSample{p.pid, p.thread[j].tid,
+          p.thread[j].pc, p.thread[j].lr, p.thread[j].cpu, p.stamp};
+    }
   }
   pcHistory = buffer;
 }
 static void snapshotThreads(ProcSnaps &out) {
-  // r216: read-only replacement for the r214 stop-based snapshot (whose real
-  // defect was the queue semantics below, not thread_stop). A blocked
-  // thread's saved user state is frozen on its kernel stack: take the
-  // machine.ss pointers under the task lock (thread+0x110 -> machine, ss at
-  // +0; arm_saved_state flavor@0 = ARM_SAVED_STATE64 21, ss_64 at +8 so
-  // pc@+0x108 lr@+0xf8 sp@+0x100 fp@+0xf0), release, then read the frozen
-  // frames directly. No thread references, no stops, no deallocations —
-  // nothing that can perturb refcounts. A thread that exits between unlock
-  // and read only yields a bounded, flavor-checked garbage frame.
-  static const char *const wanted[kMaxProcs] = {"SpringBoard", "liveactivitiesd", "chronod", "backboardd"};
+  static const char *const wanted[] = {"SpringBoard", "liveactivitiesd", "chronod", "backboardd", "lsd"};
   bzero(&out, sizeof(out));
   for (int pid = 1; pid < 512 && out.count < kMaxProcs; ++pid) {
     proc_t process = proc_find(pid);
@@ -522,8 +546,9 @@ static void snapshotThreads(ProcSnaps &out) {
     char name[32] = {};
     proc_name(pid, name, sizeof(name));
     unsigned slot = kMaxProcs;
-    for (unsigned i = 0; i != kMaxProcs; ++i)
+    for (unsigned i = 0; i != sizeof(wanted) / sizeof(wanted[0]); ++i)
       if (!strcmp(name, wanted[i])) { slot = i; break; }
+    unsigned uid = proc_getuid(process);
     task_t task = TASK_NULL;
     if (slot != kMaxProcs && !proc_exiting(process)) {
       task = proc_task(process);
@@ -533,47 +558,113 @@ static void snapshotThreads(ProcSnaps &out) {
     if (!task) continue;
     ProcSnap &p = out.proc[out.count++];
     p.pid = (unsigned)pid;
+    p.uid = uid;
+    p.stamp = mach_absolute_time();
     for (unsigned i = 0; i != sizeof(p.name); ++i) p.name[i] = name[i] ? name[i] : 0;
-    Word saved[kMaxThreads] = {};
-    unsigned count = 0;
-    // Queue semantics proven against this build's own task_threads_internal
-    // (0xfffffff0072cbb80..0xfffffff0072cbba8): the chain at task+0x80 and the
-    // link at thread+0x428 both store THREAD pointers directly (container
-    // queue), and the loop terminates at the head container address. The
-    // classic member-queue reading (member - 0x428) produced the r214
-    // os_refcnt panic (thread_reference on thread-0x428) and the r216 data
-    // abort at run+0x85c.
+    vm_map_t map = get_task_map(task);
+    Reader r = {map, nullptr};
+    const bool springboard = !strcmp(name, "SpringBoard");
+    const bool lsd = !strcmp(name, "lsd");
+    const bool deep = springboard || lsd;
+    if (deep) {
+      task_dyld_info_data_t dyld = {};
+      mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;
+      p.dyldStatus = (unsigned)task_info(task, TASK_DYLD_INFO, (task_info_t)&dyld, &count);
+      uint8_t infos[184] = {};
+      static const uint8_t cacheUuid[16] = {
+        0x59,0x0d,0x83,0x9a,0x82,0xd2,0x30,0xf1,0xa1,0x7d,0x0c,0xc0,0x53,0x42,0x0f,0x73};
+      if (!p.dyldStatus && dyld.all_image_info_format == TASK_DYLD_ALL_IMAGE_INFO_64 &&
+          dyld.all_image_info_size >= sizeof(infos) &&
+          r.probeBytes(dyld.all_image_info_addr, infos, sizeof(infos))) {
+        memcpy(&p.slide, infos + 0x98, sizeof(p.slide));
+        if (p.slide >= 0x40000000 || memcmp(infos + 0xa0, cacheUuid, 16)) p.dyldStatus = 0x10005;
+      } else if (!p.dyldStatus) p.dyldStatus = 0x10002;
+      if (!p.dyldStatus) {
+        p.lockReadBefore = r.probeBytes(0x1f4884878ULL + p.slide, &p.lockBefore, 8);
+        // Original LSDatabaseGetSeedingGroup global. The object's first word
+        // is the OS_dispatch_group CLASS at 0x1f4844bf0+slide — r228 compared
+        // the VTABLE (0x1f4844c18, __OS_dispatch_group_vtable), 0x28 higher,
+        // so the check never passed and the count read as zeros. The count/
+        // generation word at +0x30 is proven by _dispatch_group_enter
+        // 0x18f5590d0 (atomic on [x0+0x30], -4 per enter); the RAW value and
+        // its deltas are the rebuild progress evidence.
+        if (lsd && r.probeBytes(0x1ed7756e8ULL + p.slide, &p.seedGroup, 8) &&
+            p.seedGroup && r.probeBytes(p.seedGroup, &p.seedIsa, 8) &&
+            p.seedIsa == 0x1f4844bf0ULL + p.slide)
+          p.seedReadBefore = r.probeBytes(p.seedGroup + 0x30, &p.seedBefore, 8);
+      }
+    }
+    // Offsets checked in the pinned build's thread.o DWARF and pcb.o code:
+    // task.threads=0x80, thread.task_threads=0x428 (container queue),
+    // machine=0xf8, upcb=machine+0x18, cthread_self=machine+0x50,
+    // thread_id=0x508. Copy saved registers BEFORE releasing task_lock.
     task_lock(task);
-    Word head = (Word)task + 0x80;
-    for (Word th = *(const Word *)head; th != head && count != kMaxThreads;
-         th = *(const Word *)(th + 0x428)) {
-      saved[count++] = *(const Word *)(th + 0x110);  // machine.ss (runtime-proven)
+    Word head = (Word)task + 0x80, th = 0;
+    unsigned count = 0;
+    if (kernelRead(head, &th, 8)) {
+      while (th != head && th && count != kMaxThreads) {
+        ThreadSnap &t = p.thread[count++];
+        Word next = 0;
+        if (!kernelRead(th + 0x428, &next, 8)) { t.status = 5; break; }
+        kernelRead(th + 0x508, &t.tid, 8);
+        // cpu_time_eqos_stats @ thread+0x4f8 (thread.o DWARF): eight 64-bit
+        // per-QOS mach-absolute accumulators; their sum is the thread's total
+        // CPU time. Read raw under the task lock like every other field.
+        for (unsigned q = 0; q != 8; ++q) {
+          Word v = 0;
+          if (kernelRead(th + 0x4f8 + 8 * q, &v, 8)) t.cpu += v;
+        }
+        kernelRead(th + 0x1f8, &t.kernelState, 4);
+        kernelRead(th + 0x20, &t.waitEvent, 8);
+        kernelRead(th + 0xd8, &t.continuation, 8);
+        kernelRead(th + 0x148, &t.tsd, 8);
+        if (!kernelRead(th + 0x110, &t.savedState, 8)) t.status = 1;
+        else {
+          uint8_t saved[0x110] = {};
+          t.copied = ml_nofault_copy((vm_offset_t)t.savedState, (vm_offset_t)saved, sizeof(saved));
+          if (t.copied != sizeof(saved)) t.status = 2;
+          else {
+            uint32_t flavor = 0;
+            memcpy(&flavor, saved, 4); t.flavor = flavor;
+            if (flavor != 21) t.status = 3;
+            else {
+              memcpy(t.arg, saved + 8, sizeof(t.arg));
+              memcpy(&t.fp, saved + 0xf0, 8);
+              memcpy(&t.lr, saved + 0xf8, 8);
+              memcpy(&t.sp, saved + 0x100, 8);
+              memcpy(&t.pc, saved + 0x108, 8);
+              if (t.pc < 0x1000 || t.pc >= 0x8000000000ULL) t.status = 4;
+            }
+          }
+        }
+        th = next;
+      }
     }
     task_unlock(task);
     p.threads = count;
-    vm_map_t map = get_task_map(task);
-    Reader r = {map, nullptr};
     for (unsigned i = 0; i != count; ++i) {
-      Word ss = saved[i];
-      // The internal header carries ARM_SAVED_STATE64 (21), not the MIG
-      // flavor 6; machine.ss sits at thread+0x110 per this build's
-      // machine_thread_get_state flavor-6 handler (0xfffffff0074078e0).
-      if (!kernelPointer(ss) || *(const unsigned *)ss != 21U) continue;
       ThreadSnap &t = p.thread[i];
-      t.pc = *(const Word *)(ss + 0x108);
-      t.lr = *(const Word *)(ss + 0xf8);
-      t.sp = *(const Word *)(ss + 0x100);
-      if (t.pc < 0x1000 || t.pc >= 0x8000000000ULL) { t.pc = t.lr = t.sp = 0; continue; }
-      Word fp = *(const Word *)(ss + 0xf0);
-      for (unsigned d = 0; d != kFrames; ++d) {
+      // cthread_self is TPIDRRO_EL0, i.e. the TSD base. Original pthread and
+      // both os_unfair_recursive_lock variants read the self port at +0x18.
+      uint32_t port = 0;
+      if (t.tsd && r.probeBytes(t.tsd + 0x18, &port, sizeof(port))) t.port = port;
+      if (t.status) continue;
+      Word fp = t.fp;
+      const unsigned depth = deep ? kFrames : 6;
+      for (unsigned d = 0; d != depth; ++d) {
         Word next = 0, ret = 0;
-        if (fp < 0x1000 || fp >= 0x8000000000ULL) break;
-        if (!r.probeBytes(fp, &next, sizeof(next)) || !r.probeBytes(fp + 8, &ret, sizeof(ret))) break;
+        if (fp < 0x1000 || fp >= 0x8000000000ULL || (fp & 15)) break;
+        if (!r.probeBytes(fp, &next, 8) || !r.probeBytes(fp + 8, &ret, 8)) break;
         if (ret < 0x1000 || ret >= 0x8000000000ULL) break;
         t.ret[d] = ret;
-        if (next <= fp || next - fp > 0x200000) break;  // stacks grow down
+        if (next <= fp || next - fp > 0x200000) break;
         fp = next;
       }
+    }
+    if (deep && !p.dyldStatus) {
+      p.lockReadAfter = r.probeBytes(0x1f4884878ULL + p.slide, &p.lockAfter, 8);
+      if (lsd && p.seedReadBefore)
+        p.seedReadAfter = r.probeBytes(p.seedGroup + 0x30, &p.seedAfter, 8);
     }
     task_deallocate(task);
   }
@@ -712,16 +803,33 @@ extern "C" void e5_ca_probe_dump(void) {
   }
   for (unsigned i = 0; i != pcLocal.count && i != kPcHistory; ++i) {
     const PcSample &h = pcLocal.sample[i];
-    log("E5THH k=%u pid=%u pc=%llx lr=%llx", i, h.pid, h.pc, h.lr);
+    log("E5THH k=%u pid=%u tid=%llx pc=%llx lr=%llx cpu=%llx ts=%llx", i,h.pid,h.tid,h.pc,h.lr,h.cpu,h.stamp);
   }
   for (unsigned i = 0; i != threadLocal.count && i != kMaxProcs; ++i) {
     const ProcSnap &p = threadLocal.proc[i];
-    log("E5THP i=%u pid=%u name=%s n=%u", i, p.pid, p.name[0] ? p.name : "-", p.threads);
+    log("E5THP i=%u pid=%u name=%s n=%u uid=%u ts=%llx", i,p.pid,p.name[0] ? p.name : "-",p.threads,p.uid,p.stamp);
+    const bool springboard = !strcmp(p.name, "SpringBoard");
+    const bool lsd = !strcmp(p.name, "lsd");
+    const bool deep = springboard || lsd;
+    if (lsd)
+      log("E5LSD pid=%u uid=%u sl=%llx kr=%llx gp=%llx isa=%llx rd=%llu:%llu raw=%llx:%llx lk=%llx:%llx",
+          p.pid,p.uid,p.slide,p.dyldStatus,p.seedGroup,p.seedIsa,p.seedReadBefore,p.seedReadAfter,p.seedBefore,p.seedAfter,p.lockBefore,p.lockAfter);
+    if (springboard)
+      log("E5LS pid=%u sl=%llx kr=%llx rd=%llu:%llu raw=%llx:%llx",
+          p.pid, p.slide, p.dyldStatus, p.lockReadBefore, p.lockReadAfter, p.lockBefore, p.lockAfter);
     for (unsigned j = 0; j != p.threads && j != kMaxThreads; ++j) {
       const ThreadSnap &t = p.thread[j];
-      log("E5TH i=%u j=%u pc=%llx lr=%llx sp=%llx", i, j, t.pc, t.lr, t.sp);
-      log("E5THF i=%u j=%u r=%llx,%llx,%llx,%llx,%llx,%llx",
+      log("E5TH i=%u j=%u pc=%llx lr=%llx sp=%llx tid=%llx mp=%llx tsd=%llx st=%llu ss=%llx fl=%llu nb=%llu ks=%llx we=%llx co=%llx cpu=%llx",
+          i,j,t.pc,t.lr,t.sp,t.tid,t.port,t.tsd,t.status,t.savedState,t.flavor,t.copied,t.kernelState,t.waitEvent,t.continuation,t.cpu);
+      if (deep || j == 0) log("E5THF i=%u j=%u r=%llx,%llx,%llx,%llx,%llx,%llx",
           i, j, t.ret[0], t.ret[1], t.ret[2], t.ret[3], t.ret[4], t.ret[5]);
+      if (deep) {
+        for (unsigned k = 6; k < kFrames && t.ret[k]; k += 6)
+          log("E5THX i=%u j=%u k=%u r=%llx,%llx,%llx,%llx,%llx,%llx",
+              i,j,k,t.ret[k],t.ret[k+1],t.ret[k+2],t.ret[k+3],t.ret[k+4],t.ret[k+5]);
+        log("E5THA i=%u j=%u x=%llx,%llx,%llx,%llx,%llx,%llx,%llx,%llx",
+            i,j,t.arg[0],t.arg[1],t.arg[2],t.arg[3],t.arg[4],t.arg[5],t.arg[6],t.arg[7]);
+      }
     }
   }
   __atomic_store_n(&dumping, 0U, __ATOMIC_RELEASE);

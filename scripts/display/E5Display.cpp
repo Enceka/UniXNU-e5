@@ -454,7 +454,11 @@ static void e5_state_log(const char *format, ...) {
   // the late E5CA/E5TH probe dumps out of every retained capture (r219 kept
   // only generation 6). e5-no-state keeps the display service untouched and
   // only silences this line so end-of-window snapshots survive.
-  if (PE_parse_boot_argn("e5-no-state", nullptr, 0)) return;
+  // The r221 payload inherited r219's config and lost e5-no-state. A CA
+  // detail capture already reports the display state; avoid evicting its
+  // LS/thread evidence with the per-vsync summary when that probe is active.
+  if (PE_parse_boot_argn("e5-no-state", nullptr, 0) ||
+      PE_parse_boot_argn("e5-ca-state", nullptr, 0)) return;
   char line[512];
   va_list args;
   va_start(args, format);
