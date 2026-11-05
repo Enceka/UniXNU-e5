@@ -907,7 +907,20 @@ public:
         slot[6] = g;
       }
     }
-    (void)e; (void)f; (void)g;
+    // r225: the r224b capture settled the marshaling — b = block id
+    // (0x4d then 0x40), g = size (0x62c=1580 for block 77, 0x2c=44 for block
+    // 0x40), f = the output buffer (page-aligned kernel address), a = the
+    // connection context. r221 wrote to a — kernel corruption, the RW-lock
+    // panics. Answer block 0x40 into f: 44 bytes, color element ID at +4 and
+    // timing element ID at +8 matching e5PublishModeTable (both 1).
+    if (b == 0x40u && f && g >= 12u) {
+      uint8_t *out = (uint8_t *)f;
+      unsigned n = g < 44u ? g : 44u;
+      for (unsigned i = 0; i < n; ++i) out[i] = 0;
+      *(uint32_t *)(out + 4) = 1;  // color element ID
+      *(uint32_t *)(out + 8) = 1;  // timing element ID
+    }
+    (void)a; (void)c; (void)d; (void)e;
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 7, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
