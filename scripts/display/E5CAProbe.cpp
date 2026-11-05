@@ -591,8 +591,13 @@ static void snapshotThreads(ProcSnaps &out) {
         // between "sqlite row I/O (preseed/speed up storage)" and "lock spin
         // (name the owner)" — the UI goal has no use for another window.
         Word arrayPtr = 0, arrayCount = 0;
-        if (memcpy(&arrayCount, infos + 8, 8), memcpy(&arrayPtr, infos + 0x10, 8),
-            arrayPtr && arrayCount && arrayCount < 512) {
+        // r232: user64 layout is infoArrayCount@+4 (u32) and infoArray@+8;
+        // r231 read the pointer as the count so the guard never opened.
+        uint32_t arrayCount32 = 0;
+        memcpy(&arrayCount32, infos + 4, 4);
+        memcpy(&arrayPtr, infos + 8, 8);
+        arrayCount = arrayCount32;
+        if (arrayPtr && arrayCount && arrayCount < 512) {
           for (unsigned e = 0; e < arrayCount && p.images < 16; ++e) {
             Word entry = arrayPtr + 21 * e * 8;  // dyld_image_info: 3 pointers
             Word loadAddress = 0, pathPtr = 0;
