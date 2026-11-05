@@ -19,6 +19,8 @@ using e5_notify_fn = void (*)(void *, void *);
 #include <stdarg.h>
 
 extern "C" unsigned e5_quiet;
+extern "C" void e5_ca_probe_request(unsigned pid);
+extern "C" void e5_ca_probe_dump(void);
 extern "C" void e5_kputc(char);
 extern "C" void *e5_display_async_reg3(void);
 extern "C" unsigned e5_pmic_peek(unsigned off); // NativeSd.cpp: PMIC ADI read for wdt probe
@@ -56,6 +58,7 @@ static void e5_display_runtime_census() {
       if (strcmp(name, targets[i]) != 0) continue;
       seen |= 1u << i;
       const int exiting = proc_exiting(process);
+      if (i == 1 && !exiting) e5_ca_probe_request((unsigned)pid);
       task_t task = exiting ? TASK_NULL : proc_task(process);
       e5_display_tracef("E5PROC seq=%u pid=%d name=%s exit=%d active=%u suspended=%u\n",
           sample, pid, name, exiting,
@@ -83,6 +86,7 @@ static void e5_display_runtime_census() {
   { if (!e5_quiet)
       e5_display_tracef("E5LIVE seq=%u pid_limit=512 seen=%02x services=%02x\n",
       sample, seen, published); }
+  e5_ca_probe_dump();
 }
 
 extern kmod_info_t g_kernel_kmod_info;
@@ -557,7 +561,7 @@ extern "C" void e5_dpu_tick(void) {
       void *n3 = e5_display_async_node3();
       unsigned long long *w3 = (unsigned long long *)n3;
       { unsigned long long *rw = (unsigned long long *)e5_display_async_reg3();
-        e5_display_tracef("E5REG3 %p %llx %llx %llx %llx", rw ? rw[0] : 0, rw ? rw[1] : 0, rw ? rw[2] : 0, rw ? rw[3] : 0, rw ? rw[4] : 0); }
+        e5_display_tracef("E5REG3 %llx %llx %llx %llx", rw ? rw[0] : 0, rw ? rw[1] : 0, rw ? rw[2] : 0, rw ? rw[3] : 0); }
       { if (!e5_quiet)
             e5_display_tracef("E5DPU t=%u ctl=%x duty=%x crc=%08x v=%u wdt=%x af=%u gl=%d n3=%p %llx %llx %llx %llx %llx %llx",
           sPaintTicks, *ctl2,

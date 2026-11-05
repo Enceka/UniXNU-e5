@@ -23,7 +23,7 @@ unsigned e5_display_client_calls = 0;
 unsigned e5_display_client_successes = 0;
 unsigned e5_display_client_type = 0;
 unsigned long long e5_display_uc_vtable = 0;
-static unsigned e5_fake_e88_disabled = 1; // v39 A/B: e88 fake OFF unless e5-fake-e88 boot arg
+static unsigned e5_fake_e88_disabled = 0; // v43: ON — instance now 0x2110 so +0x1e88 is in-bounds
 static void e5_fake_gate_init(void) {
   if (PE_parse_boot_argn("e5-fake-e88", nullptr, 0)) e5_fake_e88_disabled = 0;
 }
@@ -91,7 +91,14 @@ static void e5_state_log(const char *fmt, ...);
 // sub-objects (+0x1638 event source, +0x1658 swap-wait helper). arm64 KC =
 // plain blr vtable dispatch (no PAC), so raw function pointers are safe.
 extern "C" unsigned long e5FakeFamilyThunk(void) { return 0; }
-static void *const e5FakeFamilyVt[128] = {
+// v44: the panel-info gate (helper 0x6bd6a90 vt+0x668) must return a NON-NULL
+// pointer — cbz x0 takes the 0xe00002c7 bail (r203). The memcpy source is the
+// RETURNED pointer +0x10. Static zero blob 0xc20 covers the 0xc0c copy.
+static unsigned long long e5FakePanelBlob[0xc20 / 8];
+extern "C" unsigned long e5FakeFamilyThunkObj(void) {
+  return (unsigned long)&e5FakePanelBlob[0];
+}
+static void *const e5FakeFamilyVt[264] = {
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
@@ -127,6 +134,74 @@ static void *const e5FakeFamilyVt[128] = {
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunkObj,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
@@ -158,7 +233,11 @@ static void *const e5FakeFamilyVt[128] = {
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
 };
 static void *sAsyncNode = nullptr; // r153: kind-3 node captured at registration
-static void *sAsyncReg = nullptr;  // r165: kind-3 registration record (port lives at +8 if async)
+// Registration arguments can live on the caller's stack. Retain only bounded
+// diagnostic copies; r201 faulted while the DPU timer reread that dead stack.
+static unsigned long long sAsyncRegSnapshot[4] = {};
+static unsigned long long sAsyncNodeSnapshot[6] = {};
+static unsigned sAsyncDiagnosticValid = 0;
 extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
                                             unsigned long long payload0);
 static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
@@ -255,8 +334,12 @@ static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *,
 // marshaling is far heavier than r126's raw send. Move delivery to a
 // self-rescheduling thread_call timer so the echo thread never blocks.
 extern "C" void e5_display_async_fire(void); // timer body below
-extern "C" void *e5_display_async_node3(void) { return sAsyncNode; }
-extern "C" void *e5_display_async_reg3(void) { return sAsyncReg; }
+extern "C" void *e5_display_async_node3(void) {
+  return __atomic_load_n(&sAsyncDiagnosticValid, __ATOMIC_ACQUIRE) ? sAsyncNodeSnapshot : nullptr;
+}
+extern "C" void *e5_display_async_reg3(void) {
+  return __atomic_load_n(&sAsyncDiagnosticValid, __ATOMIC_ACQUIRE) ? sAsyncRegSnapshot : nullptr;
+}
 extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
                                             unsigned long long payload0);
 
@@ -684,7 +767,11 @@ public:
       __atomic_fetch_or(&e5_display_async_kinds, 1u << kind, __ATOMIC_RELAXED);
       if (kind == 3) {
         sAsyncNode = node; // r153: deliver through the node the client handed us
-        sAsyncReg = registration; // r165: the registration record outlives the call
+        __atomic_store_n(&sAsyncDiagnosticValid, 0U, __ATOMIC_RELEASE);
+        bzero(sAsyncRegSnapshot, sizeof(sAsyncRegSnapshot));
+        if (registration) memcpy(sAsyncRegSnapshot, registration, sizeof(sAsyncRegSnapshot));
+        memcpy(sAsyncNodeSnapshot, node, sizeof(sAsyncNodeSnapshot));
+        __atomic_store_n(&sAsyncDiagnosticValid, 1U, __ATOMIC_RELEASE);
         unsigned long long *w = (unsigned long long *)node;
         e5_state_log("E5REG k=3 node=%p reg=%p w0=%llx w1=%llx w2=%llx w3=%llx w4=%llx",
                      node, registration, w[0], w[1], w[2], w[3], w[4]);
@@ -779,14 +866,14 @@ public:
   // miscategorized as 207 — 0x658/8 IS 203, an unoverridden Unsupported
   // stub). Zero-fill + success.
   IOReturn opaque200(void *out) override {
-    (void)out;
-    // r170 A/B: DECLINE the display-info query instead of zero-filling it.
-    // If the client distinguishes failure from an empty-but-valid struct,
-    // its behavior (selector set / userclients / F) will shift; identical
-    // behavior would mean the 0xc0c content is not consulted at all and
-    // the empty-scene hypothesis dies.
+    // v45: zero-fill + success (r170's decline A/B answered — the client
+    // DOES distinguish failure: pool-B sel 17 n=1 ok=0 ret=e00002c7 with
+    // E5CAX all-zero = display never configured while this declined).
+    // ABI (r204 decode): wrapper 0x677a0c8 validates structureOutputSize
+    // 0xc0c, forwarder 0x6778040 -> slot200(this, out).
+    if (out) bzero(out, 0xc0c);
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 8, __ATOMIC_RELAXED);
-    return kIOReturnUnsupported;
+    return kIOReturnSuccess;
   }
   IOReturn opaque203(void *a) override {
     (void)a;
@@ -803,7 +890,7 @@ public:
 };
 
 OSDefineMetaClassAndStructors(E5Display, IOMobileFramebufferLegacy)
-static_assert(sizeof(E5Display) == 0x18a8, "Only owned lifecycle flags extend Legacy");
+static_assert(sizeof(E5Display) == 0x2118, "v43: grown Legacy extent carries the +0x1e88 panel pointer in-bounds");
 
 extern "C" unsigned e5_display_compiled_size(void) { return sizeof(E5Display); }
 

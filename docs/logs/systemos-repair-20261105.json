@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "updated_at": "2026-11-04T22:10:55.173118+00:00",
+  "scope": "SystemOS repair; UI remains unqualified",
+  "single_page": {
+    "created_at": "2026-11-04T22:01:21.862743+00:00",
+    "action": "Rewrite one verified original SystemOS page at its unchanged location",
+    "card_lba": 12807632,
+    "bytes": 16384,
+    "source_sha256": "dacf90e09a69af6decc9f6052c743c9e0e3a720ccb6aca4c017f4b9d80bb98bc",
+    "backup_sha256": "50d25ebf93706441f00d1ad9dc4074e633ea2c17ac0ee015c4fe5e7278bd3acc",
+    "backup": "/Volumes/Projects/e5-xnu/uefi/build/systemos-read-repair-20261105/page-before.bin",
+    "android_boot_id": "cea37ad0-12f3-4d21-8104-c062367f4a13",
+    "command": "dd if=/data/local/tmp/e5-sd-reference-20261105.bin of=/dev/block/mmcblk1 bs=4096 seek=1600954 count=4 conv=notrunc,fsync",
+    "write_returncode": 0,
+    "write_stdout": "",
+    "write_stderr": "conv=5\n4+0 records in\n4+0 records out\n16384 bytes (16 K) copied, 0.013886 s, 1.1 M/s\n",
+    "direct_read_after": "mode=direct offset=6557507584 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=9460\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1060\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=783\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=847\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=781\niter=5 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=674\niter=6 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=792\niter=7 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=778\niter=8 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=768\niter=9 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=728\nresult=match\n"
+  },
+  "cache_file": {
+    "file": "/Volumes/DawnUpdate21H461.J120J121J207J208SystemCryptex/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64.01",
+    "source_sha256": "43a0e20d64a835266938b6dc5187a9ba74e68c433c0339935519a0cc860a6346",
+    "container_offset": 25288704,
+    "card_byte_offset": 6467739648,
+    "size": 114720768,
+    "card_first_lba": 12632304,
+    "source_extent_verified": true,
+    "remote_backup": "/data/local/tmp/e5-systemos-cache01-before-20261105.bin",
+    "remote_source": "/data/local/tmp/e5-systemos-cache01-source-20261105.bin",
+    "stage": "complete-file-readback-and-sentinels-pass",
+    "backup_command": "dd if=/dev/block/mmcblk1 of=/data/local/tmp/e5-systemos-cache01-before-20261105.bin bs=4096 skip=1579038 count=28008 conv=fsync",
+    "backup_returncode": 0,
+    "backup_stdout": "",
+    "backup_stderr": "conv=1\n28008+0 records in\n28008+0 records out\n114720768 bytes (109 M) copied, 3.688198 s, 30 M/s\n",
+    "backup_sha256": "4529d4459d4767c9bb0b45a840fdbf357c44b7f261a0e1b3ca658bb82b50236b",
+    "write_command": "dd if=/data/local/tmp/e5-systemos-cache01-source-20261105.bin of=/dev/block/mmcblk1 bs=4096 seek=1579038 count=28008 conv=notrunc,fsync",
+    "write_returncode": 0,
+    "write_stdout": "",
+    "write_stderr": "conv=5\n28008+0 records in\n28008+0 records out\n114720768 bytes (109 M) copied, 6.786438 s, 16 M/s\n",
+    "complete_file_readback_sha256": "43a0e20d64a835266938b6dc5187a9ba74e68c433c0339935519a0cc860a6346",
+    "protected_metadata_sha256": {
+      "os-gpt": "813cf9e0ec5dbc68e6e038359bdb6ae619a7956ceaf2b260e39b29ff26410342",
+      "os-backup": "b362f5f90062e2a5ae2b7d2ec47483337861b0f62cb4cc3544a1abf951e9d618",
+      "systemos-head": "557802857a9dbf401af64d4ea28f83b16a556a75642c1644aded536657757726",
+      "systemos-tail": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7"
+    }
+  },
+  "complete_systemos_readback": {
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk1 bs=1048576 skip=6144 count=3150 2>/dev/null | sha256sum",
+    "seconds": 46.45,
+    "stdout": "b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f  -\n",
+    "stderr": "",
+    "transport_returncode": 0,
+    "expected": "b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f",
+    "matches_source": true
+  },
+  "direct_reads_after_repair": [
+    {
+      "file_offset": 89669632,
+      "card_lba": 12807440,
+      "stdout": "mode=direct offset=6557409280 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=9440\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=897\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=763\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=791\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=747\niter=5 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=752\niter=6 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=897\niter=7 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=846\niter=8 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=743\niter=9 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=812\nresult=match\n"
+    },
+    {
+      "file_offset": 89767936,
+      "card_lba": 12807632,
+      "stdout": "mode=direct offset=6557507584 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=11312\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1607\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1444\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1244\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1697\niter=5 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1125\niter=6 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1565\niter=7 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1042\niter=8 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1467\niter=9 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1127\nresult=match\n"
+    },
+    {
+      "file_offset": 89964544,
+      "card_lba": 12808016,
+      "stdout": "mode=direct offset=6557704192 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=9407\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1052\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=966\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1212\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=932\niter=5 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=996\niter=6 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1110\niter=7 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1093\niter=8 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1001\niter=9 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1018\nresult=match\n"
+    },
+    {
+      "file_offset": 109232128,
+      "card_lba": 12845648,
+      "stdout": "mode=direct offset=6576971776 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=9614\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=994\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=1661\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=1076\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=885\niter=5 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=1136\niter=6 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=1230\niter=7 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=1238\niter=8 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=1098\niter=9 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=1017\nresult=match\n"
+    }
+  ],
+  "r199_cycle": {
+    "round": 199,
+    "experiment": "Storage repair only; unchanged r198 payload and card Data",
+    "stage": "complete",
+    "updated_at": "2026-11-04T22:19:38.362222+00:00",
+    "payload_sha256": "7a4f0ce513cdfb8d49ba74f7285d4a5f1e7b9ed2c200a0e1cf8402e7d46e7a6b",
+    "payload_bytes": 62926860,
+    "data_sha256_before": "7c7394a606f34d23d9e290dd60b762fb0ac99a3fe33b478dc55db31de080058d",
+    "android_boot_id_before": "cea37ad0-12f3-4d21-8104-c062367f4a13",
+    "full_payload_readback_verified": true,
+    "reports": [
+      "/Volumes/Projects/e5-xnu/dumps/uefi-report-061933.txt"
+    ],
+    "data_sha256_after": "7c7394a606f34d23d9e290dd60b762fb0ac99a3fe33b478dc55db31de080058d",
+    "android_boot_id_after": "994cf0d1-8e9b-4e8e-a0af-4ea324ee0a2b",
+    "android_slot_after": "_a"
+  },
+  "r199_kernel_summary": {
+    "record": "/Volumes/Projects/e5-xnu/uefi/build/watchdog-policy-r65/board-r199/dmesg-ramoops-0.bin",
+    "record_sha256": "773b4d159dbb9d3a2a5a71f2495b6c2d42eb252313f5943ff8b61c20234fce69",
+    "offset": 7936,
+    "position": 15817,
+    "ring_bytes": 24568,
+    "panic": "panic(cpu 0 caller 0xfffffff0079f38b0): tzinit[17] exited -- no exit reason available -- (signal 0, exit status 30 )",
+    "kernel_uuid": "ACB4342F-1F4C-3193-92F1-AC694E361574"
+  },
+  "direct_reads_after_r199_reboot": [
+    {
+      "file_offset": 89669632,
+      "stdout": "mode=direct offset=6557409280 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=9316\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=1002\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=840\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=857\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=c3285d465abeb43c us=930\nresult=match\n"
+    },
+    {
+      "file_offset": 89767936,
+      "stdout": "mode=direct offset=6557507584 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=10768\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1428\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1331\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1245\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=1200\nresult=match\n"
+    },
+    {
+      "file_offset": 89964544,
+      "stdout": "mode=direct offset=6557704192 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=9731\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1105\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1189\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1327\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=1d7dba758de9e9d8 us=1458\nresult=match\n"
+    },
+    {
+      "file_offset": 109232128,
+      "stdout": "mode=direct offset=6576971776 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=10020\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=912\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=879\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=835\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=edeb114b712da8dd us=897\nresult=match\n"
+    }
+  ],
+  "r200_source_restoration": {
+    "source": "/private/tmp/e5-local-build-r198/e5/ipados-17.7.11-21H461/e5/tree/.cache/xnu-work/bsd/kern/kern_exec.c",
+    "before_sha256": "2a8b61eea807fa8c2a16e7983212476c88853e896925678d85a3439fc6f52e2c",
+    "after_sha256": "acd80cdfa6ce85e363d25b932a43490b13cfb004ac17c35fb2ec01844c56838f",
+    "change": "Restore writable Data mount, removing the prepared-tree-only r193 readonly experiment. Keep r198 archives, Data, ADT and boot arguments."
+  }
+}

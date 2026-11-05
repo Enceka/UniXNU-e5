@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "probe_source_sha256": "90d99dba83ca6b06ba874cc5d5d65aa69f29b45924442f1a8b3d058f75d66b32",
+  "tests": [
+    {
+      "label": "emmc-reference-buffered",
+      "command": "/data/local/tmp/e5-sd-read-probe-20261105 /data/local/tmp/e5-sd-reference-20261105.bin 0 16384 10 buffered /data/local/tmp/e5-sd-reference-20261105.bin",
+      "transport_returncode": 0,
+      "stdout": "mode=buffered offset=0 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=32\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=10\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=18\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=16\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=14\niter=5 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=14\niter=6 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=14\niter=7 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=10\niter=8 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=12\niter=9 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=9\nresult=match\n",
+      "stderr": "",
+      "mmc_stat_before": "190        0     6552    11814        0        0        0        0        0    12116    11814        0        0        0        0        0        0",
+      "mmc_stat_after": "190        0     6552    11814        0        0        0        0        0    12116    11814        0        0        0        0        0        0"
+    },
+    {
+      "label": "emmc-reference-direct",
+      "command": "/data/local/tmp/e5-sd-read-probe-20261105 /data/local/tmp/e5-sd-reference-20261105.bin 0 16384 10 direct /data/local/tmp/e5-sd-reference-20261105.bin",
+      "transport_returncode": 0,
+      "stdout": "mode=direct offset=0 length=16384\niter=0 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=9305\niter=1 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=426\niter=2 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=283\niter=3 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=360\niter=4 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=285\niter=5 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=290\niter=6 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=233\niter=7 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=214\niter=8 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=271\niter=9 bytes=16384 diff_ref=0 diff_prev=0 fnv64=8ce2f51d15dd8d6b us=305\nresult=match\n",
+      "stderr": "",
+      "mmc_stat_before": "190        0     6552    11814        0        0        0        0        0    12116    11814        0        0        0        0        0        0",
+      "mmc_stat_after": "190        0     6552    11814        0        0        0        0        0    12116    11814        0        0        0        0        0        0"
+    },
+    {
+      "label": "sd-buffered",
+      "command": "/data/local/tmp/e5-sd-read-probe-20261105 /dev/block/mmcblk1 6557507584 16384 10 buffered /data/local/tmp/e5-sd-reference-20261105.bin",
+      "transport_returncode": 0,
+      "stdout": "mode=buffered offset=6557507584 length=16384\niter=0 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=157196\niter=1 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=19\niter=2 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=12\niter=3 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=14\niter=4 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=11\niter=5 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=10\niter=6 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=9\niter=7 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=20\niter=8 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=14\niter=9 bytes=16384 diff_ref=1890 diff_prev=0 fnv64=27813230cacc281f us=17\nresult=mismatch\n",
+      "stderr": "",
+      "mmc_stat_before": "190        0     6552    11814        0        0        0        0        0    12116    11814        0        0        0        0        0        0",
+      "mmc_stat_after": "191        0     6584    11971        0        0        0        0        0    12276    11971        0        0        0        0        0        0"
+    },
+    {
+      "label": "sd-direct",
+      "command": "/data/local/tmp/e5-sd-read-probe-20261105 /dev/block/mmcblk1 6557507584 16384 10 direct /data/local/tmp/e5-sd-reference-20261105.bin",
+      "transport_returncode": 0,
+      "stdout": "mode=direct offset=6557507584 length=16384\niter=0 bytes=16384 diff_ref=1337 diff_prev=0 fnv64=7b044f63faa2e478 us=100797\niter=1 bytes=16384 diff_ref=790 diff_prev=1802 fnv64=faa66edb71b17d70 us=148185\niter=2 bytes=16384 diff_ref=3851 diff_prev=3265 fnv64=ed72336432fd9cf7 us=200891\niter=3 bytes=16384 diff_ref=3831 diff_prev=702 fnv64=d5f6654087e6271 us=200895\niter=4 bytes=16384 diff_ref=3798 diff_prev=732 fnv64=f8c010645db0c411 us=200226\niter=5 bytes=16384 diff_ref=1913 diff_prev=2297 fnv64=e258fcf023c6e43c us=151975\niter=6 bytes=16384 diff_ref=130 diff_prev=1825 fnv64=9f0d91d946e318f2 us=82909\niter=7 bytes=16384 diff_ref=1867 diff_prev=1780 fnv64=90bcba489c6a751d us=202078\niter=8 bytes=16384 diff_ref=3808 diff_prev=2310 fnv64=f65edb2abcaa702d us=200910\niter=9 bytes=16384 diff_ref=3854 diff_prev=744 fnv64=7285327fa2136d47 us=200595\nresult=mismatch\n",
+      "stderr": "",
+      "mmc_stat_before": "191        0     6584    11971        0        0        0        0        0    12276    11971        0        0        0        0        0        0",
+      "mmc_stat_after": "201        0     6904    13656        0        0        0        0        0    13976    13656        0        0        0        0        0        0"
+    }
+  ]
+}

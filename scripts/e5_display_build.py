@@ -150,7 +150,7 @@ def main():
 #include <libkern/libkern.h>
 class IOMobileFramebufferLegacy : public IOService {
   OSDeclareAbstractStructors(IOMobileFramebufferLegacy)
-  unsigned char originalPrivate[0x18a0 - sizeof(IOService)];
+  unsigned char originalPrivate[0x2110 - sizeof(IOService)];
 public:
   void installBootDimensions(uint32_t width, uint32_t height) {
     auto bytes = reinterpret_cast<unsigned char *>(this);
@@ -245,7 +245,7 @@ public:
             header += f'  virtual IOReturn opaque{i}(uint32_t, void *, void *, void *) = 0;\n'
         else:
             header += f'  virtual __attribute__((deprecated("Unqualified prototype: never call from source"))) void opaque{i}();\n'
-    header += '};\nstatic_assert(sizeof(IOMobileFramebufferLegacy) == 0x18a0, "Original Legacy extent");\n'
+    header += '};\nstatic_assert(sizeof(IOMobileFramebufferLegacy) == 0x2110, "Original Legacy extent (v43: panel sub-object pointer at +0x1e88 in-bounds)");\n'
     (OUT / 'OriginalLegacyFramebufferABI.h').write_text(header)
     if '--audit-only' in sys.argv[2:]:
         print(json.dumps(dict(original_kernelcache_sha256=digest(kc),
@@ -277,7 +277,7 @@ public:
             i += 1
         args += ['-I', OUT, '-I', ROOT / '.cache/xnu-work/osfmk', '-Wall', '-Wextra', '-Werror',
                  '-Wno-unused-parameter', '-Wno-unnecessary-virtual-specifier', '-Wno-c99-designator',
-                 '-Wno-reorder-init-list', '-Wno-deprecated-enum-enum-conversion']
+                 '-Wno-reorder-init-list', '-Wno-deprecated-enum-enum-conversion', '-Wno-incompatible-sysroot']
         (OUT / (out_name + '-command.json')).write_text(json.dumps([str(a) for a in args], indent=2) + '\n')
         run(args, cwd=record['directory'])
         return OUT / (out_name + '.o')
@@ -301,7 +301,7 @@ public:
             i += 1
         args += ['-I', OUT, '-I', ROOT / '.cache/xnu-work/osfmk', '-Wall', '-Wextra', '-Werror',
                  '-Wno-unused-parameter', '-Wno-unnecessary-virtual-specifier', '-Wno-c99-designator',
-                 '-Wno-reorder-init-list', '-Wno-deprecated-enum-enum-conversion']
+                 '-Wno-reorder-init-list', '-Wno-deprecated-enum-enum-conversion', '-Wno-incompatible-sysroot']
         (OUT / (name + '-command.json')).write_text(json.dumps([str(a) for a in args], indent=2) + '\n')
         run(args, cwd=record['directory'])
         return OUT / (name + '.o')
@@ -363,17 +363,18 @@ public:
         return data[sec['fileoff']:sec['fileoff'] + sec['size']]
     require(code(blob, image) == code(late.read_bytes(), later), 'late-init staging modified owned instructions')
     probe = compile_source('E5DisplayProbe')
+    ca_probe = compile_source('E5CAProbe')
     mali = compile_source_at('E5Mali', SOURCE.parent / 'gpu' / 'E5Mali.cpp')
     archive = ROOT / 'build/e5-emmc/libE5Emmc.a'
     require(archive.is_file(), 'storage archive must be built first')
-    run(['ar', 'rcs', archive, late, OUT / 'E5DisplayBindings.o', probe, mali])
+    run(['ar', 'rcs', archive, late, OUT / 'E5DisplayBindings.o', probe, ca_probe, mali])
     report = dict(schema=1, original_kernelcache_sha256=digest(kc), original_family_text_sha256=FAMILY_HASH,
-                  original_slide=slide, legacy_instance_bytes=0x18a0, virtual_entries=358,
+                  original_slide=slide, legacy_instance_bytes=0x2110, virtual_entries=358,
                   guarded_backend_slots=PURE, owned_slots=owned_slots, inherited_native_slots=native_slots,
                   bindings={name: hex(va) for name, va in sorted(bindings.items())},
                   generated_header_sha256=digest(header.encode()), object_sha256=digest(blob),
                   source_sha256={p.name: digest(p.read_bytes()) for p in
-                                 [SOURCE / 'E5Display.cpp', SOURCE / 'E5DisplayProbe.cpp', Path(__file__)]},
+                                 [SOURCE / 'E5Display.cpp', SOURCE / 'E5DisplayProbe.cpp', SOURCE / 'E5CAProbe.cpp', Path(__file__)]},
                   late_object_sha256=digest(late.read_bytes()), archive_sha256=digest(archive.read_bytes()),
                   automatic_initializer_removed=True, owned_instructions_unchanged=True,
                   runtime_registration_verified=False, runtime_construction_verified=False,
