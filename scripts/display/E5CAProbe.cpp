@@ -95,10 +95,15 @@ struct PoolState { Word virtCount, refFB, actFB, infoCount, timerSerial; SlotSta
 // of UniXNU-qemu's snapshot-ui-threads).
 struct ThreadSnap { Word pc, lr, sp; Word ret[6]; };
 struct ProcSnap { unsigned pid, threads; char name[20]; ThreadSnap thread[12]; };
-static const unsigned kMaxProcs = 3;
+static const unsigned kMaxProcs = 4;
 static const unsigned kMaxThreads = 12;
 static const unsigned kFrames = 6;
 struct ProcSnaps { unsigned count; ProcSnap proc[kMaxProcs]; };
+// r219: rolling sample of each proc's first-thread pc across worker runs —
+// distinguishes a CPU spin (varying pc) from a frozen/stuck thread (constant).
+struct PcSample { unsigned pid; Word pc, lr; };
+static const unsigned kPcHistory = 24;
+struct PcHistory { unsigned count; PcSample sample[kPcHistory]; };
 // Kernel-side IPC census of the probed task: how many mk_timer ports exist,
 // whether any fired-but-undrained messages sit in their queues, and the
 // armed deadline of the CA display timer's own port.
@@ -113,6 +118,7 @@ static EntryState entries[kMaxEntries];
 static PoolState pool;
 static IpcState ipc;
 static ProcSnaps threads;
+static PcHistory pcHistory;
 static unsigned generation, busy, selectedPid;
 static thread_call_t worker;
 static bool enabled() {
@@ -487,6 +493,17 @@ static void ipcCensus(task_t task, Word caPortName, IpcState &out) {
   out.entries = out.ports;  // live ports seen (table size is kalloc-private)
   for (unsigned w = 0; w < 4; ++w) out.top[w] = worst[w];
 }
+static void recordPcHistory(const ProcSnaps &snaps) {
+  static PcHistory buffer;
+  bzero(&buffer, sizeof(buffer));
+  for (unsigned i = 0; i != snaps.count && i != kMaxProcs; ++i) {
+    if (i >= kPcHistory) break;
+    buffer.sample[buffer.count++] = PcSample{snaps.proc[i].pid,
+                                             snaps.proc[i].thread[0].pc,
+                                             snaps.proc[i].thread[0].lr};
+  }
+  pcHistory = buffer;
+}
 static void snapshotThreads(ProcSnaps &out) {
   // r216: read-only replacement for the r214 stop-based snapshot (whose real
   // defect was the queue semantics below, not thread_stop). A blocked
@@ -497,7 +514,7 @@ static void snapshotThreads(ProcSnaps &out) {
   // frames directly. No thread references, no stops, no deallocations —
   // nothing that can perturb refcounts. A thread that exits between unlock
   // and read only yields a bounded, flavor-checked garbage frame.
-  static const char *const wanted[kMaxProcs] = {"SpringBoard", "liveactivitiesd", "chronod"};
+  static const char *const wanted[kMaxProcs] = {"SpringBoard", "liveactivitiesd", "chronod", "backboardd"};
   bzero(&out, sizeof(out));
   for (int pid = 1; pid < 512 && out.count < kMaxProcs; ++pid) {
     proc_t process = proc_find(pid);
@@ -587,6 +604,7 @@ static void run(thread_call_param_t, thread_call_param_t) {
       inspect(task, state, snapshot, &poolSnapshot);
       ipcCensus(task, snapshot[0].timer.portName, ipcSnapshot);
       snapshotThreads(threadSnapshot);
+      recordPcHistory(threadSnapshot);
       task_deallocate(task);
     }
   }
@@ -623,6 +641,7 @@ extern "C" void e5_ca_probe_dump(void) {
   static PoolState poolLocal;
   static IpcState ipcLocal;
   static ProcSnaps threadLocal;
+  static PcHistory pcLocal;
   static unsigned dumping;
   unsigned expected = 0;
   if (!__atomic_compare_exchange_n(&dumping, &expected, 1U, false,
@@ -637,6 +656,7 @@ extern "C" void e5_ca_probe_dump(void) {
   poolLocal = pool;
   ipcLocal = ipc;
   threadLocal = threads;
+  pcLocal = pcHistory;
   if (before != __atomic_load_n(&generation, __ATOMIC_ACQUIRE)) {
     __atomic_store_n(&dumping, 0U, __ATOMIC_RELEASE);
     return;
@@ -689,6 +709,10 @@ extern "C" void e5_ca_probe_dump(void) {
     if (!ipcLocal.top[w].msgs) break;
     log("E5IPCP w=%u idx=%llx m=%llx kt=%llx",
         w,ipcLocal.top[w].idx,ipcLocal.top[w].msgs,ipcLocal.top[w].kotype);
+  }
+  for (unsigned i = 0; i != pcLocal.count && i != kPcHistory; ++i) {
+    const PcSample &h = pcLocal.sample[i];
+    log("E5THH k=%u pid=%u pc=%llx lr=%llx", i, h.pid, h.pc, h.lr);
   }
   for (unsigned i = 0; i != threadLocal.count && i != kMaxProcs; ++i) {
     const ProcSnap &p = threadLocal.proc[i];
