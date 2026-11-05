@@ -446,6 +446,11 @@ extern "C" void e5_display_vsync_fire(void) {
 // +0x1868 lock, +0x16d0 reader-A object, +0x3c4 last power arg).
 extern "C" void e5_kputc(char);
 static void e5_state_log(const char *format, ...) {
+  // r220: the periodic E5STATE line floods the 32 KiB ramoops ring and pushes
+  // the late E5CA/E5TH probe dumps out of every retained capture (r219 kept
+  // only generation 6). e5-no-state keeps the display service untouched and
+  // only silences this line so end-of-window snapshots survive.
+  if (PE_parse_boot_argn("e5-no-state", nullptr, 0)) return;
   char line[512];
   va_list args;
   va_start(args, format);
