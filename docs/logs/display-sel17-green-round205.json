@@ -1,0 +1,17 @@
+{
+ "round": "r205",
+ "date": "2026-11-05T08:45+08:00",
+ "kernel": "v45 118ba991 (opaque200 zero-fill + kIOReturnSuccess — reversing r170's decline A/B)",
+ "payload": "board-r205 06e42e9f (args e5-ca-state e5-no-vc zz)",
+ "results": [
+  "sel 17 NOW GREEN: n=1 ok=1 ret=0 — ALL kernel-visible selectors pass for the first time",
+  "E5CAX STILL all-zero (mode/en/ctx/timer/src/fi=0): the CA display remains unconfigured even with every selector green",
+  "healthy u=4:4, no panic"
+ ],
+ "conclusion": "sel-17-decline was never the configure gate (it was our own r170 residue). With all selectors green the client STILL doesn't configure — the gate is upstream of IOKit queries: either the vsync/FrameInfo EVENT path (pool-B never calls SwapWait/sel 6, so m1810 waiter never registers, notify 0xfffffff005798018 has no target), or the display-array entry semantics (n=6) / dpy object choice in E5CAProbe.",
+ "next_candidates": [
+  "event-first: deliver vsync anyway — investigate how pool-B clients receive frames (map-based? IOConnectCallAsyncMethod registration on sel 72-adjacent? decode EnableVSync pool-B conn fn 0x1b63d6f20's actual selector)",
+  "verify E5CAX reads the right array entry (walk all 6 entries, print each display ptr + state)",
+  "GPU G1.3 as independent track"
+ ]
+}

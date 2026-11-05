@@ -866,14 +866,14 @@ public:
   // miscategorized as 207 — 0x658/8 IS 203, an unoverridden Unsupported
   // stub). Zero-fill + success.
   IOReturn opaque200(void *out) override {
-    (void)out;
-    // r170 A/B: DECLINE the display-info query instead of zero-filling it.
-    // If the client distinguishes failure from an empty-but-valid struct,
-    // its behavior (selector set / userclients / F) will shift; identical
-    // behavior would mean the 0xc0c content is not consulted at all and
-    // the empty-scene hypothesis dies.
+    // v45: zero-fill + success (r170's decline A/B answered — the client
+    // DOES distinguish failure: pool-B sel 17 n=1 ok=0 ret=e00002c7 with
+    // E5CAX all-zero = display never configured while this declined).
+    // ABI (r204 decode): wrapper 0x677a0c8 validates structureOutputSize
+    // 0xc0c, forwarder 0x6778040 -> slot200(this, out).
+    if (out) bzero(out, 0xc0c);
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 8, __ATOMIC_RELAXED);
-    return kIOReturnUnsupported;
+    return kIOReturnSuccess;
   }
   IOReturn opaque203(void *a) override {
     (void)a;
