@@ -47,7 +47,7 @@ static void e5_display_runtime_census() {
   const unsigned sample = ++sequence;
   static const char *const targets[] = {
       "SpringBoard", "backboardd", "runningboardd", "frontboardd",
-      "liveactivitiesd", "launchd", "WindowServer"};
+      "liveactivitiesd", "launchd", "WindowServer", "chronod", "lockdownd"};
   unsigned seen = 0;
   for (int pid = 1; pid < 512; ++pid) {
     proc_t process = proc_find(pid);

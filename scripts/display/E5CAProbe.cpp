@@ -35,6 +35,16 @@ extern "C" unsigned e5_quiet;
 // This internal kernel helper is linked into this built-in archive, but its
 // declaration is hidden from the IOKit compile record's private-header mode.
 extern "C" kern_return_t vm_map_read_user(vm_map_t, vm_map_address_t, void *, vm_size_t);
+// r214 thread snapshot: same linkage situation as vm_map_read_user. The queue
+// offsets come from llvm-dwarfdump of this build's own objects, matching the
+// ipc offsets below: task.threads +0x80 (queue_head_t), thread.task_threads
+// +0x428 (queue_chain_t). thread_get_state stops the target briefly and is
+// the same path corpse forking uses.
+extern "C" void task_lock(task_t);
+extern "C" void task_unlock(task_t);
+extern "C" void thread_reference(thread_t);
+extern "C" void thread_deallocate(thread_t);
+extern "C" kern_return_t thread_get_state(thread_t, int, void *, unsigned *);
 
 namespace {
 using Word = unsigned long long;
@@ -82,6 +92,16 @@ struct SlotState {
   char text[20];
 };
 struct PoolState { Word virtCount, refFB, actFB, infoCount, timerSerial; SlotState slot[kMaxSlots]; };
+// r214: where is SpringBoard startup waiting? Saved pc/lr/sp plus a bounded
+// frame walk for the first threads of SpringBoard/liveactivitiesd/chronod,
+// symbolicated offline against the pinned cache (the kernel-side analogue
+// of UniXNU-qemu's snapshot-ui-threads).
+struct ThreadSnap { Word pc, lr, sp; Word ret[6]; };
+struct ProcSnap { unsigned pid, threads; char name[20]; ThreadSnap thread[12]; };
+static const unsigned kMaxProcs = 3;
+static const unsigned kMaxThreads = 12;
+static const unsigned kFrames = 6;
+struct ProcSnaps { unsigned count; ProcSnap proc[kMaxProcs]; };
 // Kernel-side IPC census of the probed task: how many mk_timer ports exist,
 // whether any fired-but-undrained messages sit in their queues, and the
 // armed deadline of the CA display timer's own port.
@@ -95,6 +115,7 @@ static Word values[Fields];
 static EntryState entries[kMaxEntries];
 static PoolState pool;
 static IpcState ipc;
+static ProcSnaps threads;
 static unsigned generation, busy, selectedPid;
 static thread_call_t worker;
 static bool enabled() {
@@ -469,6 +490,68 @@ static void ipcCensus(task_t task, Word caPortName, IpcState &out) {
   out.entries = out.ports;  // live ports seen (table size is kalloc-private)
   for (unsigned w = 0; w < 4; ++w) out.top[w] = worst[w];
 }
+static void snapshotThreads(ProcSnaps &out) {
+  // Mirror of task_threads_internal's queue walk: hold the task lock only to
+  // take thread references, then copy state (which briefly stops each
+  // thread) and walk frames through the task map with the quiet reader.
+  static const char *const wanted[kMaxProcs] = {"SpringBoard", "liveactivitiesd", "chronod"};
+  bzero(&out, sizeof(out));
+  for (int pid = 1; pid < 512 && out.count < kMaxProcs; ++pid) {
+    proc_t process = proc_find(pid);
+    if (!process) continue;
+    char name[32] = {};
+    proc_name(pid, name, sizeof(name));
+    unsigned slot = kMaxProcs;
+    for (unsigned i = 0; i != kMaxProcs; ++i)
+      if (!strcmp(name, wanted[i])) { slot = i; break; }
+    task_t task = TASK_NULL;
+    if (slot != kMaxProcs && !proc_exiting(process)) {
+      task = proc_task(process);
+      if (task) task_reference(task);
+    }
+    proc_rele(process);
+    if (!task) continue;
+    ProcSnap &p = out.proc[out.count++];
+    p.pid = (unsigned)pid;
+    for (unsigned i = 0; i != sizeof(p.name); ++i) p.name[i] = name[i] ? name[i] : 0;
+    thread_t list[kMaxThreads] = {};
+    unsigned count = 0;
+    task_lock(task);
+    Word head = (Word)task + 0x80;
+    for (Word member = *(const Word *)head; member != head && count != kMaxThreads;
+         member = *(const Word *)member) {
+      thread_t th = (thread_t)(member - 0x428);
+      thread_reference(th);
+      list[count++] = th;
+    }
+    task_unlock(task);
+    p.threads = count;
+    vm_map_t map = get_task_map(task);
+    Reader r = {map, nullptr};
+    for (unsigned i = 0; i != count; ++i) {
+      struct { Word x[29], fp, lr, sp, pc; unsigned cpsr, flags; } state = {};
+      unsigned words = 68;  // ARM_THREAD_STATE64_COUNT
+      if (thread_get_state(list[i], 6 /* ARM_THREAD_STATE64 */, &state, &words) != KERN_SUCCESS)
+        continue;
+      ThreadSnap &t = p.thread[i];
+      t.pc = state.pc;
+      t.lr = state.lr;
+      t.sp = state.sp;
+      Word fp = state.fp;
+      for (unsigned d = 0; d != kFrames; ++d) {
+        Word next = 0, ret = 0;
+        if (fp < 0x1000 || fp >= 0x8000000000ULL) break;
+        if (!r.probeBytes(fp, &next, sizeof(next)) || !r.probeBytes(fp + 8, &ret, sizeof(ret))) break;
+        if (ret < 0x1000 || ret >= 0x8000000000ULL) break;
+        t.ret[d] = ret;
+        if (next <= fp || next - fp > 0x200000) break;  // stacks grow down
+        fp = next;
+      }
+      thread_deallocate(list[i]);
+    }
+    task_deallocate(task);
+  }
+}
 static void run(thread_call_param_t, thread_call_param_t) {
   // The request busy flag serializes workers. Keep the multi-KiB census out
   // of the kernel stack, including while vm_map_read_user faults in pages.
@@ -476,10 +559,12 @@ static void run(thread_call_param_t, thread_call_param_t) {
   static EntryState snapshot[kMaxEntries];
   static PoolState poolSnapshot;
   static IpcState ipcSnapshot;
+  static ProcSnaps threadSnapshot;
   bzero(state, sizeof(state));
   bzero(snapshot, sizeof(snapshot));
   bzero(&poolSnapshot, sizeof(poolSnapshot));
   bzero(&ipcSnapshot, sizeof(ipcSnapshot));
+  bzero(&threadSnapshot, sizeof(threadSnapshot));
   unsigned pid = __atomic_load_n(&selectedPid, __ATOMIC_RELAXED);
   state[Pid] = pid;
   proc_t process = proc_find((int)pid);
@@ -492,6 +577,7 @@ static void run(thread_call_param_t, thread_call_param_t) {
     if (task) {
       inspect(task, state, snapshot, &poolSnapshot);
       ipcCensus(task, snapshot[0].timer.portName, ipcSnapshot);
+      snapshotThreads(threadSnapshot);
       task_deallocate(task);
     }
   }
@@ -500,6 +586,7 @@ static void run(thread_call_param_t, thread_call_param_t) {
   for (unsigned i = 0; i != kMaxEntries; ++i) entries[i] = snapshot[i];
   pool = poolSnapshot;
   ipc = ipcSnapshot;
+  threads = threadSnapshot;
   __atomic_add_fetch(&generation, 1U, __ATOMIC_RELEASE);
   __atomic_store_n(&busy, 0U, __ATOMIC_RELEASE);
 }
@@ -526,6 +613,7 @@ extern "C" void e5_ca_probe_dump(void) {
   static EntryState local[kMaxEntries];
   static PoolState poolLocal;
   static IpcState ipcLocal;
+  static ProcSnaps threadLocal;
   static unsigned dumping;
   unsigned expected = 0;
   if (!__atomic_compare_exchange_n(&dumping, &expected, 1U, false,
@@ -539,6 +627,7 @@ extern "C" void e5_ca_probe_dump(void) {
   for (unsigned i = 0; i != kMaxEntries; ++i) local[i] = entries[i];
   poolLocal = pool;
   ipcLocal = ipc;
+  threadLocal = threads;
   if (before != __atomic_load_n(&generation, __ATOMIC_ACQUIRE)) {
     __atomic_store_n(&dumping, 0U, __ATOMIC_RELEASE);
     return;
@@ -591,6 +680,16 @@ extern "C" void e5_ca_probe_dump(void) {
     if (!ipcLocal.top[w].msgs) break;
     log("E5IPCP w=%u idx=%llx m=%llx kt=%llx",
         w,ipcLocal.top[w].idx,ipcLocal.top[w].msgs,ipcLocal.top[w].kotype);
+  }
+  for (unsigned i = 0; i != threadLocal.count && i != kMaxProcs; ++i) {
+    const ProcSnap &p = threadLocal.proc[i];
+    log("E5THP i=%u pid=%u name=%s n=%u", i, p.pid, p.name[0] ? p.name : "-", p.threads);
+    for (unsigned j = 0; j != p.threads && j != kMaxThreads; ++j) {
+      const ThreadSnap &t = p.thread[j];
+      log("E5TH i=%u j=%u pc=%llx lr=%llx sp=%llx", i, j, t.pc, t.lr, t.sp);
+      log("E5THF i=%u j=%u r=%llx,%llx,%llx,%llx,%llx,%llx",
+          i, j, t.ret[0], t.ret[1], t.ret[2], t.ret[3], t.ret[4], t.ret[5]);
+    }
   }
   __atomic_store_n(&dumping, 0U, __ATOMIC_RELEASE);
 }
