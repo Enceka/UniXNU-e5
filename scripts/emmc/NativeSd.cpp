@@ -893,12 +893,18 @@ public:
         }
         if (i < 2000) {
           pmicWrite(0x60, 0xe551); // LOCK: unlock key.
-          pmicWrite(0x44, 0x0708); // LOAD_HIGH = 3600*32768 >> 16 (0x7080000>>16). r234: one clean 1-hour window so the LS cold rebuild (recovery-file path, see r233 attribution) can complete ONCE; after the db exists, later boots stay at 600s (r231's close only covered the 1200s case).
-          pmicWrite(0x40, 0x0000); // LOAD_LOW.
+          unsigned watchdogSeconds = 3600;
+          unsigned requestedSeconds = 0;
+          if (PE_parse_boot_argn("e5-wdt-seconds", &requestedSeconds, sizeof(requestedSeconds)) &&
+              requestedSeconds >= 60 && requestedSeconds <= 3600)
+            watchdogSeconds = requestedSeconds;
+          uint32_t watchdogTicks = watchdogSeconds * 32768u;
+          pmicWrite(0x44, watchdogTicks >> 16);
+          pmicWrite(0x40, watchdogTicks & 0xffffu);
           pmicWrite(0x70, 0x0000); // IRQ_LOAD_HIGH (pretimeout off).
           pmicWrite(0x6c, 0x0000); // IRQ_LOAD_LOW.
           pmicWrite(0x60, 0x0000); // LOCK: locked.
-          sdlog("NativeSd: wdt extended 600s ctrl %04x\n", pmicRead(0x48));
+          sdlog("NativeSd: wdt window %us ctrl %04x\n", watchdogSeconds, pmicRead(0x48));
         } else sdlog("NativeSd: wdt load busy\n");
       } else sdlog("NativeSd: wdt not counting\n");
     }

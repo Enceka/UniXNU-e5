@@ -34,7 +34,10 @@
 #include <IOKit/storage/IOBlockStorageDevice.h>
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <kern/thread.h>
+#include <kern/clock.h>
+#include <pexpert/pexpert.h>
 #include "TransferStatus.h"
+#include "BootLog.h"
 
 #define E5_EMMC_BASE 0x22200000ULL
 #define E5_EMMC_LEN  0x400ULL
@@ -96,6 +99,8 @@ class NativeEmmc : public IOBlockStorageDevice {
   uint64_t cacheSectors = E5Emmc::cacheSectorCount;
   static NativeEmmc *s_host;
   bool windowPub = false;
+  bool logWindowReady = false;
+  uint32_t logPayloadBytes = 0;
 
   inline uint8_t  r8 (uint32_t o) const { return *(volatile uint8_t  *)((uint8_t *)regs + o); }
   inline uint16_t r16(uint32_t o) const { return *(volatile uint16_t *)((uint8_t *)regs + o); }
@@ -223,6 +228,97 @@ class NativeEmmc : public IOBlockStorageDevice {
     w32(SDHCI_ARGUMENT, arg);
     w32(SDHCI_TRANSFER_MODE_CMD, ((uint32_t)cmdWord << 16) | 0x0013u);
     return waitDmaDone(2000000);
+  }
+
+  bool logRead(uint64_t lba) {
+    if (lba >= sectors || lba > 0xffffffffu) return false;
+    uint32_t st = sdmaRead512(0x113a, (uint32_t)lba, dmaD, dmaPhys);
+    cacheInvalidate(dmaD, 512);
+    return transferOk(st) && !(r32(SDHCI_RESPONSE) & E5BootLog::r1Errors);
+  }
+
+  bool locateLogWindow() {
+    using namespace E5BootLog;
+    if (!cardUp || (extCsd[179] & 7u) || extCsd[15] || !logRead(1)) return false;
+    Gpt g;
+    if (!header(dmaD8, sectors, g)) return false;
+    uint32_t crcState = 0xffffffffu, matches = 0;
+    uint32_t remaining = g.count * 128u;
+    for (uint32_t i = 0; remaining; ++i) {
+      if (!logRead(g.entriesLba + i)) return false;
+      unsigned bytes = remaining < 512 ? remaining : 512;
+      crcState = crcUpdate(crcState, dmaD8, bytes);
+      for (unsigned off = 0; off < bytes; off += 128)
+        if (bootEntry(dmaD8 + off, sectors)) ++matches;
+      remaining -= bytes;
+    }
+    if (~crcState != g.entriesCrc || matches != 1) return false;
+    if (!logRead(partitionFirst) || !bootHeader(dmaD8)) return false;
+    logPayloadBytes = le32(dmaD8 + 8);
+    if (!logRead(partitionFirst + partitionSectors - 1) || !footer(dmaD8)) return false;
+    logWindowReady = true;
+    return true;
+  }
+
+  bool waitLogReady(uint32_t timeoutMs) {
+    // CMD13 itself has a bounded 500ms command wait. A transport error aborts
+    // immediately; a busy but responding card is polled at 1ms intervals.
+    uint64_t deadline = 0, now = 0;
+    clock_interval_to_deadline(timeoutMs, NSEC_PER_MSEC, &deadline);
+    for (;;) {
+      clock_get_uptime(&now);
+      if (now >= deadline) return false;
+      uint32_t st = cmdNoData(0x0d1a, (uint32_t)rca << 16);
+      uint32_t r1 = r32(SDHCI_RESPONSE);
+      if (!cmdOk(st) || (r1 & E5BootLog::r1Errors)) return false;
+      if (E5BootLog::ready(r1) && !(r32(SDHCI_PRESENT_STATE) & 3u)) return true;
+      IODelay(1000);
+    }
+  }
+
+  bool flushLogCache() {
+    if (!(extCsd[33] & 1u)) return waitLogReady(5000);
+    uint32_t st = cmdNoData(0x061b, (3u << 24) | (32u << 16) | (1u << 8));
+    if (!cmdOk(st) || (r32(SDHCI_RESPONSE) & E5BootLog::r1Errors)) return false;
+    return waitLogReady(30000);
+  }
+
+  bool writeLogSector(uint64_t relative) {
+    if (!logWindowReady || !E5BootLog::contains(relative, 1) || !waitLogReady(5000)) return false;
+    uint64_t lba = E5BootLog::partitionFirst + E5BootLog::firstSector + relative;
+    if (lba >= sectors || lba > 0xffffffffu || (r16(0x3e) & 0x1000u) == 0) return false;
+    cacheClean(dmaD, 512);
+    w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x18u);
+    w32(SDHCI_INT_STATUS, 0xffffffffu);
+    w16(SDHCI_BLOCK_SIZE, 512); w32(SDHCI_DMA_ADDR, 1);
+    w32(SDHCI_SYSADDR_LOW, (uint32_t)dmaPhys); w32(SDHCI_SYSADDR_HIGH, 0);
+    w32(SDHCI_ARGUMENT, (uint32_t)lba);
+    w32(SDHCI_TRANSFER_MODE_CMD, 0x183a0003u); // CMD24, SDMA, count=1, WRITE.
+    uint32_t st = waitDmaDone(5000000);
+    uint32_t r1 = r32(SDHCI_RESPONSE);
+    elog("NativeEmmc: log CMD24 st %08x r1 %08x ps %08x\n", st, r1, r32(SDHCI_PRESENT_STATE));
+    return transferOk(st) && !(r1 & E5BootLog::r1Errors) && waitLogReady(5000);
+  }
+
+  void logWriteProbe(uint32_t nonce) {
+    using namespace E5BootLog;
+    if (!locateLogWindow()) { elog("NativeEmmc: log probe layout refused\n"); return; }
+    uint64_t lba = partitionFirst + firstSector;
+    if (!logRead(lba)) { elog("NativeEmmc: log probe pre-read failed\n"); return; }
+    unsigned nonzero = 0; for (unsigned i = 0; i < 512; ++i) nonzero |= dmaD8[i];
+    if (nonzero && !validProbe(dmaD8)) { elog("NativeEmmc: log probe foreign sector refused\n"); return; }
+    E5BootLog::probe(dmaD8, nonce, lba, logPayloadBytes);
+    uint32_t expected = le32(dmaD8 + 508);
+    elog("NativeEmmc: log probe nonce %u lba %llu crc %08x cache %u\n",
+         nonce, (unsigned long long)lba, expected, extCsd[33]);
+    bool wrote = writeLogSector(0);
+    bool flushed = wrote && flushLogCache();
+    bool readback = flushed && logRead(lba) && validProbe(dmaD8) &&
+        le32(dmaD8 + 12) == nonce && le32(dmaD8 + 508) == expected;
+    elog("NativeEmmc: log probe wrote %u flushed %u readback %u\n", wrote, flushed, readback);
+    // A failed write may still own DMA. Quarantine the host on any failed
+    // write/flush: the recovery path must not reuse this buffer for reads.
+    if (!wrote || !flushed) { cardUp = false; logWindowReady = false; }
   }
 
   // ---- one ADMA2 single-block 512-byte read: 16-byte v4 descriptor in the
@@ -557,6 +653,13 @@ bool NativeEmmc::start(IOService *provider)
   if (cardUp) {
     scanGpt(d, d8, dva);
     verifyReadback(d, d8, dva);
+    uint32_t logTest = 0;
+    if (PE_parse_boot_argn("e5-emmc-log-test", &logTest, sizeof(logTest)) && logTest) {
+      IOLockLock(ioLock);
+      logWriteProbe(logTest);
+      IOLockUnlock(ioLock);
+      if (!cardUp) { elog("NativeEmmc: log probe quarantined host\n"); return true; }
+    }
     // v5: keep regs/DMA page alive; the read path runs in doAsyncReadWrite.
     baseLba = E5Emmc::cacheFirstLba;
     if (!E5Emmc::windowFitsCard(sectors, baseLba, cacheSectors)) {
