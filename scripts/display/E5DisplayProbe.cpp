@@ -86,6 +86,21 @@ static void e5_display_runtime_census() {
   { if (!e5_quiet)
       e5_display_tracef("E5LIVE seq=%u pid_limit=512 seen=%02x services=%02x\n",
       sample, seen, published); }
+  // r224: replay the slot-224 (sel 79) argument captures at census cadence —
+  // the in-call prints happen during early display configuration and scroll
+  // out of the 32 KiB ring before harvest.
+  { extern unsigned long long e5_block40_args[4][7];
+    extern unsigned e5_block40_count;
+    unsigned count = e5_block40_count;
+    if (count > 4) count = 4;
+    for (unsigned i = 0; i < count; ++i) {
+      e5_display_tracef("E5B40 k=%u a=%p b=%llx c=%llx d=%p e=%llx f=%p g=%llx\n",
+          i, (void *)(uintptr_t)e5_block40_args[i][0], e5_block40_args[i][1],
+          e5_block40_args[i][2], (void *)(uintptr_t)e5_block40_args[i][3],
+          e5_block40_args[i][4], (void *)(uintptr_t)e5_block40_args[i][5],
+          e5_block40_args[i][6]);
+    }
+  }
   e5_ca_probe_dump();
 }
 

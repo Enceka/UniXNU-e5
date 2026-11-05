@@ -446,6 +446,9 @@ extern "C" void e5_display_vsync_fire(void) {
 // +0x1818 waiter out-object, +0x1858 pending object, +0x1860/+0x1861 flags,
 // +0x1868 lock, +0x16d0 reader-A object, +0x3c4 last power arg).
 extern "C" void e5_kputc(char);
+// r224: slot-224 (sel 79) argument captures, printed by the display census.
+unsigned long long e5_block40_args[4][7];
+unsigned e5_block40_count;
 static void e5_state_log(const char *format, ...) {
   // r220: the periodic E5STATE line floods the 32 KiB ramoops ring and pushes
   // the late E5CA/E5TH probe dumps out of every retained capture (r219 kept
@@ -880,23 +883,29 @@ public:
     // written. The next round writes the 44-byte 0x40 answer to the argument
     // this proves is the structure output.
     static uint32_t loggedShapes;
-    // r222 hardware result: zero fresh panics with no write (the r221/b RW-lock
-    // corruption is attributable to the raw 8-byte write), and sel 79 fired
-    // twice OK while block-id 0x40 appeared in NEITHER b nor c — the r209
-    // client-side scalar layout does not match this server slot. Record every
-    // distinct argument shape unconditionally (sel 79 fires only twice per
-    // boot); the next round writes the 44-byte answer to the pointer this
-    // proves is the structure output.
+    // r223 hardware result: the in-call kputc lines scrolled out of the 32 KiB
+    // ring before harvest (sel 79 fires during early display configuration).
+    // Capture the arguments into static storage as well; the census prints
+    // them at its own cadence, which demonstrably survives to the window end.
     uint32_t shape = (a ? 1u : 0u) | (d ? 2u : 0u) | (f ? 4u : 0u) |
                      ((b & 0xffu) ^ ((b >> 8) & 0xffu) ^ ((b >> 16) & 0xffu) ^ ((b >> 24) & 0xffu));
     uint32_t seen = __atomic_load_n(&loggedShapes, __ATOMIC_RELAXED);
     if (!(seen & (1u << (shape & 31)))) {
       __atomic_fetch_or(&loggedShapes, 1u << (shape & 31), __ATOMIC_RELAXED);
-      // Direct kputc: e5_state_log is gated by e5-no-state, which stays on.
       char line[160];
       snprintf(line, sizeof(line), "E5B40 shape=%u a=%p b=%x c=%llx d=%p e=%x f=%p g=%x\n",
                shape, a, b, (unsigned long long)c, d, e, f, g);
       for (const char *p = line; *p; ++p) e5_kputc(*p);
+      if (e5_block40_count < 4) {
+        unsigned long long *slot = e5_block40_args[e5_block40_count++];
+        slot[0] = (unsigned long long)(uintptr_t)a;
+        slot[1] = b;
+        slot[2] = c;
+        slot[3] = (unsigned long long)(uintptr_t)d;
+        slot[4] = e;
+        slot[5] = (unsigned long long)(uintptr_t)f;
+        slot[6] = g;
+      }
     }
     (void)e; (void)f; (void)g;
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 7, __ATOMIC_RELAXED);
