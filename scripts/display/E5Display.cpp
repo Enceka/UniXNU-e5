@@ -880,18 +880,23 @@ public:
     // written. The next round writes the 44-byte 0x40 answer to the argument
     // this proves is the structure output.
     static uint32_t loggedShapes;
-    uint32_t shape = (b == 0x40u ? 1u : 0u) | ((uint32_t)c == 0x40u ? 2u : 0u) |
-                     (a ? 4u : 0u) | (d ? 8u : 0u);
-    if (b == 0x40u || (uint32_t)c == 0x40u) {
-      uint32_t seen = __atomic_load_n(&loggedShapes, __ATOMIC_RELAXED);
-      if (!(seen & (1u << shape))) {
-        __atomic_fetch_or(&loggedShapes, 1u << shape, __ATOMIC_RELAXED);
-        // Direct kputc: e5_state_log is gated by e5-no-state, which stays on.
-        char line[160];
-        snprintf(line, sizeof(line), "E5B40 shape=%u a=%p b=%x c=%llx d=%p e=%x f=%p g=%x\n",
-                 shape, a, b, (unsigned long long)c, d, e, f, g);
-        for (const char *p = line; *p; ++p) e5_kputc(*p);
-      }
+    // r222 hardware result: zero fresh panics with no write (the r221/b RW-lock
+    // corruption is attributable to the raw 8-byte write), and sel 79 fired
+    // twice OK while block-id 0x40 appeared in NEITHER b nor c — the r209
+    // client-side scalar layout does not match this server slot. Record every
+    // distinct argument shape unconditionally (sel 79 fires only twice per
+    // boot); the next round writes the 44-byte answer to the pointer this
+    // proves is the structure output.
+    uint32_t shape = (a ? 1u : 0u) | (d ? 2u : 0u) | (f ? 4u : 0u) |
+                     ((b & 0xffu) ^ ((b >> 8) & 0xffu) ^ ((b >> 16) & 0xffu) ^ ((b >> 24) & 0xffu));
+    uint32_t seen = __atomic_load_n(&loggedShapes, __ATOMIC_RELAXED);
+    if (!(seen & (1u << (shape & 31)))) {
+      __atomic_fetch_or(&loggedShapes, 1u << (shape & 31), __ATOMIC_RELAXED);
+      // Direct kputc: e5_state_log is gated by e5-no-state, which stays on.
+      char line[160];
+      snprintf(line, sizeof(line), "E5B40 shape=%u a=%p b=%x c=%llx d=%p e=%x f=%p g=%x\n",
+               shape, a, b, (unsigned long long)c, d, e, f, g);
+      for (const char *p = line; *p; ++p) e5_kputc(*p);
     }
     (void)e; (void)f; (void)g;
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 7, __ATOMIC_RELAXED);
