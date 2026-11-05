@@ -87,7 +87,6 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 // read must never block acquiring the display gate: display setup can itself
 // need a media read. attemptAction skips that sample if the gate is busy.
 static void e5_state_log(const char *fmt, ...);
-// r221: defined below the class; publishes the real mode table on the service.
 static void e5PublishModeTable(IOService *service);
 // v36: universal return-0 thunk + hand-built vtable for the fake family
 // sub-objects (+0x1638 event source, +0x1658 swap-wait helper). arm64 KC =
@@ -591,7 +590,8 @@ public:
       return false;
     }
     __atomic_fetch_or(&e5_display_lifecycle, 0x020U, __ATOMIC_RELAXED);
-    e5PublishModeTable(this);  // r221: real mode contract before registration.
+    // r221: defer the mode-table publication to a thread_call (see
+    // e5PublishModeTable) — never publish from this lock context.
     familyStarted = true;
     return true;
   }
@@ -935,6 +935,12 @@ extern "C" unsigned e5_display_compiled_size(void) { return sizeof(E5Display); }
 // 0x1896e27d4.. belong to encoding 0x10). Values describe actual panel
 // behavior; no gate-opening filler.
 static void e5PublishModeTable(IOService *service) {
+  // r221: runs on its own thread_call, never inside start()/publish: the
+  // first attempt called this at the tail of E5Display::start (report
+  // 182317) and the boot ended in an RW-lock already-held assertion whose
+  // panic formatter then data-aborted inside ctid_get_thread_unsafe — the
+  // exec/publish path holds locks that property publication must not
+  // re-acquire.
   OSDictionary *color = OSDictionary::withCapacity(6);
   OSDictionary *timing = OSDictionary::withCapacity(7);
   OSDictionary *horizontal = OSDictionary::withCapacity(2);
@@ -974,6 +980,20 @@ static void e5PublishModeTable(IOService *service) {
   if (timing) timing->release();
   if (horizontal) horizontal->release();
   if (vertical) vertical->release();
+}
+
+// r221: deferred publication — scheduled from e5_display_publish once the
+// service is visible, executed on a thread_call with no exec/publish locks.
+static IOService *sModeTableService;
+static void e5ModeTableWorker(thread_call_param_t, thread_call_param_t) {
+  if (sModeTableService) e5PublishModeTable(sModeTableService);
+}
+static thread_call_t e5ModeTableCall;
+static void e5ScheduleModeTablePublish(void) {
+  static unsigned scheduled;
+  if (__atomic_exchange_n(&scheduled, 1U, __ATOMIC_ACQ_REL)) return;
+  if (!e5ModeTableCall) e5ModeTableCall = thread_call_allocate(e5ModeTableWorker, nullptr);
+  if (e5ModeTableCall) thread_call_enter(e5ModeTableCall);
 }
 
 // V8 attach phase. Runs after the construction probe reached 0x1ff on the
@@ -1033,6 +1053,11 @@ extern "C" int e5_display_publish(IOService *provider) {
     if (!live) {
       if (started) display->stop(provider);
       display->detach(provider);
+    } else {
+      // r221: registry-visible — schedule the mode-table publication from a
+      // clean thread_call context (see e5ModeTableWorker).
+      sModeTableService = display;
+      e5ScheduleModeTablePublish();
     }
   }
   object->release();
