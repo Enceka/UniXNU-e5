@@ -520,11 +520,18 @@ static void snapshotThreads(ProcSnaps &out) {
     for (unsigned i = 0; i != sizeof(p.name); ++i) p.name[i] = name[i] ? name[i] : 0;
     Word saved[kMaxThreads] = {};
     unsigned count = 0;
+    // Queue semantics proven against this build's own task_threads_internal
+    // (0xfffffff0072cbb80..0xfffffff0072cbba8): the chain at task+0x80 and the
+    // link at thread+0x428 both store THREAD pointers directly (container
+    // queue), and the loop terminates at the head container address. The
+    // classic member-queue reading (member - 0x428) produced the r214
+    // os_refcnt panic (thread_reference on thread-0x428) and the r216 data
+    // abort at run+0x85c.
     task_lock(task);
     Word head = (Word)task + 0x80;
-    for (Word member = *(const Word *)head; member != head && count != kMaxThreads;
-         member = *(const Word *)member) {
-      saved[count++] = *(const Word *)(member - 0x428 + 0xf8);
+    for (Word th = *(const Word *)head; th != head && count != kMaxThreads;
+         th = *(const Word *)(th + 0x428)) {
+      saved[count++] = *(const Word *)(th + 0xf8);  // machine.ss
     }
     task_unlock(task);
     p.threads = count;
