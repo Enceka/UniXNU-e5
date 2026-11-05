@@ -23,7 +23,7 @@ unsigned e5_display_client_calls = 0;
 unsigned e5_display_client_successes = 0;
 unsigned e5_display_client_type = 0;
 unsigned long long e5_display_uc_vtable = 0;
-static unsigned e5_fake_e88_disabled = 1; // v39 A/B: e88 fake OFF unless e5-fake-e88 boot arg
+static unsigned e5_fake_e88_disabled = 0; // v43: ON — instance now 0x2110 so +0x1e88 is in-bounds
 static void e5_fake_gate_init(void) {
   if (PE_parse_boot_argn("e5-fake-e88", nullptr, 0)) e5_fake_e88_disabled = 0;
 }
@@ -91,7 +91,75 @@ static void e5_state_log(const char *fmt, ...);
 // sub-objects (+0x1638 event source, +0x1658 swap-wait helper). arm64 KC =
 // plain blr vtable dispatch (no PAC), so raw function pointers are safe.
 extern "C" unsigned long e5FakeFamilyThunk(void) { return 0; }
-static void *const e5FakeFamilyVt[128] = {
+static void *const e5FakeFamilyVt[264] = {
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
@@ -815,7 +883,7 @@ public:
 };
 
 OSDefineMetaClassAndStructors(E5Display, IOMobileFramebufferLegacy)
-static_assert(sizeof(E5Display) == 0x18a8, "Only owned lifecycle flags extend Legacy");
+static_assert(sizeof(E5Display) == 0x2118, "v43: grown Legacy extent carries the +0x1e88 panel pointer in-bounds");
 
 extern "C" unsigned e5_display_compiled_size(void) { return sizeof(E5Display); }
 

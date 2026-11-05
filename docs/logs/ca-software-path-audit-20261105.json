@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "os_build": "21H461",
+  "quartzcore_uuid": "BCA74CF2-236A-30AC-BD05-8872B2C2262D",
+  "text_sha256": "283f624cd7c97046c23e205a3a1f99b67ac35a7b5a65c75763ee245005c1ac10",
+  "anchors": {
+    "accel_missing_renderer_branch": {
+      "symbol": "__ZN2CA12WindowServer11AccelServer13render_updateEPNS_6Render6UpdateERj",
+      "symbol_va": "0x1894c5eb0",
+      "va": "0x1894c5ed8",
+      "bytes": "800200b4f40300aac03240f9",
+      "instructions": [
+        "0x1894c5ed8: cbz x0, #0x1894c5f28",
+        "0x1894c5edc: mov x20, x0",
+        "0x1894c5ee0: ldr x0, [x22, #0x60]"
+      ]
+    },
+    "accel_software_fallback": {
+      "symbol": "__ZN2CA12WindowServer11AccelServer13render_updateEPNS_6Render6UpdateERj",
+      "symbol_va": "0x1894c5eb0",
+      "va": "0x1894c5f28",
+      "bytes": "e00316aae10313aafd7b42a9f44f41a9f657c3a8f9890714",
+      "instructions": [
+        "0x1894c5f28: mov x0, x22",
+        "0x1894c5f2c: mov x1, x19",
+        "0x1894c5f30: ldp x29, x30, [sp, #0x20]",
+        "0x1894c5f34: ldp x20, x19, [sp, #0x10]",
+        "0x1894c5f38: ldp x22, x21, [sp], #0x30",
+        "0x1894c5f3c: b #0x1896a8720"
+      ]
+    },
+    "base_render_update_calls_sw": {
+      "symbol": "__ZN2CA12WindowServer6Server13render_updateEPNS_6Render6UpdateERj",
+      "symbol_va": "0x1896a8720",
+      "va": "0x1896a8720",
+      "bytes": "f44fbea9fd7b01a9fd430091f30301aaf40300aa36000094800100b4e10300aa",
+      "instructions": [
+        "0x1896a8720: stp x20, x19, [sp, #-0x20]!",
+        "0x1896a8724: stp x29, x30, [sp, #0x10]",
+        "0x1896a8728: add x29, sp, #0x10",
+        "0x1896a872c: mov x19, x1",
+        "0x1896a8730: mov x20, x0",
+        "0x1896a8734: bl #0x1896a880c",
+        "0x1896a8738: cbz x0, #0x1896a8768",
+        "0x1896a873c: mov x1, x0"
+      ]
+    },
+    "software_context_vtable_install": {
+      "symbol": "__ZN2CA12WindowServer6Server11sw_rendererEv",
+      "symbol_va": "0x1896a880c",
+      "va": "0x1896a886c",
+      "bytes": "63dcfa97e8932e9008a10a91880200f9",
+      "instructions": [
+        "0x1896a886c: bl #0x18955f9f8",
+        "0x1896a8870: adrp x8, #0x1e6924000",
+        "0x1896a8874: add x8, x8, #0x2a8",
+        "0x1896a8878: str x8, [x20]"
+      ]
+    },
+    "timer_fallback_creation": {
+      "symbol": "__ZN2CA12WindowServer11IOMFBServer16add_vsync_sourceEv",
+      "symbol_va": "0x189510f9c",
+      "va": "0x18951103c",
+      "bytes": "0141601e020080d2a485ff97f40300aa608201f9",
+      "instructions": [
+        "0x18951103c: fmov d1, d8",
+        "0x189511040: mov x2, #0",
+        "0x189511044: bl #0x1894f26d4",
+        "0x189511048: mov x20, x0",
+        "0x18951104c: str x0, [x19, #0x300]"
+      ]
+    }
+  },
+  "software_vtable": "0x1e6924298",
+  "software_draw_elements": "0x189616220",
+  "conclusions": [
+    "AccelServer::render_update explicitly falls back to Server::render_update when its renderer is NULL.",
+    "Server::render_update calls sw_renderer, which installs the SWContext vtable.",
+    "IOMFBServer::add_vsync_source contains a CADisplayTimer fallback in addition to the native vsync source path.",
+    "Static code establishes available software paths, not actual process selection, surface submission or physical UI."
+  ]
+}

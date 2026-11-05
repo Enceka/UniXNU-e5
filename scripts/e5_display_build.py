@@ -150,7 +150,7 @@ def main():
 #include <libkern/libkern.h>
 class IOMobileFramebufferLegacy : public IOService {
   OSDeclareAbstractStructors(IOMobileFramebufferLegacy)
-  unsigned char originalPrivate[0x18a0 - sizeof(IOService)];
+  unsigned char originalPrivate[0x2110 - sizeof(IOService)];
 public:
   void installBootDimensions(uint32_t width, uint32_t height) {
     auto bytes = reinterpret_cast<unsigned char *>(this);
@@ -245,7 +245,7 @@ public:
             header += f'  virtual IOReturn opaque{i}(uint32_t, void *, void *, void *) = 0;\n'
         else:
             header += f'  virtual __attribute__((deprecated("Unqualified prototype: never call from source"))) void opaque{i}();\n'
-    header += '};\nstatic_assert(sizeof(IOMobileFramebufferLegacy) == 0x18a0, "Original Legacy extent");\n'
+    header += '};\nstatic_assert(sizeof(IOMobileFramebufferLegacy) == 0x2110, "Original Legacy extent (v43: panel sub-object pointer at +0x1e88 in-bounds)");\n'
     (OUT / 'OriginalLegacyFramebufferABI.h').write_text(header)
     if '--audit-only' in sys.argv[2:]:
         print(json.dumps(dict(original_kernelcache_sha256=digest(kc),
@@ -369,7 +369,7 @@ public:
     require(archive.is_file(), 'storage archive must be built first')
     run(['ar', 'rcs', archive, late, OUT / 'E5DisplayBindings.o', probe, ca_probe, mali])
     report = dict(schema=1, original_kernelcache_sha256=digest(kc), original_family_text_sha256=FAMILY_HASH,
-                  original_slide=slide, legacy_instance_bytes=0x18a0, virtual_entries=358,
+                  original_slide=slide, legacy_instance_bytes=0x2110, virtual_entries=358,
                   guarded_backend_slots=PURE, owned_slots=owned_slots, inherited_native_slots=native_slots,
                   bindings={name: hex(va) for name, va in sorted(bindings.items())},
                   generated_header_sha256=digest(header.encode()), object_sha256=digest(blob),

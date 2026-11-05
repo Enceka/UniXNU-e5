@@ -1,0 +1,13 @@
+{
+ "round": "r203",
+ "date": "2026-11-05T08:15+08:00",
+ "kernel": "v43 06366431 (instance 0x2110 + e88 fake ON + vt 264) branch fix/display-panel-blob-v43 (off fix/ca-state-r202 f09e8ce)",
+ "payload": "board-r203 0c859d1f (args e5-ca-state e5-no-vc zz)",
+ "results": [
+  "HEALTHY: u=5:5 (FIVE userclients incl SB), no panic, no hash mismatch, lifecycle h=1a04ff (0x100000 e88 fake installed + 0x80000 1658 fake)",
+  "sel 17 STILL ret=e00002c7 despite e88 fake + 264-slot thunk vt",
+  "E5CAX STILL all-zero (mode/en/ctx/timer/src/fi = 0) — display remains unconfigured"
+ ],
+ "decode_update": "0x6bd6a90 gate: the vt+0x668 call must return a NON-NULL POINTER (cbz x0 -> 0xe00002c7); our return-0 thunk satisfies neither NULL-check path. The memcpy source = RETURNED pointer +0x10 (b236 tail 0x6bef038), not sub+0x10.",
+ "next_v44": "add e5FakeFamilyThunkObj returning &staticPanelBlob (0xc20 zeros); point vt slot 205 (+0x668) at it; sel 17 should then return SUCCESS + zero 0xc0c blob (pool-A-proven acceptable) -> watch E5CAX configure"
+}
