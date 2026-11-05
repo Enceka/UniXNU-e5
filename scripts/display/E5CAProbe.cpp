@@ -241,7 +241,7 @@ static void inspectEntry(Reader &r, Word slide, Word wrapper, EntryState &e) {
       Word entry = e.ctxList + (Word)k * 0x10;
       Word ctxPtr = 0;
       if (!r.word(entry, ctxPtr) || !ctxPtr) break;
-      CtxEntry &t = e.ctxEntry[k];
+      EntryState::CtxEntry &t = e.ctxEntry[k];
       t.entry = entry;
       t.ptr = ctxPtr;
       r.word(ctxPtr + 8, t.w8);
@@ -572,7 +572,7 @@ extern "C" void e5_ca_probe_dump(void) {
       log("E5CASR i=%u th=%llx:%llx rl=%llx:%llx cxs=%llx:%llx",
           i,e.s1f0,e.s1f8,e.s2e0,e.s2e8,e.ctxList,e.ctxCount);
       for (unsigned k = 0; k != 4 && k < e.ctxCount; ++k) {
-        const CtxEntry &t = e.ctxEntry[k];
+        const EntryState::CtxEntry &t = e.ctxEntry[k];
         if (!t.entry) break;
         log("E5CAC i=%u k=%u e=%llx p=%llx c8=%llx fc=%llx d10=%llx",
             i,k,t.entry,t.ptr,t.w8,t.flags,t.w10);
