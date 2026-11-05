@@ -466,8 +466,14 @@ extern "C" void e5_display_state_dump(void) {
   unsigned long long e5_s175 = 0;
   if (e5_display_uc_vtable)
     e5_s175 = ((unsigned long long *)e5_display_uc_vtable)[175];
-  e5_state_log("E5STATE svc=%p m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u ap=%02x ar=%x am=%02x ev=%u:%llx:%x af=%u gl=%d ucv=%llx ucm=%llx:%llx anch=%llx s175=%llx",
-         (const void *)b, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
+  // r207: registry entry id of this service so the host can match it against
+  // the display-info pool slot id captured by IOMFB's match callback.
+  // The instance is addressed through IORegistryEntry (complete type here)
+  // because the E5Display class body is defined further below.
+  unsigned long long e5_rid =
+      ((IORegistryEntry *)e5_display_service_instance())->getRegistryEntryID();
+  e5_state_log("E5STATE svc=%p rid=%llx m3c8=%llx m1608=%llx m1640=%llx m1658=%llx m1810=%llx m1858=%llx f1860=%02x%02x m1868=%llx m16d0=%llx e16e0=%02x vfire=%u ak=%02x asend=%u aok=%u ap=%02x ar=%x am=%02x ev=%u:%llx:%x af=%u gl=%d ucv=%llx ucm=%llx:%llx anch=%llx s175=%llx",
+         (const void *)b, e5_rid, q(0x3c8), q(0x1608), q(0x1640), q(0x1658),
          q(0x1810), q(0x1858), b[0x1860], b[0x1861], q(0x1868), q(0x16d0), b[0x16e0], e5_display_vsync_fires,
          e5_display_async_kinds, e5_display_async_sends, e5_display_async_send_ok,
          e5_display_async_ports, e5_display_async_last, e5_display_async_armed,

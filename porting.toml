@@ -394,6 +394,13 @@ limits = ["Backlight control and userland presentation are not implemented; only
 next_action = ["After r199 storage acceptance, disable root/mobile IOMobileGraphicsFamily benchmark preferences in a backed-up Data copy and observe native selector 6/72/74, renderer/surface production and selectors 3/4/5 before adding more event shims.", "Preserve the qualified R109 gateway and no-vc control. Capture selector 6/12 scalar inputs and the family support byte 0x8c and readiness words 0x16d0/0x16e0, then implement the native power transition and completion contract. Original Legacy start clears the family support byte; do not equate it with IOService PMinit flag 0x68 or force success.", "Only after readiness completes, qualify first real default-surface and SwapBegin/SwapEnd calls, IOSurface identity/format, scanout mapping and physical presentation. Keep LA keybag event registration as a separate dependency."]
 
 [[area.evidence]]
+kind = "host"
+revision = "d0a90e2"
+reference = "docs/display-ca-state-r210.md"
+command = "Local archive/link/prelink using the pinned 21H461 target; llvm-objdump of E5CAProbe.o; original QuartzCore/IOMFB UUID and complete text-hash audit"
+result = "R210 candidate on the d0a90e2 baseline: move serialized census/dump scratch off the kernel stack (dump frame 0x1ac0 -> 0x120); correct render gate to display+0x30 after testing display+0x28. Kernel SHA256 60b25611cbec2697c5681c7cc67f01820129d5744c73b59d9ebf70756c2a1ced. Original code deliberately creates Mode(-1) for missing or single-entry digital arrays; mc>=2 is a power-on reselection gate, not a render-entry gate. Board acceptance is pending."
+
+[[area.evidence]]
 kind = "device"
 revision = "91e2c049f63948a560ce82d01d50499f8694c8f8"
 status = "pass"
