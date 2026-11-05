@@ -1,9 +1,16 @@
 {
  "round": "r198",
- "date": "2025-11-05T01:25+08:00",
+ "date": "2026-11-05T01:25+08:00",
  "kernel": "v0.8 local 1c1af5f8 (padded 52076544)",
  "payload": "board-r198 7a4f0ce5, args e5-mali-on",
- "result": "G1.2 PASS — stage 100, GPU_ID 0x90910010 (Mali-G57 family), SHADER_PRESENT 0x5, pmic201c=0 (rail on), NO panic",
+ "result": "G1.2 power/identity readback PASS — stage 100, GPU_ID 0x90910010 (Mali-G57 family), SHADER_PRESENT 0x5, pmic201c=0. The boot later panics after a SystemOS dyld-cache hash mismatch; this is not a healthy userland or UI round.",
+ "later_boot_failure": {
+  "volume": "SystemOS disk8s1, not writable Data disk4s1",
+  "file": "dyld_shared_cache_arm64.01, inode/data-stream 50",
+  "file_offset": 89767936,
+  "panic": "PID 1 launchd cannot load libSystem.B.dylib because the dyld cache was rejected",
+  "pstore_sha256": "b32bd02424c0b3f5afa1e66cc485e13de81e0e217677d4460a1504ce329dda56"
+ },
  "root_cause_of_r177_197": [
   "GPU windows (0x23140000, 0x23000000, 0x23014000) sit behind the aon-apb gate gpu_eb = 0x64900000 word 0x0 BIT(11), SET mirror +0x1000 (ums512-clk.c lineage; FDT clocks[0] idx 8 = CLK_GPU_EB dt-binding index, NOT the bit)",
   "r195/196 wrote BIT(8) (wrong); r197 wrote BIT(8) via set-mirror (still wrong bit); v0.8 wrote BIT(11)|BIT(9)|BIT(8) — w0 flipped to 0x2063cac1 and ALL windows opened",
