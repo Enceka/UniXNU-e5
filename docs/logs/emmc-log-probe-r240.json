@@ -1,0 +1,29 @@
+{
+  "round": "r240",
+  "device_source_revision": "7afea2f7457a80e82210f71261e02a7d133d081f",
+  "kernel_sha256": "3a91e5cd1972a521581b278ed660a9d9372dc9f3808df33dbb02f0165a36a0b7",
+  "payload_sha256": "d14aacd1068279f8d416fc217d824058bc02204d6683b7686c997da3ae5f1f8e",
+  "watchdog_seconds": 120,
+  "b_tries": 2,
+  "android_return_seconds": 185,
+  "emmc_cache_ctrl": 0,
+  "cmd24_status": "00000003",
+  "cmd24_r1": "00000900",
+  "gpt_unchanged": true,
+  "status": "PASS",
+  "nonce": 1619151325,
+  "absolute_lba": 1691648,
+  "permitted_write_offset": 63963136,
+  "permitted_write_bytes": 512,
+  "probe_crc32": "404bd9d9",
+  "probe_sha256": "f140ae99d673d14ff5e6ac441828f893235871633f9eb3e00723403b167bacd3",
+  "before_sha256": "28a76bf8a7ffc71ee1c1ded428d27bb28d58068bed103cd3031002d82e577cae",
+  "after_sha256": "4f63eb47ec0d238aecfff3240ce026c6341b96c13b53277811cc773b88eee34a",
+  "protected_bytes_unchanged": true,
+  "power_loss_retention_qualified": false,
+  "limits": [
+    "Warm watchdog reset tested; cold power loss and interrupted media writes remain unqualified.",
+    "EXT_CSD CACHE_CTRL was 0; the enabled-cache CMD6 FLUSH_CACHE branch was not exercised.",
+    "Only a single diagnostic sector was written; periodic journal validation is separate."
+  ]
+}

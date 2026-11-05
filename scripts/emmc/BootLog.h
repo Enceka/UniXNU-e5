@@ -9,6 +9,7 @@ constexpr uint64_t partitionFirst = 1566720;
 constexpr uint64_t firstSector = 124928; // 61 MiB, partition relative.
 constexpr uint64_t sectorCount = 4096;   // 2 MiB; last MiB is protected.
 constexpr uint32_t r1Errors = 0xffffa080u;
+constexpr uint32_t slots = 8, slotSectors = 512, recordPayload = 444;
 inline uint32_t le32(const uint8_t *p) {
   return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
 }
@@ -82,5 +83,20 @@ inline void probe(uint8_t *p, uint32_t nonce, uint64_t lba, uint32_t payloadByte
 }
 inline bool validProbe(const uint8_t *p) {
   return !memcmp(p, "E5LOGT1", 8) && le32(p + 8) == 1 && le32(p + 508) == crc(p, 508);
+}
+inline void record(uint8_t *p, uint32_t nonce, uint64_t generation, uint64_t seq,
+                   uint64_t uptimeNs, uint64_t stream, uint32_t flags,
+                   uint64_t dropped, const uint8_t *bytes, uint32_t length) {
+  memset(p, 0, 512);
+  memcpy(p, "E5BLOG1", 8); put32(p + 8, 1); put32(p + 12, nonce);
+  put64(p + 16, generation); put64(p + 24, seq); put64(p + 32, uptimeNs);
+  put64(p + 40, stream); put32(p + 48, length); put32(p + 52, flags);
+  put64(p + 56, dropped);
+  if (length && bytes && length <= recordPayload) memcpy(p + 64, bytes, length);
+  put32(p + 508, crc(p, 508));
+}
+inline bool validRecord(const uint8_t *p) {
+  return !memcmp(p, "E5BLOG1", 8) && le32(p + 8) == 1 && le32(p + 48) <= recordPayload &&
+      le64(p + 16) && le32(p + 508) == crc(p, 508);
 }
 }

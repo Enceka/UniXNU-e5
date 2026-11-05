@@ -35,6 +35,7 @@
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <kern/thread.h>
 #include <kern/clock.h>
+#include <kern/thread_call.h>
 #include <pexpert/pexpert.h>
 #include "TransferStatus.h"
 #include "BootLog.h"
@@ -77,6 +78,34 @@ static void elog(const char *fmt, ...) {
   e5_panic_print(buf);
 }
 
+// Console context never sleeps, allocates or performs storage I/O. A failed
+// try-lock drops a byte instead of waiting behind an interrupted producer.
+static uint8_t bootLogRing[65536];
+static uint8_t bootLogRingLock;
+static uint64_t bootLogHead, bootLogDropped;
+extern "C" void e5_bootlog_putc(char c) {
+  if (__atomic_test_and_set(&bootLogRingLock, __ATOMIC_ACQUIRE)) {
+    __atomic_fetch_add(&bootLogDropped, 1, __ATOMIC_RELAXED); return;
+  }
+  bootLogRing[bootLogHead++ & (sizeof(bootLogRing) - 1)] = (uint8_t)c;
+  __atomic_clear(&bootLogRingLock, __ATOMIC_RELEASE);
+}
+
+static unsigned bootLogCopy(uint64_t &cursor, uint8_t *bytes, uint64_t &stream, uint64_t &lost) {
+  if (__atomic_test_and_set(&bootLogRingLock, __ATOMIC_ACQUIRE)) return 0;
+  if (bootLogHead - cursor > sizeof(bootLogRing)) {
+    lost += bootLogHead - cursor - sizeof(bootLogRing);
+    cursor = bootLogHead - sizeof(bootLogRing);
+  }
+  stream = cursor;
+  unsigned n = (unsigned)(bootLogHead - cursor);
+  if (n > E5BootLog::recordPayload) n = E5BootLog::recordPayload;
+  for (unsigned i = 0; i < n; ++i) bytes[i] = bootLogRing[(cursor + i) & (sizeof(bootLogRing) - 1)];
+  cursor += n;
+  __atomic_clear(&bootLogRingLock, __ATOMIC_RELEASE);
+  return n;
+}
+
 class NativeEmmc : public IOBlockStorageDevice {
   OSDeclareDefaultStructors(NativeEmmc)
   volatile uint32_t *regs = nullptr;
@@ -101,6 +130,10 @@ class NativeEmmc : public IOBlockStorageDevice {
   bool windowPub = false;
   bool logWindowReady = false;
   uint32_t logPayloadBytes = 0;
+  thread_call_t logCall = nullptr;
+  bool logActive = false;
+  uint32_t logNonce = 0, logSlot = 0, logLastStatus = 0, logLastR1 = 0;
+  uint64_t logGeneration = 0, logSeq = 0, logCursor = 0, logOverrun = 0;
 
   inline uint8_t  r8 (uint32_t o) const { return *(volatile uint8_t  *)((uint8_t *)regs + o); }
   inline uint16_t r16(uint32_t o) const { return *(volatile uint16_t *)((uint8_t *)regs + o); }
@@ -234,7 +267,9 @@ class NativeEmmc : public IOBlockStorageDevice {
     if (lba >= sectors || lba > 0xffffffffu) return false;
     uint32_t st = sdmaRead512(0x113a, (uint32_t)lba, dmaD, dmaPhys);
     cacheInvalidate(dmaD, 512);
-    return transferOk(st) && !(r32(SDHCI_RESPONSE) & E5BootLog::r1Errors);
+    bool ok = transferOk(st) && !(r32(SDHCI_RESPONSE) & E5BootLog::r1Errors);
+    if (!ok) { cardUp = false; logWindowReady = false; }
+    return ok;
   }
 
   bool locateLogWindow() {
@@ -296,7 +331,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     w32(SDHCI_TRANSFER_MODE_CMD, 0x183a0003u); // CMD24, SDMA, count=1, WRITE.
     uint32_t st = waitDmaDone(5000000);
     uint32_t r1 = r32(SDHCI_RESPONSE);
-    elog("NativeEmmc: log CMD24 st %08x r1 %08x ps %08x\n", st, r1, r32(SDHCI_PRESENT_STATE));
+    logLastStatus = st; logLastR1 = r1;
     return transferOk(st) && !(r1 & E5BootLog::r1Errors) && waitLogReady(5000);
   }
 
@@ -312,13 +347,104 @@ class NativeEmmc : public IOBlockStorageDevice {
     elog("NativeEmmc: log probe nonce %u lba %llu crc %08x cache %u\n",
          nonce, (unsigned long long)lba, expected, extCsd[33]);
     bool wrote = writeLogSector(0);
+    elog("NativeEmmc: log CMD24 st %08x r1 %08x\n", logLastStatus, logLastR1);
     bool flushed = wrote && flushLogCache();
     bool readback = flushed && logRead(lba) && validProbe(dmaD8) &&
         le32(dmaD8 + 12) == nonce && le32(dmaD8 + 508) == expected;
     elog("NativeEmmc: log probe wrote %u flushed %u readback %u\n", wrote, flushed, readback);
     // A failed write may still own DMA. Quarantine the host on any failed
     // write/flush: the recovery path must not reuse this buffer for reads.
-    if (!wrote || !flushed) { cardUp = false; logWindowReady = false; }
+    if (!wrote || !flushed || !readback) { cardUp = false; logWindowReady = false; }
+  }
+
+  static uint64_t logUptime() {
+    uint64_t ticks = 0, ns = 0; clock_get_uptime(&ticks);
+    absolutetime_to_nanoseconds(ticks, &ns); return ns;
+  }
+
+  bool beginJournal(uint32_t nonce) {
+    using namespace E5BootLog;
+    if (!locateLogWindow()) return false;
+    uint64_t newest = 0;
+    for (unsigned i = 0; i < slots; ++i) {
+      if (!logRead(partitionFirst + firstSector + i * slotSectors)) return false;
+      if (validRecord(dmaD8) && le64(dmaD8 + 24) == 0 && le32(dmaD8 + 52) == 1) {
+        uint64_t gen = le64(dmaD8 + 16); if (gen > newest) newest = gen;
+      } else {
+        unsigned nonzero = 0; for (unsigned k = 0; k < 512; ++k) nonzero |= dmaD8[k];
+        bool ownTorn = !memcmp(dmaD8, "E5BLOG1", 8) && le32(dmaD8 + 8) == 1;
+        if (nonzero && !(i == 0 && validProbe(dmaD8)) && !ownTorn)
+          return false;
+      }
+    }
+    if (newest == ~0ull) return false;
+    logCall = thread_call_allocate(journalEntry, this);
+    if (!logCall) return false;
+    logNonce = nonce; logGeneration = newest + 1; logSlot = (uint32_t)((logGeneration - 1) % slots);
+    record(dmaD8, nonce, logGeneration, 0, logUptime(), 0, 1, 0, nullptr, 0);
+    if (!writeLogSector(logSlot * slotSectors) || !flushLogCache()) {
+      thread_call_free(logCall); logCall = nullptr;
+      cardUp = false; logWindowReady = false; return false;
+    }
+    logActive = true;
+    uint64_t deadline = 0; clock_interval_to_deadline(1, NSEC_PER_SEC, &deadline);
+    thread_call_enter_delayed(logCall, deadline);
+    return true;
+  }
+
+  static void journalEntry(thread_call_param_t context, thread_call_param_t) {
+    NativeEmmc *host = (NativeEmmc *)context;
+    if (!host || !host->logActive) return;
+    host->flushJournal();
+    if (host->logActive) {
+      uint64_t deadline = 0; clock_interval_to_deadline(5, NSEC_PER_SEC, &deadline);
+      thread_call_enter_delayed(host->logCall, deadline);
+    }
+  }
+
+  void flushJournal() {
+    using namespace E5BootLog;
+    uint64_t cursor = logCursor, lost = logOverrun;
+    unsigned written = 0;
+    bool ok = true;
+    for (unsigned i = 0; i < 16; ++i) {
+      uint8_t bytes[recordPayload]; uint64_t stream = 0;
+      unsigned n = bootLogCopy(cursor, bytes, stream, lost);
+      if (!n) break;
+      uint64_t seq = logSeq + 1;
+      // Sectors 1..71 retain early output; 72..511 roll within this boot.
+      uint32_t offset = seq < 72 ? (uint32_t)seq : 72 + (uint32_t)((seq - 72) % 440);
+      IOLockLock(ioLock);
+      if (!cardUp) { IOLockUnlock(ioLock); ok = false; break; }
+      record(dmaD8, logNonce, logGeneration, seq, logUptime(), stream, 2,
+             lost + __atomic_load_n(&bootLogDropped, __ATOMIC_RELAXED), bytes, n);
+      ok = writeLogSector(logSlot * slotSectors + offset);
+      if (!ok) { cardUp = false; logWindowReady = false; }
+      IOLockUnlock(ioLock);
+      if (!ok) break;
+      logSeq = seq; ++written;
+    }
+    if (ok && !written) {
+      uint64_t seq = logSeq + 1;
+      uint32_t offset = seq < 72 ? (uint32_t)seq : 72 + (uint32_t)((seq - 72) % 440);
+      IOLockLock(ioLock);
+      if (cardUp) {
+        record(dmaD8, logNonce, logGeneration, seq, logUptime(), cursor, 4,
+               lost + __atomic_load_n(&bootLogDropped, __ATOMIC_RELAXED), nullptr, 0);
+        ok = writeLogSector(logSlot * slotSectors + offset);
+      } else ok = false;
+      if (!ok) { cardUp = false; logWindowReady = false; }
+      IOLockUnlock(ioLock);
+      if (ok) { logSeq = seq; ++written; }
+    }
+    if (ok && written) {
+      IOLockLock(ioLock);
+      ok = cardUp && flushLogCache();
+      if (!ok) { cardUp = false; logWindowReady = false; }
+      IOLockUnlock(ioLock);
+    }
+    if (ok) { logCursor = cursor; logOverrun = lost; }
+    else { logActive = false; elog("NativeEmmc: journal stopped st %08x r1 %08x\n", logLastStatus, logLastR1); }
   }
 
   // ---- one ADMA2 single-block 512-byte read: 16-byte v4 descriptor in the
@@ -599,6 +725,11 @@ public:
                     (unsigned long long)count, (unsigned long long)block,
                     (int)buffer->getDirection(), (unsigned long long)buffer->getLength());
     IOLockLock(h->ioLock);
+    if (!h->cardUp) {
+      IOLockUnlock(h->ioLock);
+      completion->action(completion->target, completion->parameter, kIOReturnNotReady, 0);
+      return kIOReturnSuccess;
+    }
     while (done + 512 <= total) {
       uint32_t st = h->sdmaRead512(0x113A, (uint32_t)(baseOff + block + done / 512), h->dmaD, h->dmaPhys);
       cacheInvalidate(h->dmaD, 512);
@@ -659,6 +790,15 @@ bool NativeEmmc::start(IOService *provider)
       logWriteProbe(logTest);
       IOLockUnlock(ioLock);
       if (!cardUp) { elog("NativeEmmc: log probe quarantined host\n"); return true; }
+    }
+    uint32_t journalNonce = 0;
+    if (!logTest && PE_parse_boot_argn("e5-emmc-log", &journalNonce, sizeof(journalNonce)) && journalNonce) {
+      IOLockLock(ioLock);
+      bool started = beginJournal(journalNonce);
+      IOLockUnlock(ioLock);
+      elog("NativeEmmc: journal started %u nonce %u gen %llu slot %u\n", started,
+           journalNonce, (unsigned long long)logGeneration, logSlot);
+      if (!cardUp) return true;
     }
     // v5: keep regs/DMA page alive; the read path runs in doAsyncReadWrite.
     baseLba = E5Emmc::cacheFirstLba;

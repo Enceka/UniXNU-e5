@@ -33,5 +33,9 @@ int main() {
   putBig(p + 452, 0x100000000ull); putBig(p + 460, 46776320);
   putBig(p + 468, 46776320); putBig(p + 476, 2304); assert(footer(p));
   putBig(p + 468, firstSector * 512); assert(!footer(p));
+  const uint8_t text[] = {'a', 'b', 'c'};
+  record(p, 9, 2, 3, 4, 5, 2, 6, text, 3);
+  assert(validRecord(p) && le32(p + 12) == 9 && le64(p + 40) == 5);
+  assert(!memcmp(p + 64, text, 3)); p[100] ^= 1; assert(!validRecord(p));
   return 0;
 }

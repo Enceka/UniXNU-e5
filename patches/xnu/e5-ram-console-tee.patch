@@ -44,7 +44,7 @@ diff --git a/osfmk/console/serial_console.c b/osfmk/console/serial_console.c
 index 715c545..b4c692e 100644
 --- a/osfmk/console/serial_console.c
 +++ b/osfmk/console/serial_console.c
-@@ -249,9 +249,142 @@ get_cons_ops_index(void)
+@@ -249,9 +249,144 @@ get_cons_ops_index(void)
   * @param poll Whether or not this call should poll instead of going to sleep
   *             waiting for an interrupt when the hardware device isn't ready
   */
@@ -62,6 +62,7 @@ index 715c545..b4c692e 100644
 +#define E5_PRZ_RING_SIZE (E5_PRZ_WIN_SIZE - E5_PRZ_HDR_SIZE)
 +
 +extern vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
++extern void e5_bootlog_putc(char c);
 +
 +void e5_trace_mark(void);
 +
@@ -98,6 +99,7 @@ index 715c545..b4c692e 100644
 +if (c == '\n') {
 +e5_kputc('\r');
 +}
++if (e5_prz_phase == 1) e5_bootlog_putc(c);
 +if ((e5_prz_phase == 1) && (e5_prz_win != NULL)) {
 +base = (volatile unsigned char *)(e5_prz_win + E5_PRZ_DATA_OFF + E5_PRZ_WIN_OFF);
 +} else {
