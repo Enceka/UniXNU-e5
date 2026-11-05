@@ -1,0 +1,44 @@
+{
+  "round": "r242",
+  "nonce": 245336447,
+  "watchdog_seconds": 60,
+  "b_tries": 2,
+  "kernel_sha256": "461e2f066e0e9a861f1e9ce9494fbef6754aeaec2b9e1b285708e480e28c8fe4",
+  "payload_sha256": "b1159b94d6b651cf5199e317a53236f3acf2b2efb842ccb94186f0b0418618dd",
+  "device_source_revision": "9fe0c1200aaaaca75e3d868afb057f844a165cec",
+  "fat_offset": 4206604,
+  "android_return_seconds": 125,
+  "boots": [
+    {
+      "slot": 0,
+      "nonce": 819051567,
+      "generation": 1,
+      "records": 86,
+      "last_seq": 86,
+      "last_uptime_ns": 157290209269,
+      "dropped": 0,
+      "invalid_or_old_sectors": 0,
+      "gaps": 0
+    },
+    {
+      "slot": 1,
+      "nonce": 245336447,
+      "generation": 2,
+      "records": 73,
+      "last_seq": 73,
+      "last_uptime_ns": 93651871576,
+      "dropped": 0,
+      "invalid_or_old_sectors": 0,
+      "gaps": 0
+    }
+  ],
+  "previous_boot_slot_unchanged": true,
+  "previous_slot_sha256": "24bb751f561dd1ad0f6176427d418d4e1bcebcac23a293820de029a8ab6934bb",
+  "protected_bytes_unchanged": true,
+  "gpt_unchanged": true,
+  "journal_sha256": "906a2e3d9d2fe0ada570f37e4bd6085c1ba1fd472d2adf0dda7dfee24505fc32",
+  "limits": [
+    "Warm resets and two boot slots tested; cold power loss, interrupted writes and full eight-slot rotation remain unqualified.",
+    "CACHE_CTRL=0 on the tested card initialization; enabled-cache CMD6 is not device-qualified."
+  ]
+}

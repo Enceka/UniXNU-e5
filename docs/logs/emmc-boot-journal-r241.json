@@ -1,0 +1,31 @@
+{
+  "round": "r241",
+  "nonce": 819051567,
+  "watchdog_seconds": 120,
+  "b_tries": 2,
+  "kernel_sha256": "461e2f066e0e9a861f1e9ce9494fbef6754aeaec2b9e1b285708e480e28c8fe4",
+  "payload_sha256": "d8fe16f46e3a22182fe7babcb123d2a64adf7d19da9d3bc52bce4f539b0f585d",
+  "device_source_revision": "9fe0c1200aaaaca75e3d868afb057f844a165cec",
+  "fat_offset": 4206604,
+  "android_return_seconds": 185,
+  "boots": [
+    {
+      "slot": 0,
+      "nonce": 819051567,
+      "generation": 1,
+      "records": 86,
+      "last_seq": 86,
+      "last_uptime_ns": 157290209269,
+      "dropped": 0,
+      "invalid_or_old_sectors": 0,
+      "gaps": 0
+    }
+  ],
+  "protected_bytes_unchanged": true,
+  "journal_sha256": "9391e8e1c801cf0b978d9e5fd8c81cc478154ca867d5a7457a63b472b48589d6",
+  "post_boot_partition_sha256": "7ada1695b50d4c8e0432ed24922f536a9b8417f8489bcfbe768b77346fb480d0",
+  "limits": [
+    "Warm watchdog reset tested; enabled-cache CMD6 and cold power loss remain unqualified.",
+    "Cross-boot slot retention is tested in the following trial."
+  ]
+}
