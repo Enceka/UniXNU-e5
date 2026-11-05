@@ -488,16 +488,15 @@ static void ipcCensus(task_t task, Word caPortName, IpcState &out) {
   for (unsigned w = 0; w < 4; ++w) out.top[w] = worst[w];
 }
 static void snapshotThreads(ProcSnaps &out) {
-  // r216: read-only replacement for the r214 stop-based snapshot (which
-  // leaked a reference on the thread_get_state failure path and ended that
-  // boot in the os_refcnt resurrection panic, report 152225). A blocked
+  // r216: read-only replacement for the r214 stop-based snapshot (whose real
+  // defect was the queue semantics below, not thread_stop). A blocked
   // thread's saved user state is frozen on its kernel stack: take the
-  // machine.ss pointers under the task lock (thread+0xf8 -> machine, ss at
-  // +0; arm_saved_state flavor@0, ss_64 pc@+0x108 lr@+0xf8 sp@+0x100
-  // fp@+0xf0), release, then read the frozen frames directly. No thread
-  // references, no stops, no deallocations — nothing that can perturb
-  // refcounts. A thread that exits between unlock and read only yields a
-  // bounded, flavor-checked garbage frame.
+  // machine.ss pointers under the task lock (thread+0x110 -> machine, ss at
+  // +0; arm_saved_state flavor@0 = ARM_SAVED_STATE64 21, ss_64 at +8 so
+  // pc@+0x108 lr@+0xf8 sp@+0x100 fp@+0xf0), release, then read the frozen
+  // frames directly. No thread references, no stops, no deallocations —
+  // nothing that can perturb refcounts. A thread that exits between unlock
+  // and read only yields a bounded, flavor-checked garbage frame.
   static const char *const wanted[kMaxProcs] = {"SpringBoard", "liveactivitiesd", "chronod"};
   bzero(&out, sizeof(out));
   for (int pid = 1; pid < 512 && out.count < kMaxProcs; ++pid) {
@@ -531,7 +530,7 @@ static void snapshotThreads(ProcSnaps &out) {
     Word head = (Word)task + 0x80;
     for (Word th = *(const Word *)head; th != head && count != kMaxThreads;
          th = *(const Word *)(th + 0x428)) {
-      saved[count++] = *(const Word *)(th + 0xf8);  // machine.ss
+      saved[count++] = *(const Word *)(th + 0x110);  // machine.ss (runtime-proven)
     }
     task_unlock(task);
     p.threads = count;
@@ -539,7 +538,10 @@ static void snapshotThreads(ProcSnaps &out) {
     Reader r = {map, nullptr};
     for (unsigned i = 0; i != count; ++i) {
       Word ss = saved[i];
-      if (!kernelPointer(ss) || *(const unsigned *)ss != 6U) continue;  // ARM_THREAD_STATE64
+      // The internal header carries ARM_SAVED_STATE64 (21), not the MIG
+      // flavor 6; machine.ss sits at thread+0x110 per this build's
+      // machine_thread_get_state flavor-6 handler (0xfffffff0074078e0).
+      if (!kernelPointer(ss) || *(const unsigned *)ss != 21U) continue;
       ThreadSnap &t = p.thread[i];
       t.pc = *(const Word *)(ss + 0x108);
       t.lr = *(const Word *)(ss + 0xf8);
