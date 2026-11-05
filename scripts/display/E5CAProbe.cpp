@@ -100,6 +100,9 @@ struct ThreadSnap {
   Word kernelState, waitEvent, continuation;
   Word arg[8];
   Word ret[24];
+  // r233: path-like ASCII runs captured around the saved stack pointer —
+  // names the file/bundle a scan thread is chewing on (lsd seeding).
+  char stk[2][48];
 };
 struct ProcSnap {
   unsigned pid, threads, uid, images;
@@ -119,6 +122,12 @@ struct ProcSnaps { unsigned count; ProcSnap proc[kMaxProcs]; };
 struct PcSample { unsigned pid; Word tid, pc, lr, cpu, stamp; };
 static const unsigned kPcHistory = 16;
 struct PcHistory { unsigned count; PcSample sample[kPcHistory]; };
+// r233: the seeding-group raw word sampled across worker runs — one number
+// per census with a timestamp decides "progressing (count falling)" vs
+// "frozen (bit-identical for the whole window)" without console flooding.
+struct SeedSample { Word ts, raw, after, lock; };
+static const unsigned kSeedHistory = 24;
+struct SeedHistory { unsigned count; SeedSample s[kSeedHistory]; };
 // Kernel-side IPC census of the probed task: how many mk_timer ports exist,
 // whether any fired-but-undrained messages sit in their queues, and the
 // armed deadline of the CA display timer's own port.
@@ -126,6 +135,9 @@ struct IpcPortLine { Word idx, msgs, kotype, armed; };
 struct IpcState {
   Word entries, ports, timers, timerMsgs, undrained;
   Word caIdx, caMsgs, caKotype, caDeadline, caFlags;
+  // r233: where the census actually stopped — distinguishes a bad space/
+  // table deref (n=0, sp=0/tp=0) from an emptied table walk.
+  Word spacePtr, tablePtr, caPortName, idleAt;
   IpcPortLine top[4];
 };
 static Word values[Fields];
@@ -134,6 +146,7 @@ static PoolState pool;
 static IpcState ipc;
 static ProcSnaps threads;
 static PcHistory pcHistory;
+static SeedHistory seedHistory;
 static unsigned generation, busy, selectedPid;
 static thread_call_t worker;
 static bool enabled() {
@@ -458,10 +471,13 @@ static unsigned timerPortFlags(Word kobject, Word &deadline) {
 }
 static void ipcCensus(task_t task, Word caPortName, IpcState &out) {
   bzero(&out, sizeof(out));
+  out.caPortName = caPortName;
   if (!kernelPointer((Word)task)) return;
   Word space = *(const Word *)((const char *)task + 0x328);
+  out.spacePtr = space;
   if (!kernelPointer(space)) return;
   Word table = *(const volatile Word *)((const char *)space + 0x20);
+  out.tablePtr = table;
   if (!kernelPointer(table)) return;
   unsigned caIdx = caPortName ? (unsigned)(caPortName >> 8) : 0;
   IpcPortLine worst[4] = {};
@@ -470,7 +486,7 @@ static void ipcCensus(task_t task, Word caPortName, IpcState &out) {
     const char *entry = (const char *)table + (Word)i * 0x18;
     Word object = *(const volatile Word *)(entry + 0);
     if (!object || !kernelPointer(object)) {
-      if (++idle > 96) break;
+      if (++idle > 96) { out.idleAt = i; break; }
       continue;
     }
     idle = 0;
@@ -536,6 +552,15 @@ static void recordPcHistory(const ProcSnaps &snaps) {
       buffer.sample[buffer.count++] = PcSample{p.pid, p.thread[j].tid,
           p.thread[j].pc, p.thread[j].lr, p.thread[j].cpu, p.stamp};
     }
+    if (lsd) {
+      static SeedHistory buffer2;
+      if (buffer2.count == kSeedHistory) {
+        for (unsigned k = 1; k != kSeedHistory; ++k) buffer2.s[k - 1] = buffer2.s[k];
+        --buffer2.count;
+      }
+      buffer2.s[buffer2.count++] = SeedSample{p.stamp, p.seedBefore, p.seedAfter, p.lockBefore};
+      seedHistory = buffer2;
+    }
   }
   pcHistory = buffer;
 }
@@ -600,9 +625,23 @@ static void snapshotThreads(ProcSnaps &out) {
         if (arrayPtr && arrayCount && arrayCount < 512) {
           for (unsigned e = 0; e < arrayCount && p.images < 16; ++e) {
             Word entry = arrayPtr + 21 * e * 8;  // dyld_image_info: 3 pointers
-            Word loadAddress = 0, pathPtr = 0;
+            Word loadAddress = 0, pathPtr = 0, pathAlt = 0;
             if (!r.probeBytes(entry, &loadAddress, 8)) break;
-            if (!r.probeBytes(entry + 0x10, &pathPtr, 8)) pathPtr = 0;
+            // r232 delivered a=… p=0 t=- for every entry: the +0x10 slot read
+            // zero on this dyld. r233 reads +8 first (user-filed correction),
+            // keeps +0x10 as a fallback, and trusts whichever decodes to
+            // printable ASCII on the host side.
+            if (!r.probeBytes(entry + 8, &pathPtr, 8)) pathPtr = 0;
+            if (!r.probeBytes(entry + 0x10, &pathAlt, 8)) pathAlt = 0;
+            char textA[48] = {}, textB[48] = {};
+            if (pathPtr) r.probeBytes(pathPtr, textA, sizeof(textA) - 1);
+            if (pathAlt) r.probeBytes(pathAlt, textB, sizeof(textB) - 1);
+            bool okA = false, okB = false;
+            for (unsigned c = 0; c != sizeof(textA); ++c) { if (!textA[c]) break; if (textA[c] < 0x20 || textA[c] >= 0x7f) { okA = false; break; } okA = c + 1 >= 4; }
+            for (unsigned c = 0; c != sizeof(textB); ++c) { if (!textB[c]) break; if (textB[c] < 0x20 || textB[c] >= 0x7f) { okB = false; break; } okB = c + 1 >= 4; }
+            if (!okA) pathPtr = 0;
+            if (!okB) pathAlt = 0;
+            if (!pathPtr && pathAlt) pathPtr = pathAlt;
             p.imageLoad[p.images] = loadAddress;
             p.imagePath[p.images] = pathPtr;
             for (unsigned c = 0; c != sizeof(p.imageText[0]); ++c)
@@ -691,6 +730,55 @@ static void snapshotThreads(ProcSnaps &out) {
         if (next <= fp || next - fp > 0x200000) break;
         fp = next;
       }
+      // r233: harvest path-like ASCII from the live stack window above sp.
+      // A scan thread holds the bundle/file string it is working on within
+      // a few hundred bytes of its frame; two longest runs are enough to
+      // name the tar pit (e.g. a SeymourServices asset) for image surgery.
+      if (deep && !t.status && t.sp >= 0x1000 && t.sp < 0x8000000000ULL) {
+        static uint8_t window[0x500];
+        bzero(window, sizeof(window));
+        if (r.probeBytes(t.sp, window, sizeof(window))) {
+          unsigned bestLen[2] = {0, 0};
+          unsigned run = 0;
+          for (unsigned off = 0; off <= sizeof(window); ++off) {
+            const uint8_t c = off < sizeof(window) ? window[off] : 0;
+            const bool printable = c >= 0x20 && c < 0x7f;
+            if (printable) { ++run; continue; }
+            if (run >= 12) {
+              // Path-like: contains '/' or a bundle-ish extension.
+              const char *s = (const char *)window + off - run;
+              bool pathy = false;
+              for (unsigned q = 0; q + 3 < run; ++q)
+                if (s[q] == '/') { pathy = true; break; }
+              if (!pathy)
+                for (unsigned q = 0; q + 4 <= run; ++q) {
+                  if (q + 8 <= run && !memcmp(s + q, ".strings", 8)) { pathy = true; break; }
+                  if (q + 7 <= run && !memcmp(s + q, ".bundle", 7)) { pathy = true; break; }
+                  if (q + 5 <= run && !memcmp(s + q, ".lsvb", 5)) { pathy = true; break; }
+                  if (!memcmp(s + q, ".app", 4) || !memcmp(s + q, ".car", 4) ||
+                      !memcmp(s + q, ".pdf", 4) || !memcmp(s + q, ".png", 4) ||
+                      (q + 3 <= run && !memcmp(s + q, ".db", 3))) { pathy = true; break; }
+                }
+              if (pathy) {
+                unsigned slot = 2;
+                if (run > bestLen[0]) slot = 0;
+                else if (run > bestLen[1]) slot = 1;
+                if (slot == 0) {
+                  memcpy(t.stk[1], t.stk[0], sizeof(t.stk[1]));
+                  bestLen[1] = bestLen[0];
+                }
+                if (slot < 2) {
+                  unsigned len = run < sizeof(t.stk[0]) - 1 ? run : sizeof(t.stk[0]) - 1;
+                  // Keep the TAIL of long paths (the filename side).
+                  memcpy(t.stk[slot], s + run - len, len);
+                  bestLen[slot] = run;
+                }
+              }
+            }
+            run = 0;
+          }
+        }
+      }
     }
     if (deep && !p.dyldStatus) {
       p.lockReadAfter = r.probeBytes(0x1f4884878ULL + p.slide, &p.lockAfter, 8);
@@ -764,6 +852,7 @@ extern "C" void e5_ca_probe_dump(void) {
   static IpcState ipcLocal;
   static ProcSnaps threadLocal;
   static PcHistory pcLocal;
+  static SeedHistory seedLocal;
   static unsigned dumping;
   unsigned expected = 0;
   if (!__atomic_compare_exchange_n(&dumping, &expected, 1U, false,
@@ -779,6 +868,7 @@ extern "C" void e5_ca_probe_dump(void) {
   ipcLocal = ipc;
   threadLocal = threads;
   pcLocal = pcHistory;
+  seedLocal = seedHistory;
   if (before != __atomic_load_n(&generation, __ATOMIC_ACQUIRE)) {
     __atomic_store_n(&dumping, 0U, __ATOMIC_RELEASE);
     return;
@@ -824,9 +914,10 @@ extern "C" void e5_ca_probe_dump(void) {
       }
     }
   }
-  log("E5IPC n=%llu np=%llu nt=%llu tmsg=%llu und=%llu ca=%llu:%llx:%llx:%llx:%llx",
+  log("E5IPC n=%llu np=%llu nt=%llu tmsg=%llu und=%llu ca=%llu:%llx:%llx:%llx:%llx sp=%llx tp=%llx pn=%llx idle=%llu",
       ipcLocal.entries,ipcLocal.ports,ipcLocal.timers,ipcLocal.timerMsgs,ipcLocal.undrained,
-      ipcLocal.caIdx,ipcLocal.caMsgs,ipcLocal.caKotype,ipcLocal.caFlags,ipcLocal.caDeadline);
+      ipcLocal.caIdx,ipcLocal.caMsgs,ipcLocal.caKotype,ipcLocal.caFlags,ipcLocal.caDeadline,
+      ipcLocal.spacePtr,ipcLocal.tablePtr,ipcLocal.caPortName,ipcLocal.idleAt);
   for (unsigned w = 0; w < 4; ++w) {
     if (!ipcLocal.top[w].msgs) break;
     log("E5IPCP w=%u idx=%llx m=%llx kt=%llx",
@@ -836,6 +927,9 @@ extern "C" void e5_ca_probe_dump(void) {
     const PcSample &h = pcLocal.sample[i];
     log("E5THH k=%u pid=%u tid=%llx pc=%llx lr=%llx cpu=%llx ts=%llx", i,h.pid,h.tid,h.pc,h.lr,h.cpu,h.stamp);
   }
+  for (unsigned k = 0; k != seedLocal.count && k < kSeedHistory; ++k)
+    log("E5LSDH k=%u ts=%llx raw=%llx af=%llx lk=%llx", k,
+        seedLocal.s[k].ts, seedLocal.s[k].raw, seedLocal.s[k].after, seedLocal.s[k].lock);
   for (unsigned i = 0; i != threadLocal.count && i != kMaxProcs; ++i) {
     const ProcSnap &p = threadLocal.proc[i];
     log("E5THP i=%u pid=%u name=%s n=%u uid=%u ts=%llx", i,p.pid,p.name[0] ? p.name : "-",p.threads,p.uid,p.stamp);
@@ -864,6 +958,9 @@ extern "C" void e5_ca_probe_dump(void) {
         log("E5THA i=%u j=%u x=%llx,%llx,%llx,%llx,%llx,%llx,%llx,%llx",
             i,j,t.arg[0],t.arg[1],t.arg[2],t.arg[3],t.arg[4],t.arg[5],t.arg[6],t.arg[7]);
       }
+      if (deep && (t.stk[0][0] || t.stk[1][0]))
+        log("E5THS i=%u j=%u s0=%.46s s1=%.46s",
+            i, j, t.stk[0][0] ? t.stk[0] : "-", t.stk[1][0] ? t.stk[1] : "-");
     }
   }
   __atomic_store_n(&dumping, 0U, __ATOMIC_RELEASE);
