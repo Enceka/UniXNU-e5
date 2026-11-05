@@ -87,6 +87,8 @@ extern "C" void *e5_display_service_instance() { return sPowerInstance; }
 // read must never block acquiring the display gate: display setup can itself
 // need a media read. attemptAction skips that sample if the gate is busy.
 static void e5_state_log(const char *fmt, ...);
+// r221: defined below the class; publishes the real mode table on the service.
+static void e5PublishModeTable(IOService *service);
 // v36: universal return-0 thunk + hand-built vtable for the fake family
 // sub-objects (+0x1638 event source, +0x1658 swap-wait helper). arm64 KC =
 // plain blr vtable dispatch (no PAC), so raw function pointers are safe.
