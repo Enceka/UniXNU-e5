@@ -44,7 +44,6 @@ extern "C" void task_lock(task_t);
 extern "C" void task_unlock(task_t);
 extern "C" void thread_reference(thread_t);
 extern "C" void thread_deallocate(thread_t);
-extern "C" kern_return_t thread_get_state(thread_t, int, void *, unsigned *);
 
 namespace {
 using Word = unsigned long long;
@@ -530,8 +529,9 @@ static void snapshotThreads(ProcSnaps &out) {
     Reader r = {map, nullptr};
     for (unsigned i = 0; i != count; ++i) {
       struct { Word x[29], fp, lr, sp, pc; unsigned cpsr, flags; } state = {};
-      unsigned words = 68;  // ARM_THREAD_STATE64_COUNT
-      if (thread_get_state(list[i], 6 /* ARM_THREAD_STATE64 */, &state, &words) != KERN_SUCCESS)
+      mach_msg_type_number_t words = 68;  // ARM_THREAD_STATE64_COUNT
+      if (thread_get_state(list[i], 6 /* ARM_THREAD_STATE64 */,
+                           reinterpret_cast<thread_state_t>(&state), &words) != KERN_SUCCESS)
         continue;
       ThreadSnap &t = p.thread[i];
       t.pc = state.pc;
