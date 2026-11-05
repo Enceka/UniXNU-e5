@@ -38,12 +38,10 @@ extern "C" kern_return_t vm_map_read_user(vm_map_t, vm_map_address_t, void *, vm
 // r214 thread snapshot: same linkage situation as vm_map_read_user. The queue
 // offsets come from llvm-dwarfdump of this build's own objects, matching the
 // ipc offsets below: task.threads +0x80 (queue_head_t), thread.task_threads
-// +0x428 (queue_chain_t). thread_get_state stops the target briefly and is
-// the same path corpse forking uses.
+// +0x428 (queue_chain_t). r216 reads the frozen saved state directly and
+// keeps no thread references.
 extern "C" void task_lock(task_t);
 extern "C" void task_unlock(task_t);
-extern "C" void thread_reference(thread_t);
-extern "C" void thread_deallocate(thread_t);
 
 namespace {
 using Word = unsigned long long;
@@ -490,20 +488,16 @@ static void ipcCensus(task_t task, Word caPortName, IpcState &out) {
   for (unsigned w = 0; w < 4; ++w) out.top[w] = worst[w];
 }
 static void snapshotThreads(ProcSnaps &out) {
-  // r214 hardware result: running this unconditionally coincided with the
-  // probe worker going silent and backboardd/liveactivitiesd disappearing
-  // from late censuses (report 152225; the same boot kept services=0x3c and
-  // E5AKS alive), while the r213 kernel showed both daemons alive. The
-  // thread_stop inside thread_get_state is the only new perturbation, so the
-  // snapshot is now gated behind e5-threads and OFF by default until a
-  // non-stopping read of the saved state is implemented.
-  if (!PE_parse_boot_argn("e5-threads", nullptr, 0)) {
-    bzero(&out, sizeof(out));
-    return;
-  }
-  // Mirror of task_threads_internal's queue walk: hold the task lock only to
-  // take thread references, then copy state (which briefly stops each
-  // thread) and walk frames through the task map with the quiet reader.
+  // r216: read-only replacement for the r214 stop-based snapshot (which
+  // leaked a reference on the thread_get_state failure path and ended that
+  // boot in the os_refcnt resurrection panic, report 152225). A blocked
+  // thread's saved user state is frozen on its kernel stack: take the
+  // machine.ss pointers under the task lock (thread+0xf8 -> machine, ss at
+  // +0; arm_saved_state flavor@0, ss_64 pc@+0x108 lr@+0xf8 sp@+0x100
+  // fp@+0xf0), release, then read the frozen frames directly. No thread
+  // references, no stops, no deallocations — nothing that can perturb
+  // refcounts. A thread that exits between unlock and read only yields a
+  // bounded, flavor-checked garbage frame.
   static const char *const wanted[kMaxProcs] = {"SpringBoard", "liveactivitiesd", "chronod"};
   bzero(&out, sizeof(out));
   for (int pid = 1; pid < 512 && out.count < kMaxProcs; ++pid) {
@@ -524,31 +518,27 @@ static void snapshotThreads(ProcSnaps &out) {
     ProcSnap &p = out.proc[out.count++];
     p.pid = (unsigned)pid;
     for (unsigned i = 0; i != sizeof(p.name); ++i) p.name[i] = name[i] ? name[i] : 0;
-    thread_t list[kMaxThreads] = {};
+    Word saved[kMaxThreads] = {};
     unsigned count = 0;
     task_lock(task);
     Word head = (Word)task + 0x80;
     for (Word member = *(const Word *)head; member != head && count != kMaxThreads;
          member = *(const Word *)member) {
-      thread_t th = (thread_t)(member - 0x428);
-      thread_reference(th);
-      list[count++] = th;
+      saved[count++] = *(const Word *)(member - 0x428 + 0xf8);
     }
     task_unlock(task);
     p.threads = count;
     vm_map_t map = get_task_map(task);
     Reader r = {map, nullptr};
     for (unsigned i = 0; i != count; ++i) {
-      struct { Word x[29], fp, lr, sp, pc; unsigned cpsr, flags; } state = {};
-      mach_msg_type_number_t words = 68;  // ARM_THREAD_STATE64_COUNT
-      if (thread_get_state(list[i], 6 /* ARM_THREAD_STATE64 */,
-                           reinterpret_cast<thread_state_t>(&state), &words) != KERN_SUCCESS)
-        continue;
+      Word ss = saved[i];
+      if (!kernelPointer(ss) || *(const unsigned *)ss != 6U) continue;  // ARM_THREAD_STATE64
       ThreadSnap &t = p.thread[i];
-      t.pc = state.pc;
-      t.lr = state.lr;
-      t.sp = state.sp;
-      Word fp = state.fp;
+      t.pc = *(const Word *)(ss + 0x108);
+      t.lr = *(const Word *)(ss + 0xf8);
+      t.sp = *(const Word *)(ss + 0x100);
+      if (t.pc < 0x1000 || t.pc >= 0x8000000000ULL) { t.pc = t.lr = t.sp = 0; continue; }
+      Word fp = *(const Word *)(ss + 0xf0);
       for (unsigned d = 0; d != kFrames; ++d) {
         Word next = 0, ret = 0;
         if (fp < 0x1000 || fp >= 0x8000000000ULL) break;
@@ -558,7 +548,6 @@ static void snapshotThreads(ProcSnaps &out) {
         if (next <= fp || next - fp > 0x200000) break;  // stacks grow down
         fp = next;
       }
-      thread_deallocate(list[i]);
     }
     task_deallocate(task);
   }
