@@ -871,19 +871,26 @@ public:
   }
   IOReturn opaque224(void *a, uint32_t b, uint64_t c, void *d, uint32_t e,
                      void *f, uint32_t g) override {
-    // r221: sel 79 GetBlock transports {reserved, block_id, byte_offset}
-    // scalars with a structure output (client wrapper 0x1b63d7e44, chunked at
-    // 4096 bytes). The only block this flow queries is 0x40 — the 44-byte
-    // digital-out-mode block read by IOMobileFramebufferGetDigitalOutMode
-    // (0x1b63d42e0): color element ID at +4, timing element ID at +8, other
-    // bytes unspecified by the consumer. Answer with the IDs published by
-    // e5PublishModeTable (both 1) so fetch_current_iomfb_mode resolves a real
-    // ModeInfo instead of the Mode(-1) sentinel.
+    // r222: the r221 attempts wrote the ID pair at (a? a:d)+4/+8 on b/c==0x40
+    // and BOTH boots ended in the same RW-lock already-held assertion whose
+    // panic formatter data-aborted resolving the owner ctid (reports 182317,
+    // 184202) — the write was landing on kernel memory, so the slot-224
+    // argument marshaling is not what the r209 client decode suggested. This
+    // round only RECORDS the arguments (once each distinct shape); nothing is
+    // written. The next round writes the 44-byte 0x40 answer to the argument
+    // this proves is the structure output.
+    static uint32_t loggedShapes;
+    uint32_t shape = (b == 0x40u ? 1u : 0u) | ((uint32_t)c == 0x40u ? 2u : 0u) |
+                     (a ? 4u : 0u) | (d ? 8u : 0u);
     if (b == 0x40u || (uint32_t)c == 0x40u) {
-      uint8_t *out = (uint8_t *)(a ? a : d);
-      if (out) {
-        *(uint32_t *)(out + 4) = 1;  // color element ID
-        *(uint32_t *)(out + 8) = 1;  // timing element ID
+      uint32_t seen = __atomic_load_n(&loggedShapes, __ATOMIC_RELAXED);
+      if (!(seen & (1u << shape))) {
+        __atomic_fetch_or(&loggedShapes, 1u << shape, __ATOMIC_RELAXED);
+        // Direct kputc: e5_state_log is gated by e5-no-state, which stays on.
+        char line[160];
+        snprintf(line, sizeof(line), "E5B40 shape=%u a=%p b=%x c=%llx d=%p e=%x f=%p g=%x\n",
+                 shape, a, b, (unsigned long long)c, d, e, f, g);
+        for (const char *p = line; *p; ++p) e5_kputc(*p);
       }
     }
     (void)e; (void)f; (void)g;
