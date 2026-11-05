@@ -589,6 +589,7 @@ public:
       return false;
     }
     __atomic_fetch_or(&e5_display_lifecycle, 0x020U, __ATOMIC_RELAXED);
+    e5PublishModeTable(this);  // r221: real mode contract before registration.
     familyStarted = true;
     return true;
   }
@@ -868,7 +869,22 @@ public:
   }
   IOReturn opaque224(void *a, uint32_t b, uint64_t c, void *d, uint32_t e,
                      void *f, uint32_t g) override {
-    (void)a; (void)b; (void)c; (void)d; (void)e; (void)f; (void)g;
+    // r221: sel 79 GetBlock transports {reserved, block_id, byte_offset}
+    // scalars with a structure output (client wrapper 0x1b63d7e44, chunked at
+    // 4096 bytes). The only block this flow queries is 0x40 — the 44-byte
+    // digital-out-mode block read by IOMobileFramebufferGetDigitalOutMode
+    // (0x1b63d42e0): color element ID at +4, timing element ID at +8, other
+    // bytes unspecified by the consumer. Answer with the IDs published by
+    // e5PublishModeTable (both 1) so fetch_current_iomfb_mode resolves a real
+    // ModeInfo instead of the Mode(-1) sentinel.
+    if (b == 0x40u || (uint32_t)c == 0x40u) {
+      uint8_t *out = (uint8_t *)(a ? a : d);
+      if (out) {
+        *(uint32_t *)(out + 4) = 1;  // color element ID
+        *(uint32_t *)(out + 8) = 1;  // timing element ID
+      }
+    }
+    (void)e; (void)f; (void)g;
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 7, __ATOMIC_RELAXED);
     return kIOReturnSuccess;
   }
@@ -904,6 +920,59 @@ OSDefineMetaClassAndStructors(E5Display, IOMobileFramebufferLegacy)
 static_assert(sizeof(E5Display) == 0x2118, "v43: grown Legacy extent carries the +0x1e88 panel pointer in-bounds");
 
 extern "C" unsigned e5_display_compiled_size(void) { return sizeof(E5Display); }
+
+// r221: the real E5 mode contract — one 320x480@60 timing/color pair matching
+// the ST7365P RGB565 panel the firmware already scans out. Consumer contract
+// decoded from the pinned 21H461 QuartzCore (docs/display-mode-table-r221-plan.md
+// and display-mode-contract-21H461-r209.json): TOP-LEVEL ColorElements /
+// TimingElements arrays on the display service (not inside DisplayAttributes);
+// Score must be nonzero (zero rejects at 0x1896e3574); a PreciseSyncRate below
+// 121 is auto-scaled <<16 into 16.16 fixed point by the consumer itself
+// (0x1896e252c..0x1896e2538), so integer 60 is the true 60 Hz; PixelEncoding 3
+// with Colorimetry 1 takes the plain RGB path (the EOTF/Depth deep checks at
+// 0x1896e27d4.. belong to encoding 0x10). Values describe actual panel
+// behavior; no gate-opening filler.
+static void e5PublishModeTable(IOService *service) {
+  OSDictionary *color = OSDictionary::withCapacity(6);
+  OSDictionary *timing = OSDictionary::withCapacity(7);
+  OSDictionary *horizontal = OSDictionary::withCapacity(2);
+  OSDictionary *vertical = OSDictionary::withCapacity(2);
+  OSArray *colors = OSArray::withCapacity(1);
+  OSArray *timings = OSArray::withCapacity(1);
+  do {
+    if (!color || !timing || !horizontal || !vertical || !colors || !timings) break;
+    color->setObject("ID", OSNumber::withNumber((uint32_t)1, 32));
+    color->setObject("PixelEncoding", OSNumber::withNumber((uint32_t)3, 32));
+    color->setObject("Depth", OSNumber::withNumber((uint32_t)16, 32));
+    color->setObject("Colorimetry", OSNumber::withNumber((uint32_t)1, 32));
+    color->setObject("EOTF", OSNumber::withNumber((uint32_t)2, 32));
+    color->setObject("DynamicRange", OSNumber::withNumber((uint32_t)0, 32));
+    horizontal->setObject("Active", OSNumber::withNumber((uint32_t)320, 32));
+    horizontal->setObject("PixelRepetition", OSNumber::withNumber((uint32_t)0, 32));
+    vertical->setObject("Active", OSNumber::withNumber((uint32_t)480, 32));
+    vertical->setObject("PreciseSyncRate", OSNumber::withNumber((uint32_t)60, 32));
+    timing->setObject("ID", OSNumber::withNumber((uint32_t)1, 32));
+    timing->setObject("Score", OSNumber::withNumber((uint32_t)100, 32));
+    timing->setObject("HorizontalAttributes", horizontal);
+    timing->setObject("VerticalAttributes", vertical);
+    timing->setObject("IsVirtual", kOSBooleanFalse);
+    timing->setObject("IsOverscanned", kOSBooleanFalse);
+    timing->setObject("preferredUIScale", OSNumber::withNumber((uint32_t)1, 32));
+    colors->setObject(color);
+    timings->setObject(timing);
+    // OSNumber::withNumber / the sub-dictionaries are retained by their
+    // collections; release only our own creation references below.
+    service->setProperty("ColorElements", colors);
+    service->setProperty("TimingElements", timings);
+    __atomic_fetch_or(&e5_display_lifecycle, 0x400000U, __ATOMIC_RELAXED);
+  } while (false);
+  if (colors) colors->release();
+  if (timings) timings->release();
+  if (color) color->release();
+  if (timing) timing->release();
+  if (horizontal) horizontal->release();
+  if (vertical) vertical->release();
+}
 
 // V8 attach phase. Runs after the construction probe reached 0x1ff on the
 // same boot. Bits in e5_display_attach (field owned by NativeSd.cpp):
