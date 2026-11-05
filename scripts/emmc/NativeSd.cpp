@@ -60,6 +60,9 @@ extern "C" int e5_display_publish(IOService *provider);
 static const char *dataPublication = "disabled";
 static const char *dataLookup = "unreached";
 static uint32_t dataDetail;
+// Cumulative SD read accounting (blocks of 512B, request ops).
+static unsigned long long e5_sd_rd_blocks;
+static unsigned long long e5_sd_rd_ops;
 static void dataCheckpoint(const char *phase, uint32_t detail = 0) {
   __atomic_store_n(&dataDetail, detail, __ATOMIC_RELAXED);
   __atomic_store_n(&dataPublication, phase, __ATOMIC_RELEASE);
@@ -927,6 +930,10 @@ public:
       return kIOReturnBadArgument;
     UInt64 done = 0; IOLockLock(lock);
     if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
+    // Cumulative read accounting — MB/s across censuses tells us whether
+    // the LS cold rebuild is SD-I/O-bound and how long a full scan must take.
+    __atomic_fetch_add(&e5_sd_rd_blocks, count, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&e5_sd_rd_ops, 1, __ATOMIC_RELAXED);
     // Keep the GPT/first APFS requests, then sample progress. Logging every
     // multi-block read overwrites the persistent trace window during OS boot.
     uint32_t call = ++calls;
@@ -981,7 +988,7 @@ public:
       // Print 1-in-64 ticks; the E5TW ring keeps the fast history regardless.
       static unsigned sEchoThrottle = 0;
       if (e5_quiet == 0 && (++sEchoThrottle & 0x3Fu) == 0u)
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d M=%u:%08x:%08x\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d M=%u:%08x:%08x RD=%llu:%llu\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
@@ -1023,7 +1030,9 @@ public:
             __atomic_load_n(&e5_diag_stage, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_mali_stage, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_mali_gpu_id, __ATOMIC_RELAXED),
-            __atomic_load_n(&e5_mali_shader, __ATOMIC_RELAXED));
+            __atomic_load_n(&e5_mali_shader, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_sd_rd_blocks, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_sd_rd_ops, __ATOMIC_RELAXED));
     }
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
