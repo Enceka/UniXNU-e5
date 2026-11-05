@@ -91,6 +91,13 @@ static void e5_state_log(const char *fmt, ...);
 // sub-objects (+0x1638 event source, +0x1658 swap-wait helper). arm64 KC =
 // plain blr vtable dispatch (no PAC), so raw function pointers are safe.
 extern "C" unsigned long e5FakeFamilyThunk(void) { return 0; }
+// v44: the panel-info gate (helper 0x6bd6a90 vt+0x668) must return a NON-NULL
+// pointer — cbz x0 takes the 0xe00002c7 bail (r203). The memcpy source is the
+// RETURNED pointer +0x10. Static zero blob 0xc20 covers the 0xc0c copy.
+static unsigned long long e5FakePanelBlob[0xc20 / 8];
+extern "C" unsigned long e5FakeFamilyThunkObj(void) {
+  return (unsigned long)&e5FakePanelBlob[0];
+}
 static void *const e5FakeFamilyVt[264] = {
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
@@ -194,7 +201,7 @@ static void *const e5FakeFamilyVt[264] = {
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
-    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
+    (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunkObj,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,

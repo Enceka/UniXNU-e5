@@ -1,0 +1,11 @@
+{
+ "round": "r204",
+ "date": "2026-11-05T08:30+08:00",
+ "kernel": "v44 cab7227f (ptr-return thunk e5FakeFamilyThunkObj at vt slot 205, static 0xc20 blob)",
+ "payload": "board-r204 12a52565 (args e5-ca-state e5-no-vc zz)",
+ "results": [
+  "HEALTHY u=5:5, no panic; sel 17 STILL ret=e00002c7; E5CAX still all-zero",
+  "FALSIFIED: zero-e88 (v36), e88+return-0-thunk (r203), e88+ptr-return-thunk@205 (r204) — the 0xe00002c7 does NOT come from the vt+0x668 gate path as decoded"
+ ],
+ "next": "decode the FAMILY BASE slot-200 impl precisely (raw = Legacy vtable 0x6f38570[200], family __TEXT_EXEC window 0x676c000+0x366bc): find its actual NULL-check member (+0x1db8 like H9G? +0x1608 helper? other) and satisfy THAT. Fresh-context static job: kits/XnuPrelink + capstone on build/e5-kernelcache."
+}
