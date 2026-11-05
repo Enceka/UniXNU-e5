@@ -394,6 +394,14 @@ limits = ["Backlight control and userland presentation are not implemented; only
 next_action = ["After r199 storage acceptance, disable root/mobile IOMobileGraphicsFamily benchmark preferences in a backed-up Data copy and observe native selector 6/72/74, renderer/surface production and selectors 3/4/5 before adding more event shims.", "Preserve the qualified R109 gateway and no-vc control. Capture selector 6/12 scalar inputs and the family support byte 0x8c and readiness words 0x16d0/0x16e0, then implement the native power transition and completion contract. Original Legacy start clears the family support byte; do not equate it with IOService PMinit flag 0x68 or force success.", "Only after readiness completes, qualify first real default-surface and SwapBegin/SwapEnd calls, IOSurface identity/format, scanout mapping and physical presentation. Keep LA keybag event registration as a separate dependency."]
 
 [[area.evidence]]
+kind = "device"
+revision = "18a5081"
+status = "pass"
+reference = "docs/display-ca-state-r210.md"
+command = "R209/R210 kernel-only candidates through e5-xnu e5-uefi-cycle.sh; fresh Android boot IDs; raw pstore decode; complete R210 boot_b payload SHA256 readback"
+result = "Diagnostic repair accepted: R209/R210 return after 665/660 seconds with no retained panic; R210 collector exits 0 and full 62926860-byte readback matches 224729cc36923d4b91f7d588bfbc56a2efb8b0070b01c5ed514b8ca6672c3a93. Both internal native displays report tt=1 mc=2 mode=-1, disabled=shutdown=0, timer present, tc9=1, pending flags 0x40000 and kind-5 callback=0. Correct R210 render gate byte is 0. The mc<2 blocking hypothesis is contradicted; selectors 3/4/5 remain zero and UI is unqualified. Next discriminate timer activation/callbacks and ignore_update_p scene-context filtering, including the prior AppleKeyStore/liveactivitiesd dependency."
+
+[[area.evidence]]
 kind = "host"
 revision = "d0a90e2"
 reference = "docs/display-ca-state-r210.md"
