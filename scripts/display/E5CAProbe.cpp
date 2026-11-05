@@ -490,6 +490,17 @@ static void ipcCensus(task_t task, Word caPortName, IpcState &out) {
   for (unsigned w = 0; w < 4; ++w) out.top[w] = worst[w];
 }
 static void snapshotThreads(ProcSnaps &out) {
+  // r214 hardware result: running this unconditionally coincided with the
+  // probe worker going silent and backboardd/liveactivitiesd disappearing
+  // from late censuses (report 152225; the same boot kept services=0x3c and
+  // E5AKS alive), while the r213 kernel showed both daemons alive. The
+  // thread_stop inside thread_get_state is the only new perturbation, so the
+  // snapshot is now gated behind e5-threads and OFF by default until a
+  // non-stopping read of the saved state is implemented.
+  if (!PE_parse_boot_argn("e5-threads", nullptr, 0)) {
+    bzero(&out, sizeof(out));
+    return;
+  }
   // Mirror of task_threads_internal's queue walk: hold the task lock only to
   // take thread references, then copy state (which briefly stops each
   // thread) and walk frames through the task map with the quiet reader.
