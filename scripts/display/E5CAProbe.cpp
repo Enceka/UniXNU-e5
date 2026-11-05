@@ -14,6 +14,13 @@
 //     lands inside the IOMobileFramebufferCore text range — i.e. any referenced
 //     connection object, whatever offset holds it — and reads its io_connect,
 //     type and callback slots so native vs virtual profile is decided by data.
+// r212: the IPC census guard accepted only the 0xfffffff0 image window, so it
+//   bailed on backboardd's kalloc-backed itk_space and logged all zeros. The
+//   window now covers the observed 0xfffffff1..0xfffffff5 heap. Also reads the
+//   r209 "next discriminating measurements" (server+0x398/0x39c/0x39d, due
+//   +0x338, gates +0x360/+0x370, display+0x6bee latch, timer callback serial)
+//   and the r212 runloop/context fields (server+0x1f0/+0x1f8 thread handles,
+//   +0x2e0/+0x2e8 published runloops, +0x70/+0x80 Render context list).
 #include <IOKit/IOLib.h>
 #include <kern/task.h>
 #include <kern/thread_call.h>
@@ -38,6 +45,11 @@ enum Field {
 static const unsigned kMaxEntries = 8;
 static const unsigned kMaxConns = 4;
 static const unsigned kMaxSlots = 16;
+// CADisplayTimer object internals (dispatch-free decode: the timer is an
+// mk_timer mach port + CFMachPort pair; firing is observable kernel-side).
+struct TimerState {
+  Word portName, cfmach, third, hook, c8, c9, d0, d8, e0, e8;
+};
 struct ConnState {
   Word offset, conn, io, type, slot880, slot8a8, slot8e0, slot9d8, bm;
   Word k5cb, k5aux, k5port, k5src, de8;
@@ -49,15 +61,35 @@ struct EntryState {
   unsigned conns;
   ConnState connState[kMaxConns];
   Word ssw, sctx, stimer, svsync, sfi, smetal;
+  // r209 contract "next discriminating measurements": vsync enable refs,
+  // enabled byte, timer/native selection bit, pending render due time, the
+  // two vsync timestamp gates, and the ignore_update history latch.
+  Word s398, s39c, s39d, s338, s360, s370, latch;
+  // r212 static decode (docs/display-runloop-static-r212.md): runloop thread
+  // handles +0x1f0/+0x1f8, published runloops +0x2e0/+0x2e8 (NULL until
+  // IOMFBServer::add_runloop_source's thread stores CFRunLoopGetCurrent),
+  // and the Render context list +0x70/+0x80 filled by context_insert.
+  Word s1f0, s1f8, s2e0, s2e8, ctxList, ctxCount;
+  TimerState timer;
 };
 struct SlotState {
   Word present, name, type, vidx, id, flag;
   char text[20];
 };
-struct PoolState { Word virtCount, refFB, actFB, infoCount; SlotState slot[kMaxSlots]; };
+struct PoolState { Word virtCount, refFB, actFB, infoCount, timerSerial; SlotState slot[kMaxSlots]; };
+// Kernel-side IPC census of the probed task: how many mk_timer ports exist,
+// whether any fired-but-undrained messages sit in their queues, and the
+// armed deadline of the CA display timer's own port.
+struct IpcPortLine { Word idx, msgs, kotype, armed; };
+struct IpcState {
+  Word entries, ports, timers, timerMsgs, undrained;
+  Word caIdx, caMsgs, caKotype, caDeadline, caFlags;
+  IpcPortLine top[4];
+};
 static Word values[Fields];
 static EntryState entries[kMaxEntries];
 static PoolState pool;
+static IpcState ipc;
 static unsigned generation, busy, selectedPid;
 static thread_call_t worker;
 static bool enabled() {
@@ -188,7 +220,32 @@ static void inspectEntry(Reader &r, Word slide, Word wrapper, EntryState &e) {
     r.u8(e.server + 0x1e0, e.sdisabled);
     r.u8(e.server + 0x1e1, e.sshutdown);
     r.word(e.server + 0x340, e.s340);
+    r.u8(e.server + 0x398, e.s398);
+    r.u8(e.server + 0x39c, e.s39c);
+    r.u8(e.server + 0x39d, e.s39d);
+    r.word(e.server + 0x338, e.s338);
+    r.word(e.server + 0x360, e.s360);
+    r.word(e.server + 0x370, e.s370);
+    r.word(e.server + 0x1f0, e.s1f0);
+    r.word(e.server + 0x1f8, e.s1f8);
+    r.word(e.server + 0x2e0, e.s2e0);
+    r.word(e.server + 0x2e8, e.s2e8);
+    r.word(e.server + 0x70, e.ctxList);
+    r.word(e.server + 0x80, e.ctxCount);
     if (e.stimer) { r.u8(e.stimer + 0xc9, e.tc9); }
+    if (e.stimer) {
+      TimerState &t = e.timer;
+      r.u32(e.stimer + 0x78, t.portName);
+      r.word(e.stimer + 0x80, t.cfmach);
+      r.word(e.stimer + 0x88, t.third);
+      r.word(e.stimer + 0xc0, t.hook);
+      r.u8(e.stimer + 0xc8, t.c8);
+      r.u8(e.stimer + 0xc9, t.c9);
+      r.word(e.stimer + 0xd0, t.d0);
+      r.word(e.stimer + 0xd8, t.d8);
+      r.word(e.stimer + 0xe0, t.e0);
+      r.word(e.stimer + 0xe8, t.e8);
+    }
     if (e.svt == 0x1e691a648ULL + slide) r.word(e.server + 0x3b0, e.smetal);
   }
   if (!r.word(e.server + 0x60, e.display) || !e.display) return;
@@ -200,6 +257,7 @@ static void inspectEntry(Reader &r, Word slide, Word wrapper, EntryState &e) {
   r.u32(e.display + 0x2a1, e.flags);
   r.u32(e.display + 0x258, e.flags2);
   r.u16(e.display + 0x6bcd, e.enabled);
+  r.u8(e.display + 0x6bee, e.latch);
   // +0x244 is SignalType; +0x66b8 counts the mode-info hash map. The >=2
   // gate belongs to power-on mode reselection. render_for_time instead
   // tests bit5 of display+0x30 when the pointer at display+0x28 is nonzero
@@ -223,6 +281,9 @@ static void inspectPool(Reader &r, Word slide, PoolState &p) {
   r.u32(0x1f4c4f698ULL + slide, p.refFB);
   r.u32(0x1f4c4f6acULL + slide, p.actFB);
   r.u32(0x1f4c5c0b8ULL + slide, p.infoCount);
+  // CADisplayTimer callback serial in QuartzCore __DATA: nonzero means the
+  // timer callback has run at least once, independent of RunLoop state.
+  r.word(0x1ed7ab930ULL + slide, p.timerSerial);
   for (unsigned i = 0; i != kMaxSlots; ++i) {
     Word slot = 0x1f4c4f6b8ULL + slide + (Word)i * 0xa0;
     SlotState &s = p.slot[i];
@@ -313,15 +374,96 @@ static void inspect(task_t task, Word *s, EntryState *out, PoolState *poolOut) {
   inspectPool(r, s[Slide], *poolOut);
   s[Phase] = 8;
 }
+// Private osfmk layouts are not on the EXPORT_HDRS compile path; the probe
+// uses raw offsets extracted with llvm-dwarfdump from the built kernel's own
+// object files (mk_timer.o, ipc_port.o, ipc_entry.o, ipc_space.h, task.o):
+//   task.itk_space            +0x328
+//   ipc_space.is_table        +0x20   (entries at offset 0, 0x18 bytes each)
+//   ipc_entry.ie_object       +0x00, ie_bits +0x08
+//   ipc_port.io_bits          +0x00   (otype = (bits & 0x7fff0000) >> 16,
+//                                       kotype = bits & 0x3ff, IOT_PORT = 0)
+//   ipc_port.ip_messages      +0x20, imq_msgcount (u16) +0x10
+//   ipc_port.ip_kobject       +0x48
+//   mk_timer.mkt_thread_call  +0x10, is_dead +0x90, is_armed +0x91,
+//                             active (int) +0x94, port +0x98
+extern "C" uint64_t thread_call_get_armed_deadline(void *call);
+// r211 returned n=0 because this window only covered the kernel image at
+// 0xfffffff0. The live kernel places kalloc objects across 0xfffffff1..
+// 0xfffffff5 (r211 E5STATE svc/m1608/m1640/m1658/m1868), so itk_space and
+// its table failed the guard and the census bailed before the first entry.
+static bool kernelPointer(Word p) { return p >= 0xfffffff000000000ULL && p < 0xfffffff800000000ULL; }
+static unsigned timerPortFlags(Word kobject, Word &deadline) {
+  deadline = 0;
+  if (!kernelPointer(kobject)) return 0xffffffffULL;
+  unsigned flags = (unsigned)*(const unsigned char *)(kobject + 0x90) |
+                   ((unsigned)*(const unsigned char *)(kobject + 0x91) << 8) |
+                   ((unsigned)*(const volatile int *)(kobject + 0x94) << 16);
+  deadline = thread_call_get_armed_deadline((void *)(kobject + 0x10));
+  return flags;
+}
+static void ipcCensus(task_t task, Word caPortName, IpcState &out) {
+  bzero(&out, sizeof(out));
+  if (!kernelPointer((Word)task)) return;
+  Word space = *(const Word *)((const char *)task + 0x328);
+  if (!kernelPointer(space)) return;
+  Word table = *(const volatile Word *)((const char *)space + 0x20);
+  if (!kernelPointer(table)) return;
+  unsigned caIdx = caPortName ? (unsigned)(caPortName >> 8) : 0;
+  IpcPortLine worst[4] = {};
+  unsigned idle = 0;
+  for (unsigned i = 1; i < 2048; ++i) {
+    const char *entry = (const char *)table + (Word)i * 0x18;
+    Word object = *(const volatile Word *)(entry + 0);
+    if (!object || !kernelPointer(object)) {
+      if (++idle > 96) break;
+      continue;
+    }
+    idle = 0;
+    unsigned bits = *(const volatile unsigned *)object;  // io_bits at +0
+    if (((bits & 0x7fff0000U) >> 16) != 0U) continue;    // IOT_PORT = 0
+    ++out.ports;
+    unsigned kotype = bits & 0x3ffU;
+    unsigned msgs = *(const volatile unsigned short *)((const char *)object + 0x30);
+    if (msgs) ++out.undrained;
+    if (kotype == 8U) {  // IKOT_TIMER
+      ++out.timers;
+      out.timerMsgs += msgs;
+    }
+    if (i == caIdx) {
+      out.caIdx = i;
+      out.caMsgs = msgs;
+      out.caKotype = kotype;
+      if (kotype == 8U) {
+        Word kobject = *(const volatile Word *)((const char *)object + 0x48);
+        out.caFlags = timerPortFlags(kobject, out.caDeadline);
+      }
+    }
+    if (msgs) {
+      IpcPortLine line = { i, msgs, kotype, 0 };
+      for (unsigned w = 0; w < 4; ++w) {
+        if (worst[w].msgs < line.msgs) {
+          IpcPortLine sink = worst[3];
+          for (unsigned v = 3; v > w; --v) worst[v] = worst[v - 1];
+          worst[w] = line;
+          line = sink;
+        }
+      }
+    }
+  }
+  out.entries = out.ports;  // live ports seen (table size is kalloc-private)
+  for (unsigned w = 0; w < 4; ++w) out.top[w] = worst[w];
+}
 static void run(thread_call_param_t, thread_call_param_t) {
   // The request busy flag serializes workers. Keep the multi-KiB census out
   // of the kernel stack, including while vm_map_read_user faults in pages.
   static Word state[Fields];
   static EntryState snapshot[kMaxEntries];
   static PoolState poolSnapshot;
+  static IpcState ipcSnapshot;
   bzero(state, sizeof(state));
   bzero(snapshot, sizeof(snapshot));
   bzero(&poolSnapshot, sizeof(poolSnapshot));
+  bzero(&ipcSnapshot, sizeof(ipcSnapshot));
   unsigned pid = __atomic_load_n(&selectedPid, __ATOMIC_RELAXED);
   state[Pid] = pid;
   proc_t process = proc_find((int)pid);
@@ -333,6 +475,7 @@ static void run(thread_call_param_t, thread_call_param_t) {
     proc_rele(process);
     if (task) {
       inspect(task, state, snapshot, &poolSnapshot);
+      ipcCensus(task, snapshot[0].timer.portName, ipcSnapshot);
       task_deallocate(task);
     }
   }
@@ -340,6 +483,7 @@ static void run(thread_call_param_t, thread_call_param_t) {
   for (unsigned i = 0; i != Fields; ++i) __atomic_store_n(&values[i], state[i], __ATOMIC_RELAXED);
   for (unsigned i = 0; i != kMaxEntries; ++i) entries[i] = snapshot[i];
   pool = poolSnapshot;
+  ipc = ipcSnapshot;
   __atomic_add_fetch(&generation, 1U, __ATOMIC_RELEASE);
   __atomic_store_n(&busy, 0U, __ATOMIC_RELEASE);
 }
@@ -365,6 +509,7 @@ extern "C" void e5_ca_probe_dump(void) {
   // A separate, serialized scratch copy preserves the generation check.
   static EntryState local[kMaxEntries];
   static PoolState poolLocal;
+  static IpcState ipcLocal;
   static unsigned dumping;
   unsigned expected = 0;
   if (!__atomic_compare_exchange_n(&dumping, &expected, 1U, false,
@@ -377,13 +522,14 @@ extern "C" void e5_ca_probe_dump(void) {
   for (unsigned i = 0; i != Fields; ++i) s[i] = __atomic_load_n(&values[i], __ATOMIC_RELAXED);
   for (unsigned i = 0; i != kMaxEntries; ++i) local[i] = entries[i];
   poolLocal = pool;
+  ipcLocal = ipc;
   if (before != __atomic_load_n(&generation, __ATOMIC_ACQUIRE)) {
     __atomic_store_n(&dumping, 0U, __ATOMIC_RELEASE);
     return;
   }
-  log("E5CA g=%u pid=%llu ph=%llu kr=%llx sl=%llx ws=%llx arr=%llx cls=%llx fi=%llu cap=%llu n=%llu vc=%llx rf=%llx af=%llx ic=%llx",
+  log("E5CA g=%u pid=%llu ph=%llu kr=%llx sl=%llx ws=%llx arr=%llx cls=%llx fi=%llu cap=%llu n=%llu vc=%llx rf=%llx af=%llx ic=%llx ts=%llx",
       before,s[Pid],s[Phase],s[Error],s[Slide],s[WindowServer],s[Array],s[ArrayClass],s[FirstSlot],s[Capacity],s[Count],
-      poolLocal.virtCount,poolLocal.refFB,poolLocal.actFB,poolLocal.infoCount);
+      poolLocal.virtCount,poolLocal.refFB,poolLocal.actFB,poolLocal.infoCount,poolLocal.timerSerial);
   for (unsigned i = 0; i != kMaxSlots; ++i) {
     const SlotState &p = poolLocal.slot[i];
     if (!p.present) continue;
@@ -402,9 +548,27 @@ extern "C" void e5_ca_probe_dump(void) {
           i,c,k.offset,k.conn,k.io,k.type,k.slot880,k.slot8a8,k.slot8e0,k.slot9d8,k.bm,
           k.k5cb,k.k5aux,k.k5port,k.k5src,k.de8);
     }
-    if (isServerVtable(e.svt, s[Slide]))
+    if (isServerVtable(e.svt, s[Slide])) {
       log("E5CAS i=%u sw=%llx ctx=%llx gpu=%llx ti=%llx vs=%llx fi=%llx d=%llx sh=%llx tc9=%llx s340=%llx",
           i,e.ssw,e.sctx,e.smetal,e.stimer,e.svsync,e.sfi,e.sdisabled,e.sshutdown,e.tc9,e.s340);
+      log("E5CASV i=%u x398=%llx x39c=%llx x39d=%llx s338=%llx s360=%llx s370=%llx lb=%llx",
+          i,e.s398,e.s39c,e.s39d,e.s338,e.s360,e.s370,e.latch);
+      log("E5CASR i=%u th=%llx:%llx rl=%llx:%llx cxs=%llx:%llx",
+          i,e.s1f0,e.s1f8,e.s2e0,e.s2e8,e.ctxList,e.ctxCount);
+      if (e.stimer) {
+        const TimerState &t = e.timer;
+        log("E5CAT i=%u pn=%llx cfp=%llx x3=%llx hook=%llx c8=%llx c9=%llx d0=%llx d8=%llx e0=%llx e8=%llx",
+            i,t.portName,t.cfmach,t.third,t.hook,t.c8,t.c9,t.d0,t.d8,t.e0,t.e8);
+      }
+    }
+  }
+  log("E5IPC n=%llu np=%llu nt=%llu tmsg=%llu und=%llu ca=%llu:%llx:%llx:%llx:%llx",
+      ipcLocal.entries,ipcLocal.ports,ipcLocal.timers,ipcLocal.timerMsgs,ipcLocal.undrained,
+      ipcLocal.caIdx,ipcLocal.caMsgs,ipcLocal.caKotype,ipcLocal.caFlags,ipcLocal.caDeadline);
+  for (unsigned w = 0; w < 4; ++w) {
+    if (!ipcLocal.top[w].msgs) break;
+    log("E5IPCP w=%u idx=%llx m=%llx kt=%llx",
+        w,ipcLocal.top[w].idx,ipcLocal.top[w].msgs,ipcLocal.top[w].kotype);
   }
   __atomic_store_n(&dumping, 0U, __ATOMIC_RELEASE);
 }
