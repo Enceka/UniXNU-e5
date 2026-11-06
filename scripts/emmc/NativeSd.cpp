@@ -871,9 +871,15 @@ public:
       if (!E5SystemOS::fits(sectors) || !readSectors(E5SystemOS::base, 8) ||
           memcmp(buffer + 32, "NXSB", 4) ||
           crc32n(buffer, 4096) != E5SystemOS::superblockCrc) {
-        sdlog("NativeSd: SystemOS superblock refused\n"); return false;
+        // r257: the SystemOS and Data windows live on the eMMC kext now.
+        // When the window bases sit past this card the fits() check fails —
+        // do not kill this host: it still arms the UMP9620 watchdog below
+        // and publishes the read-only SD card. Only the windows are skipped.
+        sdlog("NativeSd: SystemOS window bases not on this card, eMMC host owns windows\n");
+        systemOS = false;
+      } else {
+        sdlog("NativeSd: SystemOS superblock crc %08x match y\n", E5SystemOS::superblockCrc);
       }
-      sdlog("NativeSd: SystemOS superblock crc %08x match y\n", E5SystemOS::superblockCrc);
     }
     if (PE_parse_boot_argn("e5-systemos-boot", nullptr, 0)) {
       // Nothing in XNU pets the UMP9620 watchdog, so system bring-up dies at

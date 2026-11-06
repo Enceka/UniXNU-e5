@@ -39,6 +39,7 @@
 #include <pexpert/pexpert.h>
 #include "TransferStatus.h"
 #include "BootLog.h"
+#include "SystemOSWindow.h"
 
 #define E5_EMMC_BASE 0x22200000ULL
 #define E5_EMMC_LEN  0x400ULL
@@ -86,6 +87,11 @@ static void elog(const char *fmt, ...) {
   va_end(ap);
   e5_panic_print(buf);
 }
+
+// r257: window I/O telemetry (RD=blocks:ops WR=blocks:ops:failures RV=unstable).
+static uint64_t e5_win_rd_blocks, e5_win_rd_ops;
+static uint64_t e5_win_wr_blocks, e5_win_wr_ops, e5_win_wr_bad;
+static uint64_t e5_win_unstable;
 
 // Console context never sleeps, allocates or performs storage I/O. A failed
 // try-lock drops a byte instead of waiting behind an interrupted producer.
@@ -143,6 +149,11 @@ class NativeEmmc : public IOBlockStorageDevice {
   bool logActive = false;
   uint32_t logNonce = 0, logSlot = 0, logLastStatus = 0, logLastR1 = 0;
   uint64_t logGeneration = 0, logSeq = 0, logCursor = 0, logOverrun = 0;
+  // r257: window machinery (SystemOS + Data media windows on this eMMC).
+  uint8_t readShadow[8192];      // r253 verify-retry shadow (not a DMA buffer)
+  uint16_t windowSdclkfs = 0;    // lifted divider (0 = identify clock)
+  uint32_t windowBaseMHz = 0;    // capabilities base clock when lifted
+  bool wideBus = false;          // EXT_CSD 4-bit switch held
 
   inline uint8_t  r8 (uint32_t o) const { return *(volatile uint8_t  *)((uint8_t *)regs + o); }
   inline uint16_t r16(uint32_t o) const { return *(volatile uint16_t *)((uint8_t *)regs + o); }
@@ -853,6 +864,232 @@ public:
                        done == total ? kIOReturnSuccess : kIOReturnIOError, done);
     return kIOReturnSuccess;
   }
+
+  // ---- r257: SystemOS/Data window machinery -------------------------------
+  // Accessors for the out-of-line publication helpers.
+  uint64_t windowCardSectors() const { return sectors; }
+  const uint8_t *dmaPeek() const { return dmaD8; }
+  // One multi-block SDMA CMD18 read of n<=16 sectors into the DMA page.
+  // v4 layout: block count at 0x00, system address at 0x58/0x5C. The manual
+  // CMD12 and line-reset-on-failure mirror the SD driver's proven r253 shape.
+  bool readMulti(uint32_t lba, uint32_t n) {
+    if (!n || n > 16 || !dmaD || (r16(0x3E) & 0x1000u) == 0) return false;
+    // Poison the whole range first: if the engine does not advance the SDMA
+    // system address across blocks (the v4 multi-block behavior is unproven
+    // on this controller), the untouched tail sectors still hold the fill
+    // pattern and the read fails instead of returning stale garbage — the
+    // r256 lesson (console text delivered as APFS objects) at the source.
+    for (uint32_t i = 0; i < n * 128; ++i) dmaD[i] = 0xCAFEBABEu;
+    cacheClean(dmaD8, n * 512);
+    cacheInvalidate(dmaD8, n * 512);
+    w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x18u);
+    w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
+    w16(SDHCI_BLOCK_SIZE, 512);
+    w32(SDHCI_DMA_ADDR, n);
+    w32(SDHCI_SYSADDR_LOW, (uint32_t)dmaPhys);
+    w32(SDHCI_SYSADDR_HIGH, 0);
+    w32(SDHCI_ARGUMENT, lba);
+    w32(SDHCI_TRANSFER_MODE_CMD, 0x123A0033u); // CMD18 MULTI|COUNT|DMA|READ
+    uint32_t st = waitDmaDone(2000000 + 100000 * n);
+    bool ok = transferOk(st) && !(r32(SDHCI_RESPONSE) & E5BootLog::r1Errors);
+    cacheInvalidate(dmaD8, n * 512);
+    if (ok && dmaD[n * 128 - 1] == 0xCAFEBABEu && dmaD[n * 128 - 2] == 0xCAFEBABEu) {
+      // Tail never left the fill pattern: the transfer did not cover the
+      // full multi-block range. Fail it; the reread path retries.
+      ok = false;
+      elog("NativeEmmc: multi tail poison intact lba %u n %u st %08x\n", lba, n, st);
+    }
+    cmdNoData(0x0C1A, 0); // CMD12 stop
+    if (!ok) resetLines();
+    return ok;
+  }
+
+  // One single-block SDMA CMD24 write from the first 512 bytes of the DMA
+  // page — writeLogSector's shape, parameterized for the Data window.
+  bool writeSingle(uint32_t lba) {
+    if (!dmaD || lba >= sectors || (r16(0x3E) & 0x1000u) == 0) return false;
+    if (!waitLogReady(5000)) return false;
+    cacheClean(dmaD8, 512);
+    w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x18u);
+    w32(SDHCI_INT_STATUS, 0xffffffffu);
+    w16(SDHCI_BLOCK_SIZE, 512); w32(SDHCI_DMA_ADDR, 1);
+    w32(SDHCI_SYSADDR_LOW, (uint32_t)dmaPhys); w32(SDHCI_SYSADDR_HIGH, 0);
+    w32(SDHCI_ARGUMENT, lba);
+    w32(SDHCI_TRANSFER_MODE_CMD, 0x183A0003u); // CMD24, SDMA, WRITE
+    uint32_t st = waitDmaDone(5000000);
+    uint32_t r1 = r32(SDHCI_RESPONSE);
+    bool ok = transferOk(st) && !(r1 & E5BootLog::r1Errors) && waitLogReady(5000);
+    if (!ok) { logLastStatus = st; logLastR1 = r1; resetLines(); }
+    return ok;
+  }
+
+  bool lba1Crc(uint32_t *out) {
+    if (!dmaD) return false;
+    uint32_t st = sdmaRead512(0x113A, 1, dmaD, dmaPhys);
+    cacheInvalidate(dmaD, 512);
+    if (!transferOk(st)) return false;
+    *out = crc32(dmaD8, 512);
+    return true;
+  }
+  bool stableLba1(uint32_t ref) {
+    uint32_t c = 0;
+    for (unsigned i = 0; i < 4; ++i)
+      if (!lba1Crc(&c) || c != ref) return false;
+    return true;
+  }
+
+  // r257 clock lift: the identify clock (max divider, ~50-400 KB/s) cannot
+  // carry the LS scan. Read the capabilities base clock (0x40 bits 15:8),
+  // lift the divider to <=26 MHz (legacy-mode ceiling; HS + DLL tuning is
+  // deliberately out of scope this round), switch the card to 4-bit, and
+  // verify with repeated LBA1 CRC rereads. Any failure restores the
+  // identify state; windows then still work, just slowly.
+  void setDivider(uint16_t sdclkfs) {
+    uint16_t vendor = (uint16_t)(r16(0x2C) & 0x00F8u); // preserve 0xC0-class bits
+    w16(0x2C, (uint16_t)((sdclkfs << 8) | vendor | 0x0001u));
+    waitClockStable();
+    w16(0x2C, (uint16_t)((sdclkfs << 8) | vendor | 0x0005u));
+    IODelay(2000);
+  }
+  void liftClock() {
+    uint32_t ref = 0;
+    if (!lba1Crc(&ref)) { elog("NativeEmmc: lift ref read failed\n"); return; }
+    uint32_t caps = r32(0x40);
+    uint32_t baseMHz = (caps >> 8) & 0xFFu;
+    elog("NativeEmmc: caps %08x base %u MHz ref crc %08x\n", caps, baseMHz, ref);
+    uint16_t ladder[3]; unsigned nl = 0;
+    if (baseMHz >= 26 && baseMHz <= 255) {
+      // effective = base/(2*SDCLKFS) <= 26 MHz -> SDCLKFS >= base/52.
+      uint32_t want = (baseMHz + 51) / 52;
+      if (want < 1) want = 1;
+      if (want > 255) want = 255;
+      ladder[nl++] = (uint16_t)want;
+      ladder[nl++] = (uint16_t)(want > 127 ? 255 : want * 2); // slower fallback
+    } else {
+      ladder[nl++] = 8;  // 26 MHz -> 1.6 MHz or 200 MHz -> 12.5 MHz: safe either way
+      ladder[nl++] = 4;
+      ladder[nl++] = 2;
+    }
+    for (unsigned i = 0; i < nl; ++i) {
+      setDivider(ladder[i]);
+      if (!stableLba1(ref)) {
+        elog("NativeEmmc: div %u unstable\n", ladder[i]);
+        continue;
+      }
+      uint32_t st = cmdNoData(0x061B, (3u << 24) | (183u << 16) | (1u << 8)); // 4-bit
+      uint32_t r1 = r32(SDHCI_RESPONSE);
+      if (cmdOk(st) && !(r1 & E5BootLog::r1Errors) && waitLogReady(1000)) {
+        w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) | 0x02u);
+        if (stableLba1(ref)) {
+          windowSdclkfs = ladder[i]; windowBaseMHz = baseMHz; wideBus = true;
+          uint64_t t0 = 0, t1 = 0;
+          clock_get_uptime(&t0);
+          bool fr = readMulti(1, 16);
+          clock_get_uptime(&t1);
+          uint64_t us = (t1 - t0) / 1000ull;
+          elog("NativeEmmc: fast mode div %u base %u 4-bit y; 16-sector %s in %llu us (%llu KB/s)\n",
+               ladder[i], baseMHz, fr ? "ok" : "FAIL", (unsigned long long)us,
+               (unsigned long long)(us ? (uint64_t)16384 / us : 0));
+          return;
+        }
+        elog("NativeEmmc: 4-bit unstable, reverting\n");
+        w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x02u);
+        cmdNoData(0x061B, (3u << 24) | (183u << 16)); // back to 1-bit
+        waitLogReady(1000);
+      } else {
+        elog("NativeEmmc: width switch refused st %08x r1 %08x\n", st, r1);
+      }
+    }
+    setDivider(0xFF);
+    elog("NativeEmmc: fast mode refused, identify clock restored\n");
+  }
+
+  // One verified n<=8 sector window read: multi CMD18 + r253 verify-retry
+  // (shadow copy, reread, memcmp; <=2 rounds, final read wins).
+  bool windowReadVerified(uint32_t lba, uint32_t n) {
+    for (unsigned round = 0; round < 2; ++round) {
+      if (!readMulti(lba, n)) return false;
+      memcpy(readShadow, dmaD8, (size_t)n * 512);
+      if (!readMulti(lba, n)) return false;
+      if (!memcmp(readShadow, dmaD8, (size_t)n * 512)) return true;
+      __atomic_fetch_add(&e5_win_unstable, 1, __ATOMIC_RELAXED);
+      elog("NativeEmmc: rv unstable lba %u n %u round %u\n", lba, n, round);
+    }
+    return true; // final read wins
+  }
+
+  // SystemOS window reads for E5SystemOSDeviceEmmc: 8-sector verified chunks
+  // under the host lock with the r254 big-read trace shape (the host-side
+  // scanner's 'rw+' regexes match the progress lines).
+  IOReturn windowRead(IOMemoryDescriptor *data, UInt64 block, UInt64 count, uint64_t base) {
+    if (!ioLock || !dmaD) return kIOReturnNotReady;
+    if (data->getLength() < count * 512) return kIOReturnBadArgument;
+    bool big = count >= 512;
+    if (big) elog("NativeEmmc: rw+ enter %llu at %llu\n",
+                  (unsigned long long)count, (unsigned long long)(base + block));
+    __atomic_fetch_add(&e5_win_rd_ops, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&e5_win_rd_blocks, count, __ATOMIC_RELAXED);
+    UInt64 chunks = (count + 7) / 8;
+    for (UInt64 c = 0; c < chunks; ++c) {
+      uint32_t n = (uint32_t)((count - c * 8) > 8 ? 8 : count - c * 8);
+      IOLockLock(ioLock);
+      bool ok = cardUp && windowReadVerified((uint32_t)(base + block + c * 8), n);
+      IOLockUnlock(ioLock);
+      if (!ok) return kIOReturnIOError;
+      if (data->writeBytes(c * 512, dmaD8, (size_t)n * 512) != (ByteCount)(n * 512))
+        return kIOReturnIOError;
+      if (big && ((c + 1) % 64) == 0)
+        elog("NativeEmmc: rw+ %llu/%llu at %llu+%llu\n",
+             (unsigned long long)((c + 1) * 8), (unsigned long long)count,
+             (unsigned long long)(base + block),
+             (unsigned long long)(c * 8 * 512));
+    }
+    if (big) elog("NativeEmmc: rw+ exit full %llu/%llu at %llu RD=%llu:%llu RV=%llu\n",
+                  (unsigned long long)count, (unsigned long long)count,
+                  (unsigned long long)(base + block),
+                  (unsigned long long)e5_win_rd_ops, (unsigned long long)e5_win_rd_blocks,
+                  (unsigned long long)e5_win_unstable);
+    return kIOReturnSuccess;
+  }
+
+  // Data window media-direct I/O for E5DataDeviceEmmc: reads stream verified
+  // CMD18 chunks, writes land per-sector CMD24s before completion (durable
+  // by construction), all under the host lock — the r245 SD shape.
+  IOReturn dataMediaIO(IOMemoryDescriptor *data, UInt64 block, UInt64 count, bool out) {
+    if (!ioLock || !dmaD) return kIOReturnNotReady;
+    if (data->getLength() < count * 512) return kIOReturnBadArgument;
+    if (out) {
+      __atomic_fetch_add(&e5_win_wr_ops, 1, __ATOMIC_RELAXED);
+      __atomic_fetch_add(&e5_win_wr_blocks, count, __ATOMIC_RELAXED);
+    } else {
+      __atomic_fetch_add(&e5_win_rd_ops, 1, __ATOMIC_RELAXED);
+      __atomic_fetch_add(&e5_win_rd_blocks, count, __ATOMIC_RELAXED);
+    }
+    for (UInt64 off = 0; off < count; off += 8) {
+      uint32_t n = (uint32_t)((count - off) > 8 ? 8 : count - off);
+      bool ok;
+      if (out) {
+        data->readBytes(off * 512, dmaD8, (size_t)n * 512);
+        IOLockLock(ioLock);
+        ok = cardUp;
+        for (uint32_t s = 0; ok && s < n; ++s)
+          ok = writeSingle((uint32_t)(E5Data::base + block + off + s));
+        IOLockUnlock(ioLock);
+      } else {
+        IOLockLock(ioLock);
+        ok = cardUp && windowReadVerified((uint32_t)(E5Data::base + block + off), n);
+        IOLockUnlock(ioLock);
+        if (ok) data->writeBytes(off * 512, dmaD8, (size_t)n * 512);
+      }
+      if (!ok) {
+        if (out) __atomic_fetch_add(&e5_win_wr_bad, 1, __ATOMIC_RELAXED);
+        elog("NativeEmmc: data media %s fail %llu+%llu\n",
+             out ? "write" : "read", (unsigned long long)block, (unsigned long long)off);
+        return kIOReturnIOError;
+      }
+    }
+    return kIOReturnSuccess;
+  }
 };
 OSDefineMetaClassAndStructors(NativeEmmc, IOBlockStorageDevice)
 
@@ -889,6 +1126,140 @@ extern "C" void e5_panic_scratch_write(uint64_t pc, const char *reason) {
 }
 NativeEmmc *NativeEmmc::s_host = nullptr;
 
+// ---- r257: window publication (the NativeSd r245 pattern, eMMC host) ----
+// Separate IOBlockStorageDevice instances attached to the eMMC host; the
+// host itself keeps publishing its read-only log cache window unchanged.
+class E5SystemOSDeviceEmmc : public IOBlockStorageDevice {
+  OSDeclareDefaultStructors(E5SystemOSDeviceEmmc)
+public:
+  char *getVendorString() override { return const_cast<char *>("E5"); }
+  char *getProductString() override { return const_cast<char *>("SystemOS read-only window"); }
+  char *getRevisionString() override { return const_cast<char *>("1"); }
+  char *getAdditionalDeviceInfoString() override { return const_cast<char *>(E5SystemOS::uuid); }
+  IOReturn doEjectMedia() override { return kIOReturnUnsupported; }
+  IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
+  UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
+  IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *n) override { *n = E5SystemOS::sectors - 1; return kIOReturnSuccess; }
+  IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportMediaState(bool *p, bool *c) override {
+    NativeEmmc *host = OSDynamicCast(NativeEmmc, getProvider());
+    if (!host) return kIOReturnNotReady;
+    return host->reportMediaState(p, c);
+  }
+  IOReturn reportWriteProtection(bool *b) override { *b = true; return kIOReturnSuccess; }
+  IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
+  IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
+  IOReturn getWriteCacheState(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
+  IOReturn doAsyncReadWrite(IOMemoryDescriptor *data, UInt64 block, UInt64 count,
+      IOStorageAttributes *attributes, IOStorageCompletion *completion) override {
+    if (!data || !completion || !completion->action) return kIOReturnBadArgument;
+    if (data->getDirection() != kIODirectionIn) return kIOReturnNotWritable;
+    if (!E5SystemOS::contains(block, count)) return kIOReturnBadArgument;
+    NativeEmmc *host = OSDynamicCast(NativeEmmc, getProvider());
+    if (!host) return kIOReturnNotReady;
+    IOReturn rc = host->windowRead(data, block, count, E5SystemOS::base);
+    completion->action(completion->target, completion->parameter, rc,
+                       rc == kIOReturnSuccess ? count * 512 : 0);
+    return kIOReturnSuccess;
+  }
+};
+OSDefineMetaClassAndStructors(E5SystemOSDeviceEmmc, IOBlockStorageDevice)
+
+// The system's one writable dataset: the 4 GiB eMMC window served
+// media-direct. The kernel startup patch mounts the volume at /private/var
+// before launchd starts; every completed write is durable by construction.
+class E5DataDeviceEmmc : public IOBlockStorageDevice {
+  OSDeclareDefaultStructors(E5DataDeviceEmmc)
+public:
+  char *getVendorString() override { return const_cast<char *>("E5"); }
+  char *getProductString() override { return const_cast<char *>("Data media window"); }
+  char *getRevisionString() override { return const_cast<char *>("1"); }
+  char *getAdditionalDeviceInfoString() override { return const_cast<char *>(E5Data::uuid); }
+  IOReturn doEjectMedia() override { return kIOReturnUnsupported; }
+  IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
+  UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
+  IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *n) override { *n = E5Data::sectors - 1; return kIOReturnSuccess; }
+  IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportMediaState(bool *p, bool *c) override {
+    NativeEmmc *host = OSDynamicCast(NativeEmmc, getProvider());
+    if (!host) return kIOReturnNotReady;
+    return host->reportMediaState(p, c);
+  }
+  IOReturn reportWriteProtection(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
+  IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
+  IOReturn getWriteCacheState(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
+  IOReturn doAsyncReadWrite(IOMemoryDescriptor *data, UInt64 block, UInt64 count,
+      IOStorageAttributes *attributes, IOStorageCompletion *completion) override {
+    (void)attributes;
+    if (!data || !completion || !completion->action) return kIOReturnBadArgument;
+    if (!E5Data::contains(block, count)) return kIOReturnBadArgument;
+    NativeEmmc *host = OSDynamicCast(NativeEmmc, getProvider());
+    if (!host) return kIOReturnNotReady;
+    IOReturn rc = host->dataMediaIO(data, block, count,
+                                    data->getDirection() == kIODirectionOut);
+    completion->action(completion->target, completion->parameter, rc,
+                       rc == kIOReturnSuccess ? count * 512 : 0);
+    return kIOReturnSuccess;
+  }
+};
+OSDefineMetaClassAndStructors(E5DataDeviceEmmc, IOBlockStorageDevice)
+
+static bool publishSystemOSEmmc(NativeEmmc *host) {
+  E5SystemOSDeviceEmmc *window = new E5SystemOSDeviceEmmc;
+  if (!window) return false;
+  if (!window->init(nullptr)) { window->release(); return false; }
+  if (!window->attach(host)) { window->release(); return false; }
+  if (!window->start(host)) { window->detach(host); window->release(); return false; }
+  elog("NativeEmmc: publishing SystemOS read-only %llu sectors at %llu\n",
+       (unsigned long long)E5SystemOS::sectors, (unsigned long long)E5SystemOS::base);
+  window->registerService();
+  window->release();
+  return true;
+}
+
+// Probe-time Data preparation: gate on the raw-container superblock and the
+// container/window block-count match, all before any IOKit consumer can race
+// the host (the round 55/56 root-attach lesson).
+static E5DataDeviceEmmc *prepareDataDeviceEmmc(NativeEmmc *host) {
+  if (!E5Data::fits(host->windowCardSectors())) return nullptr;
+  if (!host->readMulti((uint32_t)E5Data::base, 8)) {
+    elog("NativeEmmc: data window read failed\n");
+    return nullptr;
+  }
+  const uint8_t *probe = host->dmaPeek();
+  if (memcmp(probe + 32, "NXSB", 4)) {
+    elog("NativeEmmc: data window not NXSB\n");
+    return nullptr;
+  }
+  uint64_t containerBlocks = *(const uint64_t *)(probe + 40);
+  elog("NativeEmmc: data media window %llu sectors, container %llu blocks %s\n",
+       (unsigned long long)E5Data::sectors, (unsigned long long)containerBlocks,
+       containerBlocks * 8 == E5Data::sectors ? "match" : "MISMATCH");
+  E5DataDeviceEmmc *device = new E5DataDeviceEmmc;
+  if (!device || !device->init(nullptr)) {
+    if (device) device->release();
+    return nullptr;
+  }
+  return device;
+}
+
+static bool publishDataEmmc(E5DataDeviceEmmc *device, NativeEmmc *host) {
+  if (!device->attach(host)) { device->release(); return false; }
+  if (!device->start(host)) { device->detach(host); device->release(); return false; }
+  elog("NativeEmmc: publishing Data read-write %llu sectors at %llu\n",
+       (unsigned long long)E5Data::sectors, (unsigned long long)E5Data::base);
+  device->registerService();
+  device->release();
+  return true;
+}
+
 bool NativeEmmc::start(IOService *provider)
 {
   if (!IOBlockStorageDevice::start(provider)) return false;
@@ -921,6 +1292,9 @@ bool NativeEmmc::start(IOService *provider)
   if (cardUp) {
     scanGpt(d, d8, dva);
     verifyReadback(d, d8, dva);
+    // r257: the windows need megabytes per second; the identify clock
+    // delivers kilobytes. Lift-and-verify, falling back safely.
+    liftClock();
     uint32_t logTest = 0;
     if (PE_parse_boot_argn("e5-emmc-log-test", &logTest, sizeof(logTest)) && logTest) {
       IOLockLock(ioLock);
@@ -966,6 +1340,26 @@ bool NativeEmmc::start(IOService *provider)
            journalNonce, (unsigned long long)logGeneration, logSlot);
       if (!cardUp) return true;
     }
+    // r257: the SystemOS and Data windows live on this eMMC now. Probe both
+    // superblocks BEFORE registerService (the r55/56 root-attach race), and
+    // publish the wrapper devices after it — the NativeSd publication order.
+    bool systemOS = PE_parse_boot_argn("e5-systemos", nullptr, 0);
+    bool osWindowOk = false;
+    if (systemOS) {
+      if (E5SystemOS::fits(sectors) && readMulti((uint32_t)E5SystemOS::base, 8) &&
+          memcmp(dmaD8 + 32, "NXSB", 4) == 0 &&
+          crc32(dmaD8, 4096) == E5SystemOS::superblockCrc) {
+        osWindowOk = true;
+        elog("NativeEmmc: SystemOS superblock crc %08x match y\n", E5SystemOS::superblockCrc);
+      } else {
+        elog("NativeEmmc: SystemOS superblock refused\n");
+      }
+    }
+    E5DataDeviceEmmc *dataDevice = nullptr;
+    if (osWindowOk && PE_parse_boot_argn("e5-data", nullptr, 0)) {
+      dataDevice = prepareDataDeviceEmmc(this);
+      if (!dataDevice) elog("NativeEmmc: data window NXSB refused\n");
+    }
     // v5: keep regs/DMA page alive; the read path runs in doAsyncReadWrite.
     baseLba = E5Emmc::cacheFirstLba;
     if (!E5Emmc::windowFitsCard(sectors, baseLba, cacheSectors)) {
@@ -977,6 +1371,10 @@ bool NativeEmmc::start(IOService *provider)
     elog("NativeEmmc: publishing cache window (%llu sectors @ lba %llx)\n",
          (unsigned long long)cacheSectors, (unsigned long long)baseLba);
     registerService();
+    if (osWindowOk && !publishSystemOSEmmc(this))
+      elog("NativeEmmc: SystemOS publication failed\n");
+    if (dataDevice && !publishDataEmmc(dataDevice, this))
+      elog("NativeEmmc: data publication failed\n");
     return true;
   }
   resetLines();
