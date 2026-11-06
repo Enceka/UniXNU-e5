@@ -813,10 +813,14 @@ static void run(thread_call_param_t, thread_call_param_t) {
     if (task) {
       inspect(task, state, snapshot, &poolSnapshot);
       ipcCensus(task, snapshot[0].timer.portName, ipcSnapshot);
-      snapshotThreads(threadSnapshot);
-      recordPcHistory(threadSnapshot);
       task_deallocate(task);
     }
+    // r245: the thread/LS snapshot no longer depends on a backboardd task.
+    // r243 got exactly one sample in 3600 s because the whole chain needed
+    // one; the periodic entry below runs this on a wall-clock cadence with
+    // selectedPid 0 (the CA-pool inspect above stays backboardd-driven).
+    snapshotThreads(threadSnapshot);
+    recordPcHistory(threadSnapshot);
   }
   __atomic_add_fetch(&generation, 1U, __ATOMIC_ACQ_REL);
   for (unsigned i = 0; i != Fields; ++i) __atomic_store_n(&values[i], state[i], __ATOMIC_RELAXED);
@@ -836,6 +840,20 @@ extern "C" void e5_ca_probe_request(unsigned pid) {
   unsigned expected = 0;
   if (!__atomic_compare_exchange_n(&busy, &expected, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED)) return;
   __atomic_store_n(&selectedPid, pid, __ATOMIC_RELAXED);
+  if (!worker) worker = thread_call_allocate(run, nullptr);
+  if (worker) thread_call_enter(worker);
+  else __atomic_store_n(&busy, 0U, __ATOMIC_RELEASE);
+}
+
+// r245: unconditional periodic entry from the display paint tick. Runs the
+// census worker with selectedPid 0 - no CA-pool inspect, but the thread/LS
+// snapshot (SpringBoard/backboardd/lsd/... states, seeding-group counter,
+// PC history) executes on every call and lands in the next dump.
+extern "C" void e5_ca_probe_periodic(void) {
+  if (!enabled()) return;
+  unsigned expected = 0;
+  if (!__atomic_compare_exchange_n(&busy, &expected, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED)) return;
+  __atomic_store_n(&selectedPid, 0U, __ATOMIC_RELAXED);
   if (!worker) worker = thread_call_allocate(run, nullptr);
   if (worker) thread_call_enter(worker);
   else __atomic_store_n(&busy, 0U, __ATOMIC_RELEASE);

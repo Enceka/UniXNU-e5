@@ -19,12 +19,16 @@ inline bool fits(uint64_t cardSectors) {
 }
 
 namespace E5Data {
-// A writable RAM-backed copy of a 128 MiB APFS container image holding the
-// Data-role volume, read from the card right after the SystemOS window and
-// published as read-write media. The kernel startup patch mounts it at
-// /private/var so tzinit and later boot tasks find a writable dataset.
+// r245: the Data window is served media-direct from the card — reads pull
+// CMD18 chunks under the host lock and writes land as CMD25 chunks before
+// their block I/O completes, so there is no RAM image and every completed
+// write is already durable. The container on the card must be grown to the
+// window size (macOS-side apfs resizeContainer keeps the volume UUID); the
+// NXSB block count is cross-checked against the window at publication.
+// 4 GiB fits the 14.4 GiB card at the same base with ~1.3 GiB spare; the
+// r239 128 MiB RAM image and its whole-window boot load are gone.
 static constexpr uint64_t base = 19034112; // in 512-byte sectors.
-static constexpr uint64_t sectors = 262144; // 128 MiB; round 62 exhausted 32 MiB.
+static constexpr uint64_t sectors = 8388608; // 4 GiB media-direct window.
 // Verified against the installed container's checksummed APSB objects and
 // diskutil's read-only attachment. The earlier B5A22774 UUID was stale.
 static constexpr const char *uuid = "30ADC749-351F-4FFF-998A-20E1B683859F";

@@ -14,6 +14,7 @@ using e5_notify_fn = void (*)(void *, void *);
 #include <mach/kmod.h>
 #include <sys/proc.h>
 #include <kern/task.h>
+#include <kern/clock.h> // r245: clock_interval_to_deadline for the census cadence
 
 // E5TW only: printf would change the framebuffer being measured.
 #include <stdarg.h>
@@ -21,6 +22,7 @@ using e5_notify_fn = void (*)(void *, void *);
 extern "C" unsigned e5_quiet;
 extern "C" void e5_ca_probe_request(unsigned pid);
 extern "C" void e5_ca_probe_dump(void);
+extern "C" void e5_ca_probe_periodic(void); // r245: forced 60 s census
 extern "C" void e5_kputc(char);
 extern "C" void *e5_display_async_reg3(void);
 extern "C" unsigned e5_pmic_peek(unsigned off); // NativeSd.cpp: PMIC ADI read for wdt probe
@@ -525,6 +527,24 @@ extern "C" void e5_dpu_tick(void) {
   // continuous dynamic output: step the paint pattern; every 8th tick also
   // pulse the backlight to 1/4 duty and back (panel/backlight acceptance)
   e5_dpu_paint_step();
+  // r245: force a thread/LS census every 60 s of wall clock. r243 sampled
+  // exactly once in 3600 s because the CA-state trigger chain needs a
+  // backboardd request; the LS slow-versus-looping question needs a series.
+  // The probe runs on its own worker, so the dump follows two seconds later
+  // to print a completed snapshot; the deadline helpers handle tick units.
+  {
+    static uint64_t nextProbe = 0, nextDump = 0;
+    uint64_t now = mach_absolute_time();
+    if (!nextProbe) clock_interval_to_deadline(90, NSEC_PER_SEC, &nextProbe);
+    if (nextDump && now >= nextDump) {
+      nextDump = 0;
+      e5_ca_probe_dump();
+    } else if (now >= nextProbe) {
+      e5_ca_probe_periodic();
+      clock_interval_to_deadline(2, NSEC_PER_SEC, &nextDump);
+      clock_interval_to_deadline(60, NSEC_PER_SEC, &nextProbe);
+    }
+  }
   // r148: i2c tick disabled (r147 regression bisect: keep D2 paint only)
 
   if (sDpuMap) {

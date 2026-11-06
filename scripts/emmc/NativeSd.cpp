@@ -64,8 +64,9 @@ static uint32_t dataDetail;
 // Cumulative SD read accounting (blocks of 512B, request ops).
 static unsigned long long e5_sd_rd_blocks;
 static unsigned long long e5_sd_rd_ops;
-// v47 (r244): Data write-through accounting (boot-arg e5-data-wt). Blocks,
-// operations and failures of card-side writes issued by the Data service.
+// v47 (r244)→r245: Data-window accounting. Blocks, ops and failures count
+// every media-direct Data access; they ride the sampled progress line next
+// to the OS/SystemOS read counters (RD= blocks:ops, WR= blocks:ops:bad).
 static unsigned long long e5_sd_wr_blocks;
 static unsigned long long e5_sd_wr_ops;
 static unsigned long long e5_sd_wr_bad;
@@ -93,14 +94,9 @@ extern "C" int e5_keystore_start(void);
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
 static bool publishData(E5DataDevice *device, NativeSd *host);
-// v46 (r239): Data-window persistence state (boot-arg e5-data-persist). The
-// flush streams the LIVE RAM image to the SD window so a seeded LS database
-// survives a PMIC kill; armed only when the boot arg is present.
-static E5DataDevice *sPersistData = nullptr;
-static unsigned long long e5_persist_flushes = 0, e5_persist_bad = 0;
-static NativeSd *sPersistHost = nullptr;
-static thread_call_t sPersistCall = nullptr;
-static void persistEntry(thread_call_param_t, thread_call_param_t);
+// r245: the r239 periodic flush (e5-data-persist) and the r244 RAM-image
+// write-through are superseded by the media-direct window — there is no RAM
+// image to flush or mirror; every completed write is on the card already.
 
 class NativeSd : public IOBlockStorageDevice {
   friend unsigned e5_pmic_peek(unsigned off);
@@ -832,28 +828,12 @@ class NativeSd : public IOBlockStorageDevice {
   }
 
 public:
-  // v46 (r239): stream the live Data RAM image out to the SD window
-  // (out-of-line definition after E5DataDevice is complete). 8-sector
-  // chunks under per-chunk locking; the window-LBA-0 chunk (container
-  // superblock) is written LAST so a torn flush leaves the OLD checkpoint
-  // reachable: APFS rolls back one checkpoint instead of mounting garbage.
-  unsigned flushDataWindow();
-  // v47 (r244): write-through state + card landing for Data writes.
-  bool dataWriteThroughArmed = false;
-  bool dataWriteThrough(const char *img, UInt64 block, UInt64 count);
-  // Load the Data container image from the card into a caller buffer,
-  // 16 sectors per multi-block read (the DMA page limit). ~13 s at the
-  // proven 24 MHz 4-bit throughput; runs once, before the device publishes.
-  bool fillDataImage(char *destination) {
-    for (uint64_t off = 0; off < E5Data::sectors; off += 16) {
-      if (!readSectors((uint32_t)(E5Data::base + off), 16)) {
-        dataCheckpoint("load-read-failed", (uint32_t)off);
-        return false;
-      }
-      memcpy(destination + off * 512, buffer, 16 * 512);
-    }
-    return true;
-  }
+  // r245: media-direct Data window I/O
+  // (out-of-line definition after E5DataDevice is complete). 16-sector
+  // chunks under per-chunk locking share the one DMA page with every other
+  // card op; both directions count into the RD=/WR= census counters and a
+  // failed chunk completes the request with kIOReturnIOError.
+  IOReturn dataMediaIO(IOMemoryDescriptor *data, UInt64 block, UInt64 count, bool out);
   bool start(IOService *provider) override {
     if (PE_parse_boot_argn("e5-quiet", &e5_quiet, sizeof(e5_quiet))) e5_quiet = 1;
     if (!IOBlockStorageDevice::start(provider)) return false;
@@ -933,37 +913,9 @@ public:
     if (systemOS && !publishSystemOS(this)) sdlog("NativeSd: SystemOS publication failed\n");
     if (dataDevice && !publishData(dataDevice, this))
       sdlog("NativeSd: data publication failed\n");
-    // v46 (r239): arm the RAM->SD persistence flush when asked. The window
-    // must be backed up host-side BEFORE booting with this arg (see
-    // e5-data-media.py --backup); the flush writes the live image over the
-    // card copy every 30 minutes.
-    if (dataDevice) {
-      int persist = 0;
-      PE_parse_boot_argn("e5-data-persist", &persist, sizeof(persist));
-      if (persist) {
-        sPersistData = dataDevice;
-        sPersistHost = this;
-        sPersistCall = thread_call_allocate(persistEntry, nullptr);
-        if (sPersistCall) {
-          uint64_t deadline = 0;
-          clock_interval_to_deadline(1800, NSEC_PER_SEC, &deadline);
-          thread_call_enter_delayed(sPersistCall, deadline);
-          sdlog("NativeSd: data persist armed, 1800s cadence\n");
-        } else sdlog("NativeSd: data persist timer alloc failed\n");
-      }
-      // v47 (r244): Data write-through (boot-arg e5-data-wt). Every Data
-      // write lands on the card under the host lock before its block I/O
-      // completes, so the RAM image is only a read cache and the card stays
-      // consistent without the periodic sweep. The card window must still be
-      // backed up host-side first (e5-data-media.py --backup): the first
-      // write-through boot owns the card copy from then on.
-      int writeThroughArg = 0;
-      PE_parse_boot_argn("e5-data-wt", &writeThroughArg, sizeof(writeThroughArg));
-      if (writeThroughArg) {
-        dataWriteThroughArmed = true;
-        sdlog("NativeSd: data write-through armed\n");
-      }
-    }
+    // r245: the Data device is media-direct (no RAM image, no flush timer,
+    // no write-through gate) — writes land on the card inside their own
+    // block I/O, so there is nothing left to arm here.
     return true;
   }
   E5DataDevice *prepareDataDevice();
@@ -1148,12 +1100,6 @@ extern "C" int e5_pmic_rmw(unsigned off, unsigned mask, unsigned val) {
 
 OSDefineMetaClassAndStructors(NativeSd, IOBlockStorageDevice)
 
-// v46 (r239): periodic live-image flush onto the SD Data window. Runs on a
-// kernel thread_call; re-arms itself AFTER each pass so passes never
-// overlap. A failed pass is counted and logged; the next pass retries the
-// whole window (torn mid-pass states roll back one APFS checkpoint).
-
-
 // A second storage device shares the host's lock, DMA buffer and error handling.
 // Its offsets never enter the original OS image or the physical card's GPT.
 class E5SystemOSDevice : public IOBlockStorageDevice {
@@ -1236,17 +1182,16 @@ extern "C" int e5_systemos_device(char *path, size_t size, int *major, int *mino
   return ok ? 1 : 0;
 }
 
-// The system's one writable dataset: a 128 MiB APFS container copied from the
-// card into a RAM buffer and served read-write. The kernel startup patch
-// mounts the volume at /private/var before launchd starts (tzinit and the
-// data-protection boot tasks need a writable dataset; the OS volume is
-// read-only). The RAM copy is volatile by design: nothing writes the card.
+// The system's one writable dataset: the 4 GiB card window served
+// media-direct (r245). The kernel startup patch mounts the volume at
+// /private/var before launchd starts (tzinit and the data-protection boot
+// tasks need a writable dataset; the OS volume is read-only). Every
+// completed write is durable on the card by construction.
 class E5DataDevice : public IOBlockStorageDevice {
   OSDeclareDefaultStructors(E5DataDevice)
 public:
-  IOBufferMemoryDescriptor *image = nullptr;
   char *getVendorString() override { return const_cast<char *>("E5"); }
-  char *getProductString() override { return const_cast<char *>("Data ramdisk window"); }
+  char *getProductString() override { return const_cast<char *>("Data media window"); }
   char *getRevisionString() override { return const_cast<char *>("1"); }
   char *getAdditionalDeviceInfoString() override { return const_cast<char *>(E5Data::uuid); }
   IOReturn doEjectMedia() override { return kIOReturnUnsupported; }
@@ -1266,106 +1211,65 @@ public:
   IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
   IOReturn getWriteCacheState(bool *b) override { *b = false; return kIOReturnSuccess; }
   IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
+  // r245: media-direct — the card IS the media. Reads stream CMD18 chunks
+  // under the host lock, writes land as CMD25 chunks before their completion
+  // fires (durable by construction, which is what breaking the LS
+  // recovery-file loop needs), and a failed chunk answers kIOReturnIOError
+  // instead of pretending success against volatile state.
   IOReturn doAsyncReadWrite(IOMemoryDescriptor *data, UInt64 block, UInt64 count,
       IOStorageAttributes *attributes, IOStorageCompletion *completion) override {
     (void)attributes;
     if (!data || !completion || !completion->action) return kIOReturnBadArgument;
-    if (!image || !E5Data::contains(block, count)) return kIOReturnBadArgument;
-    UInt64 bytes = count * 512;
-    char *base = (char *)image->getBytesNoCopy() + block * 512;
-    if (data->getDirection() == kIODirectionOut) {
-      data->readBytes(0, base, bytes);
-      // v47 (r244): under e5-data-wt the card copy must be durable before
-      // the write completes; an honest error beats a volatile success that
-      // vanishes on the next PMIC watchdog kill (the LS recovery-file loop).
-      NativeSd *host = OSDynamicCast(NativeSd, getProvider());
-      if (host && host->dataWriteThroughArmed &&
-          !host->dataWriteThrough((const char *)image->getBytesNoCopy(), block, count)) {
-        completion->action(completion->target, completion->parameter,
-                           kIOReturnIOError, bytes);
-        return kIOReturnSuccess;
-      }
-    } else {
-      // Serve reads (and flush-style no-direction requests) from the image.
-      data->writeBytes(0, base, bytes);
-    }
-    completion->action(completion->target, completion->parameter, kIOReturnSuccess, bytes);
+    if (!E5Data::contains(block, count)) return kIOReturnBadArgument;
+    NativeSd *host = OSDynamicCast(NativeSd, getProvider());
+    if (!host) return kIOReturnNotReady;
+    IOReturn rc = host->dataMediaIO(data, block, count,
+                                    data->getDirection() == kIODirectionOut);
+    completion->action(completion->target, completion->parameter, rc,
+                       rc == kIOReturnSuccess ? count * 512 : 0);
     return kIOReturnSuccess;
-  }
-  void free() override {
-    if (image) image->release();
-    IOBlockStorageDevice::free();
   }
 };
 OSDefineMetaClassAndStructors(E5DataDevice, IOBlockStorageDevice)
 
-static void persistEntry(thread_call_param_t, thread_call_param_t) {
-  NativeSd *host = sPersistHost;
-  if (!host) return;
-  unsigned bad = host->flushDataWindow();
-  unsigned long long n = __atomic_add_fetch(&e5_persist_flushes, 1, __ATOMIC_RELAXED);
-  if (bad) __atomic_add_fetch(&e5_persist_bad, 1, __ATOMIC_RELAXED);
-  printf("NativeSd: persist flush #%llu rc %u bad %llu\n",
-         n, bad, e5_persist_bad);
-  if (sPersistCall) {
-    uint64_t deadline = 0;
-    clock_interval_to_deadline(1800, NSEC_PER_SEC, &deadline);
-    thread_call_enter_delayed(sPersistCall, deadline);
+// Out-of-line (E5DataDevice is complete). One DMA page shared with every
+// other card operation; each chunk takes the host lock around its command,
+// so OS-volume reads, the journal and Data traffic serialize on it. Client
+// memory is touched outside the lock - descriptor copies may fault, and the
+// card must not stall behind them. A failed chunk aborts the request with
+// kIOReturnIOError; both directions count into RD=/WR=.
+IOReturn NativeSd::dataMediaIO(IOMemoryDescriptor *data, UInt64 block, UInt64 count, bool out) {
+  if (!lock || !buffer || !prepared) return kIOReturnNotReady;
+  if (data->getLength() < count * 512) return kIOReturnBadArgument;
+  if (out) {
+    __atomic_fetch_add(&e5_sd_wr_blocks, count, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&e5_sd_wr_ops, 1, __ATOMIC_RELAXED);
+  } else {
+    __atomic_fetch_add(&e5_sd_rd_blocks, count, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&e5_sd_rd_ops, 1, __ATOMIC_RELAXED);
   }
-}
-
-// Out-of-line (E5DataDevice is complete here). Per-chunk locking keeps SD
-// reads from the block layer running between chunks; a failed chunk aborts
-// the pass so the caller can log it and retry on the next cadence tick.
-unsigned NativeSd::flushDataWindow() {
-  if (!sPersistData || !sPersistData->image || !buffer) return 2;
-  char *img = (char *)sPersistData->image->getBytesNoCopy();
-  const uint64_t chunk = 8; // 4 KiB per command
-  const uint64_t total = E5Data::sectors;
-  for (uint64_t off = chunk; off < total; off += chunk) {
-    // v47 (r244): copy INSIDE the host lock — the r239 pre-lock copy let a
-    // concurrent read overwrite the shared DMA buffer between the memcpy and
-    // the write command using it.
+  for (UInt64 off = 0; off < count; off += 16) {
+    uint32_t n = (count - off) > 16 ? 16 : (uint32_t)(count - off);
+    if (out) data->readBytes(off * 512, buffer, (size_t)n * 512);
     IOLockLock(lock);
-    memcpy(buffer, img + off * 512, chunk * 512);
-    bool ok = writeSectors((uint32_t)(E5Data::base + off), 8);
-    IOLockUnlock(lock);
-    if (!ok) return 1;
-  }
-  IOLockLock(lock);
-  memcpy(buffer, img, chunk * 512);
-  bool ok = writeSectors((uint32_t)E5Data::base, 8);
-  IOLockUnlock(lock);
-  return ok ? 0 : 1;
-}
-
-// v47 (r244): land one Data-write range on the card. Called from the Data
-// block service on the way to completion; the RAM image already holds the
-// bytes. Chunks stay at 8 sectors (the proven CMD25 shape); the host lock
-// serializes against reads, the journal and any flush pass, and the copy
-// into the shared DMA buffer happens under that lock.
-bool NativeSd::dataWriteThrough(const char *img, UInt64 block, UInt64 count) {
-  if (!lock || !buffer) return false;
-  __atomic_fetch_add(&e5_sd_wr_ops, 1, __ATOMIC_RELAXED);
-  __atomic_fetch_add(&e5_sd_wr_blocks, count, __ATOMIC_RELAXED);
-  for (UInt64 off = 0; off < count; off += 8) {
-    uint32_t n = (count - off) > 8 ? 8 : (uint32_t)(count - off);
-    IOLockLock(lock);
-    memcpy(buffer, img + (block + off) * 512, (size_t)n * 512);
-    bool ok = writeSectors((uint32_t)(E5Data::base + block + off), n);
+    if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
+    bool ok = out ? writeSectors((uint32_t)(E5Data::base + block + off), n)
+                  : readSectors((uint32_t)(E5Data::base + block + off), n);
     IOLockUnlock(lock);
     if (!ok) {
-      __atomic_add_fetch(&e5_sd_wr_bad, 1, __ATOMIC_RELAXED);
-      sdlog("NativeSd: wt fail block %llu+%u bad %llu\n",
-            (unsigned long long)(block + off), n,
-            __atomic_load_n(&e5_sd_wr_bad, __ATOMIC_RELAXED));
-      return false;
+      if (out) __atomic_add_fetch(&e5_sd_wr_bad, 1, __ATOMIC_RELAXED);
+      sdlog("NativeSd: data media %s fail block %llu+%u%s\n", out ? "write" : "read",
+            (unsigned long long)(block + off), n, out ? " (bad count incremented)" : "");
+      return kIOReturnIOError;
     }
+    if (!out) data->writeBytes(off * 512, buffer, (size_t)n * 512);
   }
-  return true;
+  return kIOReturnSuccess;
 }
+
   // Probe-time Data preparation: gate on the raw-container superblock and
-  // load the whole image while no IOKit consumer can race the host.
+  // the container/window block-count match, all before any IOKit consumer
+  // can race the host (the round 55/56 root-attach lesson).
 
 E5DataDevice *NativeSd::prepareDataDevice() {
     dataCheckpoint("probe");
@@ -1381,45 +1285,21 @@ E5DataDevice *NativeSd::prepareDataDevice() {
       sdlog("NativeSd: data window not NXSB (%08x %08x)\n", a, b);
       return nullptr;
     }
+    // r245: media-direct — no RAM image, no whole-window load and no
+    // verify pass (4 GiB would spend ~6.5 minutes at the measured 24 MHz
+    // throughput just to be read twice). Cross-check the container's own
+    // block count against the window so a stale small fixture on the card
+    // shows up in the boot log instead of as mysterious ENOSPC later.
+    uint64_t containerBlocks = *(uint64_t *)(buffer + 40);
+    sdlog("NativeSd: data media window %llu sectors, container %llu blocks %s\n",
+          (unsigned long long)E5Data::sectors, (unsigned long long)containerBlocks,
+          containerBlocks * 8 == E5Data::sectors ? "match" : "MISMATCH");
     E5DataDevice *device = new E5DataDevice;
     if (!device) { dataCheckpoint("object-failed"); return nullptr; }
     if (!device->init(nullptr)) {
       dataCheckpoint("init-failed"); device->release(); return nullptr;
     }
-    dataCheckpoint("alloc");
-    device->image = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
-        kernel_task, kIODirectionInOut, E5Data::sectors * 512, 0x0000000FFFFFFFFFull);
-    char *destination = device->image ? (char *)device->image->getBytesNoCopy() : nullptr;
-    bool loaded = false;
-    if (!destination) dataCheckpoint(device->image ? "buffer-failed" : "alloc-failed");
-    else {
-      dataCheckpoint("loading");
-      loaded = fillDataImage(destination);
-    }
-    if (loaded) {
-      // v40: r184-r188 fsck hash mismatches at 85-104MiB while the card
-      // window is byte-verified clean from Android — verify the RAM copy
-      // against fresh card reads before publishing. Answers "is the fill
-      // loop/SDMA corrupt, or does it happen later?"
-      unsigned bad = 0;
-      for (uint64_t off = 0; off < E5Data::sectors; off += 1024) {
-        if (!readSectors((uint32_t)(E5Data::base + off), 16)) { sdlog("NativeSd: data verify read fail @%llu\n", off); bad = 2; break; }
-        if (memcmp(destination + off * 512, buffer, 16 * 512) != 0) {
-          sdlog("NativeSd: data verify MISMATCH @off %llu (%llu MiB) sectors %llu\n",
-                off, off / 2048u, E5Data::sectors);
-          bad = 1; break;
-        }
-      }
-      if (!bad) sdlog("NativeSd: data verify clean, window %llu sectors\n", E5Data::sectors);
-    }
-    if (!loaded) {
-      sdlog("NativeSd: data image load failed\n");
-      if (device->image) device->image->release();
-      device->image = nullptr;
-      device->release();
-      return nullptr;
-    }
-    dataCheckpoint("loaded", crc32n((const uint8_t *)destination, 4096));
+    dataCheckpoint("media-direct", crc32n(buffer, 4096));
     return device;
   }
 
