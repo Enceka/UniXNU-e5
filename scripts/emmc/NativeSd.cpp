@@ -64,6 +64,11 @@ static uint32_t dataDetail;
 // Cumulative SD read accounting (blocks of 512B, request ops).
 static unsigned long long e5_sd_rd_blocks;
 static unsigned long long e5_sd_rd_ops;
+// v47 (r244): Data write-through accounting (boot-arg e5-data-wt). Blocks,
+// operations and failures of card-side writes issued by the Data service.
+static unsigned long long e5_sd_wr_blocks;
+static unsigned long long e5_sd_wr_ops;
+static unsigned long long e5_sd_wr_bad;
 static void dataCheckpoint(const char *phase, uint32_t detail = 0) {
   __atomic_store_n(&dataDetail, detail, __ATOMIC_RELAXED);
   __atomic_store_n(&dataPublication, phase, __ATOMIC_RELEASE);
@@ -833,6 +838,9 @@ public:
   // superblock) is written LAST so a torn flush leaves the OLD checkpoint
   // reachable: APFS rolls back one checkpoint instead of mounting garbage.
   unsigned flushDataWindow();
+  // v47 (r244): write-through state + card landing for Data writes.
+  bool dataWriteThroughArmed = false;
+  bool dataWriteThrough(const char *img, UInt64 block, UInt64 count);
   // Load the Data container image from the card into a caller buffer,
   // 16 sectors per multi-block read (the DMA page limit). ~13 s at the
   // proven 24 MHz 4-bit throughput; runs once, before the device publishes.
@@ -942,6 +950,18 @@ public:
           thread_call_enter_delayed(sPersistCall, deadline);
           sdlog("NativeSd: data persist armed, 1800s cadence\n");
         } else sdlog("NativeSd: data persist timer alloc failed\n");
+      }
+      // v47 (r244): Data write-through (boot-arg e5-data-wt). Every Data
+      // write lands on the card under the host lock before its block I/O
+      // completes, so the RAM image is only a read cache and the card stays
+      // consistent without the periodic sweep. The card window must still be
+      // backed up host-side first (e5-data-media.py --backup): the first
+      // write-through boot owns the card copy from then on.
+      int writeThroughArg = 0;
+      PE_parse_boot_argn("e5-data-wt", &writeThroughArg, sizeof(writeThroughArg));
+      if (writeThroughArg) {
+        dataWriteThroughArmed = true;
+        sdlog("NativeSd: data write-through armed\n");
       }
     }
     return true;
@@ -1054,7 +1074,7 @@ public:
       // Print 1-in-64 ticks; the E5TW ring keeps the fast history regardless.
       static unsigned sEchoThrottle = 0;
       if (e5_quiet == 0 && (++sEchoThrottle & 0x3Fu) == 0u)
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d M=%u:%08x:%08x RD=%llu:%llu\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d M=%u:%08x:%08x RD=%llu:%llu WR=%llu:%llu:%llu\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
@@ -1098,7 +1118,10 @@ public:
             __atomic_load_n(&e5_mali_gpu_id, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_mali_shader, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_sd_rd_blocks, __ATOMIC_RELAXED),
-            __atomic_load_n(&e5_sd_rd_ops, __ATOMIC_RELAXED));
+            __atomic_load_n(&e5_sd_rd_ops, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_sd_wr_blocks, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_sd_wr_ops, __ATOMIC_RELAXED),
+            __atomic_load_n(&e5_sd_wr_bad, __ATOMIC_RELAXED));
     }
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
@@ -1252,6 +1275,16 @@ public:
     char *base = (char *)image->getBytesNoCopy() + block * 512;
     if (data->getDirection() == kIODirectionOut) {
       data->readBytes(0, base, bytes);
+      // v47 (r244): under e5-data-wt the card copy must be durable before
+      // the write completes; an honest error beats a volatile success that
+      // vanishes on the next PMIC watchdog kill (the LS recovery-file loop).
+      NativeSd *host = OSDynamicCast(NativeSd, getProvider());
+      if (host && host->dataWriteThroughArmed &&
+          !host->dataWriteThrough((const char *)image->getBytesNoCopy(), block, count)) {
+        completion->action(completion->target, completion->parameter,
+                           kIOReturnIOError, bytes);
+        return kIOReturnSuccess;
+      }
     } else {
       // Serve reads (and flush-style no-direction requests) from the image.
       data->writeBytes(0, base, bytes);
@@ -1290,17 +1323,46 @@ unsigned NativeSd::flushDataWindow() {
   const uint64_t chunk = 8; // 4 KiB per command
   const uint64_t total = E5Data::sectors;
   for (uint64_t off = chunk; off < total; off += chunk) {
-    memcpy(buffer, img + off * 512, chunk * 512);
+    // v47 (r244): copy INSIDE the host lock — the r239 pre-lock copy let a
+    // concurrent read overwrite the shared DMA buffer between the memcpy and
+    // the write command using it.
     IOLockLock(lock);
+    memcpy(buffer, img + off * 512, chunk * 512);
     bool ok = writeSectors((uint32_t)(E5Data::base + off), 8);
     IOLockUnlock(lock);
     if (!ok) return 1;
   }
-  memcpy(buffer, img, chunk * 512);
   IOLockLock(lock);
+  memcpy(buffer, img, chunk * 512);
   bool ok = writeSectors((uint32_t)E5Data::base, 8);
   IOLockUnlock(lock);
   return ok ? 0 : 1;
+}
+
+// v47 (r244): land one Data-write range on the card. Called from the Data
+// block service on the way to completion; the RAM image already holds the
+// bytes. Chunks stay at 8 sectors (the proven CMD25 shape); the host lock
+// serializes against reads, the journal and any flush pass, and the copy
+// into the shared DMA buffer happens under that lock.
+bool NativeSd::dataWriteThrough(const char *img, UInt64 block, UInt64 count) {
+  if (!lock || !buffer) return false;
+  __atomic_fetch_add(&e5_sd_wr_ops, 1, __ATOMIC_RELAXED);
+  __atomic_fetch_add(&e5_sd_wr_blocks, count, __ATOMIC_RELAXED);
+  for (UInt64 off = 0; off < count; off += 8) {
+    uint32_t n = (count - off) > 8 ? 8 : (uint32_t)(count - off);
+    IOLockLock(lock);
+    memcpy(buffer, img + (block + off) * 512, (size_t)n * 512);
+    bool ok = writeSectors((uint32_t)(E5Data::base + block + off), n);
+    IOLockUnlock(lock);
+    if (!ok) {
+      __atomic_add_fetch(&e5_sd_wr_bad, 1, __ATOMIC_RELAXED);
+      sdlog("NativeSd: wt fail block %llu+%u bad %llu\n",
+            (unsigned long long)(block + off), n,
+            __atomic_load_n(&e5_sd_wr_bad, __ATOMIC_RELAXED));
+      return false;
+    }
+  }
+  return true;
 }
   // Probe-time Data preparation: gate on the raw-container superblock and
   // load the whole image while no IOKit consumer can race the host.
