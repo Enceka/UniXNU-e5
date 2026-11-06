@@ -406,6 +406,7 @@ class NativeEmmc : public IOBlockStorageDevice {
     }
   }
 
+public:
   // r247: called from the panic path (e5-ram-console-tee patch) after the
   // panic reason is teed. The panic CPU is the only runner; a plain
   // IOLockLock could spin forever if a stopped CPU died holding ioLock, so
@@ -421,6 +422,8 @@ class NativeEmmc : public IOBlockStorageDevice {
     logPanicMode = false;
     e5_panic_print("E5JRN: panic flush done\n");
   }
+
+private:
 
   // r247: in panic mode every host lock is a try-lock - a stopped CPU may
   // have died holding ioLock and the panic CPU must never spin on it.
