@@ -331,30 +331,30 @@ class NativeSd : public IOBlockStorageDevice {
     }
     return true;
   }
-  // v46 (r239): multi-block CMD25 write of n sectors (n <= 16). Mirror of
-  // readSectors with the DAT direction bit clear (xfer 0x23 = multi|count|DMA,
-  // no bit4 = WRITE) and a cache CLEAN before the command (CPU -> RAM -> DMA).
-  // Untested on this host: the caller treats failure as evidence.
+  // r248: per-sector CMD24 write of n sectors (n <= 16). The r239/r245
+  // multi-block CMD25 shape fails on this card at the command level (r247c:
+  // "mwrite fail ... r1 00000c00" on the very first Data writes, then the
+  // reset-poisoned host served EIO to OS-volume reads 400 s later), while
+  // single-sector CMD24 is hardware-proven by the r240 journal probe. Same
+  // register sequence as the proven single-block read with the DAT direction
+  // bit clear (xfer 0x03 = DMA|count|write) and a cache CLEAN per sector.
   bool writeSectors(uint32_t lba, uint32_t n) {
     if (n == 0 || n > 16) return false;
-    if (!idle(3)) return false;
-    cacheN(buffer, n * 512, true); // push the payload out to RAM for the DMA.
-    w8(0x28, r8(0x28) & (uint8_t)~0x18);
-    w32(0x30, 0xffffffffu); w16(0x04, 512); w32(0x00, n);
-    w32(0x58, (uint32_t)physical); w32(0x5c, 0);
-    w32(0x08, lba); w32(0x0c, 0x193a0023u); // CMD25, multi|count|DMA|write.
-    uint32_t st = wait(2, 4000000u + 200000u * n);
-    if (!E5Emmc::transferOk(st) || (r32(0x10) & E5Sd::r1Errors)) {
-      sdlog("NativeSd: mwrite fail lba %u n %u st %08x r1 %08x ps %08x\n",
-            lba, n, st, r32(0x10), r32(0x24));
-      resetLines();
-      return false;
-    }
-    uint32_t s12 = command(0x0c1a, 0); // CMD12 stop, R1b-ish.
-    if (!commandOk(s12) || !idle(3)) {
-      sdlog("NativeSd: mwrite stop fail lba %u st %08x s12 %08x\n", lba, st, s12);
-      resetLines();
-      return false;
+    for (uint32_t i = 0; i < n; ++i) {
+      if (!idle(3)) return false;
+      cacheN(buffer + i * 512, 512, true); // push this sector out for the DMA.
+      w8(0x28, r8(0x28) & (uint8_t)~0x18u); // SDMA, retaining bus width.
+      w32(0x30, 0xffffffffu); w16(0x04, 512); w32(0x00, 1);
+      w32(0x58, (uint32_t)(physical + i * 512)); w32(0x5c, 0);
+      w32(0x08, lba + i); w32(0x0c, 0x183a0003u); // CMD24 single, SDMA, write.
+      uint32_t st = wait(2, 5000000u);
+      uint32_t r1 = r32(0x10);
+      if (!E5Emmc::transferOk(st) || (r1 & E5Sd::r1Errors)) {
+        sdlog("NativeSd: write fail lba %u+%u st %08x r1 %08x ps %08x\n",
+              lba, i, st, r1, r32(0x24));
+        resetLines();
+        return false;
+      }
     }
     return true;
   }
