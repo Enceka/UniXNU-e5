@@ -987,6 +987,15 @@ public:
     if (call <= 12 || (call & (call - 1)) == 0)
       sdlog("NativeSd: rw %llu blocks at %llu\n", (unsigned long long)count, (unsigned long long)block);
     UInt64 wbShort = 0;
+    // r254: big-read wedge instrumentation. The r251/r253 boots die
+    // deterministically at ~140 s with the LAST console line a 2048-block
+    // read at LBA 16349840 (dyld subcache demand page-in) and no panic; the
+    // paint tick dies with it, so the freeze is inside or right after this
+    // loop. Mark entry, per-64-chunk progress and exit for count >= 512 so
+    // the surviving ring shows exactly which chunk (or completion) wedged.
+    const bool bigTrace = count >= 512;
+    uint32_t chunkIdx = 0;
+    if (bigTrace) sdlog("NativeSd: rw+ enter %llu at %llu\n", (unsigned long long)count, (unsigned long long)block);
     while (done < count * 512) {
       uint32_t left = (uint32_t)((count * 512 - done) / 512);
       uint32_t n = 1;
@@ -1028,7 +1037,16 @@ public:
       }
       if (!ok) break;
       done += n * 512;
+      // r254: wedge point trace - every 64 chunks of a big read.
+      if (bigTrace && ((++chunkIdx & 0x3Fu) == 0u))
+        sdlog("NativeSd: rw+ %u/%llu at %llu+%llu\n", chunkIdx,
+              (unsigned long long)count, (unsigned long long)block,
+              (unsigned long long)(done / 512));
     }
+    if (bigTrace)
+      sdlog("NativeSd: rw+ exit %s %llu/%llu at %llu\n",
+            done == count * 512 ? "full" : "PART", (unsigned long long)(done / 512),
+            (unsigned long long)count, (unsigned long long)block);
     if (wbShort) sdlog("NativeSd: rw wb short %llu at %llu\n", (unsigned long long)wbShort, (unsigned long long)block);
     if (done != count * 512) sdlog("NativeSd: rw incomplete %llu/%llu blocks at %llu\n", (unsigned long long)(done / 512), (unsigned long long)count, (unsigned long long)block);
     // v23: large-read completion trace, THROTTLED — round 30's unthrottled
