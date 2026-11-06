@@ -844,6 +844,34 @@ OSDefineMetaClassAndStructors(NativeEmmc, IOBlockStorageDevice)
 extern "C" void e5_journal_flush_panic(void) {
   if (sJournalHost) sJournalHost->flushJournalPanic();
 }
+
+// r250: panic-site scratch. The firmware's ring-resume dumps physical
+// 0xC6000000 words 0..3 ("scratch raw") and 0xC6002000 words 0..7 ("trace")
+// on every boot, so a panic can leave its caller PC and reason text in plain
+// DRAM with no locks, no console and no eMMC. Mapped once during start().
+static volatile uint32_t *sPanicScratch = nullptr;   // 0xC6000000
+static volatile uint32_t *sPanicTrace = nullptr;     // 0xC6002000
+extern "C" void e5_panic_scratch_write(uint64_t pc, const char *reason) {
+  if (!sPanicScratch) return;
+  uint32_t hash = 2166136261u;
+  for (const char *p = reason; p && *p; ++p) hash = (hash ^ (uint8_t)*p) * 16777619u;
+  sPanicScratch[0] = 0x494E4150u; // "PANI"
+  sPanicScratch[1] = (uint32_t)(pc & 0xffffffffu);
+  sPanicScratch[2] = (uint32_t)(pc >> 32);
+  sPanicScratch[3] = hash;
+  if (sPanicTrace) {
+    for (unsigned i = 0; i != 8; ++i) sPanicTrace[i] = 0;
+    for (unsigned i = 0; i != 8; ++i) {
+      uint32_t w = 0;
+      for (unsigned b = 0; b != 4; ++b) {
+        char c = reason[i * 4 + b];
+        if (!c) break;
+        w |= (uint32_t)(uint8_t)c << (8 * b);
+      }
+      sPanicTrace[i] = w;
+    }
+  }
+}
 NativeEmmc *NativeEmmc::s_host = nullptr;
 
 bool NativeEmmc::start(IOService *provider)
@@ -888,7 +916,23 @@ bool NativeEmmc::start(IOService *provider)
     uint32_t journalNonce = 0;
     if (!logTest && PE_parse_boot_argn("e5-emmc-log", &journalNonce, sizeof(journalNonce)) && journalNonce) {
       IOLockLock(ioLock);
-      bool started = beginJournal(journalNonce);
+      {
+      // r250: map the firmware-read panic scratch (plain DRAM at the initrd
+      // reserve top; cacheable is fine - the firmware reads it after reset).
+      IODeviceMemory *scr = IODeviceMemory::withRange(0xC6000000ull, 0x3000ull);
+      if (scr) {
+        IOMemoryMap *m = scr->map(kIODirectionOutIn);
+        if (m) {
+          volatile uint32_t *base = (volatile uint32_t *)m->getVirtualAddress();
+          sPanicScratch = base;
+          sPanicTrace = base + 0x2000 / 4;
+          base[0] = 0; base[1] = 0; base[2] = 0; base[3] = 0;
+        }
+        scr->release();
+      }
+      elog("NativeEmmc: panic scratch %s\n", sPanicScratch ? "mapped" : "FAILED");
+    }
+    bool started = beginJournal(journalNonce);
       IOLockUnlock(ioLock);
       elog("NativeEmmc: journal started %u nonce %u gen %llu slot %u\n", started,
            journalNonce, (unsigned long long)logGeneration, logSlot);

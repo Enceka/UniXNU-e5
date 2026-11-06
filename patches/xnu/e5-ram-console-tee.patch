@@ -193,7 +193,7 @@ diff --git a/osfmk/kern/debug.c b/osfmk/kern/debug.c
 index e9daeed..2cfd86d 100644
 --- a/osfmk/kern/debug.c
 +++ b/osfmk/kern/debug.c
-@@ -1023,6 +1023,18 @@ panic(const char *str, ...)
+@@ -1023,6 +1023,20 @@ panic(const char *str, ...)
  	va_list panic_str_args;
  
  	va_start(panic_str_args, str);
@@ -207,6 +207,8 @@ index e9daeed..2cfd86d 100644
 +		// journal thread never gets scheduled again. The flush try-locks the
 +		// host and gives up if a stopped CPU still owns it.
 +		extern void e5_journal_flush_panic(void);
++		extern void e5_panic_scratch_write(uint64_t, const char *);
++		e5_panic_scratch_write((uint64_t)(uintptr_t)__builtin_return_address(0), str);
 +		e5_journal_flush_panic();
 +	}
  	panic_trap_to_debugger(str, &panic_str_args, 0, NULL, 0, NULL, (unsigned long)(char *)__builtin_return_address(0));
