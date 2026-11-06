@@ -1155,6 +1155,7 @@ public:
   IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
   IOReturn doAsyncReadWrite(IOMemoryDescriptor *data, UInt64 block, UInt64 count,
       IOStorageAttributes *attributes, IOStorageCompletion *completion) override {
+    (void)attributes;
     if (!data || !completion || !completion->action) return kIOReturnBadArgument;
     if (data->getDirection() != kIODirectionIn) return kIOReturnNotWritable;
     if (!E5SystemOS::contains(block, count)) return kIOReturnBadArgument;
