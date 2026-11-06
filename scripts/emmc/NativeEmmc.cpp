@@ -1036,7 +1036,7 @@ public:
       bool ok = cardUp && windowReadVerified((uint32_t)(base + block + c * 8), n);
       IOLockUnlock(ioLock);
       if (!ok) return kIOReturnIOError;
-      if (data->writeBytes(c * 512, dmaD8, (size_t)n * 512) != (ByteCount)(n * 512))
+      if (data->writeBytes(c * 512, dmaD8, (size_t)n * 512) != (IOByteCount)(n * 512))
         return kIOReturnIOError;
       if (big && ((c + 1) % 64) == 0)
         elog("NativeEmmc: rw+ %llu/%llu at %llu+%llu\n",
