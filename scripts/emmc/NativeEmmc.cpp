@@ -413,14 +413,68 @@ public:
   // try-lock once and give up - a partial flush still beats none.
   void flushJournalPanic() {
     if (!logActive || !ioLock) return;
-    if (!cardUp || !logWindowReady) {
+    if (!logWindowReady) {
       e5_panic_print("E5JRN: panic flush skipped (journal down)\n");
+      return;
+    }
+    if (!IOLockTryLock(ioLock)) {
+      e5_panic_print("E5JRN: lock busy, bare panic sector\n");
+      panicWriteBare();
+      return;
+    }
+    IOLockUnlock(ioLock);
+    if (!cardUp) {
+      e5_panic_print("E5JRN: panic flush skipped (card down)\n");
       return;
     }
     logPanicMode = true;
     flushJournal();
     logPanicMode = false;
     e5_panic_print("E5JRN: panic flush done\n");
+  }
+
+  // r249: if the ioLock try failed above, the journal thread died holding it
+  // (r248/r248b: commits stop at ~84 s with no stopped line, and the later
+  // panic's flush could not run). The panic CPU owns the world after the
+  // debugger IPIs - the frozen holder will never run again - so write one
+  // bare sector of the tee tail after a line reset, lock-free. Content beats
+  // protocol here: a hand-rolled E5BLOG record with the newest console bytes
+  // lands in this slot's sector 511.
+  void panicWriteBare() {
+    if (!logWindowReady) return;
+    uint8_t *sect = dmaD8;
+    // drain what the tee still holds into a raw text block (not a standard
+    // record): magic + nonce + uptime + up to 470 bytes of console tail.
+    uint64_t stream = 0;
+    uint8_t bytes[E5BootLog::recordPayload];
+    // Seed the cursor to leave only the newest recordPayload bytes pending,
+    // using the same ring the journal thread reads (its own cursor may be
+    // stuck behind a lock; the ring head is lock-free enough for panic).
+    uint64_t tailCursor = logCursor;
+    uint64_t lost = 0;
+    uint64_t head = __atomic_load_n(&bootLogHead, __ATOMIC_RELAXED);
+    if (head > tailCursor + E5BootLog::recordPayload)
+      tailCursor = head - E5BootLog::recordPayload;
+    unsigned n = bootLogCopy(tailCursor, bytes, stream, lost);
+    bzero(sect, 512);
+    memcpy(sect, "E5PANIC1", 8);
+    struct Pack { uint32_t nonce; uint32_t len; uint64_t uptime; } pack = { logNonce, n, logUptime() };
+    memcpy(sect + 16, &pack, sizeof(pack));
+    if (n) memcpy(sect + 32, bytes, n < 470 ? n : 470);
+    // line reset then one CMD24, mirroring writeLogSector's sequence but
+    // without taking ioLock or touching cardUp state.
+    resetLines();
+    uint64_t lba = E5BootLog::partitionFirst + E5BootLog::firstSector
+                 + logSlot * E5BootLog::slotSectors + (E5BootLog::slotSectors - 1);
+    cacheClean(sect, 512);
+    w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x18u);
+    w32(SDHCI_INT_STATUS, 0xffffffffu);
+    w16(SDHCI_BLOCK_SIZE, 512); w32(SDHCI_DMA_ADDR, 1);
+    w32(SDHCI_SYSADDR_LOW, (uint32_t)dmaPhys); w32(SDHCI_SYSADDR_HIGH, 0);
+    w32(SDHCI_ARGUMENT, (uint32_t)lba);
+    w32(SDHCI_TRANSFER_MODE_CMD, 0x183a0003u); // CMD24, SDMA, WRITE
+    waitDmaDone(5000000);
+    flushLogCache();
   }
 
 private:

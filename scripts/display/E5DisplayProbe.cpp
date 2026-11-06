@@ -584,7 +584,7 @@ extern "C" void e5_dpu_tick(void) {
   // path are alive independently of the media stack; r245's freeze cut a
   // printf mid-word with nothing after it for 560 s and no way to tell a
   // console death from a system death afterwards.
-  if ((sPaintTicks % 100) == 10)
+  if ((sPaintTicks % 600) == 10) // r249: every ~30 s - 6x less ring burn
     e5_display_tracef("E5HB %u\n", sPaintTicks);
   if ((sPaintTicks % 100) == 10) { // every ~5s at 20Hz
     unsigned rowCrc = 0;
