@@ -68,6 +68,7 @@
 // Kernel printf does not reach the ram tee from IOKit context; the tee
 // printer e5_panic_print() (e5-ram-console-tee.patch) does.
 extern "C" void e5_panic_print(const char *s);
+class NativeEmmc; // r247: the panic-flush host pointer lives before the class
 static NativeEmmc *sJournalHost = nullptr;
 
 static void elog(const char *fmt, ...) {
