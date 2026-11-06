@@ -1241,6 +1241,14 @@ OSDefineMetaClassAndStructors(E5DataDevice, IOBlockStorageDevice)
 IOReturn NativeSd::dataMediaIO(IOMemoryDescriptor *data, UInt64 block, UInt64 count, bool out) {
   if (!lock || !buffer || !prepared) return kIOReturnNotReady;
   if (data->getLength() < count * 512) return kIOReturnBadArgument;
+  // r246 instrumentation: the first sixteen Data-window ops log in full so a
+  // freeze like r245's (dead at the SystemOS container read, no Data I/O
+  // visible) can place the first media-direct op on the timeline.
+  static unsigned long long logged;
+  unsigned long long seq = __atomic_add_fetch(&logged, 1, __ATOMIC_RELAXED);
+  if (seq <= 16) sdlog("NativeSd: dmio #%llu %s %llu+%llu\n", seq,
+                       out ? "wr" : "rd", (unsigned long long)block,
+                       (unsigned long long)count);
   if (out) {
     __atomic_fetch_add(&e5_sd_wr_blocks, count, __ATOMIC_RELAXED);
     __atomic_fetch_add(&e5_sd_wr_ops, 1, __ATOMIC_RELAXED);
@@ -1248,8 +1256,11 @@ IOReturn NativeSd::dataMediaIO(IOMemoryDescriptor *data, UInt64 block, UInt64 co
     __atomic_fetch_add(&e5_sd_rd_blocks, count, __ATOMIC_RELAXED);
     __atomic_fetch_add(&e5_sd_rd_ops, 1, __ATOMIC_RELAXED);
   }
-  for (UInt64 off = 0; off < count; off += 16) {
-    uint32_t n = (count - off) > 16 ? 16 : (uint32_t)(count - off);
+  for (UInt64 off = 0; off < count; off += 8) {
+    // r246: 8-sector chunks both directions - the CMD25 shape the driver was
+    // written for (16-sector CMD18 reads stay proven, but r245 never got far
+    // enough to distinguish; keep one shape until the path is qualified).
+    uint32_t n = (count - off) > 8 ? 8 : (uint32_t)(count - off);
     if (out) data->readBytes(off * 512, buffer, (size_t)n * 512);
     IOLockLock(lock);
     if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
@@ -1258,8 +1269,9 @@ IOReturn NativeSd::dataMediaIO(IOMemoryDescriptor *data, UInt64 block, UInt64 co
     IOLockUnlock(lock);
     if (!ok) {
       if (out) __atomic_add_fetch(&e5_sd_wr_bad, 1, __ATOMIC_RELAXED);
-      sdlog("NativeSd: data media %s fail block %llu+%u%s\n", out ? "write" : "read",
-            (unsigned long long)(block + off), n, out ? " (bad count incremented)" : "");
+      sdlog("NativeSd: data media %s fail block %llu+%u bad %llu\n", out ? "write" : "read",
+            (unsigned long long)(block + off), n,
+            __atomic_load_n(&e5_sd_wr_bad, __ATOMIC_RELAXED));
       return kIOReturnIOError;
     }
     if (!out) data->writeBytes(off * 512, buffer, (size_t)n * 512);

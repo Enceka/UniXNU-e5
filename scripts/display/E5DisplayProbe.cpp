@@ -580,6 +580,12 @@ extern "C" void e5_dpu_tick(void) {
   // r140 measured the real tick rate at ~1.8 kHz (thread_call interval
   // unit mismatch vs assumption): %50 printed ~40 Hz and flooded the ring
   // again. %5000 = one line every ~3 s.
+  // r246 heartbeat: one short line every ~5 s proves the CPU and the console
+  // path are alive independently of the media stack; r245's freeze cut a
+  // printf mid-word with nothing after it for 560 s and no way to tell a
+  // console death from a system death afterwards.
+  if ((sPaintTicks % 100) == 10)
+    e5_display_tracef("E5HB %u\n", sPaintTicks);
   if ((sPaintTicks % 100) == 10) { // every ~5s at 20Hz
     unsigned rowCrc = 0;
     if (sPanelMap) {
