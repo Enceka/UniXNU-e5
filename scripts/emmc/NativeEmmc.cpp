@@ -68,8 +68,15 @@
 // Kernel printf does not reach the ram tee from IOKit context; the tee
 // printer e5_panic_print() (e5-ram-console-tee.patch) does.
 extern "C" void e5_panic_print(const char *s);
+// r251: uncached device-map window over physical memory (the same call the
+// prz tee uses). Used for the panic scratch at 0xC6000000.
+extern "C" vm_offset_t ml_io_map(vm_offset_t phys_addr, vm_size_t size);
 class NativeEmmc; // r247: the panic-flush host pointer lives before the class
 static NativeEmmc *sJournalHost = nullptr;
+// r251: panic scratch pointers (0xC6000000/0xC6002000) - declared here so
+// the journal worker heartbeat can touch them; armed in start().
+static volatile uint32_t *sPanicScratch = nullptr;
+static volatile uint32_t *sPanicTrace = nullptr;
 
 static void elog(const char *fmt, ...) {
   char buf[192];
@@ -398,6 +405,14 @@ class NativeEmmc : public IOBlockStorageDevice {
   static void journalEntry(thread_call_param_t context, thread_call_param_t) {
     NativeEmmc *host = (NativeEmmc *)context;
     if (!host || !host->logActive) return;
+    // r251: heartbeat FIRST - if this pass hangs inside eMMC the scratch
+    // still timestamps the pass that hung (the journal record it was about
+    // to write will be missing). Words: [2]=pass count, [3]=uptime ms.
+    // Lock-free uncached stores; single writer thread.
+    if (sPanicScratch) {
+      sPanicScratch[2]++;
+      sPanicScratch[3] = (uint32_t)(logUptime() / 1000000ull);
+    }
     host->flushJournal();
     if (host->logActive) {
       // r247: 2 s cadence (was 5) - short pre-panic windows keep more context.
@@ -848,9 +863,8 @@ extern "C" void e5_journal_flush_panic(void) {
 // r250: panic-site scratch. The firmware's ring-resume dumps physical
 // 0xC6000000 words 0..3 ("scratch raw") and 0xC6002000 words 0..7 ("trace")
 // on every boot, so a panic can leave its caller PC and reason text in plain
-// DRAM with no locks, no console and no eMMC. Mapped once during start().
-static volatile uint32_t *sPanicScratch = nullptr;   // 0xC6000000
-static volatile uint32_t *sPanicTrace = nullptr;     // 0xC6002000
+// DRAM with no locks, no console and no eMMC. Armed during start() (r251:
+// uncached ml_io_map window + rolling heartbeat in the journal worker).
 extern "C" void e5_panic_scratch_write(uint64_t pc, const char *reason) {
   if (!sPanicScratch) return;
   uint32_t hash = 2166136261u;
@@ -917,20 +931,33 @@ bool NativeEmmc::start(IOService *provider)
     if (!logTest && PE_parse_boot_argn("e5-emmc-log", &journalNonce, sizeof(journalNonce)) && journalNonce) {
       IOLockLock(ioLock);
       {
-      // r250: map the firmware-read panic scratch (plain DRAM at the initrd
-      // reserve top; cacheable is fine - the firmware reads it after reset).
-      IODeviceMemory *scr = IODeviceMemory::withRange(0xC6000000ull, 0x3000ull);
-      if (scr) {
-        IOMemoryMap *m = scr->map(kIODirectionOutIn);
-        if (m) {
-          volatile uint32_t *base = (volatile uint32_t *)m->getVirtualAddress();
-          sPanicScratch = base;
-          sPanicTrace = base + 0x2000 / 4;
-          base[0] = 0; base[1] = 0; base[2] = 0; base[3] = 0;
-        }
-        scr->release();
+      // r251: map the firmware-read panic scratch (plain DRAM at the initrd
+      // reserve top) UNCACHED via ml_io_map - the mapping class the prz
+      // console tee uses, whose writes demonstrably survive the watchdog
+      // reset. r250 mapped this cacheable (IODeviceMemory::map) and the next
+      // boot read 0xFFFFFFFF from both zones: not even the init zeros
+      // reached DRAM before the hard freeze killed the dirty cache lines.
+      // Layout: [0]=magic "E5X1" [1]=journal nonce [2]=worker pass count
+      // [3]=uptime ms of that pass; a panic overwrites [0..3] with PANI/pc.
+      volatile uint32_t *base = (volatile uint32_t *)ml_io_map(0xC6000000ull, 0x3000ull);
+      if (base) {
+        sPanicScratch = base;
+        sPanicTrace = base + 0x2000 / 4;
+        // Read what the PREVIOUS boot left before touching anything: this
+        // lands in the console/journal, so the answer is readable offline
+        // even if the firmware-side read stays 0xFFFFFFFF.
+        elog("NativeEmmc: scratch pre %08x %08x %08x %08x | tr %08x %08x %08x %08x %08x %08x %08x %08x\n",
+             base[0], base[1], base[2], base[3],
+             base[0x800], base[0x801], base[0x802], base[0x803],
+             base[0x804], base[0x805], base[0x806], base[0x807]);
+        base[0] = 0x31583545u; // "E5X1"
+        base[1] = journalNonce;
+        base[2] = 0; base[3] = 0;
+        elog("NativeEmmc: panic scratch %s (readback %08x)\n",
+             base[0] == 0x31583545u ? "armed" : "VERIFY-FAILED", base[0]);
+      } else {
+        elog("NativeEmmc: panic scratch FAILED\n");
       }
-      elog("NativeEmmc: panic scratch %s\n", sPanicScratch ? "mapped" : "FAILED");
     }
     bool started = beginJournal(journalNonce);
       IOLockUnlock(ioLock);
