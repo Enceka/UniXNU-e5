@@ -410,7 +410,8 @@ class NativeEmmc : public IOBlockStorageDevice {
     // to write will be missing). Words: [2]=pass count, [3]=uptime ms.
     // Lock-free uncached stores; single writer thread.
     if (sPanicScratch) {
-      sPanicScratch[2]++;
+      // r251: plain load+store, not ++ (C++20 deprecates volatile compound ops; -Werror).
+      sPanicScratch[2] = sPanicScratch[2] + 1;
       sPanicScratch[3] = (uint32_t)(logUptime() / 1000000ull);
     }
     host->flushJournal();
