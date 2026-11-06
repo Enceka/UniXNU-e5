@@ -1,0 +1,989 @@
+--- a/osfmk/console/serial_console.c
++++ b/osfmk/console/serial_console.c
+@@ -267,6 +267,8 @@
+ 
+ void e5_trace_mark(void);
+ 
++#include "e5_usb_console.inc"
++
+ static char * volatile e5_prz_win;
+ static unsigned long e5_prz_pos;
+ static int e5_prz_phase;
+@@ -274,6 +276,7 @@
+ void
+ e5_trace_init(void)
+ {
++e5_usb_native_early_init();
+ e5_prz_phase = 0;
+ e5_prz_win = NULL;
+ e5_prz_pos = 0;
+@@ -286,19 +289,20 @@
+ e5_prz_win = (char *)ml_io_map(E5_PRZ_PA, 0x10000);
+ if (e5_prz_win != NULL) {
+ e5_prz_phase = 1;
++e5_usb_native_map();
+ e5_trace_mark();
+ }
+ }
+ }
+ 
+ void
+-e5_kputc(char c)
++e5_ramputc(char c)
+ {
+ volatile unsigned char *base;
+ volatile char *p;
+ 
+ if (c == '\n') {
+-e5_kputc('\r');
++e5_ramputc('\r');
+ }
+ if (e5_prz_phase == 1) e5_bootlog_putc(c);
+ if ((e5_prz_phase == 1) && (e5_prz_win != NULL)) {
+@@ -338,6 +342,13 @@
+ __asm__ volatile ("dsb sy" ::: "memory");
+ }
+ 
++void
++e5_kputc(char c)
++{
++e5_usb_native_putc(c);
++e5_ramputc(c);
++}
++
+ static void
+ e5_doprnt_putc(char c)
+ {
+@@ -386,7 +397,7 @@
+ static inline void
+ _cnputc(char c, bool poll)
+ {
+-	e5_kputc(c);
++	e5_ramputc(c);
+ 	{
+ 		extern void e5flight_putc(char);
+ 		e5flight_putc(c);
+@@ -664,6 +675,7 @@
+ void
+ console_write(char *str, int size)
+ {
++	for (int UsbIndex = 0; UsbIndex < size; UsbIndex++) { e5_usb_native_putc(str[UsbIndex]); }
+ 	if (disableConsoleOutput) {
+ 		return;
+ 	}
+@@ -749,6 +761,7 @@
+ void
+ console_write_unbuffered(char c)
+ {
++	e5_usb_native_putc(c);
+ 	if (disableConsoleOutput) {
+ 		return;
+ 	}
+--- a/osfmk/kern/printf.c
++++ b/osfmk/kern/printf.c
+@@ -850,6 +850,8 @@
+ #endif /* __x86_64__ */
+ }
+ 
++extern bool e5_usb_native_active(void);
++
+ void
+ conslog_putc(char c)
+ {
+@@ -994,14 +996,14 @@
+ consdebug_putc(char c)
+ {
+ 	{
+-		extern void e5_kputc(char);
+-		e5_kputc(c);
++		extern void e5_ramputc(char);
++		e5_ramputc(c);
+ 	}
+ 	console_write_char(c);
+ 
+ 	debug_putc(c);
+ 
+-	if (!console_is_serial() && !disable_serial_output) {
++	if (!console_is_serial() && !disable_serial_output && !e5_usb_native_active()) {
+ 		PE_kputc(c);
+ 	}
+ }
+@@ -1010,8 +1012,8 @@
+ consdebug_putc_unbuffered(char c)
+ {
+ 	{
+-		extern void e5_kputc(char);
+-		e5_kputc(c);
++		extern void e5_ramputc(char);
++		e5_ramputc(c);
+ 	}
+ 	{
+ 		extern void e5flight_putc(char);
+@@ -1021,7 +1023,7 @@
+ 
+ 	debug_putc(c);
+ 
+-	if (!console_is_serial() && !disable_serial_output) {
++	if (!console_is_serial() && !disable_serial_output && !e5_usb_native_active()) {
+ 		PE_kputc(c);
+ 	}
+ }
+--- a/pexpert/arm/pe_kprintf.c
++++ b/pexpert/arm/pe_kprintf.c
+@@ -63,6 +63,11 @@
+ 	{
+ 		extern void e5_kputc(char c);
+ 		PE_kputc = e5_kputc;
++	}
++	{
++		extern bool e5_usb_native_active(void);
++		extern void e5_kputc(char);
++		if (e5_usb_native_active()) { PE_kputc = e5_kputc; return; }
+ 	}
+ 	if (serial_init()) {
+ 		PE_kputc = serial_putc_crlf;
+--- a/osfmk/kern/debug.c
++++ b/osfmk/kern/debug.c
+@@ -1043,6 +1043,8 @@
+ 		extern void e5_panic_vprint(const char *, va_list);
+ 		e5_panic_print("E5PANIC: ");
+ 		e5_panic_vprint(str, panic_str_args);
++		extern void e5_usb_native_drain(void);
++		e5_usb_native_drain();
+ 		// r247: drain the tee queue to the eMMC journal right here, before
+ 		// the debugger dump - the panic CPU is the only runner and the 5 s
+ 		// journal thread never gets scheduled again. The flush try-locks the
+--- /dev/null
++++ b/osfmk/console/E5UsbCdc.h
+@@ -0,0 +1,69 @@
++// SPDX-License-Identifier: BSD-2-Clause-Patent
++#ifndef E5_USB_CDC_H_
++#define E5_USB_CDC_H_
++#ifdef E5_USB_NATIVE
++#include <stdint.h>
++#include <stdbool.h>
++typedef uint8_t UINT8;
++typedef uint16_t UINT16;
++typedef uint32_t UINT32;
++typedef uint64_t UINT64;
++typedef uintptr_t UINTN;
++typedef bool BOOLEAN;
++typedef char CHAR8;
++typedef int EFI_STATUS;
++#define EFI_SUCCESS 0
++#define EFI_DEVICE_ERROR 7
++#define STATIC static
++#define CONST const
++#define VOID void
++#ifndef TRUE
++#define TRUE true
++#define FALSE false
++#endif
++#else
++#include <Uefi.h>
++#endif
++
++#ifndef E5_USB_PRODUCT
++#define E5_USB_PRODUCT "E5 UEFI log"
++#endif
++#ifndef E5_USB_SERIAL
++#define E5_USB_SERIAL "E5UEFI0001"
++#endif
++
++#define E5_USB_BASE  0x64A00000
++#define E5_USB_PACKET 64
++
++// Kept separate from the DXE lifecycle so the actual EP0 and FIFO code can be
++// exercised with a host-side register model.
++UINT8  E5UsbRead8 (UINTN Register);
++UINT16 E5UsbRead16 (UINTN Register);
++VOID   E5UsbWrite8 (UINTN Register, UINT8 Value);
++VOID   E5UsbWrite16 (UINTN Register, UINT16 Value);
++
++typedef struct {
++  UINT8   Configuration;
++  UINT8   ControlLines;
++  UINT8   Phase;
++  UINT8   Action;
++  UINT16  Value;
++  UINT16  ReplyLength;
++  UINT16  ReplyPosition;
++  BOOLEAN ReplyZlp;
++  UINT8   Reply[128];
++  UINT8   LineCoding[7];
++  BOOLEAN TxPending;
++  BOOLEAN TxCompleted;
++  BOOLEAN Notify;
++  BOOLEAN Suspended;
++  UINT32  Epoch;
++  UINT32  Resets;
++  UINT32  Setups;
++} E5_USB_CDC;
++
++VOID E5UsbCdcInit (E5_USB_CDC *Cdc);
++VOID E5UsbCdcPoll (E5_USB_CDC *Cdc);
++BOOLEAN E5UsbCdcSend (E5_USB_CDC *Cdc, CONST UINT8 *Data, UINTN Length);
++VOID E5UsbCdcDisconnect (VOID);
++#endif
+--- /dev/null
++++ b/osfmk/console/E5UsbCdc.c
+@@ -0,0 +1,414 @@
++// SPDX-License-Identifier: BSD-2-Clause-Patent
++// Polling, full-speed CDC ACM for the E5's Mentor/Unisoc MUSB controller.
++// No DMA, IRQ handler, allocation, waiting for a host, or DebugLib calls.
++#include "E5UsbCdc.h"
++
++#define FADDR       0x00
++#define POWER       0x01
++#define INTRTX      0x02
++#define INTRRX      0x04
++#define INTRTXE     0x06
++#define INTRRXE     0x08
++#define INTRUSB     0x0A
++#define INTRUSBE    0x0B
++#define INDEX       0x0E
++#define TXMAXP      0x10
++#define CSR0        0x12
++#define TXCSR       0x12
++#define RXMAXP      0x14
++#define RXCSR       0x16
++#define RXCOUNT     0x18
++#define E5_USB_FIFO(Ep)    (0x20 + 4 * (Ep))
++#define TXFIFOSZ    0x62
++#define RXFIFOSZ    0x63
++#define TXFIFOADD   0x64
++#define RXFIFOADD   0x66
++
++#define RX_READY    0x01
++#define TX_READY    0x02
++#define SENT_STALL  0x04
++#define DATA_END    0x08
++#define SETUP_END   0x10
++#define SEND_STALL  0x20
++#define ACK_RX      0x40
++#define ACK_SETUP   0x80
++
++enum { Setup, DataIn, LineOut, StatusIn, StatusOut };
++enum { NoAction, Address, Configuration, ControlLines, LineCoding };
++
++STATIC CONST UINT8 mDevice[] = {
++  18, 1, 0, 2, 0xEF, 2, 1, 64, 0x25, 0x05, 0xA7, 0xA4,
++  0, 1, 1, 2, 3, 1
++};
++STATIC CONST UINT8 mConfiguration[] = {
++  9, 2, 75, 0, 2, 1, 0, 0x80, 50,
++  8, 11, 0, 2, 2, 2, 1, 0,
++  9, 4, 0, 0, 1, 2, 2, 1, 0,
++  5, 0x24, 0, 0x10, 1,
++  5, 0x24, 1, 0, 1,
++  4, 0x24, 2, 2,
++  5, 0x24, 6, 0, 1,
++  7, 5, 0x81, 3, 16, 0, 16,
++  9, 4, 1, 0, 2, 0x0A, 0, 0, 0,
++  7, 5, 0x02, 2, 64, 0, 0,
++  7, 5, 0x82, 2, 64, 0, 0
++};
++
++STATIC UINT16
++Le16 (CONST UINT8 *Bytes)
++{
++  return (UINT16)(Bytes[0] | ((UINT16)Bytes[1] << 8));
++}
++
++STATIC VOID
++ReadFifo (UINT8 Ep, UINT8 *Data, UINTN Length)
++{
++  while (Length-- != 0) { *Data++ = E5UsbRead8 (E5_USB_FIFO (Ep)); }
++}
++
++STATIC VOID
++WriteFifo (UINT8 Ep, CONST UINT8 *Data, UINTN Length)
++{
++  while (Length-- != 0) { E5UsbWrite8 (E5_USB_FIFO (Ep), *Data++); }
++}
++
++STATIC VOID
++Endpoints (E5_USB_CDC *Cdc)
++{
++  // E5_USB_FIFO addresses are in units of eight bytes. EP0 owns bytes 0..63.
++  // EP1 IN: 64..79, EP2 IN: 80..143, EP2 OUT: 144..207.
++  E5UsbWrite8 (INDEX, 1);
++  E5UsbWrite8 (TXFIFOSZ, 1);
++  E5UsbWrite16 (TXFIFOADD, 8);
++  E5UsbWrite16 (TXMAXP, 16);
++  E5UsbWrite16 (TXCSR, 0x2048); // TX mode, flush, clear data toggle
++  E5UsbWrite16 (TXCSR, 0x2048);
++  E5UsbWrite8 (INDEX, 2);
++  E5UsbWrite8 (TXFIFOSZ, 3);
++  E5UsbWrite16 (TXFIFOADD, 10);
++  E5UsbWrite8 (RXFIFOSZ, 3);
++  E5UsbWrite16 (RXFIFOADD, 18);
++  E5UsbWrite16 (TXMAXP, E5_USB_PACKET);
++  E5UsbWrite16 (RXMAXP, E5_USB_PACKET);
++  E5UsbWrite16 (TXCSR, 0x2048);
++  E5UsbWrite16 (TXCSR, 0x2048);
++  E5UsbWrite16 (RXCSR, 0x0090); // flush, clear RX toggle, DMA disabled
++  E5UsbWrite16 (RXCSR, 0x0090);
++  Cdc->TxPending = FALSE;
++  Cdc->TxCompleted = FALSE;
++  Cdc->Epoch++;
++  E5UsbWrite8 (INDEX, 0);
++}
++
++STATIC VOID
++Reset (E5_USB_CDC *Cdc)
++{
++  Cdc->Configuration = 0;
++  Cdc->ControlLines = 0;
++  Cdc->Phase = Setup;
++  Cdc->Action = NoAction;
++  Cdc->Notify = FALSE;
++  Cdc->Suspended = FALSE;
++  E5UsbWrite8 (FADDR, 0);
++  Endpoints (Cdc);
++}
++
++VOID
++E5UsbCdcDisconnect (VOID)
++{
++  E5UsbWrite8 (POWER, 0);
++  E5UsbWrite16 (INTRTXE, 0);
++  E5UsbWrite16 (INTRRXE, 0);
++  E5UsbWrite8 (INTRUSBE, 0);
++}
++
++VOID
++E5UsbCdcInit (E5_USB_CDC *Cdc)
++{
++  UINTN Index;
++  for (Index = 0; Index < sizeof (*Cdc); Index++) { ((UINT8 *)Cdc)[Index] = 0; }
++  Cdc->LineCoding[0] = 0x00;
++  Cdc->LineCoding[1] = 0xC2; // 115200, 8N1
++  Cdc->LineCoding[2] = 0x01;
++  Cdc->LineCoding[6] = 8;
++  E5UsbCdcDisconnect ();
++  E5UsbWrite8 (0x0F, 0); // TESTMODE
++  E5UsbWrite8 (0x60, 0); // DEVCTL: peripheral, no host session
++  E5UsbWrite8 (0x34B, (UINT8)(E5UsbRead8 (0x34B) & ~0x41));
++  Reset (Cdc);
++  (VOID)E5UsbRead8 (INTRUSB);
++  (VOID)E5UsbRead16 (INTRTX);
++  (VOID)E5UsbRead16 (INTRRX);
++  // These latch endpoint events. The platform never enables the MUSB GIC SPI;
++  // all status is serviced by polling. High-speed negotiation stays disabled.
++  E5UsbWrite16 (INTRTXE, 7);
++  E5UsbWrite16 (INTRRXE, 4);
++  E5UsbWrite8 (INTRUSBE, 0x27); // suspend, resume, reset, disconnect
++  E5UsbWrite8 (POWER, 0x40);   // SOFTCONN
++}
++
++STATIC VOID
++Stall (E5_USB_CDC *Cdc)
++{
++  E5UsbWrite16 (CSR0, ACK_RX | SEND_STALL);
++  Cdc->Phase = Setup;
++  Cdc->Action = NoAction;
++}
++
++STATIC VOID
++NextReply (E5_USB_CDC *Cdc, UINT16 Ack)
++{
++  UINTN Length = Cdc->ReplyLength - Cdc->ReplyPosition;
++  BOOLEAN Last;
++  if (Length > E5_USB_PACKET) { Length = E5_USB_PACKET; }
++  WriteFifo (0, Cdc->Reply + Cdc->ReplyPosition, Length);
++  Cdc->ReplyPosition += (UINT16)Length;
++  Last = (Cdc->ReplyPosition == Cdc->ReplyLength) &&
++         (!Cdc->ReplyZlp || (Length == 0));
++  Cdc->Phase = Last ? StatusOut : DataIn;
++  E5UsbWrite16 (CSR0, (UINT16)(Ack | TX_READY | (Last ? DATA_END : 0)));
++}
++
++STATIC VOID
++Reply (E5_USB_CDC *Cdc, CONST UINT8 *Data, UINTN Length, UINT16 Requested)
++{
++  UINTN Index;
++  if (Length > Requested) { Length = Requested; }
++  for (Index = 0; Index < Length; Index++) { Cdc->Reply[Index] = Data[Index]; }
++  Cdc->ReplyPosition = 0;
++  Cdc->ReplyLength = (UINT16)Length;
++  Cdc->ReplyZlp = (Length < Requested) && ((Length % E5_USB_PACKET) == 0);
++  // MUSB's EP0 FIFO changes direction only after the SETUP RX packet is
++  // serviced. Writing the reply first leaves it in the RX FIFO on Unisoc.
++  // This is musb_read_setup()'s IN-direction transition in the E5 kernel.
++  E5UsbWrite16 (CSR0, ACK_RX);
++  for (Index = 0; Index < 64; Index++) {
++    if (!(E5UsbRead16 (CSR0) & RX_READY)) { NextReply (Cdc, 0); return; }
++  }
++  Stall (Cdc); // bounded: a broken controller must never stall firmware boot
++}
++
++STATIC BOOLEAN
++EndpointValid (E5_USB_CDC *Cdc, UINT16 Ep)
++{
++  return (Ep == 0) || (Ep == 0x80) ||
++         ((Cdc->Configuration != 0) && ((Ep == 0x81) || (Ep == 2) || (Ep == 0x82)));
++}
++
++STATIC VOID
++SetupPacket (E5_USB_CDC *Cdc)
++{
++  UINT8 Packet[8], Small[2];
++  UINT16 Value, Index, Length;
++  UINTN N;
++  CONST CHAR8 *String;
++
++  Cdc->Setups++;
++  Cdc->Action = NoAction;
++  if (E5UsbRead16 (RXCOUNT) != 8) { Stall (Cdc); return; }
++  ReadFifo (0, Packet, 8);
++  Value = Le16 (Packet + 2);
++  Index = Le16 (Packet + 4);
++  Length = Le16 (Packet + 6);
++  if ((Packet[0] == 0x80) && (Packet[1] == 6) && (Length != 0)) {
++    if ((Value == 0x0100) && (Index == 0)) {
++      Reply (Cdc, mDevice, sizeof (mDevice), Length); return;
++    }
++    if ((Value == 0x0200) && (Index == 0)) {
++      Reply (Cdc, mConfiguration, sizeof (mConfiguration), Length); return;
++    }
++    if (Value == 0x0300 && Index == 0) {
++      CONST UINT8 Language[] = {4, 3, 9, 4};
++      Reply (Cdc, Language, sizeof (Language), Length); return;
++    }
++    if (((Value >> 8) == 3) && (Index == 0x0409)) {
++      switch (Value & 0xFF) {
++        case 1: String = "e5-xnu"; break;
++        case 2: String = E5_USB_PRODUCT; break;
++        case 3: String = E5_USB_SERIAL; break;
++        default: Stall (Cdc); return;
++      }
++      for (N = 0; String[N] != 0; N++) {
++        Cdc->Reply[2 + 2 * N] = (UINT8)String[N];
++        Cdc->Reply[3 + 2 * N] = 0;
++      }
++      Cdc->Reply[0] = (UINT8)(2 + 2 * N); Cdc->Reply[1] = 3;
++      Reply (Cdc, Cdc->Reply, 2 + 2 * N, Length); return;
++    }
++  } else if ((Packet[1] == 0) && (Value == 0) && (Length == 2)) {
++    // GET_STATUS: device, configured interface, or a valid endpoint.
++    Small[0] = Small[1] = 0;
++    if ((Packet[0] == 0x80) && (Index == 0)) {
++      Reply (Cdc, Small, 2, Length); return;
++    }
++    if ((Packet[0] == 0x81) && Cdc->Configuration && (Index < 2)) {
++      Reply (Cdc, Small, 2, Length); return;
++    }
++    if ((Packet[0] == 0x82) && EndpointValid (Cdc, Index)) {
++      // No endpoint is deliberately halted by this implementation.
++      Reply (Cdc, Small, 2, Length); return;
++    }
++  } else if ((Packet[0] == 0x80) && (Packet[1] == 8) &&
++             (Value == 0) && (Index == 0) && (Length == 1)) {
++    Reply (Cdc, &Cdc->Configuration, 1, Length); return;
++  } else if ((Packet[0] == 0x81) && (Packet[1] == 10) &&
++             Cdc->Configuration && (Value == 0) && (Index < 2) && (Length == 1)) {
++    Small[0] = 0; Reply (Cdc, Small, 1, Length); return;
++  } else if ((Packet[0] == 0xA1) && (Packet[1] == 0x21) &&
++             Cdc->Configuration && (Value == 0) && (Index == 0) && (Length == 7)) {
++    Reply (Cdc, Cdc->LineCoding, 7, Length); return;
++  } else if ((Packet[0] == 0x21) && Cdc->Configuration && (Index == 0)) {
++    if ((Packet[1] == 0x20) && (Value == 0) && (Length == 7)) {
++      Cdc->Phase = LineOut;
++      E5UsbWrite16 (CSR0, ACK_RX); return;
++    }
++    if ((Packet[1] == 0x22) && (Length == 0) && ((Value & ~3U) == 0)) {
++      Cdc->Action = ControlLines;
++    } else if ((Packet[1] != 0x23) || (Length != 0)) {
++      Stall (Cdc); return;
++    }
++  } else if (Length == 0) {
++    if ((Packet[0] == 0) && (Packet[1] == 5) && (Index == 0) && (Value < 128)) {
++      Cdc->Action = Address;
++    } else if ((Packet[0] == 0) && (Packet[1] == 9) && (Index == 0) && (Value <= 1)) {
++      Cdc->Action = Configuration;
++    } else if ((Packet[0] == 1) && (Packet[1] == 11) &&
++               Cdc->Configuration && (Index < 2) && (Value == 0)) {
++      // Both interfaces have only alternate setting zero.
++    } else if ((Packet[0] == 2) && (Packet[1] == 1) && (Value == 0) &&
++               (Index != 0) && (Index != 0x80) && EndpointValid (Cdc, Index)) {
++      // CLEAR_FEATURE(ENDPOINT_HALT). Cancel unacknowledged data and reset
++      // the selected toggle. The log cursor remains uncommitted for retry.
++      E5UsbWrite8 (INDEX, (UINT8)(Index & 15));
++      if (Index & 0x80) {
++        E5UsbWrite16 (TXCSR, 0x2048); E5UsbWrite16 (TXCSR, 0x2048);
++      } else {
++        E5UsbWrite16 (RXCSR, 0x0090); E5UsbWrite16 (RXCSR, 0x0090);
++      }
++      if (Index == 0x82) {
++        Cdc->TxPending = Cdc->TxCompleted = FALSE; Cdc->Epoch++;
++      }
++      E5UsbWrite8 (INDEX, 0);
++    } else { Stall (Cdc); return; }
++  } else { Stall (Cdc); return; }
++
++  // Any unsupported IN request must stall; it must not fall into the
++  // no-data status path after descriptor / GET_STATUS dispatch.
++  if (Length != 0) { Stall (Cdc); return; }
++  Cdc->Value = Value;
++  Cdc->Phase = StatusIn;
++  E5UsbWrite16 (CSR0, ACK_RX | DATA_END);
++}
++
++VOID
++E5UsbCdcPoll (E5_USB_CDC *Cdc)
++{
++  UINT8 Bus;
++  UINT16 Tx, Csr, Count;
++  UINTN Index;
++  UINT8 Notification[] = {0xA1, 0x20, 0, 0, 0, 0, 2, 0, 3, 0};
++
++  Bus = E5UsbRead8 (INTRUSB); // clear on read
++  Tx = E5UsbRead16 (INTRTX);
++  (VOID)E5UsbRead16 (INTRRX);
++  if (Bus & 0x24) { Cdc->Resets++; Reset (Cdc); return; }
++  if (Bus & 1) { Cdc->Suspended = TRUE; }
++  if (Bus & 2) { Cdc->Suspended = FALSE; }
++  E5UsbWrite8 (INDEX, 0);
++  Csr = E5UsbRead16 (CSR0);
++  if (Csr & SENT_STALL) {
++    E5UsbWrite16 (CSR0, 0); Cdc->Phase = Setup; Cdc->Action = NoAction;
++  }
++  if (Csr & SETUP_END) {
++    E5UsbWrite16 (CSR0, ACK_SETUP);
++    Cdc->Phase = Setup; Cdc->Action = NoAction;
++    Csr = E5UsbRead16 (CSR0);
++  }
++  if ((Cdc->Phase == StatusIn) && (Tx & 1)) {
++    // Address/configuration/control-line changes apply only AFTER the host
++    // acknowledges status. A cancelled setup never commits them.
++    switch (Cdc->Action) {
++      case Address: E5UsbWrite8 (FADDR, (UINT8)Cdc->Value); break;
++      case Configuration:
++        Cdc->Configuration = (UINT8)Cdc->Value;
++        Cdc->ControlLines = 0; Cdc->Notify = FALSE;
++        Endpoints (Cdc); break;
++      case ControlLines:
++        Cdc->ControlLines = (UINT8)Cdc->Value; Cdc->Notify = TRUE; break;
++      case LineCoding:
++        for (Index = 0; Index < 7; Index++) { Cdc->LineCoding[Index] = Cdc->Reply[Index]; }
++        break;
++      default: break;
++    }
++    Cdc->Phase = Setup; Cdc->Action = NoAction;
++  } else if ((Cdc->Phase == StatusOut) && (Tx & 1)) {
++    Cdc->Phase = Setup;
++  } else if ((Cdc->Phase == DataIn) && (Tx & 1) && !(Csr & TX_READY)) {
++    NextReply (Cdc, 0);
++  }
++  if ((Cdc->Phase == LineOut) && (Csr & RX_READY)) {
++    Count = E5UsbRead16 (RXCOUNT);
++    if (Count != 7) { Stall (Cdc); }
++    else {
++      ReadFifo (0, Cdc->Reply, 7);
++      if ((Cdc->Reply[4] > 2) || (Cdc->Reply[5] > 4) ||
++          ((Cdc->Reply[6] != 5) && (Cdc->Reply[6] != 6) &&
++           (Cdc->Reply[6] != 7) && (Cdc->Reply[6] != 8) && (Cdc->Reply[6] != 16))) {
++        Stall (Cdc);
++      } else {
++        Cdc->Action = LineCoding; Cdc->Phase = StatusIn;
++        E5UsbWrite16 (CSR0, ACK_RX | DATA_END);
++      }
++    }
++  } else if ((Cdc->Phase == Setup) && (Csr & RX_READY)) { SetupPacket (Cdc); }
++
++  if (!Cdc->Configuration || Cdc->Suspended) { return; }
++  E5UsbWrite8 (INDEX, 2);
++  Csr = E5UsbRead16 (TXCSR);
++  if (Cdc->TxPending) {
++    if (Csr & 0x20) { // SENTSTALL: never count as delivered
++      E5UsbWrite16 (TXCSR, 0x2048); E5UsbWrite16 (TXCSR, 0x2048);
++      Cdc->TxPending = FALSE; Cdc->Epoch++;
++    } else {
++      // PIO UNDERRUN means the host polled an empty FIFO and received NAK.
++      // It can occur AFTER the queued packet was ACKed; retrying that packet
++      // duplicates console bytes and prevents the final short/ZLP boundary.
++      // Match musb_g_tx(): clear the NAK indication, then account completion.
++      if (Csr & 4) { E5UsbWrite16 (TXCSR, (UINT16)(Csr & ~4U)); }
++      if ((Csr & 3) == 0) {
++        Cdc->TxPending = FALSE; Cdc->TxCompleted = TRUE;
++      }
++    }
++  }
++  // Logging is output-only. Drain host bulk OUT so writes cannot wedge the
++  // ACM port; no reboot or other command is interpreted here.
++  if (E5UsbRead16 (RXCSR) & 1) {
++    Count = E5UsbRead16 (RXCOUNT);
++    if (Count > E5_USB_PACKET) { Count = E5_USB_PACKET; }
++    while (Count-- != 0) { (VOID)E5UsbRead8 (E5_USB_FIFO (2)); }
++    E5UsbWrite16 (RXCSR, 0);
++  }
++  E5UsbWrite8 (INDEX, 1);
++  if (Cdc->Notify && ((E5UsbRead16 (TXCSR) & 3) == 0)) {
++    Notification[8] = (Cdc->ControlLines & 1) ? 3 : 0;
++    WriteFifo (1, Notification, sizeof (Notification));
++    E5UsbWrite16 (TXCSR, 0x2001);
++    Cdc->Notify = FALSE;
++  }
++  E5UsbWrite8 (INDEX, 0);
++}
++
++BOOLEAN
++E5UsbCdcSend (E5_USB_CDC *Cdc, CONST UINT8 *Data, UINTN Length)
++{
++  if (!Cdc->Configuration || !(Cdc->ControlLines & 1) || Cdc->Suspended ||
++      Cdc->TxPending || (Length > E5_USB_PACKET)) { return FALSE; }
++  E5UsbWrite8 (INDEX, 2);
++  if (E5UsbRead16 (TXCSR) & 3) { E5UsbWrite8 (INDEX, 0); return FALSE; }
++  WriteFifo (2, Data, Length);
++  Cdc->TxPending = TRUE;
++  Cdc->TxCompleted = FALSE;
++  E5UsbWrite16 (TXCSR, 0x2001);
++  E5UsbWrite8 (INDEX, 0);
++  return TRUE;
++}
+--- /dev/null
++++ b/osfmk/console/E5UsbPlatform.c
+@@ -0,0 +1,100 @@
++// SPDX-License-Identifier: BSD-2-Clause-Patent
++// Register facts: E5 live-fdt.dts and e5-linux's ums9621 clock, Qogirn6lite
++// PHY, UMP9620 regulator and UMS9620 ADI drivers. Preserve unrelated bits.
++#ifndef E5_USB_NATIVE
++#include <Uefi.h>
++#include <Library/IoLib.h>
++#include <Library/TimerLib.h>
++#endif
++
++#define AON     0x64900000
++#define PMU     0x64910000
++#define ANALOG  0x64300000
++#define ADI     0x64400000
++
++STATIC BOOLEAN
++PmicRead (UINT32 Register, UINT16 *Value)
++{
++  UINTN Attempt;
++  UINT32 Data;
++  MmioWrite32 (ADI + 0x28, Register);
++  for (Attempt = 0; Attempt < 2000; Attempt++) {
++    Data = MmioRead32 (ADI + 0x2C);
++    if ((Data & 0x80000000U) == 0) {
++      // UMS9620/r5p0 ADI has no returned-address check (unlike r2/r3).
++      *Value = (UINT16)Data;
++      return TRUE;
++    }
++    MicroSecondDelay (1);
++  }
++  return FALSE;
++}
++
++STATIC BOOLEAN
++PmicWrite (UINT32 Register, UINT16 Value)
++{
++  UINTN Attempt;
++  UINT16 Verify;
++  for (Attempt = 0; Attempt < 2000; Attempt++) {
++    if ((MmioRead32 (ADI + 0x30) & 0xC00) == 0x400) { break; }
++    MicroSecondDelay (1);
++  }
++  if (Attempt == 2000) { return FALSE; }
++  // 17-bit slave addressing: the virtual write aperture starts at +0x20000.
++  MmioWrite32 (ADI + 0x20000 + Register, Value);
++  for (Attempt = 0; Attempt < 2000; Attempt++) {
++    if ((MmioRead32 (ADI + 0x30) & 0x80000000U) == 0) { break; }
++    MicroSecondDelay (1);
++  }
++  // PWR_WR_PROT contains a read-only protection-status bit as well as the
++  // write key. Verify the actual voltage/power/routing registers below.
++  return (Attempt != 2000) && ((Register == 0x23D0) ||
++         (PmicRead (Register, &Verify) && (Verify == Value)));
++}
++
++STATIC BOOLEAN
++PmicUpdate (UINT32 Register, UINT16 Mask, UINT16 Bits)
++{
++  UINT16 Value;
++  if (!PmicRead (Register, &Value)) { return FALSE; }
++  if ((Value & Mask) == Bits) { return TRUE; }
++  return PmicWrite (Register, (UINT16)((Value & ~Mask) | Bits));
++}
++
++EFI_STATUS
++E5UsbPlatformInit (VOID)
++{
++  UINTN Channel;
++  // ADI and its clocks are already running: LK uses this PMIC for power and
++  // reset. Do not reconfigure the shared controller or its hardware channels.
++  // The stock DT has no ADI hwspinlock. Each transaction has a bounded wait.
++  if (!PmicWrite (0x23D0, 0x6E7F) ||
++      !PmicUpdate (0x21EC, 0xFF, 0xD2) || // USB33 = stock 3.3 V
++      !PmicUpdate (0x21E8, 1, 0) ||        // USB33 power-down off
++      !PmicUpdate (0x23A0, 0x4001, 0x4001)) { // route DP/DM to USB PHY
++    return EFI_DEVICE_ERROR;
++  }
++  // USB2's reference comes from USB31PLLV, even on this USB2-only board.
++  // The missing force-on bit also broke enumeration during Linux bring-up.
++  MmioOr32 (PMU + 0xA58, 1);
++  MmioOr32 (AON + 0x04, 0x300);   // USB2 top + PHY gates
++  MmioOr32 (AON + 0x138, 0x1400); // OTG + DPHY reference gates
++  MmioAnd32 (AON + 0x350, ~3U);   // PHY PD_L / PD_S
++  MmioAnd32 (ANALOG + 0x1C, ~1U); // analog isolation
++  MmioAnd32 (AON + 0x190, ~0x18U); // AON controller mux, isolation
++  MmioOr32 (AON + 0x204, 0x01000000); // VBUS valid
++  MmioAndThenOr32 (ANALOG + 0x04, ~0xFFFFU, 0x10010000);
++  MmioOr32 (AON + 0x208, 0x40000008); // 16-bit UTMI, peripheral ID
++  MmioOr32 (ANALOG + 0x20, 0x0C); // software controls DP/DM pull-downs
++  MmioAnd32 (ANALOG + 0x0C, ~0x18U); // peripheral: no host pull-downs
++  MmioWrite32 (ANALOG + 0x10, 0x067BD1C0); // E5 DT device eye pattern
++  MmioOr32 (AON + 0x10, 0x300);
++  MicroSecondDelay (20000); // vendor PHY requires 20..30 ms reset
++  MmioAnd32 (AON + 0x10, ~0x300U);
++  MicroSecondDelay (2000);
++  // Quiesce any LK DMA descriptors before we take ownership of the FIFOs.
++  for (Channel = 0; Channel < 30; Channel++) {
++    MmioAnd32 (0x64A01C04 + Channel * 0x20, ~1U);
++  }
++  return EFI_SUCCESS;
++}
+--- /dev/null
++++ b/osfmk/console/e5_usb_console.inc
+@@ -0,0 +1,239 @@
++// SPDX-License-Identifier: BSD-2-Clause-Patent
++// Included by serial_console.c. USB has no dependency on UEFI services.
++#include <pexpert/pexpert.h>
++#include <kern/misc_protos.h>
++#define E5_USB_NATIVE 1
++#define E5_USB_PRODUCT "E5 XNU log"
++#define E5_USB_SERIAL "E5XNU0001"
++#include "E5UsbCdc.h"
++
++void e5_usb_native_putc(char Byte);
++bool e5_usb_native_active(void);
++void e5_usb_native_drain(void);
++EFI_STATUS E5UsbPlatformInit(void);
++
++#define E5_USB_RING_BYTES (1024U * 1024U)
++static UINT8 e5_usb_ring[E5_USB_RING_BYTES];
++static UINT64 e5_usb_written, e5_usb_cursor, e5_usb_pending_cursor;
++static UINT64 e5_usb_dropped, e5_usb_delivered, e5_usb_frequency;
++static UINTN e5_usb_pending_length;
++static volatile UINT32 e5_usb_lock;
++static int e5_usb_phase; // 0: early RAM only, 1: mapped, -1: disabled/failed
++static bool e5_usb_configured, e5_usb_need_zlp, e5_usb_pending_marker;
++static bool e5_usb_overrun;
++static UINT32 e5_usb_epoch;
++static UINT16 e5_usb_tx_csr;
++static E5_USB_CDC e5_usb_cdc;
++static const UINT8 e5_usb_lost[] = "\r\n[XNUUSB: log bytes lost]\r\n";
++
++static struct {
++  UINTN physical, bytes;
++  vm_offset_t virtual;
++} e5_usb_maps[] = {
++  {0x64A00000, 0x2000, 0},
++  {0x64900000, 0x1000, 0},
++  {0x64910000, 0x3000, 0},
++  {0x64300000, 0x1000, 0},
++  {0x64400000, 0x30000, 0},
++};
++
++static UINT64 e5_usb_ticks(void) {
++  UINT64 Value;
++  __asm__ volatile ("mrs %0, cntvct_el0" : "=r"(Value));
++  return Value;
++}
++
++static UINTN e5_usb_address(UINTN Address) {
++  for (UINTN I = 0; I < sizeof(e5_usb_maps) / sizeof(e5_usb_maps[0]); I++) {
++    if (Address >= e5_usb_maps[I].physical &&
++        Address - e5_usb_maps[I].physical < e5_usb_maps[I].bytes) {
++      return e5_usb_maps[I].virtual + Address - e5_usb_maps[I].physical;
++    }
++  }
++  __builtin_trap(); // programming error; never access an unowned MMIO address
++}
++static UINT8 MmioRead8(UINTN Address) { return *(volatile UINT8 *)e5_usb_address(Address); }
++static UINT16 MmioRead16(UINTN Address) { return *(volatile UINT16 *)e5_usb_address(Address); }
++static UINT32 MmioRead32(UINTN Address) { return *(volatile UINT32 *)e5_usb_address(Address); }
++static void MmioWrite8(UINTN Address, UINT8 Value) { *(volatile UINT8 *)e5_usb_address(Address) = Value; }
++static void MmioWrite16(UINTN Address, UINT16 Value) { *(volatile UINT16 *)e5_usb_address(Address) = Value; }
++static void MmioWrite32(UINTN Address, UINT32 Value) { *(volatile UINT32 *)e5_usb_address(Address) = Value; }
++static void MmioOr32(UINTN Address, UINT32 Value) { MmioWrite32(Address, MmioRead32(Address) | Value); }
++static void MmioAnd32(UINTN Address, UINT32 Value) { MmioWrite32(Address, MmioRead32(Address) & Value); }
++static void MmioAndThenOr32(UINTN Address, UINT32 Mask, UINT32 Value) {
++  MmioWrite32(Address, (MmioRead32(Address) & Mask) | Value);
++}
++static void MicroSecondDelay(UINTN Microseconds) {
++  UINT64 Start = e5_usb_ticks();
++  UINT64 Delta = (e5_usb_frequency * Microseconds + 999999) / 1000000;
++  while (e5_usb_ticks() - Start < Delta) { __asm__ volatile ("yield"); }
++}
++UINT8 E5UsbRead8(UINTN Register) { return MmioRead8(E5_USB_BASE + Register); }
++UINT16 E5UsbRead16(UINTN Register) { return MmioRead16(E5_USB_BASE + Register); }
++void E5UsbWrite8(UINTN Register, UINT8 Value) { MmioWrite8(E5_USB_BASE + Register, Value); }
++void E5UsbWrite16(UINTN Register, UINT16 Value) { MmioWrite16(E5_USB_BASE + Register, Value); }
++
++// Exported with this patch from e5-xnu's host-tested firmware core. The device
++// repository has standalone copies; sync-e5-usb-kernel.py checks their hashes.
++#include "E5UsbCdc.c"
++#include "E5UsbPlatform.c"
++
++static void e5_usb_append(UINT8 Byte) {
++  e5_usb_ring[e5_usb_written++ & (E5_USB_RING_BYTES - 1)] = Byte;
++}
++
++static void e5_usb_service_locked(void) {
++  UINT8 Packet[E5_USB_PACKET];
++  UINTN Length;
++  UINT64 Oldest;
++  E5UsbCdcPoll(&e5_usb_cdc);
++  Oldest = e5_usb_written > E5_USB_RING_BYTES ? e5_usb_written - E5_USB_RING_BYTES : 0;
++  if (!e5_usb_cdc.Configuration) {
++    e5_usb_configured = false; e5_usb_need_zlp = false;
++    e5_usb_pending_length = 0;
++    return;
++  }
++  if (!e5_usb_configured) {
++    e5_usb_cursor = Oldest; e5_usb_configured = true; e5_usb_overrun = Oldest != 0;
++  }
++  if (e5_usb_epoch != e5_usb_cdc.Epoch) {
++    e5_usb_pending_length = 0; e5_usb_pending_marker = false;
++    e5_usb_epoch = e5_usb_cdc.Epoch;
++  }
++  if (e5_usb_cdc.TxCompleted) {
++    if (e5_usb_pending_marker) {
++      e5_usb_overrun = false; e5_usb_pending_marker = false;
++    } else {
++      e5_usb_cursor = e5_usb_pending_cursor + e5_usb_pending_length;
++      e5_usb_delivered += e5_usb_pending_length;
++      e5_usb_need_zlp = e5_usb_pending_length == E5_USB_PACKET;
++    }
++    e5_usb_cdc.TxCompleted = false;
++    e5_usb_pending_length = 0;
++  }
++  if (e5_usb_cdc.TxPending) { return; }
++  if (e5_usb_cursor < Oldest) {
++    e5_usb_dropped += Oldest - e5_usb_cursor;
++    e5_usb_cursor = Oldest; e5_usb_overrun = true;
++  }
++  if (e5_usb_overrun) {
++    if (E5UsbCdcSend(&e5_usb_cdc, e5_usb_lost, sizeof(e5_usb_lost) - 1)) {
++      e5_usb_pending_marker = true;
++    }
++    return;
++  }
++  Length = (UINTN)(e5_usb_written - e5_usb_cursor);
++  if (Length > sizeof(Packet)) { Length = sizeof(Packet); }
++  if (Length || e5_usb_need_zlp) {
++    for (UINTN I = 0; I < Length; I++) {
++      Packet[I] = e5_usb_ring[(e5_usb_cursor + I) & (E5_USB_RING_BYTES - 1)];
++    }
++    if (E5UsbCdcSend(&e5_usb_cdc, Packet, Length)) {
++      e5_usb_pending_cursor = e5_usb_cursor; e5_usb_pending_length = Length;
++    }
++  }
++}
++
++static void e5_usb_native_early_init(void) {
++  e5_usb_phase = 0; e5_usb_written = 0;
++}
++
++void e5_usb_native_putc(char Byte) {
++  boolean_t Interrupts;
++  if (e5_usb_phase < 0) { return; }
++  // Before arm_vm_init no exclusive/atomic operations or MMIO are allowed.
++  if (e5_usb_phase == 0) { e5_usb_append((UINT8)Byte); return; }
++  Interrupts = ml_set_interrupts_enabled(FALSE);
++  if (__atomic_exchange_n(&e5_usb_lock, 1, __ATOMIC_ACQUIRE)) {
++    __atomic_fetch_add(&e5_usb_dropped, 1, __ATOMIC_RELAXED);
++    ml_set_interrupts_enabled(Interrupts);
++    return;
++  }
++  e5_usb_append((UINT8)Byte);
++  // Service enumeration before the scheduler/worker exists. One bounded pass
++  // only: an absent/slow host cannot block a console producer.
++  if (Byte == '\n' || !(e5_usb_written & 15)) { e5_usb_service_locked(); }
++  __atomic_store_n(&e5_usb_lock, 0, __ATOMIC_RELEASE);
++  ml_set_interrupts_enabled(Interrupts);
++}
++
++bool e5_usb_native_active(void) { return e5_usb_phase == 1; }
++
++static void e5_usb_native_map(void) {
++  int Enabled = 0;
++  extern void e5_trace_tag(const char *);
++  if (!PE_parse_boot_argn("e5-usb", &Enabled, sizeof(Enabled)) || !Enabled) {
++    e5_usb_phase = -1; return;
++  }
++  __asm__ volatile ("mrs %0, cntfrq_el0" : "=r"(e5_usb_frequency));
++  if (!e5_usb_frequency) { e5_usb_phase = -1; return; }
++  for (UINTN I = 0; I < sizeof(e5_usb_maps) / sizeof(e5_usb_maps[0]); I++) {
++    e5_usb_maps[I].virtual = ml_io_map(e5_usb_maps[I].physical, e5_usb_maps[I].bytes);
++    if (!e5_usb_maps[I].virtual) {
++      e5_usb_phase = -1; e5_trace_tag("XNUUSB: MMIO map failed\n"); return;
++    }
++  }
++  if (E5UsbPlatformInit() != EFI_SUCCESS) {
++    e5_usb_phase = -1; e5_trace_tag("XNUUSB: PMIC/PHY init failed\n"); return;
++  }
++  E5UsbCdcInit(&e5_usb_cdc);
++  __atomic_store_n(&e5_usb_phase, 1, __ATOMIC_RELEASE);
++  e5_trace_tag("XNUUSB: native MUSB CDC initialized, replaying early kernel log\n");
++}
++
++static void e5_usb_native_poll(void) {
++  boolean_t Interrupts;
++  if (e5_usb_phase != 1) { return; }
++  Interrupts = ml_set_interrupts_enabled(FALSE);
++  if (!__atomic_exchange_n(&e5_usb_lock, 1, __ATOMIC_ACQUIRE)) {
++    e5_usb_service_locked();
++    E5UsbWrite8(0x0E, 2);
++    e5_usb_tx_csr = E5UsbRead16(0x12);
++    E5UsbWrite8(0x0E, 0);
++    __atomic_store_n(&e5_usb_lock, 0, __ATOMIC_RELEASE);
++  }
++  ml_set_interrupts_enabled(Interrupts);
++}
++
++void e5_usb_native_drain(void) {
++  UINT64 Start;
++  if (e5_usb_phase != 1) { return; }
++  Start = e5_usb_ticks();
++  while (e5_usb_ticks() - Start < e5_usb_frequency / 4) { e5_usb_native_poll(); }
++}
++
++static __attribute__((noreturn)) void e5_usb_worker(void *Argument, wait_result_t Result) {
++  UINT64 Last = e5_usb_ticks();
++  (void)Argument; (void)Result;
++  for (;;) {
++    e5_usb_native_poll();
++    if (e5_usb_ticks() - Last >= e5_usb_frequency * 5) {
++      char Status[256];
++      extern void e5_trace_tag(const char *);
++      Last = e5_usb_ticks();
++      snprintf(Status, sizeof(Status), "XNUUSB: heartbeat written=%llu sent=%llu dropped=%llu cfg=%u dtr=%u suspend=%u phase=%u pending=%u tx=%x reset=%u setup=%u\n",
++               (unsigned long long)e5_usb_written, (unsigned long long)e5_usb_delivered,
++               (unsigned long long)e5_usb_dropped, e5_usb_cdc.Configuration,
++               e5_usb_cdc.ControlLines, e5_usb_cdc.Suspended, e5_usb_cdc.Phase,
++               e5_usb_cdc.TxPending, e5_usb_tx_csr, e5_usb_cdc.Resets, e5_usb_cdc.Setups);
++      // Keep transport state observable through the independent RAM/eMMC tee
++      // even when the USB path being diagnosed has stopped delivering bytes.
++      e5_trace_tag(Status);
++    }
++    assert_wait_timeout((event_t)&e5_usb_cdc, THREAD_UNINT, 1, 1000000);
++    thread_block(THREAD_CONTINUE_NULL);
++  }
++}
++
++static void e5_usb_start_worker(const void *Argument) {
++  thread_t Thread;
++  extern void e5_trace_tag(const char *);
++  (void)Argument;
++  if (e5_usb_phase != 1) { return; }
++  if (kernel_thread_start(e5_usb_worker, NULL, &Thread) == KERN_SUCCESS) {
++    thread_set_thread_name(Thread, "e5_usb_log");
++    thread_deallocate(Thread);
++    e5_trace_tag("XNUUSB: background polling thread started\n");
++  } else { e5_trace_tag("XNUUSB: background thread failed\n"); }
++}
++STARTUP_ARG(THREAD_CALL, STARTUP_RANK_LAST, e5_usb_start_worker, NULL);

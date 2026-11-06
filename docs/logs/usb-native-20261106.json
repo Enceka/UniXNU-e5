@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-06",
+  "result": "PASS",
+  "device": "Rongyue E5 / UMS9621",
+  "host": "macOS CDC ACM",
+  "trial_id": 2026110617,
+  "kernel_sha256": "185e737660b217a5a9e01f68dfcf56ed3855acc233e10a90bb36c4178524f87c",
+  "firmware_sha256": "d260398192dc4914301e62423beef16716425aa0ac5e44b39bf9bb1e196129e3",
+  "payload_sha256": "7ca7d16910d0190216dd1c3cb5544bc6f0ca9b7b6b270a4cced9bf67827c9aa5",
+  "payload_bytes": 62926860,
+  "usb": {
+    "vid": "0525",
+    "pid": "a4a7",
+    "firmware_product": "E5 UEFI log",
+    "kernel_product": "E5 XNU log"
+  },
+  "capture": {
+    "firmware_bytes": 76344,
+    "native_initial_bytes": 34066,
+    "native_reopened_bytes": 97397,
+    "native_total_bytes": 131463,
+    "darwin_banner_count": 1,
+    "early_markers": true,
+    "bsd_root": true,
+    "background_heartbeats": 25,
+    "all_heartbeats_dropped_zero": true,
+    "all_heartbeats_sent_equals_written": true,
+    "firmware_serial_log_sha256": "aa333379c7fa226e37e416387e796cae4e920d3c9f7c058b8626099ad5682bb9",
+    "initial_kernel_log_sha256": "2be4ba592c1f9bd7f614ad5211587d3f6bb4269a1b170b73b06d298ee9cec787",
+    "reopened_kernel_log_sha256": "d976ab7fe37fca0a25724c977e38802133aa8b1abe307205664731a7d0578a4b",
+    "directory": "uefi/build/usb-native-20261106/accepted"
+  },
+  "recovery": {
+    "slot": "_a",
+    "android_boot_completed": "1",
+    "boot_id": "ab4218e5-a310-4d38-9330-d1741554891d",
+    "cycle_success": true,
+    "payload_sha256_after_boot": "7ca7d16910d0190216dd1c3cb5544bc6f0ca9b7b6b270a4cced9bf67827c9aa5",
+    "last_mib_sha256_after_boot": "a581e69a917987adecd2653b304fcc0d1c30c763d1fcac0a12118de31fe4b6e4",
+    "last_mib_matches_before": true
+  },
+  "source": {
+    "unixnu": "066c8d8315f83749d28bcae2faf3595718646be5",
+    "xnu": "d8b80295118ef25ac3a784134bcf95cd8e88109f",
+    "version": "10063.141.1 / Darwin 23.6.0 / 21H461"
+  },
+  "validation": {
+    "host_tests": 11,
+    "actual_cdc_platform_dxe_asan_ubsan": true,
+    "xnu_source_compile_link_prelink": true,
+    "flash_sha256_before_reboot": true
+  },
+  "limits": [
+    "Hardware host was macOS; Linux hardware capture was not tested.",
+    "Reopen testing closes/reopens the serial reader; no physical cable unplug was required.",
+    "Kernel failure before native MMIO mapping cannot deliver its early buffer over USB.",
+    "Panic drain and cold-power-loss behavior were not separately forced."
+  ]
+}

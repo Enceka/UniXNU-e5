@@ -40,7 +40,7 @@
 ["payload"]
 "title" = "Boot E5"
 "dram_size" = "0x80000000"
-"kernel_args" = ["-v", "serial=3"]
+"kernel_args" = ["-v", "serial=3", "e5-usb=1"]
 
 [payload.adt]
 owned_memory_size = "0x20000000"

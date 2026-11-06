@@ -831,3 +831,23 @@ reference = "docs/logs/emmc-boot-journal-r242.json"
 revision = "9fe0c1200aaaaca75e3d868afb057f844a165cec"
 command = "Rebuild the pinned kernel; verify independent FAT kernel extraction and full boot_b readback; boot journal trials with B_TRIES=2 and watchdog intervals 120s/60s; harvest and decode the raw journal; compare complete before/after partitions and the previous boot slot."
 result = "PASS: Android A returns in 185s and 125s. Both journal generations decode with 86 and 73 records, zero reported loss, invalid records or gaps; the previous 256 KiB slot is byte-identical. All boot_b bytes outside the journal and the primary GPT are unchanged. CACHE_CTRL=0; cold power loss, interrupted writes and full rotation are not qualified."
+
+
+[[area]]
+id = "usb-console"
+status = "device-verified"
+components = []
+paths = ["patches/xnu/e5-usb-console.patch", "scripts/usb/**", "docs/usb-console.md"]
+inputs = ["E5 vendor FDT, e5-linux Qogirn6lite PHY/MUSB/UMP9620 ADI definitions, XNU 10063.141.1 patched baseline."]
+configuration = ["Board payload defaults to e5-usb=1; native full-speed polling CDC ACM at physical 0x64a00000, product E5 XNU log, VID:PID 0525:a4a7.", "Independent 1 MiB kernel log history and 1 ms worker. No EFI callbacks, descriptors or memory pointers are retained after handoff."]
+procedure = ["Export the identical shared CDC/PHY implementation with e5-xnu/tools/sync-e5-usb-kernel.py against the prepared preceding patch series.", "Rebuild the pinned source kernel and prelink, pack a bounded B-slot trial, verify flash readback and collect firmware/native USB plus Android recovery through e5-uefi-cycle.sh."]
+findings = ["The native transport buffers early console bytes before arm_vm_init, then maps its own MMIO and reinitializes controller/PHY. Console producers use a nonblocking lock after VM initialization; USB completion advances the delivery cursor. A startup worker keeps enumeration and idle output alive.", "Trial 2026110617 qualifies native CDC after firmware handoff on macOS: 76,344 firmware bytes, 34,066 initial kernel bytes and 97,397 kernel bytes after closing/reopening the reader. The kernel stream includes early E5 markers, Darwin 23.6.0, VM startup and BSD root disk4s1. All 25 sampled heartbeats report sent==written and dropped=0.", "EP0 IN replies must release SETUP RX ownership before filling TX. PIO UNDERRUN is an empty-FIFO NAK, including after a packet ACK; treating it as failure duplicated 64-byte packets. Both transports share the corrected implementation. Normal printf/vprintf is captured at common console_write/unbuffered entries before panel/UART policy."]
+completion = ["Native CDC ACM enumerates after ExitBootServices, captures kernel startup and idle heartbeat, survives a reconnect, and the bounded trial returns to Android A."]
+limits = ["Hardware capture used macOS; Linux discovery/reader coverage is host-fixture only. The reconnect test closes/reopens the serial reader, without physical unplugging.", "A kernel failure before native MMIO mapping cannot deliver its early buffer over USB; panic drain and cold power loss were not separately forced."]
+next_action = ["Retain the verified USB kernel/payload as a bring-up baseline; separately qualify physical unplug/replug, Linux hardware capture and panic-context delivery."]
+
+[[area.evidence]]
+kind = "device"
+reference = "docs/logs/usb-native-20261106.json"
+command = "Build the pinned source kernel and prelink; pack with e5-usb=1, trial ID 2026110617 and 120 s watchdog; verify boot_b payload SHA-256; run e5-uefi-cycle.sh with B_TRIES=2 and capture/reopen both CDC products."
+result = "PASS: kernel 185e737660b217a5a9e01f68dfcf56ed3855acc233e10a90bb36c4178524f87c, payload 7ca7d16910d0190216dd1c3cb5544bc6f0ca9b7b6b270a4cced9bf67827c9aa5. Source compile/link/prelink and 11 host tests pass. Native USB bytes and zero-drop heartbeats are captured. Fresh Android A recovers with sys.boot_completed=1; payload hash and protected final boot_b MiB match readback."

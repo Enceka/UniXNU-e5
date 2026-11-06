@@ -23,3 +23,4 @@ e5-crash-reason.patch
 e5-display-mode-crash.patch
 e5-display-mode-keep.patch
 e5-display-submit-trace.patch
+e5-usb-console.patch
