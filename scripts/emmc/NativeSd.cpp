@@ -130,6 +130,15 @@ class NativeSd : public IOBlockStorageDevice {
   const char *mode = "none";
   uint32_t calls = 0;
   uint32_t bigReads = 0;
+  // r253: read verify-retry. The r252 forensics proved the SD card has
+  // marginal cells that flip single bits per READ (not stuck-wrong: full
+  // Android readback == source twice). APFS surfaces one flipped bit as a
+  // file-integrity retval 94 that kills launchd; the only workable fix at
+  // this layer is detecting instability where the bytes enter the system:
+  // re-read every chunk and deliver only a chunk two consecutive reads
+  // agree on (up to 3 reads; the last read wins if never stable).
+  unsigned long long unstableReads = 0, verifiedChunks = 0;
+  uint8_t readShadow[8192] __attribute__((aligned(8)));
 
   uint8_t r8(uint32_t o) const { return host.bytes[o]; }
   uint16_t r16(uint32_t o) const { return *(volatile uint16_t *)(host.bytes + o); }
@@ -987,9 +996,34 @@ public:
       bool ok;
       if (n > 1) {
         ok = readSectors((uint32_t)(block + done / 512), n);
+        // r253: verify-retry - deliver only media-stable bytes (see the
+        // readShadow declaration for why). Two reads must agree; one more
+        // try for a stable pair; the final read wins otherwise.
+        if (ok) {
+          verifiedChunks++;
+          for (int round = 0; round < 2; ++round) {
+            memcpy(readShadow, buffer, (size_t)n * 512);
+            if (!readSectors((uint32_t)(block + done / 512), n)) { ok = false; break; }
+            if (memcmp(readShadow, buffer, (size_t)n * 512) == 0) break;
+            unstableReads++;
+            sdlog("NativeSd: rv unstable lla %u n %u round %d\n",
+                  (uint32_t)(block + done / 512), n, round);
+          }
+        }
         if (ok && data->writeBytes(done, buffer, n * 512) != n * 512) { wbShort = done; ok = false; }
       } else {
         ok = readSector((uint32_t)(block + done / 512));
+        if (ok) {
+          verifiedChunks++;
+          for (int round = 0; round < 2; ++round) {
+            memcpy(readShadow, buffer, 512);
+            if (!readSector((uint32_t)(block + done / 512))) { ok = false; break; }
+            if (memcmp(readShadow, buffer, 512) == 0) break;
+            unstableReads++;
+            sdlog("NativeSd: rv unstable lba %u n 1 round %d\n",
+                  (uint32_t)(block + done / 512), round);
+          }
+        }
         if (ok && data->writeBytes(done, buffer, 512) != 512) { wbShort = done; ok = false; }
       }
       if (!ok) break;
@@ -1026,7 +1060,7 @@ public:
       // Print 1-in-64 ticks; the E5TW ring keeps the fast history regardless.
       static unsigned sEchoThrottle = 0;
       if (e5_quiet == 0 && (++sEchoThrottle & 0x3Fu) == 0u)
-      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d M=%u:%08x:%08x RD=%llu:%llu WR=%llu:%llu:%llu\n",
+      sdlog("NativeSd: rw done #%u %llu/%llu at %llu d=%d c=%d m=%d k=%x l=%x a=%d o=%u u=%u:%u:%u:%x g=%u:%x h=%x:%x v=%x s=%x r=%x p=%s x=%08x q=%s t=%d:%x B=%u.%x.%u.%x C=%u:%x D=%u:%u F=%u:%08x P=%u:%u:%u Q=%u:%u W=%u:%x:%x G=%d M=%u:%08x:%08x RD=%llu:%llu WR=%llu:%llu:%llu RV=%llu:%llu\n",
             bigReads, (unsigned long long)(done / 512), (unsigned long long)count,
             (unsigned long long)block, e5_data_mount_state,
             __atomic_load_n(&e5_display_census, __ATOMIC_RELAXED),
@@ -1073,7 +1107,8 @@ public:
             __atomic_load_n(&e5_sd_rd_ops, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_sd_wr_blocks, __ATOMIC_RELAXED),
             __atomic_load_n(&e5_sd_wr_ops, __ATOMIC_RELAXED),
-            __atomic_load_n(&e5_sd_wr_bad, __ATOMIC_RELAXED));
+            __atomic_load_n(&e5_sd_wr_bad, __ATOMIC_RELAXED),
+            verifiedChunks, unstableReads);
     }
     IOLockUnlock(lock);
     completion->action(completion->target, completion->parameter,
