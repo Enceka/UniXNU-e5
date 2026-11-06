@@ -202,6 +202,12 @@ index e9daeed..2cfd86d 100644
 +		extern void e5_panic_vprint(const char *, va_list);
 +		e5_panic_print("E5PANIC: ");
 +		e5_panic_vprint(str, panic_str_args);
++		// r247: drain the tee queue to the eMMC journal right here, before
++		// the debugger dump - the panic CPU is the only runner and the 5 s
++		// journal thread never gets scheduled again. The flush try-locks the
++		// host and gives up if a stopped CPU still owns it.
++		extern void e5_journal_flush_panic(void);
++		e5_journal_flush_panic();
 +	}
  	panic_trap_to_debugger(str, &panic_str_args, 0, NULL, 0, NULL, (unsigned long)(char *)__builtin_return_address(0));
  	va_end(panic_str_args);

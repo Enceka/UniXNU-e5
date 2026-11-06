@@ -68,6 +68,7 @@
 // Kernel printf does not reach the ram tee from IOKit context; the tee
 // printer e5_panic_print() (e5-ram-console-tee.patch) does.
 extern "C" void e5_panic_print(const char *s);
+static NativeEmmc *sJournalHost = nullptr;
 
 static void elog(const char *fmt, ...) {
   char buf[192];
@@ -387,6 +388,7 @@ class NativeEmmc : public IOBlockStorageDevice {
       cardUp = false; logWindowReady = false; return false;
     }
     logActive = true;
+    sJournalHost = this; // r247: the panic flush needs the running journal host
     uint64_t deadline = 0; clock_interval_to_deadline(1, NSEC_PER_SEC, &deadline);
     thread_call_enter_delayed(logCall, deadline);
     return true;
@@ -397,9 +399,35 @@ class NativeEmmc : public IOBlockStorageDevice {
     if (!host || !host->logActive) return;
     host->flushJournal();
     if (host->logActive) {
-      uint64_t deadline = 0; clock_interval_to_deadline(5, NSEC_PER_SEC, &deadline);
+      // r247: 2 s cadence (was 5) - short pre-panic windows keep more context.
+      uint64_t deadline = 0; clock_interval_to_deadline(2, NSEC_PER_SEC, &deadline);
       thread_call_enter_delayed(host->logCall, deadline);
     }
+  }
+
+  // r247: called from the panic path (e5-ram-console-tee patch) after the
+  // panic reason is teed. The panic CPU is the only runner; a plain
+  // IOLockLock could spin forever if a stopped CPU died holding ioLock, so
+  // try-lock once and give up - a partial flush still beats none.
+  void flushJournalPanic() {
+    if (!logActive || !ioLock) return;
+    if (!cardUp || !logWindowReady) {
+      e5_panic_print("E5JRN: panic flush skipped (journal down)\n");
+      return;
+    }
+    logPanicMode = true;
+    flushJournal();
+    logPanicMode = false;
+    e5_panic_print("E5JRN: panic flush done\n");
+  }
+
+  // r247: in panic mode every host lock is a try-lock - a stopped CPU may
+  // have died holding ioLock and the panic CPU must never spin on it.
+  bool logPanicMode = false;
+  bool lockIo() {
+    if (logPanicMode) return IOLockTryLock(ioLock);
+    IOLockLock(ioLock);
+    return true;
   }
 
   void flushJournal() {
@@ -414,7 +442,7 @@ class NativeEmmc : public IOBlockStorageDevice {
       uint64_t seq = logSeq + 1;
       // Sectors 1..71 retain early output; 72..511 roll within this boot.
       uint32_t offset = seq < 72 ? (uint32_t)seq : 72 + (uint32_t)((seq - 72) % 440);
-      IOLockLock(ioLock);
+      if (!lockIo()) { ok = false; break; }
       if (!cardUp) { IOLockUnlock(ioLock); ok = false; break; }
       record(dmaD8, logNonce, logGeneration, seq, logUptime(), stream, 2,
              lost + __atomic_load_n(&bootLogDropped, __ATOMIC_RELAXED), bytes, n);
@@ -427,21 +455,24 @@ class NativeEmmc : public IOBlockStorageDevice {
     if (ok && !written) {
       uint64_t seq = logSeq + 1;
       uint32_t offset = seq < 72 ? (uint32_t)seq : 72 + (uint32_t)((seq - 72) % 440);
-      IOLockLock(ioLock);
-      if (cardUp) {
-        record(dmaD8, logNonce, logGeneration, seq, logUptime(), cursor, 4,
-               lost + __atomic_load_n(&bootLogDropped, __ATOMIC_RELAXED), nullptr, 0);
-        ok = writeLogSector(logSlot * slotSectors + offset);
-      } else ok = false;
-      if (!ok) { cardUp = false; logWindowReady = false; }
-      IOLockUnlock(ioLock);
+      ok = lockIo();
+      if (ok) {
+        if (cardUp) {
+          record(dmaD8, logNonce, logGeneration, seq, logUptime(), cursor, 4,
+                 lost + __atomic_load_n(&bootLogDropped, __ATOMIC_RELAXED), nullptr, 0);
+          ok = writeLogSector(logSlot * slotSectors + offset);
+        } else ok = false;
+        if (!ok) { cardUp = false; logWindowReady = false; }
+        IOLockUnlock(ioLock);
+      }
       if (ok) { logSeq = seq; ++written; }
     }
     if (ok && written) {
-      IOLockLock(ioLock);
-      ok = cardUp && flushLogCache();
-      if (!ok) { cardUp = false; logWindowReady = false; }
-      IOLockUnlock(ioLock);
+      if (lockIo()) {
+        ok = cardUp && flushLogCache();
+        if (!ok) { cardUp = false; logWindowReady = false; }
+        IOLockUnlock(ioLock);
+      } else ok = false;
     }
     if (ok) { logCursor = cursor; logOverrun = lost; }
     else { logActive = false; elog("NativeEmmc: journal stopped st %08x r1 %08x\n", logLastStatus, logLastR1); }
@@ -750,6 +781,11 @@ public:
   }
 };
 OSDefineMetaClassAndStructors(NativeEmmc, IOBlockStorageDevice)
+
+// r247: panic-path entry from e5-ram-console-tee (class complete here).
+extern "C" void e5_journal_flush_panic(void) {
+  if (sJournalHost) sJournalHost->flushJournalPanic();
+}
 NativeEmmc *NativeEmmc::s_host = nullptr;
 
 bool NativeEmmc::start(IOService *provider)
