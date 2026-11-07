@@ -1,0 +1,117 @@
+{
+  "round": 277,
+  "source": "uefi/build/sb-r277/r277/capture/kernel.log",
+  "source_sha256": "e0a3a68a76390248ef1fad35d512f7f9ebcd082e28116c08bc495416de93190c",
+  "device_commit": "2151edf2c3d0c3810551e911cecb2ae576603655",
+  "payload_sha256": "dbfa2f8a34d2f227e4f120a61feffffdc469e299456e0042d93ca46e26711fd0",
+  "owned_bytes": 671088640,
+  "markers": {
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "load code signature error": 0,
+    "panic(cpu": 0,
+    "E5OBS uptime_ms": 19,
+    "E5PANELSNAP": 1
+  },
+  "early_boot": [
+    "com.apple.xpc.launchd|1969-12-31 16:03:08.691501 (boot) <Notice>: Early boot complete. Continuing system boot."
+  ],
+  "result": "640MiB boots through the entire 600-second trial and returns to fresh Android. The late CA probe reaches phase 8: native display enabled, two contexts, timer serial advances, no default-surface or swap submission observed. SpringBoard still waits for LS seeding. Low free pages with wanted=0 are not alone proof of allocation stalls. IPC table is a packed kalloc pointer, so the old raw-pointer IPC probe is invalid.",
+  "first": {
+    "uptime_ms": 43048,
+    "processes": [
+      {
+        "pid": 1,
+        "name": "launchd"
+      }
+    ],
+    "io": {
+      "read_ops": 716,
+      "read_blocks": 230341,
+      "write_ops": 1,
+      "write_blocks": 8,
+      "write_failures": 0,
+      "unstable": 0
+    },
+    "vm_pages": {
+      "free": 136136,
+      "active": 65,
+      "inactive": 66,
+      "wired": 27144,
+      "internal": 0,
+      "external": 454,
+      "wanted": 0
+    }
+  },
+  "last": {
+    "uptime_ms": 627789,
+    "processes": [
+      {
+        "pid": 1,
+        "name": "launchd"
+      },
+      {
+        "pid": 25,
+        "name": "logd"
+      },
+      {
+        "pid": 26,
+        "name": "runningboardd"
+      },
+      {
+        "pid": 27,
+        "name": "SpringBoard"
+      },
+      {
+        "pid": 47,
+        "name": "amfid"
+      },
+      {
+        "pid": 57,
+        "name": "backboardd"
+      },
+      {
+        "pid": 66,
+        "name": "driverkitd"
+      },
+      {
+        "pid": 71,
+        "name": "lockdownd"
+      },
+      {
+        "pid": 87,
+        "name": "notifyd"
+      },
+      {
+        "pid": 98,
+        "name": "chronod"
+      },
+      {
+        "pid": 101,
+        "name": "lsd"
+      },
+      {
+        "pid": 103,
+        "name": "liveactivitiesd"
+      }
+    ],
+    "io": {
+      "read_ops": 241020,
+      "read_blocks": 8317061,
+      "write_ops": 2466,
+      "write_blocks": 295704,
+      "write_failures": 0,
+      "unstable": 0
+    },
+    "vm_pages": {
+      "free": 801,
+      "active": 31347,
+      "inactive": 32059,
+      "wired": 48554,
+      "internal": 704,
+      "external": 66881,
+      "wanted": 0
+    }
+  }
+}
