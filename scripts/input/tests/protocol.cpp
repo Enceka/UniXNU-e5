@@ -90,6 +90,10 @@ int main() {
   assert(report.fingers[1][2]==0xff && report.fingers[1][3]==0x7f && report.fingers[1][4]==0xff && report.fingers[1][5]==0x7f);
   report=touch.report(Frame{});assert(report.count==2 && report.fingers[0][0]==2 && report.fingers[1][0]==2);
   assert(touch.report(Frame{}).count==0); // each vanished ID has one lift
+  Frame firstDown{};firstDown.count=1;firstDown.contacts[0]={0,100,200,true};
+  TouchState ambiguous;ambiguous.report(firstDown);ambiguous.retainPossible(Frame{},firstDown);
+  assert(ambiguous.report(Frame{}).count==1); // ambiguous first-down completion still gets a lift
+  ambiguous.retainPossible(firstDown,Frame{});assert(ambiguous.report(Frame{}).count==1); // failed lift can be retried
   Frame unchanged=frame;packet[11]=0x21;assert(decode(packet,18,frame)==PacketResult::Identifier && frame.count==unchanged.count);
   packet[11]=1;assert(decode(packet,18,frame)==PacketResult::Duplicate);
   packet[11]=0x11;packet[10]=0x41;assert(decode(packet,18,frame)==PacketResult::Coordinate);

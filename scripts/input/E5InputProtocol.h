@@ -109,6 +109,17 @@ struct TouchReport { uint8_t id=3; uint8_t fingers[Contacts][6]={}; uint8_t coun
 static_assert(sizeof(TouchReport)==14,"Two-finger HID report wire length");
 struct TouchState {
   Frame previous{};
+  // A failed completion can be ambiguous. Preserve every possibly-down ID so
+  // a later all-up still sends lifts for both the old and attempted frame.
+  void retainPossible(const Frame &old,const Frame &attempted) {
+    previous=Frame{};
+    for(unsigned id=0;id<Contacts;++id) {
+      const Contact *contact=nullptr;
+      for(unsigned i=0;i<attempted.count;++i)if(attempted.contacts[i].id==id)contact=&attempted.contacts[i];
+      if(!contact)for(unsigned i=0;i<old.count;++i)if(old.contacts[i].id==id)contact=&old.contacts[i];
+      if(contact)previous.contacts[previous.count++]=*contact;
+    }
+  }
   TouchReport report(const Frame &frame) {
     TouchReport result{};
     // One slot per stable hardware ID; absent previous IDs get an explicit lift.

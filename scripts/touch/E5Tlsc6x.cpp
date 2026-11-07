@@ -18,7 +18,9 @@ void note(const char *format,...) {
   for(const char *p=text;*p;++p)e5_kputc(*p);e5_kputc('\n');
 }
 // Board addresses include the parent bus translation, not the FDT unit offset.
-constexpr uint64_t I2cAddress=0x22270000,GateAddress=0x20003000;
+// apahb-gate reg <0 0x3000>: address offset 0, size 0x3000 under
+// syscon@20000000; the size must never be added to the parent address.
+constexpr uint64_t I2cAddress=0x22270000,GateAddress=0x20000000;
 constexpr uint64_t ClockAddress=0x20010000,AonAddress=0x64900000,GpioAddress=0x64170000;
 IOMemoryMap *controller=nullptr,*gateMap=nullptr,*clockMap=nullptr,*aon=nullptr,*gpio=nullptr;
 uint32_t gpioMaskBefore=0,gpioDirectionBefore=0,gpioInputBefore=0;
@@ -154,6 +156,7 @@ extern "C" void e5_touch_stop(void) {
   OSSafeReleaseNULL(aon);OSSafeReleaseNULL(gpio);
   stage=0;mode=0;havePrevious=false;lastCount=0;retryDeadline=0;
 }
+extern "C" bool e5_touch_ready(void) {return mode==3 && stage==2 && good>0;}
 
 extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *context) {
   if(!stage) {
