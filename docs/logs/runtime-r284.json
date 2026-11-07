@@ -1,0 +1,128 @@
+{
+  "round": 284,
+  "device_source_revision": "079a88022f46bff0420ced83e6d43470940442e8",
+  "kernel_sha256": "565d2f5ac1bafbdf44c8056a9b5f8381e88c7e4319f2b36b42f5cfb37223bfd6",
+  "payload_sha256": "19676c4c8bef31b163b1bba584cccb0da3305a62f928d516fb6bece014b627b0",
+  "watchdog_seconds": 720,
+  "source": {
+    "path": "uefi/build/sb-r284/r284/capture/kernel.log",
+    "sha256": "cc30c7df4171e83b73d2d88691584eadf4bd84bf87ee1674a06207f9b592f9cc"
+  },
+  "markers": {
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "load code signature error": 0,
+    "panic(cpu": 0,
+    "E5CPU offer": 17,
+    "E5CPU copied": 17,
+    "E5CPU copy-failed": 0,
+    "E5FRAME begin": 1,
+    "E5FRAME end": 1
+  },
+  "power_transitions": [
+    "E5POWER n=1 skip=1:0 input=0:1 requested=0 powered=1 ret=0",
+    "E5POWER n=2 skip=0:1 input=1:2863311530 requested=1 powered=1 ret=0",
+    "E5POWER n=3 skip=1:0 input=2863311530:1 requested=1 powered=1 ret=0"
+  ],
+  "pm_events": [
+    "E5PM register=0 initialized=1",
+    "E5PM ordinal=1 driver=0xfffffff41d220000 requested=1 powered=1 ret=0"
+  ],
+  "presenter_ready": [
+    "E5CPU ready map=0xfffffff16a4d2400 requested=0 powered=1"
+  ],
+  "first_swap_after_sample_ms": 435187,
+  "first_offer_after_sample_ms": 435187,
+  "last_display_summary": [
+    "E5IMSUM vc=1:46548:46548 d=1:0:e00002bc b=36:36:0 e=36:36:0 over=0"
+  ],
+  "presenter_events": [
+    "E5CPU ready map=0xfffffff16a4d2400 requested=0 powered=1",
+    "E5CPU offer=1 accept=1 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 fmt=42475241 planes=0 masks=80000007:80000006",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 masks=80000007:80000007 reason=0",
+    "E5CPU copied=1 retired=1 failed=0 blank=0",
+    "E5CPU offer=2 accept=2 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 masks=1:1 reason=0",
+    "E5CPU copied=2 retired=2 failed=0 blank=0",
+    "E5CPU offer=3 accept=3 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 masks=1:1 reason=0",
+    "E5CPU copied=3 retired=3 failed=0 blank=0",
+    "E5CPU offer=4 accept=4 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 masks=1:1 reason=0",
+    "E5CPU copied=4 retired=4 failed=0 blank=0",
+    "E5CPU offer=5 accept=5 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 masks=1:1 reason=0",
+    "E5CPU copied=5 retired=5 failed=0 blank=0",
+    "E5CPU offer=6 accept=6 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 masks=1:1 reason=0",
+    "E5CPU copied=6 retired=6 failed=0 blank=0",
+    "E5CPU offer=7 accept=7 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 masks=1:1 reason=0",
+    "E5CPU copied=7 retired=7 failed=0 blank=0",
+    "E5CPU offer=8 accept=8 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 masks=1:1 reason=0",
+    "E5CPU copied=8 retired=8 failed=0 blank=0",
+    "E5CPU offer=9 accept=9 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 masks=1:1 reason=0",
+    "E5CPU copied=9 retired=9 failed=0 blank=0",
+    "E5CPU offer=10 accept=10 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 masks=1:1 reason=0",
+    "E5CPU copied=10 retired=10 failed=0 blank=0",
+    "E5CPU offer=11 accept=11 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 masks=1:1 reason=0",
+    "E5CPU copied=11 retired=11 failed=0 blank=0",
+    "E5CPU offer=12 accept=12 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 masks=1:1 reason=0",
+    "E5CPU copied=12 retired=12 failed=0 blank=0",
+    "E5CPU offer=13 accept=13 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 masks=1:1 reason=0",
+    "E5CPU copied=13 retired=13 failed=0 blank=0",
+    "E5CPU offer=14 accept=14 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 masks=1:1 reason=0",
+    "E5CPU copied=14 retired=14 failed=0 blank=0",
+    "E5CPU offer=15 accept=15 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcbf0 masks=1:1 reason=0",
+    "E5CPU copied=15 retired=15 failed=0 blank=0",
+    "E5CPU offer=16 accept=16 reason=0 req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU pending req=0xfffffff41dc3d000 surface=0xfffffff5038fcfa8 masks=1:1 reason=0",
+    "E5CPU copied=16 retired=16 failed=0 blank=0",
+    "E5CPU offer=32 accept=32 reason=0 req=0xfffffff41dc3a000 surface=0xfffffff5038fcfa8 fmt=42475241 planes=0 masks=1:0",
+    "E5CPU copied=32 retired=32 failed=0 blank=0"
+  ],
+  "panel_crc_changes": [
+    "E5Display: panel crc 1593727e (was 557a87bd) change #2",
+    "E5Display: panel crc 82a2feb4 (was 1593727e) change #3",
+    "E5Display: panel crc c8e40057 (was 82a2feb4) change #4",
+    "E5Display: panel crc 48a57c24 (was c8e40057) change #5",
+    "E5Display: panel crc 00170417 (was 48a57c24) change #6",
+    "E5Display: panel crc 3ff761cf (was 00170417) change #7",
+    "E5Display: panel crc fee6b68b (was 3ff761cf) change #8"
+  ],
+  "last_uptime_ms": 756129,
+  "postboot_verification": {
+    "expected_chunks": 37,
+    "observed_chunks": 37,
+    "matched": 37,
+    "mismatched": 0,
+    "missing": 0
+  },
+  "user_visible_springboard": null,
+  "result": "Original IOPM callbacks open submission. Accepted full-frame plans survive original mutable masks (1:0 becomes 1:1). At least 32 frames are explicitly logged copied and retired with no failures; final API count is 36. Panel CRC changes through multiple nonblack frames. User text confirmed visible iOS UI. Android recovered and protected-window verification passed.",
+  "user_visible_ios_ui": true,
+  "user_confirmation": {
+    "source": "User text reply during R284",
+    "text": "\u5df2\u770b\u5230 iOS \u684c\u9762\u6216\u9501\u5c4f",
+    "scope": "Visible iOS UI confirmed; exact desktop state and touch operation are not established by this text."
+  },
+  "explicit_completed_frames_lower_bound": 32,
+  "final_successful_swap_api_calls": 36,
+  "first_copy_after_sample_ms": 435187,
+  "frame_capture": {
+    "complete_frames": 1,
+    "id": 1,
+    "fnv": "b6005dc5",
+    "content": "Initial all-black frame; not a screenshot of the later visible UI.",
+    "later_capture_id_64": "not reached"
+  }
+}

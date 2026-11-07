@@ -25,7 +25,23 @@ Pending masks are logged for the first sixteen copies, so hardware can verify
 whether the rejected predicate was the changed mask rather than surface type.
 Full compile, ABI checks, link/prelink, final vtable audit and source hashes
 pass. Payload changes only kernel.macho, with the same 720-second watchdog and
-preserved Data. R284 hardware acceptance and actual panel output remain pending.
+preserved Data.
+
+Hardware result: the pending log confirms the input mask changes from 1:0 to
+1:1 (first request 80000007:80000006 to 80000007:80000007), while the same
+IOSurface remains valid. Explicit completion samples reach copied=32,
+retired=32, failed=0; the final successful swap API count is 36. These are
+separate measurements: the sparse completion log establishes at least 32
+completed copies, not an exact final completion count. Panel CRC changes
+through multiple nonblack frames. The user explicitly confirmed visible iOS UI.
+
+One complete, checksum-verified capture records the initial black frame; copy
+64 was not reached, so there is no later full-frame capture. This initial PNG
+must not be presented as the visible iOS screen. Exact desktop state and touch
+operation remain unqualified. Android recovered on the 720-second test and all
+37 protected-window chunks passed. No CAFEBABE, APFS corruption, signature-load
+error, copy failure or kernel panic markers were retained. See
+[the runtime record](logs/runtime-r284.json).
 
 Kernel: 565d2f5ac1bafbdf44c8056a9b5f8381e88c7e4319f2b36b42f5cfb37223bfd6
 Payload: 19676c4c8bef31b163b1bba584cccb0da3305a62f928d516fb6bece014b627b0
