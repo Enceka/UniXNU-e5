@@ -19,7 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
-OWNED = sorted([0, 1, 7, 14, 84, 86, 87, 91, 141, 176, 180, 183, 184, 188, 199, 200, 201, 203, 206, 207, 208, 210, 224, 229, 232, 255, 256, 258, 288, 290, 296, 344] + PURE)
+OWNED = sorted([0, 1, 7, 14, 84, 86, 87, 91, 141, 176, 180, 183, 184, 188, 199, 200, 201, 203, 206, 207, 208, 210, 224, 229, 232, 255, 256, 258, 288, 290, 296, 344, 354] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -158,6 +158,11 @@ def main():
             read(0xfffffff004ba2910 - slide, 4) == bytes.fromhex('c84e40b9'),
             'original IOSurface read-fence active/completed fields changed')
     surface_bindings = {}
+    require(table[354] + slide == 0xfffffff0057970cc and
+            read(0xfffffff005797110 - slide, 12) == bytes.fromhex('a8035ff8080140b908010071') and
+            read(0xfffffff005797148 - slide, 16) == bytes.fromhex('e90b40f9a8035ff8080540b928cd16b9') and
+            read(0xfffffff00579719c - slide, 16) == bytes.fromhex('e90b40f9a8035ff8080d40b928d116b9'),
+            'original display-state request flags and uint32 stores changed')
     for name, address, field, wide in [
         ('descriptor', 0xfffffff004b9ead0, 48, True),
         ('width', 0xfffffff004b9ebbc, 88, True), ('height', 0xfffffff004b9ebc4, 96, True),
@@ -174,6 +179,11 @@ def main():
 #include <IOKit/IOService.h>
 #include <libkern/libkern.h>
 struct OriginalLegacySwapRequest;
+struct OriginalLegacyDisplayState {
+  uint32_t skipRequested, requested, skipPowered, powered;
+  uint8_t changed, padding[11];
+};
+static_assert(sizeof(OriginalLegacyDisplayState) == 28, "Original state request extent");
 class IOMobileFramebufferLegacy : public IOService {
   OSDeclareAbstractStructors(IOMobileFramebufferLegacy)
   unsigned char originalPrivate[0x2110 - sizeof(IOService)];
@@ -302,6 +312,8 @@ public:
             header += '  virtual IOReturn collectCompletionReports(uint32_t, void *, uint32_t *, uint32_t) = 0;\n'
         elif i == 344:
             header += '  virtual IOReturn opaque344(uint64_t, void *);\n'
+        elif i == 354:
+            header += '  virtual IOReturn setDisplayState(OriginalLegacyDisplayState *, bool);\n'
         elif i in PURE:
             header += f'  virtual IOReturn opaque{i}(uint32_t, void *, void *, void *) = 0;\n'
         else:
@@ -392,6 +404,7 @@ public:
                 '__ZTV25IOMobileFramebufferLegacy': vptr - 16}
     bindings['__ZN25IOMobileFramebufferLegacy4freeEv'] = table[14] + slide
     bindings['__ZN25IOMobileFramebufferLegacy9opaque176EPvjjj'] = table[176] + slide
+    bindings['__ZN25IOMobileFramebufferLegacy15setDisplayStateEP26OriginalLegacyDisplayStateb'] = table[354] + slide
     owned_slots, native_slots = [], []
     for i, name in enumerate(compiled):
         if name.startswith(('__ZN9E5Display', '__ZNK9E5Display')):

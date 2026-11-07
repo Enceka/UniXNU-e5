@@ -1,0 +1,37 @@
+{
+  "round": 281,
+  "kernel_sha256": "4b4677c1a3b954ad0f8a1925bbb4f4ba48d009b9a6582ff41bedb8c19605bafc",
+  "source": {
+    "path": "uefi/build/sb-r281/r281/capture/kernel.log",
+    "sha256": "f0ab5fe8537aead11415b7ce5c28bacf6a8d238bd17840b6c00be1501ff9a2ce"
+  },
+  "device_source_revision": "6f181a068f9ed634591ce6283e301e1f51d59bcd",
+  "watchdog_seconds": 720,
+  "markers": {
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "load code signature error": 0,
+    "panic(cpu": 0,
+    "E5CPU": 0,
+    "E5PANELSNAP": 1
+  },
+  "early_boot": [
+    "com.apple.xpc.launchd|1969-12-31 16:03:08.932973 (boot) <Notice>: Early boot complete. Continuing system boot.",
+    "[System Event] [4912309213] [INFO] [Subsystem: launchd] [Event: boot] Early boot complete. Continuing system boot."
+  ],
+  "first_swap_after_sample_ms": 434988,
+  "total_swaps": 8096,
+  "panel_crcs": [
+    "11b0af80"
+  ],
+  "postboot_verification": {
+    "expected_chunks": 37,
+    "observed_chunks": 37,
+    "matched": 37,
+    "mismatched": 0,
+    "missing": 0
+  },
+  "user_visible_springboard": false,
+  "result": "Android recovered; 8096 successful swap API calls, unchanged panel CRC. E5CPU logging was suppressed by e5-ca-state, so neither missing validation nor missing copy can be concluded from that marker."
+}

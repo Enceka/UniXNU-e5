@@ -110,11 +110,25 @@ private:
     if (!reason) ++cpu->accepted;
     OSObject *surface = request ? requestSurface(request, 0) : nullptr;
     if (cpu->offered <= 16 || !(cpu->offered & (cpu->offered - 1)))
-      e5_state_log("E5CPU offer=%u accept=%u reason=%u req=%p surface=%p fmt=%x planes=%u masks=%x:%x",
+      e5_cpu_log("E5CPU offer=%u accept=%u reason=%u req=%p surface=%p fmt=%x planes=%u masks=%x:%x",
           cpu->offered, cpu->accepted, reason, request, surface,
           surface && surface->metaCast("IOSurface") ? e5_surface_format(surface) : 0,
           surface && surface->metaCast("IOSurface") ? e5_surface_planes(surface) : 0,
           request ? requestWord(request, 792) : 0, request ? requestWord(request, 796) : 0);
+    if (reason && cpu->offered <= 16 && request) {
+      e5_cpu_log("E5CPUREQ bg=%x opts=%x:%x:%x dims=%u:%u rect=%u:%u:%u:%u dst=%u:%u:%u:%u",
+          requestWord(request, 800), requestWord(request, 804), requestWord(request, 808), requestWord(request, 812),
+          requestWord(request, 816), requestWord(request, 820), requestWord(request, 17), requestWord(request, 21),
+          requestWord(request, 25), requestWord(request, 29), requestWord(request, 81), requestWord(request, 85),
+          requestWord(request, 89), requestWord(request, 93));
+      if (surface && surface->metaCast("IOSurface")) {
+        IOMemoryDescriptor *memory = e5_surface_descriptor(surface);
+        e5_cpu_log("E5CPUSURF wh=%llu:%llu stride=%llu alloc=%llu descriptor=%llu",
+            (unsigned long long)e5_surface_width(surface), (unsigned long long)e5_surface_height(surface),
+            (unsigned long long)e5_surface_stride(surface), (unsigned long long)e5_surface_allocation(surface),
+            (unsigned long long)(memory && memory->metaCast("IOMemoryDescriptor") ? memory->getLength() : 0));
+      }
+    }
     return reason == 0;
   }
   void copyCpuRequests() {
@@ -135,7 +149,7 @@ private:
         if (!active || completed) {
           ++cpu->fenceWaits;
           if (!(cpu->fenceWaits & (cpu->fenceWaits - 1)))
-            e5_state_log("E5CPU fence-wait=%u req=%p active=%u completed=%u", cpu->fenceWaits, request, active, completed);
+            e5_cpu_log("E5CPU fence-wait=%u req=%p active=%u completed=%u", cpu->fenceWaits, request, active, completed);
           cpu->retry->setTimeoutMS(16);
           break;
         }
@@ -157,7 +171,7 @@ private:
       }
       if (!copied) {
         ++cpu->failed;
-        e5_state_log("E5CPU copy-failed=%u reason=%u req=%p", cpu->failed, reason, request);
+        e5_cpu_log("E5CPU copy-failed=%u reason=%u req=%p", cpu->failed, reason, request);
         break;
       }
       // Finish every device-memory store before the family releases the
@@ -166,14 +180,14 @@ private:
       ++cpu->copied;
       if (!activateOnlyPendingSwap(request)) {
         ++cpu->failed;
-        e5_state_log("E5CPU activation-failed=%u req=%p", cpu->failed, request);
+        e5_cpu_log("E5CPU activation-failed=%u req=%p", cpu->failed, request);
         break;
       }
       for (auto &entry : cpu->validated) if (entry == request) entry = nullptr;
       IOMobileFramebufferLegacy::completeCurrentSwap();
       ++cpu->retired;
       if (cpu->retired <= 16 || !(cpu->retired & (cpu->retired - 1)))
-        e5_state_log("E5CPU copied=%u retired=%u failed=%u blank=%u", cpu->copied, cpu->retired, cpu->failed, surface == nullptr);
+        e5_cpu_log("E5CPU copied=%u retired=%u failed=%u blank=%u", cpu->copied, cpu->retired, cpu->failed, surface == nullptr);
     }
     cpu->kicking = false;
   }

@@ -460,6 +460,16 @@ extern "C" void e5_kputc(char);
 // r224: slot-224 (sel 79) argument captures, printed by the display census.
 unsigned long long e5_block40_args[4][7];
 unsigned e5_block40_count;
+// Bounded presenter events must remain visible with the CA diagnostic enabled.
+static void e5_cpu_log(const char *format, ...) {
+  char line[512];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(line, sizeof(line), format, args);
+  va_end(args);
+  for (const char *p = line; *p; ++p) e5_kputc(*p);
+  e5_kputc('\n');
+}
 static void e5_state_log(const char *format, ...) {
   // r220: the periodic E5STATE line floods the 32 KiB ramoops ring and pushes
   // the late E5CA/E5TH probe dumps out of every retained capture (r219 kept
@@ -615,7 +625,32 @@ public:
     // r221: defer the mode-table publication to a thread_call (see
     // e5PublishModeTable) — never publish from this lock context.
     familyStarted = true;
+    // The original family separates the client's requested state (+5836)
+    // from the platform's powered state (+5840). The retained firmware
+    // scanout is already on. Report that through its qualified setter;
+    // leave the requested state entirely under the original client path.
+    OriginalLegacyDisplayState power = {1, 0, 0, 1, 1, {}};
+    IOReturn powerStatus = setDisplayState(&power, false);
+    e5_cpu_log("E5CPU ready map=%p requested=%u powered=%u",
+        cpu ? cpu->scanout : nullptr,
+        *(volatile uint32_t *)((uint8_t *)this + 5836),
+        *(volatile uint32_t *)((uint8_t *)this + 5840));
+    if (powerStatus != kIOReturnSuccess) {
+      stop(provider);
+      return false;
+    }
     return true;
+  }
+  IOReturn setDisplayState(OriginalLegacyDisplayState *state, bool option) override {
+    IOReturn result = IOMobileFramebufferLegacy::setDisplayState(state, option);
+    static unsigned calls;
+    unsigned n = ++calls;
+    if (n <= 16 || !(n & (n - 1)))
+      e5_cpu_log("E5POWER n=%u skip=%u:%u input=%u:%u requested=%u powered=%u ret=%x",
+          n, state->skipRequested, state->skipPowered, state->requested, state->powered,
+          *(volatile uint32_t *)((uint8_t *)this + 5836),
+          *(volatile uint32_t *)((uint8_t *)this + 5840), result);
+    return result;
   }
   void stop(IOService *provider) override {
     stopCpuPresenter();
