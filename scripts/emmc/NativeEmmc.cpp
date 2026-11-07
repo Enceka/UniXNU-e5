@@ -40,6 +40,7 @@
 #include "TransferStatus.h"
 #include "BootLog.h"
 #include "SystemOSWindow.h"
+#include "E5SelfTestTables.h"
 
 #define E5_EMMC_BASE 0x22200000ULL
 #define E5_EMMC_LEN  0x400ULL
@@ -131,6 +132,17 @@ class NativeEmmc : public IOBlockStorageDevice {
   uint32_t *dmaD = nullptr;
   uint8_t *dmaD8 = nullptr;
   uint64_t dmaPhys = 0;
+  // r259: window I/O (readMulti/writeSingle) uses the SECOND half of the DMA
+  // page so journal record staging (first 4 KiB) and window transfers can
+  // never alias — the r258 corruption served journal records as Data-window
+  // content while every lock was held.
+  uint8_t *winD8 = nullptr;
+  uint32_t winPhys = 0;
+  uint64_t winTraceSeq = 0;
+  uint64_t jrPasses = 0;
+  // r260: window self-test scheduling (journal OFF rounds).
+  thread_call_t stCall = nullptr;
+  uint32_t stPass = 0;
   uint16_t rca = 0;
   uint32_t ocr = 0;
   uint32_t cid[4] = {0, 0, 0, 0};
@@ -561,6 +573,14 @@ private:
     }
     if (ok) { logCursor = cursor; logOverrun = lost; }
     else { logActive = false; elog("NativeEmmc: journal stopped st %08x r1 %08x\n", logLastStatus, logLastR1); }
+    // r259: one line per pass (first 8, then every 16th) pins the journal
+    // timeline against window-read traces when correlating corruption.
+    if (written) {
+      ++jrPasses;
+      if (jrPasses <= 8 || (jrPasses % 16) == 0)
+        elog("E5JRN pass %llu seq %llu+%u\n",
+             (unsigned long long)jrPasses, (unsigned long long)(logSeq - written + 1), written);
+    }
   }
 
   // ---- one ADMA2 single-block 512-byte read: 16-byte v4 descriptor in the
@@ -868,32 +888,37 @@ public:
   // ---- r257: SystemOS/Data window machinery -------------------------------
   // Accessors for the out-of-line publication helpers.
   uint64_t windowCardSectors() const { return sectors; }
-  const uint8_t *dmaPeek() const { return dmaD8; }
+  const uint8_t *dmaPeek() const { return winD8; } // r259: window reads land in the second half-page
   // One multi-block SDMA CMD18 read of n<=16 sectors into the DMA page.
   // v4 layout: block count at 0x00, system address at 0x58/0x5C. The manual
   // CMD12 and line-reset-on-failure mirror the SD driver's proven r253 shape.
   bool readMulti(uint32_t lba, uint32_t n) {
-    if (!n || n > 16 || !dmaD || (r16(0x3E) & 0x1000u) == 0) return false;
+    if (!n || n > 16 || !dmaD || !winD8 || (r16(0x3E) & 0x1000u) == 0) return false;
     // Poison the whole range first: if the engine does not advance the SDMA
     // system address across blocks (the v4 multi-block behavior is unproven
     // on this controller), the untouched tail sectors still hold the fill
     // pattern and the read fails instead of returning stale garbage — the
     // r256 lesson (console text delivered as APFS objects) at the source.
-    for (uint32_t i = 0; i < n * 128; ++i) dmaD[i] = 0xCAFEBABEu;
-    cacheClean(dmaD8, n * 512);
-    cacheInvalidate(dmaD8, n * 512);
+    for (uint32_t i = 0; i < n * 128; ++i) ((uint32_t *)winD8)[i] = 0xCAFEBABEu;
+    cacheClean(winD8, n * 512);
+    cacheInvalidate(winD8, n * 512);
     w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x18u);
     w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
     w16(SDHCI_BLOCK_SIZE, 512);
     w32(SDHCI_DMA_ADDR, n);
-    w32(SDHCI_SYSADDR_LOW, (uint32_t)dmaPhys);
+    w32(SDHCI_SYSADDR_LOW, winPhys);
     w32(SDHCI_SYSADDR_HIGH, 0);
     w32(SDHCI_ARGUMENT, lba);
     w32(SDHCI_TRANSFER_MODE_CMD, 0x123A0033u); // CMD18 MULTI|COUNT|DMA|READ
     uint32_t st = waitDmaDone(2000000 + 100000 * n);
     bool ok = transferOk(st) && !(r32(SDHCI_RESPONSE) & E5BootLog::r1Errors);
-    cacheInvalidate(dmaD8, n * 512);
-    if (ok && dmaD[n * 128 - 1] == 0xCAFEBABEu && dmaD[n * 128 - 2] == 0xCAFEBABEu) {
+    // r259: catch any argument/mode clobbering while the transfer ran.
+    uint32_t argNow = r32(SDHCI_ARGUMENT), tmNow = r32(SDHCI_TRANSFER_MODE_CMD);
+    if (ok && (argNow != lba || tmNow != 0x123A0033u))
+      elog("NativeEmmc: xfer drift lba %u arg %08x tm %08x st %08x\n", lba, argNow, tmNow, st);
+    cacheInvalidate(winD8, n * 512);
+    if (ok && ((uint32_t *)winD8)[n * 128 - 1] == 0xCAFEBABEu &&
+        ((uint32_t *)winD8)[n * 128 - 2] == 0xCAFEBABEu) {
       // Tail never left the fill pattern: the transfer did not cover the
       // full multi-block range. Fail it; the reread path retries.
       ok = false;
@@ -907,13 +932,13 @@ public:
   // One single-block SDMA CMD24 write from the first 512 bytes of the DMA
   // page — writeLogSector's shape, parameterized for the Data window.
   bool writeSingle(uint32_t lba) {
-    if (!dmaD || lba >= sectors || (r16(0x3E) & 0x1000u) == 0) return false;
+    if (!dmaD || !winD8 || lba >= sectors || (r16(0x3E) & 0x1000u) == 0) return false;
     if (!waitLogReady(5000)) return false;
-    cacheClean(dmaD8, 512);
+    cacheClean(winD8, 512);
     w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x18u);
     w32(SDHCI_INT_STATUS, 0xffffffffu);
     w16(SDHCI_BLOCK_SIZE, 512); w32(SDHCI_DMA_ADDR, 1);
-    w32(SDHCI_SYSADDR_LOW, (uint32_t)dmaPhys); w32(SDHCI_SYSADDR_HIGH, 0);
+    w32(SDHCI_SYSADDR_LOW, winPhys); w32(SDHCI_SYSADDR_HIGH, 0);
     w32(SDHCI_ARGUMENT, lba);
     w32(SDHCI_TRANSFER_MODE_CMD, 0x183A0003u); // CMD24, SDMA, WRITE
     uint32_t st = waitDmaDone(5000000);
@@ -1009,9 +1034,9 @@ public:
   bool windowReadVerified(uint32_t lba, uint32_t n) {
     for (unsigned round = 0; round < 2; ++round) {
       if (!readMulti(lba, n)) return false;
-      memcpy(readShadow, dmaD8, (size_t)n * 512);
+      memcpy(readShadow, winD8, (size_t)n * 512);
       if (!readMulti(lba, n)) return false;
-      if (!memcmp(readShadow, dmaD8, (size_t)n * 512)) return true;
+      if (!memcmp(readShadow, winD8, (size_t)n * 512)) return true;
       __atomic_fetch_add(&e5_win_unstable, 1, __ATOMIC_RELAXED);
       elog("NativeEmmc: rv unstable lba %u n %u round %u\n", lba, n, round);
     }
@@ -1035,8 +1060,13 @@ public:
       IOLockLock(ioLock);
       bool ok = cardUp && windowReadVerified((uint32_t)(base + block + c * 8), n);
       IOLockUnlock(ioLock);
+      uint64_t ts = ++winTraceSeq;
+      if (ts <= 64)
+        elog("NativeEmmc: wr #%llu os %llx+%u %s crc %08x\n",
+             (unsigned long long)ts, (unsigned long long)(base + block + c * 8), n,
+             ok ? "y" : "FAIL", ok ? crc32(winD8, n * 512) : 0u);
       if (!ok) return kIOReturnIOError;
-      if (data->writeBytes(c * 512, dmaD8, (size_t)n * 512) != (IOByteCount)(n * 512))
+      if (data->writeBytes(c * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
         return kIOReturnIOError;
       if (big && ((c + 1) % 64) == 0)
         elog("NativeEmmc: rw+ %llu/%llu at %llu+%llu\n",
@@ -1069,7 +1099,7 @@ public:
       uint32_t n = (uint32_t)((count - off) > 8 ? 8 : count - off);
       bool ok;
       if (out) {
-        data->readBytes(off * 512, dmaD8, (size_t)n * 512);
+        data->readBytes(off * 512, winD8, (size_t)n * 512);
         IOLockLock(ioLock);
         ok = cardUp;
         for (uint32_t s = 0; ok && s < n; ++s)
@@ -1079,7 +1109,12 @@ public:
         IOLockLock(ioLock);
         ok = cardUp && windowReadVerified((uint32_t)(E5Data::base + block + off), n);
         IOLockUnlock(ioLock);
-        if (ok) data->writeBytes(off * 512, dmaD8, (size_t)n * 512);
+        uint64_t ts = ++winTraceSeq;
+        if (ts <= 64)
+          elog("NativeEmmc: wr #%llu dm %llx+%u %s crc %08x\n",
+               (unsigned long long)ts, (unsigned long long)(E5Data::base + block + off), n,
+               ok ? "y" : "FAIL", ok ? crc32(winD8, n * 512) : 0u);
+        if (ok) data->writeBytes(off * 512, winD8, (size_t)n * 512);
       }
       if (!ok) {
         if (out) __atomic_fetch_add(&e5_win_wr_bad, 1, __ATOMIC_RELAXED);
@@ -1089,6 +1124,69 @@ public:
       }
     }
     return kIOReturnSuccess;
+  }
+
+  // r260: deterministic window self-test, host-verifiable. Journal OFF is
+  // the variable under test (r258/r259 served journal bytes to Data-window
+  // reads); tables: os = systemos.img head (also the SD container head),
+  // dm = Data window head, sp = E5TEST01 LBA-indexed pattern past the Data
+  // window. Single readMulti per chunk — no two-agree masking.
+  void windowSelfTest(const char *tag) {
+    struct Area { const char *name; uint32_t base; const uint32_t *crcs; };
+    static const Area areas[3] = {
+      {"os", (uint32_t)E5SystemOS::base, E5SelfTest::os},
+      {"dm", (uint32_t)E5Data::base, E5SelfTest::data},
+      {"sp", E5SelfTest::kSpareBase, E5SelfTest::spare},
+    };
+    if (!ioLock || !winD8) return;
+    uint32_t bad = 0;
+    bool dead = !cardUp;
+    uint64_t t0ns = 0, t1ns = 0;
+    clock_get_uptime(&t0ns);
+    if (!dead) {
+      IOLockLock(ioLock);
+      dead = !cardUp; // re-check under the lock
+      if (!dead) {
+        for (int a = 0; a < 3; ++a) {
+          for (uint32_t i = 0; i < 256; ++i) {
+            uint32_t lba = areas[a].base + i * 8;
+            if (!readMulti(lba, 8)) {
+              elog("NativeEmmc: ST %s %s#%u READFAIL lba %u\n", tag, areas[a].name, i, lba);
+              ++bad;
+              continue;
+            }
+            uint32_t c = crc32(winD8, 4096);
+            if (c != areas[a].crcs[i]) {
+              elog("NativeEmmc: ST %s %s#%u lba %u crc %08x want %08x\n",
+                   tag, areas[a].name, i, lba, c, areas[a].crcs[i]);
+              ++bad;
+            }
+          }
+        }
+      }
+      IOLockUnlock(ioLock);
+    }
+    clock_get_uptime(&t1ns);
+    elog("NativeEmmc: SELFTEST %s %s bad=%u %llums\n",
+         tag, (bad || dead) ? "FAIL" : "CLEAN", bad,
+         (unsigned long long)((t1ns - t0ns) / 1000000ull));
+  }
+
+  // r260: t1..t3 repeat the self-test on 45 s spacing so reads land inside
+  // the APFS mount window where the corruption was observed.
+  static void stEntry(thread_call_param_t context, thread_call_param_t) {
+    NativeEmmc *host = (NativeEmmc *)context;
+    if (!host || !host->stCall) return;
+    static const char *tags[3] = {"t1", "t2", "t3"};
+    if (host->stPass < 3) {
+      host->windowSelfTest(tags[host->stPass]);
+      host->stPass += 1;
+    }
+    if (host->stPass < 3) {
+      uint64_t deadline = 0;
+      clock_interval_to_deadline(45, NSEC_PER_SEC, &deadline);
+      thread_call_enter_delayed(host->stCall, deadline);
+    }
   }
 };
 OSDefineMetaClassAndStructors(NativeEmmc, IOBlockStorageDevice)
@@ -1284,6 +1382,7 @@ bool NativeEmmc::start(IOService *provider)
   uint8_t *d8 = (uint8_t *)d;
   uint64_t dva = bmd->getPhysicalAddress();
   dmaD = d; dmaD8 = d8; dmaPhys = dva; ioLock = IOLockAlloc();
+  winD8 = d8 + 4096; winPhys = (uint32_t)(dva + 4096); // r259 second half-page
   elog("NativeEmmc: dma page %08llx\n", (unsigned long long)dva);
 
   cardUp = identifyAndRead(d, d8, dva);
@@ -1347,9 +1446,12 @@ bool NativeEmmc::start(IOService *provider)
     bool systemOS = PE_parse_boot_argn("e5-systemos", nullptr, 0);
     bool osWindowOk = false;
     if (systemOS) {
-      if (E5SystemOS::fits(sectors) && readMulti((uint32_t)E5SystemOS::base, 8) &&
-          memcmp(dmaD8 + 32, "NXSB", 4) == 0 &&
-          crc32(dmaD8, 4096) == E5SystemOS::superblockCrc) {
+      IOLockLock(ioLock); // r259: journal passes are live by now
+      bool probeOk = E5SystemOS::fits(sectors) && readMulti((uint32_t)E5SystemOS::base, 8) &&
+          memcmp(winD8 + 32, "NXSB", 4) == 0 &&
+          crc32(winD8, 4096) == E5SystemOS::superblockCrc;
+      IOLockUnlock(ioLock);
+      if (probeOk) {
         osWindowOk = true;
         elog("NativeEmmc: SystemOS superblock crc %08x match y\n", E5SystemOS::superblockCrc);
       } else {
@@ -1358,7 +1460,9 @@ bool NativeEmmc::start(IOService *provider)
     }
     E5DataDeviceEmmc *dataDevice = nullptr;
     if (osWindowOk && PE_parse_boot_argn("e5-data", nullptr, 0)) {
+      IOLockLock(ioLock); // r259: probe under the same lock as journal passes
       dataDevice = prepareDataDeviceEmmc(this);
+      IOLockUnlock(ioLock);
       if (!dataDevice) elog("NativeEmmc: data window NXSB refused\n");
     }
     // v5: keep regs/DMA page alive; the read path runs in doAsyncReadWrite.
@@ -1376,6 +1480,14 @@ bool NativeEmmc::start(IOService *provider)
       elog("NativeEmmc: SystemOS publication failed\n");
     if (dataDevice && !publishDataEmmc(dataDevice, this))
       elog("NativeEmmc: data publication failed\n");
+    // r260: baseline self-test, then 45 s repeats during the mount window.
+    windowSelfTest("t0");
+    stCall = thread_call_allocate(stEntry, this);
+    if (stCall) {
+      uint64_t deadline = 0;
+      clock_interval_to_deadline(45, NSEC_PER_SEC, &deadline);
+      thread_call_enter_delayed(stCall, deadline);
+    }
     return true;
   }
   resetLines();
