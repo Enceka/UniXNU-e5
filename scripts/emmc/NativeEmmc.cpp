@@ -94,6 +94,7 @@ static void elog(const char *fmt, ...) {
 static uint64_t e5_win_rd_blocks, e5_win_rd_ops;
 static uint64_t e5_win_wr_blocks, e5_win_wr_ops, e5_win_wr_bad;
 static uint64_t e5_win_unstable;
+static uint64_t e5_win_w25_ops, e5_win_w25_verified, e5_win_w25_ticks;
 // Enabled by this board's kernel config; that source-file define is not
 // present in the IOKit archive's compile record.
 extern "C" uint64_t cs_native4k_read_ticks, cs_native4k_hash_ticks, cs_native4k_bytes;
@@ -123,6 +124,12 @@ extern "C" void e5_emmc_runtime_dump(void) {
        vm_page_free_count, vm_page_active_count, vm_page_inactive_count,
        vm_page_wire_count, vm_page_pageable_internal_count,
        vm_page_pageable_external_count, vm_page_free_wanted);
+  uint64_t writeNs = 0;
+  absolutetime_to_nanoseconds(__atomic_load_n(&e5_win_w25_ticks, __ATOMIC_RELAXED), &writeNs);
+  elog("E5W25 ops=%llu verified=%llu ms=%llu\n",
+       (unsigned long long)__atomic_load_n(&e5_win_w25_ops, __ATOMIC_RELAXED),
+       (unsigned long long)__atomic_load_n(&e5_win_w25_verified, __ATOMIC_RELAXED),
+       (unsigned long long)(writeNs / 1000000));
 }
 
 // Report the executing context, not an inferred originating process: APFS
@@ -231,6 +238,7 @@ class NativeEmmc : public IOBlockStorageDevice {
   uint8_t  extCsd[512] = {0};
   uint64_t sectors = 0;
   bool cardUp = false;
+  bool windowMultiWriteReady = false;
   bool partMode = false;
   uint64_t baseLba = 0;
   uint64_t cacheSectors = E5Emmc::cacheSectorCount;
@@ -1094,6 +1102,88 @@ public:
     return ok;
   }
 
+  // r278: program a staged Data chunk with CMD25 instead of eight CMD24s.
+  // Caller owns ioLock throughout staging, programming and readback. The
+  // readback poisons/overwrites winD8, so retain the exact staged bytes in
+  // the non-DMA shadow; no success is reported until every byte agrees.
+  bool writeWindowVerified(uint32_t lba, uint32_t n) {
+    if (!n || n > 8 || !dmaD || !winD8 || lba >= sectors || n > sectors - lba ||
+        (r16(0x3E) & 0x1000u) == 0) return false;
+    const uint64_t started = mach_absolute_time();
+    const uint64_t sequence = __atomic_add_fetch(&e5_win_w25_ops, 1ULL, __ATOMIC_RELAXED);
+    memcpy(readShadow, winD8, (size_t)n * 512);
+    bool ok = false;
+    if (n == 1) {
+      ok = writeSingle(lba);
+    } else if (waitLogReady(5000)) {
+      cacheClean(winD8, n * 512);
+      w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x18u);
+      w32(SDHCI_INT_STATUS, 0xffffffffu);
+      w16(SDHCI_BLOCK_SIZE, 512);
+      w32(SDHCI_DMA_ADDR, n);
+      w32(SDHCI_SYSADDR_LOW, winPhys);
+      w32(SDHCI_SYSADDR_HIGH, 0);
+      w32(SDHCI_ARGUMENT, lba);
+      w32(SDHCI_TRANSFER_MODE_CMD, 0x193A0023u); // CMD25 MULTI|COUNT|DMA, WRITE
+      const uint32_t st = waitDmaDone(5000000);
+      const uint32_t r1 = r32(SDHCI_RESPONSE);
+      ok = transferOk(st) && !(r1 & E5BootLog::r1Errors);
+      const uint32_t stop = cmdNoData(0x0C1A, 0);
+      const bool ready = waitLogReady(5000);
+      ok = ok && cmdOk(stop) && ready;
+      if (!ok) {
+        logLastStatus = st; logLastR1 = r1;
+        resetLines();
+      }
+    }
+    if (ok) ok = readMulti(lba, n) && !memcmp(readShadow, winD8, (size_t)n * 512);
+    if (ok) __atomic_add_fetch(&e5_win_w25_verified, 1ULL, __ATOMIC_RELAXED);
+    const uint64_t elapsed = mach_absolute_time() - started;
+    __atomic_add_fetch(&e5_win_w25_ticks, elapsed, __ATOMIC_RELAXED);
+    if (!ok || sequence <= 4) {
+      uint64_t ns = 0;
+      absolutetime_to_nanoseconds(elapsed, &ns);
+      elog("E5W25 id=%llu lba=%u n=%u ok=%u us=%llu\n",
+           (unsigned long long)sequence, lba, n, ok,
+           (unsigned long long)(ns / 1000));
+    }
+    return ok;
+  }
+
+  // Qualify CMD25 on one existing spare page before exposing writable Data.
+  // Restore with the accepted CMD24 path, then compare a fresh media read.
+  // A failed qualification keeps CMD24; a failed restore refuses publication.
+  bool qualifyWindowWrite() {
+    constexpr uint32_t lba = E5SelfTest::kSpareBase;
+    constexpr uint32_t first = lba - 8;
+    static_assert(first >= E5Data::base + E5Data::sectors, "write probe overlaps Data");
+    static uint8_t before[3][4096]; // target plus two guards; never on the stack
+    windowMultiWriteReady = false;
+    if (first >= sectors || 24 > sectors - first) return true;
+    for (unsigned page = 0; page < 3; ++page) {
+      if (!readMulti(first + page * 8, 8)) return true;
+      memcpy(before[page], winD8, 4096);
+      if (!readMulti(first + page * 8, 8) || memcmp(before[page], winD8, 4096)) return true;
+    }
+    for (unsigned i = 0; i < 4096 / 4; ++i)
+      ((uint32_t *)winD8)[i] = 0xE5278000u ^ (i * 0x01010101u);
+    bool passed = writeWindowVerified(lba, 8);
+    for (unsigned page = 0; page < 3; page += 2) {
+      if (!readMulti(first + page * 8, 8) || memcmp(before[page], winD8, 4096)) passed = false;
+    }
+    bool restored = true;
+    for (unsigned page = 0; restored && page < 3; ++page) {
+      memcpy(winD8, before[page], 4096);
+      for (uint32_t i = 0; restored && i < 8; ++i)
+        restored = writeSingle(first + page * 8 + i, i * 512);
+      if (restored) restored = readMulti(first + page * 8, 8) && !memcmp(before[page], winD8, 4096);
+    }
+    windowMultiWriteReady = passed && restored;
+    elog("E5W25 qualification lba=%u passed=%u restored=%u enabled=%u\n",
+         lba, passed, restored, windowMultiWriteReady);
+    return restored;
+  }
+
   bool lba1Crc(uint32_t *out) {
     if (!dmaD) return false;
     uint32_t st = sdmaRead512(0x113A, 1, dmaD, dmaPhys);
@@ -1367,8 +1457,8 @@ public:
   }
 
   // Data window media-direct I/O for E5DataDeviceEmmc: reads stream verified
-  // CMD18 chunks, writes land per-sector CMD24s before completion (durable
-  // by construction), all under the host lock — the r245 SD shape.
+  // CMD18 chunks. Qualified multi-sector writes use CMD25 plus byte-for-byte
+  // readback; otherwise use the accepted CMD24 path, under the host lock.
   IOReturn dataMediaIO(IOMemoryDescriptor *data, UInt64 block, UInt64 count, bool out) {
     if (!ioLock || !dmaD) return kIOReturnNotReady;
     if (data->getLength() < count * 512) return kIOReturnBadArgument;
@@ -1393,8 +1483,12 @@ public:
         ok = cardUp;
         if (ok && data->readBytes(off * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
           ok = false;
-        for (uint32_t s = 0; ok && s < n; ++s)
-          ok = writeSingle((uint32_t)(E5Data::base + block + off + s), s * 512);
+        if (windowMultiWriteReady) {
+          if (ok) ok = writeWindowVerified((uint32_t)(E5Data::base + block + off), n);
+        } else {
+          for (uint32_t s = 0; ok && s < n; ++s)
+            ok = writeSingle((uint32_t)(E5Data::base + block + off + s), s * 512);
+        }
         IOLockUnlock(ioLock);
       } else {
         ts = __atomic_add_fetch(&winTraceSeq, 1ULL, __ATOMIC_RELAXED);
@@ -1924,6 +2018,12 @@ bool NativeEmmc::start(IOService *provider)
     E5DataDeviceEmmc *dataDevice = nullptr;
     if (osWindowOk && PE_parse_boot_argn("e5-data", nullptr, 0)) {
       IOLockLock(ioLock); // r259: probe under the same lock as journal passes
+      if (!qualifyWindowWrite()) {
+        cardUp = false;
+        IOLockUnlock(ioLock);
+        elog("E5W25 spare restore failed; refusing window publication\n");
+        return true;
+      }
       dataDevice = prepareDataDeviceEmmc(this);
       IOLockUnlock(ioLock);
       if (!dataDevice) elog("NativeEmmc: data window NXSB refused\n");

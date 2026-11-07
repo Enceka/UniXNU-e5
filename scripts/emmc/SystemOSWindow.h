@@ -42,9 +42,9 @@ inline bool fits(uint64_t cardSectors) {
 
 namespace E5Data {
 // r245: the Data window is served media-direct from the card — reads pull
-// CMD18 chunks under the host lock and writes land as single-sector CMD24
-// writes before their block I/O completes, so there is no RAM image and every
-// completed write is already durable. The container on the card must be grown
+// CMD18 chunks under the host lock. The eMMC path qualifies CMD25 on a spare
+// page, then reads every programmed Data chunk back before completion; CMD24
+// remains the fallback. There is no volatile Data image. The container must be grown
 // to the window size (macOS-side apfs resizeContainer keeps the volume UUID);
 // the NXSB block count is cross-checked against the window at publication.
 // r257: the window moved to the eMMC userdata tail, after the SystemOS image.
