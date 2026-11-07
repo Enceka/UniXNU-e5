@@ -1160,8 +1160,28 @@ public:
       IOLockLock(ioLock);
       dead = !cardUp; // re-check under the lock
       if (!dead) {
+        // r263: hard deadline so a wedged area cannot stall the worker
+        // thread forever (r262 t0 hung silently inside start()).
+        uint64_t deadline = 0;
+        clock_interval_to_absolutetime(90, NSEC_PER_SEC, &deadline);
+        deadline += t0ns;
+        uint64_t chunk = 0, total = 0;
+        for (int a = 0; a < 4; ++a) total += areas[a].count;
         for (int a = 0; a < 4; ++a) {
+          elog("NativeEmmc: ST %s %s begin (%u chunks)\n", tag, areas[a].name, areas[a].count);
           for (uint32_t i = 0; i < areas[a].count; ++i) {
+            if ((++chunk & 255u) == 0) {
+              uint64_t now = 0;
+              clock_get_uptime(&now);
+              if (now > deadline) {
+                elog("NativeEmmc: ST %s %s deadline bail at %llu/%llu\n",
+                     tag, areas[a].name, (unsigned long long)chunk, (unsigned long long)total);
+                bad += 0x80000000u;
+                break;
+              }
+              elog("NativeEmmc: ST %s %s progress %llu/%llu\n",
+                   tag, areas[a].name, (unsigned long long)chunk, (unsigned long long)total);
+            }
             uint32_t lba = areas[a].base + i * areas[a].chunkStep * 8;
             if (!readMulti(lba, 8)) {
               elog("NativeEmmc: ST %s %s#%u READFAIL lba %u\n", tag, areas[a].name, i, lba);
@@ -1286,6 +1306,63 @@ public:
   }
 };
 OSDefineMetaClassAndStructors(E5SystemOSDeviceEmmc, IOBlockStorageDevice)
+
+// r263: the OS root container window, read-only. The wrapper media carries
+// the root volume UUID (04769D26) as its device-info string so the APFS
+// volume synthesized on top inherits the value the /chosen root-matching
+// dictionary waits for; the ADT stays untouched.
+class E5OsRootDeviceEmmc : public IOBlockStorageDevice {
+  OSDeclareDefaultStructors(E5OsRootDeviceEmmc)
+public:
+  char *getVendorString() override { return const_cast<char *>("E5"); }
+  char *getProductString() override { return const_cast<char *>("OS root window"); }
+  char *getRevisionString() override { return const_cast<char *>("1"); }
+  char *getAdditionalDeviceInfoString() override { return const_cast<char *>(E5OsRoot::uuid); }
+  IOReturn doEjectMedia() override { return kIOReturnUnsupported; }
+  IOReturn doFormatMedia(UInt64) override { return kIOReturnUnsupported; }
+  UInt32 doGetFormatCapacities(UInt64 *, UInt32) const override { return 0; }
+  IOReturn reportBlockSize(UInt64 *n) override { *n = 512; return kIOReturnSuccess; }
+  IOReturn reportMaxValidBlock(UInt64 *n) override { *n = E5OsRoot::sectors - 1; return kIOReturnSuccess; }
+  IOReturn reportEjectability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportRemovability(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn reportMediaState(bool *p, bool *c) override {
+    NativeEmmc *host = OSDynamicCast(NativeEmmc, getProvider());
+    if (!host) return kIOReturnNotReady;
+    return host->reportMediaState(p, c);
+  }
+  IOReturn reportWriteProtection(bool *b) override { *b = true; return kIOReturnSuccess; }
+  IOReturn doSynchronizeCache() override { return kIOReturnSuccess; }
+  IOReturn doSynchronize(UInt64, UInt64, IOOptionBits) override { return kIOReturnSuccess; }
+  IOReturn getWriteCacheState(bool *b) override { *b = false; return kIOReturnSuccess; }
+  IOReturn setWriteCacheState(bool) override { return kIOReturnUnsupported; }
+  IOReturn doAsyncReadWrite(IOMemoryDescriptor *data, UInt64 block, UInt64 count,
+      IOStorageAttributes *attributes, IOStorageCompletion *completion) override {
+    (void)attributes;
+    if (!data || !completion || !completion->action) return kIOReturnBadArgument;
+    if (!E5OsRoot::contains(block, count)) return kIOReturnBadArgument;
+    NativeEmmc *host = OSDynamicCast(NativeEmmc, getProvider());
+    if (!host) return kIOReturnNotReady;
+    IOReturn rc = host->windowRead(data, block, count, E5OsRoot::base);
+    completion->action(completion->target, completion->parameter, rc,
+                       rc == kIOReturnSuccess ? count * 512 : 0);
+    return kIOReturnSuccess;
+  }
+};
+OSDefineMetaClassAndStructors(E5OsRootDeviceEmmc, IOBlockStorageDevice)
+
+static bool publishOsRootEmmc(NativeEmmc *host) {
+  E5OsRootDeviceEmmc *window = new E5OsRootDeviceEmmc;
+  if (!window) return false;
+  if (!window->init(nullptr)) { window->release(); return false; }
+  if (!window->attach(host)) { window->release(); return false; }
+  if (!window->start(host)) { window->detach(host); window->release(); return false; }
+  elog("NativeEmmc: publishing OsRoot read-only %llu sectors at %llu (uuid %s)\n",
+       (unsigned long long)E5OsRoot::sectors, (unsigned long long)E5OsRoot::base,
+       E5OsRoot::uuid);
+  window->registerService();
+  window->release();
+  return true;
+}
 
 // The system's one writable dataset: the 4 GiB eMMC window served
 // media-direct. The kernel startup patch mounts the volume at /private/var
@@ -1465,17 +1542,30 @@ bool NativeEmmc::start(IOService *provider)
     // publish the wrapper devices after it — the NativeSd publication order.
     bool systemOS = PE_parse_boot_argn("e5-systemos", nullptr, 0);
     bool osWindowOk = false;
+    bool osRootOk = false;
     if (systemOS) {
       IOLockLock(ioLock); // r259: journal passes are live by now
       bool probeOk = E5SystemOS::fits(sectors) && readMulti((uint32_t)E5SystemOS::base, 8) &&
           memcmp(winD8 + 32, "NXSB", 4) == 0 &&
           crc32(winD8, 4096) == E5SystemOS::superblockCrc;
+      // r263: OS root window (bare container, same NXSB-at-+32 shape). Its
+      // wrapper media carries the root volume UUID so /chosen root-matching
+      // binds here before the SD stack registers.
+      bool rootOk = E5OsRoot::fits(sectors) && readMulti((uint32_t)E5OsRoot::base, 8) &&
+          memcmp(winD8 + 32, "NXSB", 4) == 0;
       IOLockUnlock(ioLock);
       if (probeOk) {
         osWindowOk = true;
         elog("NativeEmmc: SystemOS superblock crc %08x match y\n", E5SystemOS::superblockCrc);
       } else {
         elog("NativeEmmc: SystemOS superblock refused\n");
+      }
+      if (rootOk) {
+        osRootOk = true;
+        elog("NativeEmmc: OsRoot NXSB at %llu match y\n",
+             (unsigned long long)E5OsRoot::base);
+      } else {
+        elog("NativeEmmc: OsRoot window refused\n");
       }
     }
     E5DataDeviceEmmc *dataDevice = nullptr;
@@ -1496,12 +1586,15 @@ bool NativeEmmc::start(IOService *provider)
     elog("NativeEmmc: publishing cache window (%llu sectors @ lba %llx)\n",
          (unsigned long long)cacheSectors, (unsigned long long)baseLba);
     registerService();
+    if (osRootOk && !publishOsRootEmmc(this))
+      elog("NativeEmmc: OsRoot publication failed\n");
     if (osWindowOk && !publishSystemOSEmmc(this))
       elog("NativeEmmc: SystemOS publication failed\n");
     if (dataDevice && !publishDataEmmc(dataDevice, this))
       elog("NativeEmmc: data publication failed\n");
-    // r260: baseline self-test, then 45 s repeats during the mount window.
-    windowSelfTest("t0");
+    // r263: the r262 synchronous t0 wedged inside start() (silent IOLock
+    // wait) and stalled IOKit serialization past the root timeout. The
+    // self-test now runs ONLY on the delayed thread_call; tags t1..t3.
     stCall = thread_call_allocate(stEntry, this);
     if (stCall) {
       uint64_t deadline = 0;
