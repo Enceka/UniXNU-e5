@@ -894,10 +894,10 @@ public:
   // journal is dormant in journal-off rounds).
   uint32_t windowCrc() { return crc32(winD8, 4096); }
   bool legacyReadProbe(uint32_t lba) {
-    uint32_t st = sdmaRead512(0x113A, lba, d8, dmaPhys);
-    cacheInvalidate(d8, 512);
+    uint32_t st = sdmaRead512(0x113A, lba, dmaD8, dmaPhys);
+    cacheInvalidate(dmaD8, 512);
     if (!transferOk(st)) return false;
-    return memcmp(d8 + 32, "NXSB", 4) == 0;
+    return memcmp(dmaD8 + 32, "NXSB", 4) == 0;
   }
   // One multi-block SDMA CMD18 read of n<=16 sectors into the DMA page.
   // v4 layout: block count at 0x00, system address at 0x58/0x5C. The manual
