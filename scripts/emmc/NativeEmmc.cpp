@@ -1162,7 +1162,9 @@ public:
       if (!dead) {
         // r263: hard deadline so a wedged area cannot stall the worker
         // thread forever (r262 t0 hung silently inside start()).
-        uint64_t deadline = clock_interval_to_absolutetime(90, NSEC_PER_SEC) + t0ns;
+        uint64_t deadline = 0;
+        clock_interval_to_absolutetime_interval(90, NSEC_PER_SEC, &deadline);
+        deadline += t0ns;
         uint64_t chunk = 0, total = 0;
         for (int a = 0; a < 4; ++a) total += areas[a].count;
         for (int a = 0; a < 4; ++a) {
