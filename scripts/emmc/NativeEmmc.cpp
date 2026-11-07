@@ -992,16 +992,20 @@ public:
     if (!ok) resetLines();
     return ok;
   }
-  // One single-block SDMA CMD24 write from the first 512 bytes of the DMA
-  // page — writeLogSector's shape, parameterized for the Data window.
-  bool writeSingle(uint32_t lba) {
-    if (!dmaD || !winD8 || lba >= sectors || (r16(0x3E) & 0x1000u) == 0) return false;
+  // One single-block SDMA CMD24 write from winD8[srcOff .. srcOff+512) —
+  // writeLogSector's shape, parameterized for the Data window. r271 fix: the
+  // caller stages up to 8 sectors in winD8; without srcOff every sector of a
+  // multi-sector write landed with sector-0 content (r270: dyld's generated
+  // dyldlinkedit resource-fork offsets came back interleaved garbage and every
+  // service paging it crashed).
+  bool writeSingle(uint32_t lba, uint32_t srcOff = 0) {
+    if (!dmaD || !winD8 || srcOff > 4096 - 512 || lba >= sectors || (r16(0x3E) & 0x1000u) == 0) return false;
     if (!waitLogReady(5000)) return false;
-    cacheClean(winD8, 512);
+    cacheClean(winD8 + srcOff, 512);
     w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x18u);
     w32(SDHCI_INT_STATUS, 0xffffffffu);
     w16(SDHCI_BLOCK_SIZE, 512); w32(SDHCI_DMA_ADDR, 1);
-    w32(SDHCI_SYSADDR_LOW, winPhys); w32(SDHCI_SYSADDR_HIGH, 0);
+    w32(SDHCI_SYSADDR_LOW, winPhys + srcOff); w32(SDHCI_SYSADDR_HIGH, 0);
     w32(SDHCI_ARGUMENT, lba);
     w32(SDHCI_TRANSFER_MODE_CMD, 0x183A0003u); // CMD24, SDMA, WRITE
     uint32_t st = waitDmaDone(5000000);
@@ -1261,7 +1265,7 @@ public:
         IOLockLock(ioLock);
         ok = cardUp;
         for (uint32_t s = 0; ok && s < n; ++s)
-          ok = writeSingle((uint32_t)(E5Data::base + block + off + s));
+          ok = writeSingle((uint32_t)(E5Data::base + block + off + s), s * 512);
         IOLockUnlock(ioLock);
       } else {
         IOLockLock(ioLock);
