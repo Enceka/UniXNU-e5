@@ -893,7 +893,11 @@ public:
   // v4 layout: block count at 0x00, system address at 0x58/0x5C. The manual
   // CMD12 and line-reset-on-failure mirror the SD driver's proven r253 shape.
   bool readMulti(uint32_t lba, uint32_t n) {
-    if (!n || n > 16 || !dmaD || !winD8 || (r16(0x3E) & 0x1000u) == 0) return false;
+    // r259 DMA overrun fix: window I/O lands in the SECOND 4 KiB half of the
+    // 8 KiB page (journal staging keeps the first), so 8 sectors is the hard
+    // ceiling — a 16-sector read wrote 4 KiB past the page and data-aborted
+    // the kernel (r259/r260, far = regs+0x3000, x22 = poison).
+    if (!n || n > 8 || !dmaD || !winD8 || (r16(0x3E) & 0x1000u) == 0) return false;
     // Poison the whole range first: if the engine does not advance the SDMA
     // system address across blocks (the v4 multi-block behavior is unproven
     // on this controller), the untouched tail sectors still hold the fill
@@ -1009,12 +1013,12 @@ public:
           windowSdclkfs = ladder[i]; windowBaseMHz = baseMHz; wideBus = true;
           uint64_t t0 = 0, t1 = 0;
           clock_get_uptime(&t0);
-          bool fr = readMulti(1, 16);
+          bool fr = readMulti(1, 8);
           clock_get_uptime(&t1);
           uint64_t us = (t1 - t0) / 1000ull;
-          elog("NativeEmmc: fast mode div %u base %u 4-bit y; 16-sector %s in %llu us (%llu KB/s)\n",
+          elog("NativeEmmc: fast mode div %u base %u 4-bit y; 8-sector %s in %llu us (%llu KB/s)\n",
                ladder[i], baseMHz, fr ? "ok" : "FAIL", (unsigned long long)us,
-               (unsigned long long)(us ? (uint64_t)16384 / us : 0));
+               (unsigned long long)(us ? (uint64_t)4096 / us : 0));
           return;
         }
         elog("NativeEmmc: 4-bit unstable, reverting\n");
