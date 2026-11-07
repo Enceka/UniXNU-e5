@@ -6,7 +6,7 @@ private:
     IOMemoryMap *scanout;
     IOTimerEventSource *retry;
     const OriginalLegacySwapRequest *validated[8];
-    uint32_t offered, accepted, copied, retired, failed, fenceWaits;
+    uint32_t offered, accepted, copied, retired, failed, fenceWaits, snapshots;
     bool kicking, stopped, timerAdded;
   };
   CpuState *cpu = nullptr;
@@ -131,6 +131,38 @@ private:
     }
     return reason == 0;
   }
+  // Two bounded captures of the actual destination, while the presenter's
+  // work loop owns it. RLE keeps flat UI regions small; the host rejects
+  // incomplete rows or a mismatched whole-frame checksum. This is memory
+  // readback, not evidence that the physical panel scanned the frame.
+  void captureCpuFrame() {
+    const volatile uint16_t *pixels =
+        (const volatile uint16_t *)cpu->scanout->getVirtualAddress();
+    const unsigned id = cpu->copied;
+    uint32_t checksum = 2166136261U;
+    e5_cpu_log("E5FRAME begin id=%u width=320 height=480 format=RGB565", id);
+    static const char hex[] = "0123456789abcdef";
+    for (unsigned y = 0; y < 480; ++y) {
+      char prefix[64];
+      snprintf(prefix, sizeof(prefix), "E5FRAMEROW id=%u y=%u ", id, y);
+      for (const char *p = prefix; *p; ++p) e5_kputc(*p);
+      for (unsigned x = 0; x < 320;) {
+        const uint16_t pixel = pixels[y * 320 + x];
+        unsigned run = 1;
+        while (x + run < 320 && pixels[y * 320 + x + run] == pixel) ++run;
+        for (unsigned i = 0; i < run; ++i) {
+          checksum = (checksum ^ (pixel & 0xffU)) * 16777619U;
+          checksum = (checksum ^ (pixel >> 8)) * 16777619U;
+        }
+        const uint32_t pair = (run << 16) | pixel;
+        for (int shift = 28; shift >= 0; shift -= 4) e5_kputc(hex[(pair >> shift) & 15]);
+        x += run;
+      }
+      e5_kputc('\n');
+    }
+    e5_cpu_log("E5FRAME end id=%u fnv=%08x", id, checksum);
+    ++cpu->snapshots;
+  }
   void copyCpuRequests() {
     if (!cpu || cpu->stopped || cpu->kicking) return;
     cpu->kicking = true;
@@ -178,6 +210,8 @@ private:
       // request's source ownership. No hardware vblank is claimed here.
       __asm__ volatile("dsb sy" ::: "memory");
       ++cpu->copied;
+      if (surface && (!cpu->snapshots || (cpu->snapshots == 1 && cpu->copied >= 64)))
+        captureCpuFrame();
       if (!activateOnlyPendingSwap(request)) {
         ++cpu->failed;
         e5_cpu_log("E5CPU activation-failed=%u req=%p", cpu->failed, request);

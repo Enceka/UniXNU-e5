@@ -11,6 +11,7 @@
 #include <IOKit/IOTimerEventSource.h>
 #include <IOKit/IOMemoryDescriptor.h>
 #include <IOKit/IODeviceMemory.h>
+#include <IOKit/pwr_mgt/IOPM.h>
 #include "E5FramebufferCopy.h"
 #include <libkern/c++/OSData.h>
 #include <pexpert/pexpert.h>
@@ -521,6 +522,7 @@ class E5Display : public IOMobileFramebufferLegacy {
   OSDeclareDefaultStructors(E5Display)
   bool familyStarted = false;
   bool bootValidated = false;
+  bool logicalPM = false;
 #include "E5CpuPresenter.inc"
 public:
   bool start(IOService *provider) override {
@@ -639,7 +641,30 @@ public:
       stop(provider);
       return false;
     }
+    // The generic lcd provider bypasses the Apple-specific PM setup in the
+    // inherited start chain. Register the platform's two logical states so
+    // IOPM calls the original setPowerState path with its controlling driver.
+    // That path, under the original command gate, owns requested (+5836).
+    static IOPMPowerState states[2] = {};
+    states[0].version = states[1].version = 1;
+    states[1].capabilityFlags = kIOPMDeviceUsable;
+    PMinit();
+    logicalPM = initialized;
+    if (!logicalPM) { stop(provider); return false; }
+    provider->joinPMtree(this);
+    IOReturn pmStatus = registerPowerDriver(this, states, 2);
+    if (pmStatus == kIOReturnSuccess) pmStatus = changePowerStateToPriv(1);
+    e5_cpu_log("E5PM register=%x initialized=%u", pmStatus, (unsigned)logicalPM);
+    if (pmStatus != kIOReturnSuccess) { stop(provider); return false; }
     return true;
+  }
+  IOReturn setPowerState(unsigned long ordinal, IOService *device) override {
+    if (logicalPM && ordinal > 1) return kIOReturnUnsupported;
+    IOReturn result = IOMobileFramebufferLegacy::setPowerState(ordinal, device);
+    e5_cpu_log("E5PM ordinal=%lu driver=%p requested=%u powered=%u ret=%x",
+        ordinal, device, *(volatile uint32_t *)((uint8_t *)this + 5836),
+        *(volatile uint32_t *)((uint8_t *)this + 5840), result);
+    return result;
   }
   IOReturn setDisplayState(OriginalLegacyDisplayState *state, bool option) override {
     IOReturn result = IOMobileFramebufferLegacy::setDisplayState(state, option);
@@ -653,6 +678,7 @@ public:
     return result;
   }
   void stop(IOService *provider) override {
+    if (logicalPM) { PMstop(); logicalPM = false; }
     stopCpuPresenter();
     familyStarted = false;
     bootValidated = false;
