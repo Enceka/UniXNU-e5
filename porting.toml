@@ -446,7 +446,7 @@ result = "640MiB and late CA observations pass; UI pending. 19 samples through 6
 
 [[area.evidence]]
 kind = "device"
-revision = "f0eedfc"
+revision = "f0eedfcf7c65645cac870bc8367e6ab4e13bca07"
 reference = "docs/logs/runtime-r278.json"
 command = "R278 e5-uefi-cycle.sh flash/collect; protected windows and full payload readback; 600-second watchdog"
 result = "CMD25 qualification passed and restored its spare page plus guards; first Data page write and reread took 1855us. No retained corruption or failed CMD25 marker. LS still pending and no swaps at reset; Android recovered."
@@ -728,7 +728,7 @@ result = "640MiB and late CA observations pass; UI pending. 19 samples through 6
 
 [[area.evidence]]
 kind = "device"
-revision = "f0eedfc"
+revision = "f0eedfcf7c65645cac870bc8367e6ab4e13bca07"
 reference = "docs/logs/runtime-r278.json"
 command = "R278 e5-uefi-cycle.sh flash/collect; protected windows and full payload readback; 600-second watchdog"
 result = "CMD25 qualification passed and restored its spare page plus guards; first Data page write and reread took 1855us. No retained corruption or failed CMD25 marker. LS still pending and no swaps at reset; Android recovered."
