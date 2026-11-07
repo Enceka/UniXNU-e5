@@ -7,11 +7,20 @@
 #include <stdarg.h>
 #include <IOKit/IOLib.h>
 #include <IOKit/IOCommandGate.h>
+#include <IOKit/IOWorkLoop.h>
+#include <IOKit/IOTimerEventSource.h>
+#include <IOKit/IOMemoryDescriptor.h>
+#include <IOKit/IODeviceMemory.h>
+#include "E5FramebufferCopy.h"
 #include <libkern/c++/OSData.h>
 #include <pexpert/pexpert.h>
 #include <mach/mach_time.h>
 
 extern "C" unsigned e5_quiet;
+extern "C" IOMemoryDescriptor *e5_surface_descriptor(OSObject *);
+extern "C" uint64_t e5_surface_width(OSObject *), e5_surface_height(OSObject *);
+extern "C" uint64_t e5_surface_stride(OSObject *), e5_surface_allocation(OSObject *);
+extern "C" uint32_t e5_surface_format(OSObject *), e5_surface_planes(OSObject *);
 
 extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
                                             void *b, void *c, void *d);
@@ -502,6 +511,7 @@ class E5Display : public IOMobileFramebufferLegacy {
   OSDeclareDefaultStructors(E5Display)
   bool familyStarted = false;
   bool bootValidated = false;
+#include "E5CpuPresenter.inc"
 public:
   bool start(IOService *provider) override {
     __atomic_fetch_or(&e5_display_lifecycle, 0x001U, __ATOMIC_RELAXED);
@@ -513,7 +523,10 @@ public:
     if (!surface) return false;
     surface->release();
     __atomic_fetch_or(&e5_display_lifecycle, 0x400U, __ATOMIC_RELAXED);
-    if (!IOMobileFramebufferLegacy::start(provider)) return false;
+    if (!IOMobileFramebufferLegacy::start(provider)) {
+      releaseCpuPresenter();
+      return false;
+    }
     // Power-change support contract: the original Legacy::start clears the
     // family's power-support byte (family __TEXT_EXEC raw 0xfffffff006787e58,
     // `strb wzr,[x8,#0x8c]`) and NOTHING inside the family ever sets it again
@@ -605,10 +618,12 @@ public:
     return true;
   }
   void stop(IOService *provider) override {
+    stopCpuPresenter();
     familyStarted = false;
     bootValidated = false;
     __atomic_fetch_or(&e5_display_lifecycle, 0x200U, __ATOMIC_RELAXED);
     IOMobileFramebufferLegacy::stop(provider);
+    releaseCpuPresenter();
   }
   // The original start calls virtual registerService before it returns.
   // Publication is released by e5_display_publish only after the entire
@@ -637,6 +652,7 @@ public:
     uint32_t width = 0, height = 0;
     getDisplayDimensions(&width, &height);
     if (width != 320 || height != 480) return false;
+    if (!startCpuPresenter()) return false;
     bootValidated = true;
     __atomic_fetch_or(&e5_display_lifecycle, 0x008U, __ATOMIC_RELAXED);
     return true;
@@ -821,25 +837,13 @@ public:
   IOReturn opaque176(void *client, uint32_t swap, uint32_t flags, uint32_t timeout) override {
     __atomic_fetch_add(&e5_display_wait_calls, 1U, __ATOMIC_RELAXED);
     __atomic_store_n(&e5_display_wait_last, (swap & 0xFFFFu) | ((flags & 0xFFu) << 16) | ((timeout & 0xFFu) << 24), __ATOMIC_RELAXED);
-    // r163: v25 proved the client RETRIES SwapWait on Timeout and its loop
-    // revives on a periodic success pulse (n=4 with 3 timeouts + 1 ok at
-    // 1-in-4). The pure native pass-through (r127) answers from empty
-    // structures and the client abandons after one call. Serve the v25
-    // cadence directly: ~3 timeouts then one success = a fake vsync tick.
-    static unsigned sWaitBeats = 0;
-    const bool pulse = (++sWaitBeats & 0x3u) == 0;
-    const IOReturn status =
-        pulse ? kIOReturnSuccess : kIOReturnTimeout;
-    __atomic_store_n(&e5_display_wait_status,
-                     (unsigned)(pulse ? 0 : 0xE00002D5u), __ATOMIC_RELAXED);
+    const IOReturn status = IOMobileFramebufferLegacy::opaque176(client, swap, flags, timeout);
+    __atomic_store_n(&e5_display_wait_status, (unsigned)status, __ATOMIC_RELAXED);
     return status;
-    (void)client; (void)flags; (void)timeout;
   }
-  // v18: the swap/surface band. The Legacy base returns kIOReturnUnsupported
-  // from every one of these (r114: sel 15/22/27/33/50/57/79/84 all rejected);
-  // the concrete platform driver owns them. Firmware-scanout semantics: every
-  // surface/swap operation succeeds as a no-op (the DPU scans 0xBE000000
-  // continuously; buffers written by the compositor ARE the scanout).
+  // Existing configuration probe responses remain separately observable.
+  // Pixel delivery is performed by the validated CPU presenter above; these
+  // configuration responses do not establish that a frame was presented.
   IOReturn opaque180(uint32_t a, uint32_t b, void *out) override {
     (void)a; (void)b; if (out) *(uint32_t *)out = 0;
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 0, __ATOMIC_RELAXED);
@@ -952,14 +956,13 @@ public:
   E5_GUARDED_SLOT(245)
   E5_GUARDED_SLOT(246)
   E5_GUARDED_SLOT(307)
-  E5_GUARDED_SLOT(337)
   E5_GUARDED_SLOT(338)
   E5_GUARDED_SLOT(345)
 #undef E5_GUARDED_SLOT
 };
 
 OSDefineMetaClassAndStructors(E5Display, IOMobileFramebufferLegacy)
-static_assert(sizeof(E5Display) == 0x2118, "v43: grown Legacy extent carries the +0x1e88 panel pointer in-bounds");
+static_assert(sizeof(E5Display) == 0x2120, "Legacy extent plus lifecycle flags and owned CPU presenter pointer");
 
 extern "C" unsigned e5_display_compiled_size(void) { return sizeof(E5Display); }
 

@@ -444,9 +444,23 @@ reference = "docs/logs/runtime-r277.json"
 command = "R277 640MiB typed ADT, validated payload and raw windows; e5-uefi-cycle.sh flash/collect with native USB"
 result = "640MiB and late CA observations pass; UI pending. 19 samples through 627789ms, RD=241020:8317061, WR=2466:295704:0, RV=0. No CAFEBABE/APFS corruption/signature-load error/panic. Native display is enabled and CA timer serial advances; SpringBoard waits for the database while LS seeding proceeds. One initial panel CRC; Android recovery succeeds. IPC packed-pointer decoding remains unqualified."
 
+[[area.evidence]]
+kind = "device"
+revision = "f0eedfc"
+reference = "docs/logs/runtime-r278.json"
+command = "R278 e5-uefi-cycle.sh flash/collect; protected windows and full payload readback; 600-second watchdog"
+result = "CMD25 qualification passed and restored its spare page plus guards; first Data page write and reread took 1855us. No retained corruption or failed CMD25 marker. LS still pending and no swaps at reset; Android recovered."
+
+[[area.evidence]]
+kind = "device"
+revision = "756af5c49e859fa7dddc1eea2bf9e20d7bfabb78"
+reference = "docs/logs/runtime-r279.json"
+command = "R279 same kernel, explicitly authorized 1800-second diagnostic; native USB capture and harvest"
+result = "LS seeding group completed at 675.759s. SpringBoard reached UIApplication run loop; 19 successful SwapBegin/SwapEnd calls, one missing-default-surface error. No visible SpringBoard, retained corruption or CMD25 failure. Final 40139 writes verified; fresh Android returned and spare/guards matched. Later trials restricted to 720 seconds with user upper limit 900."
+
 [[area]]
 id = "display"
-findings = ["R277 diagnostics: periodic CA inspection retains the last observed backboardd PID (with name/lifetime revalidation) instead of clearing it to zero. R275/R276 sampled the array before it was populated and otherwise lost every late display-state snapshot. Fix dyld_image_info stride from 168 to the ABI 24 bytes; the old image enumeration skipped six entries at a time.", "R275 independent timer is live on eMMC-only: E5OBS/E5PROC/E5LIVE and E5DPU appear while PID 1 reads the cache. R275 CPU values exposed an older probe bug: cpu_time_eqos_stats at 0x4f8 is a task field, not a thread field. R276 samples real accumulated absolute ticks through recount_thread_time_mach while task_lock protects the member; prior E5TH cpu values are invalid.", "R274 eMMC-only boots skip SD media publication, so the SD read-completion frame kick never runs and neither the runtime census nor the delivery/DPU timer starts. R275 starts an independent, serialized kernel-priority timer from display startup, samples processes/registry/panel/eMMC counters every approximately 32 seconds, and schedules the 60-second deep thread probe outside display delivery. The native family notification stays on the delivery worker. Census now includes launchd/logd/lsd/watchdogd and IOWatchdog registry presence. Host compilation is verified; R275 device acceptance is pending."]
+findings = ["R279 reaches the SpringBoard UIApplication run loop and real SwapBegin/SwapEnd, but original selector 3 fails with No Default FB Surface found; the user reports no SpringBoard pixels. R281 preparation connects hash-qualified original IOSurface getters, request validation, bounded BGRA-to-RGB565 copying and original current-swap retirement. SwapWait now uses the original completion state; host sanitizer checks cover padded rows, colors, alignment and rejected bounds. Default-surface absence is also seen on successful comparable ports and is not established as the sole blocker. No new display kernel is device-qualified yet.", "R277 diagnostics: periodic CA inspection retains the last observed backboardd PID (with name/lifetime revalidation) instead of clearing it to zero. R275/R276 sampled the array before it was populated and otherwise lost every late display-state snapshot. Fix dyld_image_info stride from 168 to the ABI 24 bytes; the old image enumeration skipped six entries at a time.", "R275 independent timer is live on eMMC-only: E5OBS/E5PROC/E5LIVE and E5DPU appear while PID 1 reads the cache. R275 CPU values exposed an older probe bug: cpu_time_eqos_stats at 0x4f8 is a task field, not a thread field. R276 samples real accumulated absolute ticks through recount_thread_time_mach while task_lock protects the member; prior E5TH cpu values are invalid.", "R274 eMMC-only boots skip SD media publication, so the SD read-completion frame kick never runs and neither the runtime census nor the delivery/DPU timer starts. R275 starts an independent, serialized kernel-priority timer from display startup, samples processes/registry/panel/eMMC counters every approximately 32 seconds, and schedules the 60-second deep thread probe outside display delivery. The native family notification stays on the delivery worker. Census now includes launchd/logd/lsd/watchdogd and IOWatchdog registry presence. Host compilation is verified; R275 device acceptance is pending."]
 status = "device-verified"
 components = ["GopFramebuffer"]
 paths = ["package/*Framebuffer*", "package/*Display*", "scripts/emmc/NativeSd.cpp", "scripts/display/**", "scripts/e5_display_build.py", "patches/xnu/e5-display-submit-trace.patch"]
@@ -711,6 +725,20 @@ revision = "2151edf2c3d0c3810551e911cecb2ae576603655"
 reference = "docs/logs/runtime-r277.json"
 command = "R277 640MiB typed ADT, validated payload and raw windows; e5-uefi-cycle.sh flash/collect with native USB"
 result = "640MiB and late CA observations pass; UI pending. 19 samples through 627789ms, RD=241020:8317061, WR=2466:295704:0, RV=0. No CAFEBABE/APFS corruption/signature-load error/panic. Native display is enabled and CA timer serial advances; SpringBoard waits for the database while LS seeding proceeds. One initial panel CRC; Android recovery succeeds. IPC packed-pointer decoding remains unqualified."
+
+[[area.evidence]]
+kind = "device"
+revision = "f0eedfc"
+reference = "docs/logs/runtime-r278.json"
+command = "R278 e5-uefi-cycle.sh flash/collect; protected windows and full payload readback; 600-second watchdog"
+result = "CMD25 qualification passed and restored its spare page plus guards; first Data page write and reread took 1855us. No retained corruption or failed CMD25 marker. LS still pending and no swaps at reset; Android recovered."
+
+[[area.evidence]]
+kind = "device"
+revision = "756af5c49e859fa7dddc1eea2bf9e20d7bfabb78"
+reference = "docs/logs/runtime-r279.json"
+command = "R279 same kernel, explicitly authorized 1800-second diagnostic; native USB capture and harvest"
+result = "LS seeding group completed at 675.759s. SpringBoard reached UIApplication run loop; 19 successful SwapBegin/SwapEnd calls, one missing-default-surface error. No visible SpringBoard, retained corruption or CMD25 failure. Final 40139 writes verified; fresh Android returned and spare/guards matched. Later trials restricted to 720 seconds with user upper limit 900."
 
 [[area]]
 id = "input"

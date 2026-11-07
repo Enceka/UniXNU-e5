@@ -1,0 +1,72 @@
+{
+  "round": 278,
+  "sources": [
+    {
+      "path": "uefi/build/sb-r278/r278/capture/kernel.log",
+      "bytes": 954799,
+      "sha256": "a1ba6ba662a05d5b395aed33e1a60cddcfd0d9619270939f1482bf81210fe723"
+    }
+  ],
+  "kernel_sha256": "abcfc2d2843ab0dc61627b5d7cef54899bf1a07520c473760081fa5cda944dbb",
+  "owned_bytes": 671088640,
+  "markers": {
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "load code signature error": 0,
+    "panic(cpu": 0,
+    "E5PANELSNAP": 1
+  },
+  "early_boot": [
+    "com.apple.xpc.launchd|1969-12-31 16:03:09.177271 (boot) <Notice>: Early boot complete. Continuing system boot.",
+    "[System Event] [4918659894] [INFO] [Subsystem: launchd] [Event: boot] Early boot complete. Continuing system boot."
+  ],
+  "uptime_ms": [
+    43427,
+    75537,
+    110318,
+    144548,
+    176637,
+    210783,
+    242843,
+    274924,
+    306993,
+    339106,
+    371184,
+    403280,
+    435355,
+    467455,
+    499566,
+    531646,
+    563754,
+    595831,
+    627929
+  ],
+  "cmd25_qualification": [
+    "E5W25 qualification lba=58728704 passed=1 restored=1 enabled=1"
+  ],
+  "cmd25_failures": [],
+  "cmd25_last": [
+    "E5W25 ops=15377 verified=15376 ms=37791"
+  ],
+  "display_last": [
+    "E5IMSUM vc=1:45416:45416 d=0:0:0 b=0:0:0 e=0:0:0 over=0"
+  ],
+  "first_surface_calls": [],
+  "last_heartbeat": [
+    "XNUUSB: heartbeat written=954679 sent=954679 dropped=0 cfg=1 dtr=3 suspend=0 phase=0 pending=0 tx=2004 reset=1 setup=21"
+  ],
+  "last_io": [
+    "E5IO RD=302325:8881437 WR=3112:123104:0 RV=0"
+  ],
+  "last_process_census": [
+    "E5LIVE seq=19 pid_limit=512 seen=77b7 services=3c total=146 max_pid=261"
+  ],
+  "ls_last": [
+    "E5LSD pid=104 uid=501 sl=11abc000 kr=0 gp=1015ce030 isa=206300bf0 rd=1:1 raw=fffffffb:fffffffb lk=0:0"
+  ],
+  "user_visible_springboard": false,
+  "payload_sha256": "b0d3e20b9bd5ee4c72c86064dd7cc1faec2ae88cb6356ec2979e56f1834008cf",
+  "watchdog_seconds": 600,
+  "result": "Data writes qualified and per-transfer readback compared; LS still had pending work at watchdog reset."
+}

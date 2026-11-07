@@ -19,7 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
-OWNED = sorted([0, 1, 7, 84, 86, 87, 91, 141, 176, 180, 183, 184, 188, 199, 200, 201, 203, 206, 207, 208, 210, 224, 229, 232, 255, 256, 258, 288, 344] + PURE)
+OWNED = sorted([0, 1, 7, 14, 84, 86, 87, 91, 141, 176, 180, 183, 184, 188, 199, 200, 201, 203, 206, 207, 208, 210, 224, 229, 232, 255, 256, 258, 288, 290, 296, 344] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -143,11 +143,37 @@ def main():
         require(word & 0xfc000000 == 0x94000000 and
                 derive.branch_target(pc - slide, word) + slide == target, 'original C2/D2 chain changed')
 
+    require(table[295] + slide == 0xfffffff005795b88 and
+            read(0xfffffff005795b98 - slide, 16) == bytes.fromhex('e00740f9280080520101001272d3ff97'),
+            'original normal current-swap completion changed')
+    require(read(0xfffffff00578aa7c - slide, 24) == bytes.fromhex('080040f9084545f9030080d2e20303aa0400805200013fd6'),
+            'original optional completion-report call changed')
+    require(read(0xfffffff005790ec8 - slide, 16) == bytes.fromhex('08a144f900013fd6280080520800080a'),
+            'original request-validation bool dispatch changed')
+    require(read(0xfffffff005787d84 - slide, 4) == bytes.fromhex('3fb50af9') and
+            read(0xfffffff005787d90 - slide, 4) == bytes.fromhex('28b90af9') and
+            read(0xfffffff005786c5c - slide, 4) == bytes.fromhex('08c945f9'),
+            'original pending queue head/tail/next fields changed')
+    require(read(0xfffffff004ba2908 - slide, 4) == bytes.fromhex('c84e4139') and
+            read(0xfffffff004ba2910 - slide, 4) == bytes.fromhex('c84e40b9'),
+            'original IOSurface read-fence active/completed fields changed')
+    surface_bindings = {}
+    for name, address, field, wide in [
+        ('descriptor', 0xfffffff004b9ead0, 48, True),
+        ('width', 0xfffffff004b9ebbc, 88, True), ('height', 0xfffffff004b9ebc4, 96, True),
+        ('stride', 0xfffffff004b9ebd4, 104, True), ('allocation', 0xfffffff004b9ebfc, 144, True),
+        ('format', 0xfffffff004b9ebac, 128, False), ('planes', 0xfffffff004b9ebf4, 152, False)]:
+        expected = (0xf9400000 if wide else 0xb9400000) | ((field // (8 if wide else 4)) << 10)
+        require(read(address - slide, 8) == struct.pack('<2I', expected, 0xd65f03c0),
+                'original IOSurface getter changed: ' + name)
+        surface_bindings['_e5_surface_' + name] = address
+
     header = '''// SPDX-License-Identifier: BSD-2-Clause-Patent
 // Generated opaque inheritance layout for the hash-qualified 21H461 family.
 #pragma once
 #include <IOKit/IOService.h>
 #include <libkern/libkern.h>
+struct OriginalLegacySwapRequest;
 class IOMobileFramebufferLegacy : public IOService {
   OSDeclareAbstractStructors(IOMobileFramebufferLegacy)
   unsigned char originalPrivate[0x2110 - sizeof(IOService)];
@@ -157,6 +183,33 @@ public:
     memcpy(bytes + 0x16b0, &width, sizeof(width));
     memcpy(bytes + 0x16b4, &height, sizeof(height));
   }
+ const OriginalLegacySwapRequest *pendingSwapRequest() const {
+  const OriginalLegacySwapRequest *request=nullptr;
+  memcpy(&request,reinterpret_cast<const unsigned char *>(this)+5480,sizeof(request));return request;
+ }
+ // The real normal scanout backend removes its pending head before calling
+ // slot 295. Slot 312 is a discard path (terminal state 8), not presentation.
+ // The queue is a tail queue (head at +5480, tail pointer at +5488, each request's next at +2960 and previous-link at +2968): taking the head
+ // moves the next request, if a client already queued one behind it (int-132: swap 3 arrived during swap 2's GPU copy and the old
+ // single-entry form refused to retire swap 2, so every wait on it stayed busy), up to the head. The original queue's reference
+ // moves to the current-swap slot for the original completion body.
+ bool activateOnlyPendingSwap(const OriginalLegacySwapRequest *request) {
+  auto self=reinterpret_cast<unsigned char *>(this);
+  auto bytes=reinterpret_cast<const unsigned char *>(request);
+  const void *current=nullptr,*head=nullptr,*tail=nullptr,*next=nullptr,*previous=nullptr;
+  memcpy(&current,self+5472,8);memcpy(&head,self+5480,8);memcpy(&tail,self+5488,8);
+  if(!request || current || head!=request)return false;
+  memcpy(&next,bytes+2960,8);memcpy(&previous,bytes+2968,8);
+  if(previous!=self+5480)return false;
+  if(next) {
+   const void *link=self+5480;
+   memcpy(const_cast<unsigned char *>(reinterpret_cast<const unsigned char *>(next))+2968,&link,8);
+  } else if(tail!=bytes+2960)return false;
+  memcpy(self+5472,&request,8);
+  if(next) {memcpy(self+5480,&next,8);}
+  else {const void *empty=nullptr,*emptyTail=self+5480;memcpy(self+5480,&empty,8);memcpy(self+5488,&emptyTail,8);}
+  return true;
+ }
   unsigned lifecycleResourceMask() const {
     const unsigned offsets[] = {0x1608, 0x1610, 0x1638, 0x1648, 0x17f8, 0x1868};
     auto bytes = reinterpret_cast<const unsigned char *>(this);
@@ -239,6 +292,14 @@ public:
         elif i == 288:
             header += '  virtual bool startHardware();\n'
 
+        elif i == 290:
+            header += '  virtual void kickSwapQueue();\n'
+        elif i == 295:
+            header += '  virtual void completeCurrentSwap();\n'
+        elif i == 296:
+            header += '  virtual bool validateSwap(const OriginalLegacySwapRequest *);\n'
+        elif i == 337:
+            header += '  virtual IOReturn collectCompletionReports(uint32_t, void *, uint32_t *, uint32_t) = 0;\n'
         elif i == 344:
             header += '  virtual IOReturn opaque344(uint64_t, void *);\n'
         elif i in PURE:
@@ -329,6 +390,8 @@ public:
                 '__ZN25IOMobileFramebufferLegacy5startEP9IOService': table[86] + slide,
                 '__ZN25IOMobileFramebufferLegacy4stopEP9IOService': table[87] + slide,
                 '__ZTV25IOMobileFramebufferLegacy': vptr - 16}
+    bindings['__ZN25IOMobileFramebufferLegacy4freeEv'] = table[14] + slide
+    bindings['__ZN25IOMobileFramebufferLegacy9opaque176EPvjjj'] = table[176] + slide
     owned_slots, native_slots = [], []
     for i, name in enumerate(compiled):
         if name.startswith(('__ZN9E5Display', '__ZNK9E5Display')):
@@ -344,6 +407,7 @@ public:
     undefined = {name for name, _, kind in symbols if kind == 1 and 'IOMobileFramebufferLegacy' in name}
     require(undefined <= set(bindings), 'unqualified original-class imports: ' + str(undefined - set(bindings)))
     bindings = {name: bindings[name] for name in undefined}
+    bindings.update(surface_bindings)
     asm = OUT / 'E5DisplayBindings.S'
     asm.write_text(''.join(f'.globl {name}\n.set {name}, {va:#x}\n' for name, va in sorted(bindings.items())))
     run([record['arguments'][0], '--target=arm64-apple-ios17.0', '-Werror', '-Wno-incompatible-sysroot',
@@ -378,12 +442,12 @@ public:
          keystore, keystore_component])
     report = dict(schema=1, original_kernelcache_sha256=digest(kc), original_family_text_sha256=FAMILY_HASH,
                   original_slide=slide, legacy_instance_bytes=0x2110, virtual_entries=358,
-                  guarded_backend_slots=PURE, owned_slots=owned_slots, inherited_native_slots=native_slots,
+                  original_abstract_slots=PURE, guarded_backend_slots=[245, 246, 307, 338, 345], owned_slots=owned_slots, inherited_native_slots=native_slots,
                   bindings={name: hex(va) for name, va in sorted(bindings.items())},
                   generated_header_sha256=digest(header.encode()), object_sha256=digest(blob),
                   source_sha256={p.name: digest(p.read_bytes()) for p in
                                  [SOURCE / 'E5Display.cpp', SOURCE / 'E5DisplayProbe.cpp', SOURCE / 'E5CAProbe.cpp',
-                                  SOURCE / 'E5KeyStore.cpp', component, Path(__file__)]},
+                                  SOURCE / 'E5KeyStore.cpp', SOURCE / 'E5FramebufferCopy.h', SOURCE / 'E5CpuPresenter.inc', component, Path(__file__)]},
                   late_object_sha256=digest(late.read_bytes()), archive_sha256=digest(archive.read_bytes()),
                   automatic_initializer_removed=True, owned_instructions_unchanged=True,
                   runtime_registration_verified=False, runtime_construction_verified=False,

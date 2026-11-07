@@ -1,0 +1,1225 @@
+{
+  "round": 279,
+  "sources": [
+    {
+      "path": "uefi/build/sb-r279/r279/capture/kernel.log",
+      "bytes": 590626,
+      "sha256": "69b379c5d1f796a0572c943c86a401de8b9aa4a2e530f4acfb119b86132b633a"
+    },
+    {
+      "path": "uefi/build/sb-r279/r279/capture-resumed/kernel.log",
+      "bytes": 1706907,
+      "sha256": "00a97441f1f520708afb7afef5b29b26ae382cd8df9d0b38a5c1f394574794f2"
+    }
+  ],
+  "kernel_sha256": "abcfc2d2843ab0dc61627b5d7cef54899bf1a07520c473760081fa5cda944dbb",
+  "owned_bytes": 671088640,
+  "markers": {
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "load code signature error": 0,
+    "panic(cpu": 0,
+    "E5PANELSNAP": 1
+  },
+  "early_boot": [
+    "com.apple.xpc.launchd|1969-12-31 16:03:09.038820 (boot) <Notice>: Early boot complete. Continuing system boot.",
+    "[System Event] [4915058936] [INFO] [Subsystem: launchd] [Event: boot] Early boot complete. Continuing system boot."
+  ],
+  "uptime_ms": [
+    43185,
+    75303,
+    110075,
+    144289,
+    176392,
+    210520,
+    242576,
+    274662,
+    306734,
+    338820,
+    370893,
+    402988,
+    435067,
+    467163,
+    499260,
+    531338,
+    563435,
+    595512,
+    627610,
+    659686,
+    691782,
+    723858,
+    755957,
+    788039,
+    820136,
+    852217,
+    884319,
+    916396,
+    948496,
+    980595,
+    1012671,
+    1044773,
+    1076857,
+    1108957,
+    1141036,
+    1173136,
+    1205216,
+    1237314,
+    1269391,
+    1301543,
+    1333622,
+    1365720,
+    1397799,
+    1429898,
+    1461994,
+    1494071,
+    1526168,
+    1558245,
+    1590340,
+    1622416,
+    1654512,
+    1686589,
+    1718688,
+    1750765,
+    1782864,
+    1814945
+  ],
+  "cmd25_qualification": [
+    "E5W25 qualification lba=58728704 passed=1 restored=1 enabled=1"
+  ],
+  "cmd25_failures": [],
+  "cmd25_last": [
+    "E5W25 ops=40139 verified=40139 ms=76599"
+  ],
+  "display_last": [
+    "E5IMSUM vc=1:51590:51590 d=1:0:e00002bc b=19:19:0 e=19:19:0 over=0"
+  ],
+  "first_surface_calls": [
+    "E5IMCALL pid=57 name=backboardd sel=4 n=1 ret=0 si=0 bi=0 so=1 out=1",
+    "E5IMCALL pid=57 name=backboardd sel=5 n=1 ret=0 si=0 bi=1288 so=0 out=0",
+    "E5IMCALL pid=57 name=backboardd sel=3 n=1 ret=e00002bc si=2 bi=0 so=1 out=0",
+    "E5IMCALL pid=57 name=backboardd sel=4 n=2 ret=0 si=0 bi=0 so=1 out=2",
+    "E5IMCALL pid=57 name=backboardd sel=5 n=2 ret=0 si=0 bi=1288 so=0 out=0",
+    "E5IMCALL pid=57 name=backboardd sel=4 n=3 ret=0 si=0 bi=0 so=1 out=3",
+    "E5IMCALL pid=57 name=backboardd sel=5 n=3 ret=0 si=0 bi=1288 so=0 out=0",
+    "E5IMCALL pid=57 name=backboardd sel=4 n=4 ret=0 si=0 bi=0 so=1 out=4"
+  ],
+  "last_heartbeat": [
+    "XNUUSB: heartbeat written=2297411 sent=2297411 dropped=0 cfg=1 dtr=3 suspend=0 phase=0 pending=0 tx=2004 reset=1 setup=31"
+  ],
+  "last_io": [
+    "E5IO RD=1547650:21284045 WR=7373:321104:0 RV=0"
+  ],
+  "last_process_census": [
+    "E5LIVE seq=56 pid_limit=512 seen=77b7 services=3c total=173 max_pid=428"
+  ],
+  "ls_last": [
+    "E5LSD pid=105 uid=501 sl=b21c000 kr=0 gp=100e8eda0 isa=1ffa60bf0 rd=1:1 raw=100000000:100000000 lk=0:0"
+  ],
+  "user_visible_springboard": false,
+  "ls_completion_first_observed_seconds": 675.7589465384615,
+  "ls_group_state": "0x100000000: pending=0, generation=1",
+  "springboard_latest": {
+    "header": "E5THP i=3 pid=27 name=SpringBoard n=12 uid=501 ts=932e43a62",
+    "seconds": 1519.5586006923077,
+    "slide": "0xb21c000",
+    "threads": {
+      "0": [
+        {
+          "runtime": "0x1d699cb58",
+          "unslid": "0x1cb780b58",
+          "symbol": "_mach_msg2_trap",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1d69a0224",
+          "unslid": "0x1cb784224",
+          "symbol": "_mach_msg2_internal",
+          "offset": "0x4c"
+        },
+        {
+          "runtime": "0x1d69a01b0",
+          "unslid": "0x1cb7841b0",
+          "symbol": "_mach_msg_overwrite",
+          "offset": "0x1ec"
+        },
+        {
+          "runtime": "0x1d699ffb8",
+          "unslid": "0x1cb783fb8",
+          "symbol": "_mach_msg",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x1930dda6c",
+          "unslid": "0x187ec1a6c",
+          "symbol": "___CFRunLoopServiceMachPort",
+          "offset": "0x9c"
+        },
+        {
+          "runtime": "0x1930dd0dc",
+          "unslid": "0x187ec10dc",
+          "symbol": "___CFRunLoopRun",
+          "offset": "0x4b8"
+        },
+        {
+          "runtime": "0x1930dc7d0",
+          "unslid": "0x187ec07d0",
+          "symbol": "_CFRunLoopRunSpecific",
+          "offset": "0x23c"
+        },
+        {
+          "runtime": "0x1d2ae0814",
+          "unslid": "0x1c78c4814",
+          "symbol": "_GSEventRunModal",
+          "offset": "0xa0"
+        },
+        {
+          "runtime": "0x1955d5268",
+          "unslid": "0x18a3b9268",
+          "symbol": "-[UIApplication _run]",
+          "offset": "0x364"
+        },
+        {
+          "runtime": "0x19567f90c",
+          "unslid": "0x18a46390c",
+          "symbol": "_UIApplicationMain",
+          "offset": "0x138"
+        },
+        {
+          "runtime": "0x1dac54df4",
+          "unslid": "0x1cfa38df4",
+          "symbol": "_SBSystemAppMain",
+          "offset": "0x1474"
+        },
+        {
+          "runtime": "0x1b467a228",
+          "unslid": "0x1a945e228",
+          "symbol": "start",
+          "offset": "0x5f0"
+        }
+      ],
+      "1": [
+        {
+          "runtime": "0x1d699cb58",
+          "unslid": "0x1cb780b58",
+          "symbol": "_mach_msg2_trap",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1d69a0224",
+          "unslid": "0x1cb784224",
+          "symbol": "_mach_msg2_internal",
+          "offset": "0x4c"
+        },
+        {
+          "runtime": "0x1d69a01b0",
+          "unslid": "0x1cb7841b0",
+          "symbol": "_mach_msg_overwrite",
+          "offset": "0x1ec"
+        },
+        {
+          "runtime": "0x1d699ffb8",
+          "unslid": "0x1cb783fb8",
+          "symbol": "_mach_msg",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x1930dda6c",
+          "unslid": "0x187ec1a6c",
+          "symbol": "___CFRunLoopServiceMachPort",
+          "offset": "0x9c"
+        },
+        {
+          "runtime": "0x1930dd0dc",
+          "unslid": "0x187ec10dc",
+          "symbol": "___CFRunLoopRun",
+          "offset": "0x4b8"
+        },
+        {
+          "runtime": "0x1930dc7d0",
+          "unslid": "0x187ec07d0",
+          "symbol": "_CFRunLoopRunSpecific",
+          "offset": "0x23c"
+        },
+        {
+          "runtime": "0x1920f7368",
+          "unslid": "0x186edb368",
+          "symbol": "-[NSRunLoop(NSRunLoop) runMode:beforeDate:]",
+          "offset": "0xd0"
+        },
+        {
+          "runtime": "0x1920f71e4",
+          "unslid": "0x186edb1e4",
+          "symbol": "-[NSRunLoop(NSRunLoop) runUntilDate:]",
+          "offset": "0x3c"
+        },
+        {
+          "runtime": "0x1955e7e28",
+          "unslid": "0x18a3cbe28",
+          "symbol": "-[UIEventFetcher threadMain]",
+          "offset": "0x198"
+        },
+        {
+          "runtime": "0x19210bd04",
+          "unslid": "0x186eefd04",
+          "symbol": "___NSThread__start__",
+          "offset": "0x2d0"
+        },
+        {
+          "runtime": "0x1e883f82c",
+          "unslid": "0x1dd62382c",
+          "symbol": "__pthread_start",
+          "offset": "0x68"
+        },
+        {
+          "runtime": "0x1e883bcd8",
+          "unslid": "0x1dd61fcd8",
+          "symbol": "_thread_start",
+          "offset": "0x8"
+        }
+      ],
+      "2": [
+        {
+          "runtime": "0x1d699cb58",
+          "unslid": "0x1cb780b58",
+          "symbol": "_mach_msg2_trap",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1d69a0224",
+          "unslid": "0x1cb784224",
+          "symbol": "_mach_msg2_internal",
+          "offset": "0x4c"
+        },
+        {
+          "runtime": "0x1d69a01b0",
+          "unslid": "0x1cb7841b0",
+          "symbol": "_mach_msg_overwrite",
+          "offset": "0x1ec"
+        },
+        {
+          "runtime": "0x1d699ffb8",
+          "unslid": "0x1cb783fb8",
+          "symbol": "_mach_msg",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x1930dda6c",
+          "unslid": "0x187ec1a6c",
+          "symbol": "___CFRunLoopServiceMachPort",
+          "offset": "0x9c"
+        },
+        {
+          "runtime": "0x1930dd0dc",
+          "unslid": "0x187ec10dc",
+          "symbol": "___CFRunLoopRun",
+          "offset": "0x4b8"
+        },
+        {
+          "runtime": "0x1930dc7d0",
+          "unslid": "0x187ec07d0",
+          "symbol": "_CFRunLoopRunSpecific",
+          "offset": "0x23c"
+        },
+        {
+          "runtime": "0x193146348",
+          "unslid": "0x187f2a348",
+          "symbol": "_CFRunLoopRun",
+          "offset": "0x3c"
+        },
+        {
+          "runtime": "0x19f0a37a0",
+          "unslid": "0x193e877a0",
+          "symbol": null,
+          "offset": null
+        },
+        {
+          "runtime": "0x1e883f82c",
+          "unslid": "0x1dd62382c",
+          "symbol": "__pthread_start",
+          "offset": "0x68"
+        },
+        {
+          "runtime": "0x1e883bcd8",
+          "unslid": "0x1dd61fcd8",
+          "symbol": "_thread_start",
+          "offset": "0x8"
+        }
+      ],
+      "3": [
+        {
+          "runtime": "0x1d699cb58",
+          "unslid": "0x1cb780b58",
+          "symbol": "_mach_msg2_trap",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1d69a0224",
+          "unslid": "0x1cb784224",
+          "symbol": "_mach_msg2_internal",
+          "offset": "0x4c"
+        },
+        {
+          "runtime": "0x1d69a01b0",
+          "unslid": "0x1cb7841b0",
+          "symbol": "_mach_msg_overwrite",
+          "offset": "0x1ec"
+        },
+        {
+          "runtime": "0x1d699ffb8",
+          "unslid": "0x1cb783fb8",
+          "symbol": "_mach_msg",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x1930dda6c",
+          "unslid": "0x187ec1a6c",
+          "symbol": "___CFRunLoopServiceMachPort",
+          "offset": "0x9c"
+        },
+        {
+          "runtime": "0x1930dd0dc",
+          "unslid": "0x187ec10dc",
+          "symbol": "___CFRunLoopRun",
+          "offset": "0x4b8"
+        },
+        {
+          "runtime": "0x1930dc7d0",
+          "unslid": "0x187ec07d0",
+          "symbol": "_CFRunLoopRunSpecific",
+          "offset": "0x23c"
+        },
+        {
+          "runtime": "0x1920f7368",
+          "unslid": "0x186edb368",
+          "symbol": "-[NSRunLoop(NSRunLoop) runMode:beforeDate:]",
+          "offset": "0xd0"
+        },
+        {
+          "runtime": "0x1920f7254",
+          "unslid": "0x186edb254",
+          "symbol": "-[NSRunLoop(NSRunLoop) run]",
+          "offset": "0x3c"
+        },
+        {
+          "runtime": "0x1dad97478",
+          "unslid": "0x1cfb7b478",
+          "symbol": "-[SBWiFiManager _runManagerCallbackThread]",
+          "offset": "0xb4"
+        },
+        {
+          "runtime": "0x19210bd04",
+          "unslid": "0x186eefd04",
+          "symbol": "___NSThread__start__",
+          "offset": "0x2d0"
+        },
+        {
+          "runtime": "0x1e883f82c",
+          "unslid": "0x1dd62382c",
+          "symbol": "__pthread_start",
+          "offset": "0x68"
+        },
+        {
+          "runtime": "0x1e883bcd8",
+          "unslid": "0x1dd61fcd8",
+          "symbol": "_thread_start",
+          "offset": "0x8"
+        }
+      ],
+      "4": [
+        {
+          "runtime": "0x1d699cb58",
+          "unslid": "0x1cb780b58",
+          "symbol": "_mach_msg2_trap",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1d69a0224",
+          "unslid": "0x1cb784224",
+          "symbol": "_mach_msg2_internal",
+          "offset": "0x4c"
+        },
+        {
+          "runtime": "0x1d69a01b0",
+          "unslid": "0x1cb7841b0",
+          "symbol": "_mach_msg_overwrite",
+          "offset": "0x1ec"
+        },
+        {
+          "runtime": "0x1d699ffb8",
+          "unslid": "0x1cb783fb8",
+          "symbol": "_mach_msg",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x19a7a5538",
+          "unslid": "0x18f589538",
+          "symbol": "__dispatch_mach_send_and_wait_for_reply",
+          "offset": "0x20c"
+        },
+        {
+          "runtime": "0x19a7a58d4",
+          "unslid": "0x18f5898d4",
+          "symbol": "_dispatch_mach_send_with_result_and_wait_for_reply$VARIANT$armv81",
+          "offset": "0x38"
+        },
+        {
+          "runtime": "0x1e888fdf0",
+          "unslid": "0x1dd673df0",
+          "symbol": "_xpc_connection_send_message_with_reply_sync",
+          "offset": "0x100"
+        },
+        {
+          "runtime": "0x19209cd10",
+          "unslid": "0x186e80d10",
+          "symbol": "___NSXPCCONNECTION_IS_WAITING_FOR_A_SYNCHRONOUS_REPLY__",
+          "offset": "0xc"
+        },
+        {
+          "runtime": "0x192099528",
+          "unslid": "0x186e7d528",
+          "symbol": "-[NSXPCConnection _sendInvocation:orArguments:count:methodSignature:selector:withProxy:]",
+          "offset": "0x7e8"
+        },
+        {
+          "runtime": "0x192108a64",
+          "unslid": "0x186eeca64",
+          "symbol": "-[NSXPCConnection _sendSelector:withProxy:arg1:arg2:arg3:]",
+          "offset": "0x84"
+        },
+        {
+          "runtime": "0x19210873c",
+          "unslid": "0x186eec73c",
+          "symbol": "__NSXPCDistantObjectSimpleMessageSend3",
+          "offset": "0x48"
+        },
+        {
+          "runtime": "0x19f52b76c",
+          "unslid": "0x19430f76c",
+          "symbol": "_CLClientMarkAsHavingReceivedLocation",
+          "offset": "0xa3c"
+        },
+        {
+          "runtime": "0x19f531d70",
+          "unslid": "0x194315d70",
+          "symbol": "_CLClientGetDistanceHighPrecision",
+          "offset": "0xbcc"
+        },
+        {
+          "runtime": "0x19f531c4c",
+          "unslid": "0x194315c4c",
+          "symbol": "_CLClientGetDistanceHighPrecision",
+          "offset": "0xaa8"
+        },
+        {
+          "runtime": "0x20d19f56c",
+          "unslid": "0x201f8356c",
+          "symbol": "___84-[UNSLocationMonitor setMonitoredRegions:forBundleIdentifier:withCompletionHandler:]_block_invoke",
+          "offset": "0x90"
+        },
+        {
+          "runtime": "0x19a7d1c9c",
+          "unslid": "0x18f5b5c9c",
+          "symbol": "__dispatch_call_block_and_release",
+          "offset": "0x18"
+        },
+        {
+          "runtime": "0x19a7d2cc0",
+          "unslid": "0x18f5b6cc0",
+          "symbol": "__dispatch_client_callout",
+          "offset": "0x10"
+        },
+        {
+          "runtime": "0x19a7ae8f8",
+          "unslid": "0x18f5928f8",
+          "symbol": "__dispatch_lane_serial_drain$VARIANT$armv81",
+          "offset": "0x2a8"
+        },
+        {
+          "runtime": "0x19a7af374",
+          "unslid": "0x18f593374",
+          "symbol": "__dispatch_lane_invoke$VARIANT$armv81",
+          "offset": "0x174"
+        },
+        {
+          "runtime": "0x19a7b8a34",
+          "unslid": "0x18f59ca34",
+          "symbol": "__dispatch_root_queue_drain_deferred_wlh",
+          "offset": "0x104"
+        },
+        {
+          "runtime": "0x19a7b8338",
+          "unslid": "0x18f59c338",
+          "symbol": "__dispatch_workloop_worker_thread",
+          "offset": "0x184"
+        },
+        {
+          "runtime": "0x1e883e534",
+          "unslid": "0x1dd622534",
+          "symbol": "__pthread_wqthread",
+          "offset": "0x11c"
+        },
+        {
+          "runtime": "0x1e883bccc",
+          "unslid": "0x1dd61fccc",
+          "symbol": "_start_wqthread",
+          "offset": "0x8"
+        }
+      ],
+      "5": [
+        {
+          "runtime": "0x1d699cb58",
+          "unslid": "0x1cb780b58",
+          "symbol": "_mach_msg2_trap",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1d69a0224",
+          "unslid": "0x1cb784224",
+          "symbol": "_mach_msg2_internal",
+          "offset": "0x4c"
+        },
+        {
+          "runtime": "0x1d69a01b0",
+          "unslid": "0x1cb7841b0",
+          "symbol": "_mach_msg_overwrite",
+          "offset": "0x1ec"
+        },
+        {
+          "runtime": "0x1d699ffb8",
+          "unslid": "0x1cb783fb8",
+          "symbol": "_mach_msg",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x19a7a5538",
+          "unslid": "0x18f589538",
+          "symbol": "__dispatch_mach_send_and_wait_for_reply",
+          "offset": "0x20c"
+        },
+        {
+          "runtime": "0x19a7a58d4",
+          "unslid": "0x18f5898d4",
+          "symbol": "_dispatch_mach_send_with_result_and_wait_for_reply$VARIANT$armv81",
+          "offset": "0x38"
+        },
+        {
+          "runtime": "0x1e888fdf0",
+          "unslid": "0x1dd673df0",
+          "symbol": "_xpc_connection_send_message_with_reply_sync",
+          "offset": "0x100"
+        },
+        {
+          "runtime": "0x1bfd9390c",
+          "unslid": "0x1b4b7790c",
+          "symbol": "_TMIsAutomaticTimeZoneEnabled",
+          "offset": "0x7c"
+        },
+        {
+          "runtime": "0x1dac7f73c",
+          "unslid": "0x1cfa6373c",
+          "symbol": "___SBValidateTimeZone_block_invoke",
+          "offset": "0x60"
+        },
+        {
+          "runtime": "0x19a7d1c9c",
+          "unslid": "0x18f5b5c9c",
+          "symbol": "__dispatch_call_block_and_release",
+          "offset": "0x18"
+        },
+        {
+          "runtime": "0x19a7d2cc0",
+          "unslid": "0x18f5b6cc0",
+          "symbol": "__dispatch_client_callout",
+          "offset": "0x10"
+        },
+        {
+          "runtime": "0x19a7ae8f8",
+          "unslid": "0x18f5928f8",
+          "symbol": "__dispatch_lane_serial_drain$VARIANT$armv81",
+          "offset": "0x2a8"
+        },
+        {
+          "runtime": "0x19a7af374",
+          "unslid": "0x18f593374",
+          "symbol": "__dispatch_lane_invoke$VARIANT$armv81",
+          "offset": "0x174"
+        },
+        {
+          "runtime": "0x19a7b8a34",
+          "unslid": "0x18f59ca34",
+          "symbol": "__dispatch_root_queue_drain_deferred_wlh",
+          "offset": "0x104"
+        },
+        {
+          "runtime": "0x19a7b8338",
+          "unslid": "0x18f59c338",
+          "symbol": "__dispatch_workloop_worker_thread",
+          "offset": "0x184"
+        },
+        {
+          "runtime": "0x1e883e534",
+          "unslid": "0x1dd622534",
+          "symbol": "__pthread_wqthread",
+          "offset": "0x11c"
+        },
+        {
+          "runtime": "0x1e883bccc",
+          "unslid": "0x1dd61fccc",
+          "symbol": "_start_wqthread",
+          "offset": "0x8"
+        }
+      ],
+      "6": [
+        {
+          "runtime": "0x1d69a21a4",
+          "unslid": "0x1cb7861a4",
+          "symbol": "___psynch_cvwait",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1e884603c",
+          "unslid": "0x1dd62a03c",
+          "symbol": "__pthread_cond_wait$VARIANT$armv81",
+          "offset": "0x4c0"
+        },
+        {
+          "runtime": "0x209709574",
+          "unslid": "0x1fe4ed574",
+          "symbol": "_SPFastApplicationsGetWithWait",
+          "offset": "0x70"
+        },
+        {
+          "runtime": "0x20f269324",
+          "unslid": "0x20404d324",
+          "symbol": "___22-[SPUIAppService init]_block_invoke",
+          "offset": "0x58"
+        },
+        {
+          "runtime": "0x19a7d1c9c",
+          "unslid": "0x18f5b5c9c",
+          "symbol": "__dispatch_call_block_and_release",
+          "offset": "0x18"
+        },
+        {
+          "runtime": "0x19a7d2cc0",
+          "unslid": "0x18f5b6cc0",
+          "symbol": "__dispatch_client_callout",
+          "offset": "0x10"
+        },
+        {
+          "runtime": "0x19a7ae8f8",
+          "unslid": "0x18f5928f8",
+          "symbol": "__dispatch_lane_serial_drain$VARIANT$armv81",
+          "offset": "0x2a8"
+        },
+        {
+          "runtime": "0x19a7af374",
+          "unslid": "0x18f593374",
+          "symbol": "__dispatch_lane_invoke$VARIANT$armv81",
+          "offset": "0x174"
+        },
+        {
+          "runtime": "0x19a7b8a34",
+          "unslid": "0x18f59ca34",
+          "symbol": "__dispatch_root_queue_drain_deferred_wlh",
+          "offset": "0x104"
+        },
+        {
+          "runtime": "0x19a7b8338",
+          "unslid": "0x18f59c338",
+          "symbol": "__dispatch_workloop_worker_thread",
+          "offset": "0x184"
+        },
+        {
+          "runtime": "0x1e883e534",
+          "unslid": "0x1dd622534",
+          "symbol": "__pthread_wqthread",
+          "offset": "0x11c"
+        },
+        {
+          "runtime": "0x1e883bccc",
+          "unslid": "0x1dd61fccc",
+          "symbol": "_start_wqthread",
+          "offset": "0x8"
+        }
+      ],
+      "7": [
+        {
+          "runtime": "0x1e88387c8",
+          "unslid": "0x1dd61c7c8",
+          "symbol": "__Block_copy",
+          "offset": "0x34"
+        },
+        {
+          "runtime": "0x19a7d1c68",
+          "unslid": "0x18f5b5c68",
+          "symbol": "__dispatch_Block_copy",
+          "offset": "0x1c"
+        },
+        {
+          "runtime": "0x19a7d1c68",
+          "unslid": "0x18f5b5c68",
+          "symbol": "__dispatch_Block_copy",
+          "offset": "0x1c"
+        },
+        {
+          "runtime": "0x19a7ac1e8",
+          "unslid": "0x18f5901e8",
+          "symbol": "_dispatch_async$VARIANT$armv81",
+          "offset": "0x34"
+        },
+        {
+          "runtime": "0x1da992fb0",
+          "unslid": "0x1cf776fb0",
+          "symbol": "-[STStatusDomainPublisherXPCClientHandle registerToPublishDomain:fallbackData:]",
+          "offset": "0x70"
+        },
+        {
+          "runtime": "0x1930ac000",
+          "unslid": "0x187e90000",
+          "symbol": "___invoking___",
+          "offset": "0x90"
+        },
+        {
+          "runtime": "0x1930ab1c0",
+          "unslid": "0x187e8f1c0",
+          "symbol": "-[NSInvocation invoke]",
+          "offset": "0x114"
+        },
+        {
+          "runtime": "0x1920ec3cc",
+          "unslid": "0x186ed03cc",
+          "symbol": "___NSXPCCONNECTION_IS_CALLING_OUT_TO_EXPORTED_OBJECT__",
+          "offset": "0xc"
+        },
+        {
+          "runtime": "0x1920eb2ac",
+          "unslid": "0x186ecf2ac",
+          "symbol": "-[NSXPCConnection _decodeAndInvokeMessageWithEvent:reply:flags:]",
+          "offset": "0x4a0"
+        },
+        {
+          "runtime": "0x1920ea7e4",
+          "unslid": "0x186ece7e4",
+          "symbol": "_message_handler_message",
+          "offset": "0x54"
+        },
+        {
+          "runtime": "0x1920ea6c0",
+          "unslid": "0x186ece6c0",
+          "symbol": "_message_handler",
+          "offset": "0x94"
+        },
+        {
+          "runtime": "0x1e8890ee8",
+          "unslid": "0x1dd674ee8",
+          "symbol": "__xpc_connection_call_event_handler",
+          "offset": "0x44"
+        },
+        {
+          "runtime": "0x1e8892978",
+          "unslid": "0x1dd676978",
+          "symbol": "__xpc_connection_mach_event",
+          "offset": "0x544"
+        },
+        {
+          "runtime": "0x19a7d2d74",
+          "unslid": "0x18f5b6d74",
+          "symbol": "__dispatch_client_callout4",
+          "offset": "0x10"
+        },
+        {
+          "runtime": "0x19a7a6894",
+          "unslid": "0x18f58a894",
+          "symbol": "__dispatch_mach_msg_invoke$VARIANT$armv81",
+          "offset": "0x174"
+        },
+        {
+          "runtime": "0x19a7ae77c",
+          "unslid": "0x18f59277c",
+          "symbol": "__dispatch_lane_serial_drain$VARIANT$armv81",
+          "offset": "0x12c"
+        },
+        {
+          "runtime": "0x19a7a7434",
+          "unslid": "0x18f58b434",
+          "symbol": "__dispatch_mach_invoke$VARIANT$armv81",
+          "offset": "0x1b8"
+        },
+        {
+          "runtime": "0x19a7ae77c",
+          "unslid": "0x18f59277c",
+          "symbol": "__dispatch_lane_serial_drain$VARIANT$armv81",
+          "offset": "0x12c"
+        },
+        {
+          "runtime": "0x19a7af374",
+          "unslid": "0x18f593374",
+          "symbol": "__dispatch_lane_invoke$VARIANT$armv81",
+          "offset": "0x174"
+        },
+        {
+          "runtime": "0x19a7b8a34",
+          "unslid": "0x18f59ca34",
+          "symbol": "__dispatch_root_queue_drain_deferred_wlh",
+          "offset": "0x104"
+        },
+        {
+          "runtime": "0x19a7b8338",
+          "unslid": "0x18f59c338",
+          "symbol": "__dispatch_workloop_worker_thread",
+          "offset": "0x184"
+        },
+        {
+          "runtime": "0x1e883e534",
+          "unslid": "0x1dd622534",
+          "symbol": "__pthread_wqthread",
+          "offset": "0x11c"
+        },
+        {
+          "runtime": "0x1e883bccc",
+          "unslid": "0x1dd61fccc",
+          "symbol": "_start_wqthread",
+          "offset": "0x8"
+        }
+      ],
+      "8": [
+        {
+          "runtime": "0x19309bb34",
+          "unslid": "0x187e7fb34",
+          "symbol": "_CF_IS_OBJC",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x19309b8b0",
+          "unslid": "0x187e7f8b0",
+          "symbol": "_CFStringGetLength",
+          "offset": "0x80"
+        },
+        {
+          "runtime": "0x19309b8b0",
+          "unslid": "0x187e7f8b0",
+          "symbol": "_CFStringGetLength",
+          "offset": "0x80"
+        },
+        {
+          "runtime": "0x1930a7bf4",
+          "unslid": "0x187e8bbf4",
+          "symbol": "_CFStringFindWithOptionsAndLocale",
+          "offset": "0x54"
+        },
+        {
+          "runtime": "0x1930a6e84",
+          "unslid": "0x187e8ae84",
+          "symbol": "-[__NSCFString hasPrefix:]",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x209707a8c",
+          "unslid": "0x1fe4eba8c",
+          "symbol": "_SPCopyVisibleApps",
+          "offset": "0xc8"
+        },
+        {
+          "runtime": "0x209709aa4",
+          "unslid": "0x1fe4edaa4",
+          "symbol": "___SPApplicationsBasicInit_block_invoke_2",
+          "offset": "0x184"
+        },
+        {
+          "runtime": "0x19a7d2cc0",
+          "unslid": "0x18f5b6cc0",
+          "symbol": "__dispatch_client_callout",
+          "offset": "0x10"
+        },
+        {
+          "runtime": "0x19a7ab004",
+          "unslid": "0x18f58f004",
+          "symbol": "__dispatch_continuation_pop$VARIANT$armv81",
+          "offset": "0x214"
+        },
+        {
+          "runtime": "0x19a7bba78",
+          "unslid": "0x18f59fa78",
+          "symbol": "__dispatch_source_invoke$VARIANT$armv81",
+          "offset": "0x604"
+        },
+        {
+          "runtime": "0x19a7ae77c",
+          "unslid": "0x18f59277c",
+          "symbol": "__dispatch_lane_serial_drain$VARIANT$armv81",
+          "offset": "0x12c"
+        },
+        {
+          "runtime": "0x19a7af374",
+          "unslid": "0x18f593374",
+          "symbol": "__dispatch_lane_invoke$VARIANT$armv81",
+          "offset": "0x174"
+        },
+        {
+          "runtime": "0x19a7b8a34",
+          "unslid": "0x18f59ca34",
+          "symbol": "__dispatch_root_queue_drain_deferred_wlh",
+          "offset": "0x104"
+        },
+        {
+          "runtime": "0x19a7b8338",
+          "unslid": "0x18f59c338",
+          "symbol": "__dispatch_workloop_worker_thread",
+          "offset": "0x184"
+        },
+        {
+          "runtime": "0x1e883e534",
+          "unslid": "0x1dd622534",
+          "symbol": "__pthread_wqthread",
+          "offset": "0x11c"
+        },
+        {
+          "runtime": "0x1e883bccc",
+          "unslid": "0x1dd61fccc",
+          "symbol": "_start_wqthread",
+          "offset": "0x8"
+        }
+      ],
+      "9": [
+        {
+          "runtime": "0x1d699cb58",
+          "unslid": "0x1cb780b58",
+          "symbol": "_mach_msg2_trap",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1d69a0224",
+          "unslid": "0x1cb784224",
+          "symbol": "_mach_msg2_internal",
+          "offset": "0x4c"
+        },
+        {
+          "runtime": "0x1d69a01b0",
+          "unslid": "0x1cb7841b0",
+          "symbol": "_mach_msg_overwrite",
+          "offset": "0x1ec"
+        },
+        {
+          "runtime": "0x1d699ffb8",
+          "unslid": "0x1cb783fb8",
+          "symbol": "_mach_msg",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x1930dda6c",
+          "unslid": "0x187ec1a6c",
+          "symbol": "___CFRunLoopServiceMachPort",
+          "offset": "0x9c"
+        },
+        {
+          "runtime": "0x1930dd0dc",
+          "unslid": "0x187ec10dc",
+          "symbol": "___CFRunLoopRun",
+          "offset": "0x4b8"
+        },
+        {
+          "runtime": "0x1930dc7d0",
+          "unslid": "0x187ec07d0",
+          "symbol": "_CFRunLoopRunSpecific",
+          "offset": "0x23c"
+        },
+        {
+          "runtime": "0x1920f7368",
+          "unslid": "0x186edb368",
+          "symbol": "-[NSRunLoop(NSRunLoop) runMode:beforeDate:]",
+          "offset": "0xd0"
+        },
+        {
+          "runtime": "0x1b26212e0",
+          "unslid": "0x1a74052e0",
+          "symbol": "_TTSCFAttributedStringCreateStringByBracketingAttributeWithString",
+          "offset": "0x2fc"
+        },
+        {
+          "runtime": "0x19210bd04",
+          "unslid": "0x186eefd04",
+          "symbol": "___NSThread__start__",
+          "offset": "0x2d0"
+        },
+        {
+          "runtime": "0x1e883f82c",
+          "unslid": "0x1dd62382c",
+          "symbol": "__pthread_start",
+          "offset": "0x68"
+        },
+        {
+          "runtime": "0x1e883bcd8",
+          "unslid": "0x1dd61fcd8",
+          "symbol": "_thread_start",
+          "offset": "0x8"
+        }
+      ],
+      "10": [
+        {
+          "runtime": "0x1d699cb58",
+          "unslid": "0x1cb780b58",
+          "symbol": "_mach_msg2_trap",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1d69a0224",
+          "unslid": "0x1cb784224",
+          "symbol": "_mach_msg2_internal",
+          "offset": "0x4c"
+        },
+        {
+          "runtime": "0x1d69a01b0",
+          "unslid": "0x1cb7841b0",
+          "symbol": "_mach_msg_overwrite",
+          "offset": "0x1ec"
+        },
+        {
+          "runtime": "0x1d699ffb8",
+          "unslid": "0x1cb783fb8",
+          "symbol": "_mach_msg",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x1930dda6c",
+          "unslid": "0x187ec1a6c",
+          "symbol": "___CFRunLoopServiceMachPort",
+          "offset": "0x9c"
+        },
+        {
+          "runtime": "0x1930dd0dc",
+          "unslid": "0x187ec10dc",
+          "symbol": "___CFRunLoopRun",
+          "offset": "0x4b8"
+        },
+        {
+          "runtime": "0x1930dc7d0",
+          "unslid": "0x187ec07d0",
+          "symbol": "_CFRunLoopRunSpecific",
+          "offset": "0x23c"
+        },
+        {
+          "runtime": "0x1920f7368",
+          "unslid": "0x186edb368",
+          "symbol": "-[NSRunLoop(NSRunLoop) runMode:beforeDate:]",
+          "offset": "0xd0"
+        },
+        {
+          "runtime": "0x1b26212e0",
+          "unslid": "0x1a74052e0",
+          "symbol": "_TTSCFAttributedStringCreateStringByBracketingAttributeWithString",
+          "offset": "0x2fc"
+        },
+        {
+          "runtime": "0x19210bd04",
+          "unslid": "0x186eefd04",
+          "symbol": "___NSThread__start__",
+          "offset": "0x2d0"
+        },
+        {
+          "runtime": "0x1e883f82c",
+          "unslid": "0x1dd62382c",
+          "symbol": "__pthread_start",
+          "offset": "0x68"
+        },
+        {
+          "runtime": "0x1e883bcd8",
+          "unslid": "0x1dd61fcd8",
+          "symbol": "_thread_start",
+          "offset": "0x8"
+        }
+      ],
+      "11": [
+        {
+          "runtime": "0x1d699cb58",
+          "unslid": "0x1cb780b58",
+          "symbol": "_mach_msg2_trap",
+          "offset": "0x8"
+        },
+        {
+          "runtime": "0x1d69a0224",
+          "unslid": "0x1cb784224",
+          "symbol": "_mach_msg2_internal",
+          "offset": "0x4c"
+        },
+        {
+          "runtime": "0x1d69a01b0",
+          "unslid": "0x1cb7841b0",
+          "symbol": "_mach_msg_overwrite",
+          "offset": "0x1ec"
+        },
+        {
+          "runtime": "0x1d699ffb8",
+          "unslid": "0x1cb783fb8",
+          "symbol": "_mach_msg",
+          "offset": "0x14"
+        },
+        {
+          "runtime": "0x1930dda6c",
+          "unslid": "0x187ec1a6c",
+          "symbol": "___CFRunLoopServiceMachPort",
+          "offset": "0x9c"
+        },
+        {
+          "runtime": "0x1930dd0dc",
+          "unslid": "0x187ec10dc",
+          "symbol": "___CFRunLoopRun",
+          "offset": "0x4b8"
+        },
+        {
+          "runtime": "0x1930dc7d0",
+          "unslid": "0x187ec07d0",
+          "symbol": "_CFRunLoopRunSpecific",
+          "offset": "0x23c"
+        },
+        {
+          "runtime": "0x193146348",
+          "unslid": "0x187f2a348",
+          "symbol": "_CFRunLoopRun",
+          "offset": "0x3c"
+        },
+        {
+          "runtime": "0x1afce8234",
+          "unslid": "0x1a4acc234",
+          "symbol": "_CUTXPCAlert",
+          "offset": "0x1cec"
+        },
+        {
+          "runtime": "0x19210bd04",
+          "unslid": "0x186eefd04",
+          "symbol": "___NSThread__start__",
+          "offset": "0x2d0"
+        },
+        {
+          "runtime": "0x1e883f82c",
+          "unslid": "0x1dd62382c",
+          "symbol": "__pthread_start",
+          "offset": "0x68"
+        },
+        {
+          "runtime": "0x1e883bcd8",
+          "unslid": "0x1dd61fcd8",
+          "symbol": "_thread_start",
+          "offset": "0x8"
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Group completion does not independently prove store durability.",
+    "Successful current SwapEnd does not establish pixel transfer; default surface fails.",
+    "Process census excludes PID 512 and above; IPC table probe is invalid."
+  ],
+  "payload_sha256": "1f52981784ae2d816c5177c92fd81d71b1e7ce7fb4150dcee9cca3b2ee2baa2c",
+  "watchdog_seconds": 1800,
+  "result": "LS seeding group completed, SpringBoard main thread reached UIApplication event loop, and actual swaps reached original family. Default framebuffer surface was missing; no displayed UI.",
+  "android_return": {
+    "boot_id": "6db22189-a44b-4989-9495-e6ed7ea13122",
+    "watch_elapsed_s": 1366.645793
+  },
+  "spare_guards_after": {
+    "bytes": 12288,
+    "sha256": "29ab4c2adc21cfd3e83b1bef082c52cf4704571951f5a7577338691ab2b1e7ae"
+  }
+}
