@@ -31,4 +31,4 @@ missing rows, corruption/oversized runs and an interrupted capture.
 
 Kernel: a2bf9cd38ab0e72aa27a75db171489e9e09f23c33a66ffbd0bad766be9109289.
 Payload: 33dedd44478caf2f2c0481606d69cd6aa08007f7d4859ebb5ba58fe78097b26b.
-R283 hardware acceptance is pending; no SpringBoard presentation is claimed.
+R283 hardware confirms the original IOPM callback updates requested=1 and powered=1. Three real BGRA surfaces pass initial validation. The pending worker rejects each copy with reason 6, so no frame capture or retirement occurs. Android recovered and all 37 protected-window chunks passed without retained corruption/panic markers. See docs/logs/runtime-r283.json. This qualifies logical power registration, not SpringBoard presentation.
