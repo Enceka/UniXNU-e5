@@ -1,0 +1,38 @@
+{
+  "linux_revision": "6b355f728578c9070da794773cb212346379f790",
+  "vendor_revision": "63b8011056a5060e274fc1dcc9051c94d9a7bab8",
+  "linux_root": "/Volumes/Workspace/e5-linux/linux-lts-e5",
+  "files": {
+    "drivers/input/keyboard/sprd_keypad.c": "a268d774352ce6d80f0bae7ccabfe6382a1333563988d27592d61d74d2a02883",
+    "drivers/input/touchscreen/tlsc6x/tlsc6x_main.c": "1c46eef4a4ace772dceff3f3a14e2cea6f7d029686bac0e6debf40d5e25772d9",
+    "drivers/input/touchscreen/tlsc6x/tlsc6x_comp.c": "5a4f46a120c222937303983dd236bce5f6b5cd1de7ee040e23177058d72ec40a",
+    "drivers/i2c/busses/i2c-sprd.c": "f1db23e526daf49e09f7e17b8a5a36ce54e249e93213b08d7076c22d01c58d6b",
+    "drivers/gpio/gpio-sprd.c": "ebf0b9e3266440c2b8198e87475e97adf6b1ac1a16ce5f16ee33cb541efd51b1",
+    "drivers/clk/sprd/ums9621-clk.c": "eca39bb16ee859d4bb49aedc94d887376d8ed9c5c87bc8ea7103c7fc9bdaebf3",
+    "drivers/clk/sprd/composite.h": "2d0d25cedb3cf9c96d746df79d355bc8bc47ca3e110b65699c0189a59305ea48"
+  },
+  "live_fdt_sha256": "4ff13c4ea30021ed9e7863f3b7f815dab3b2c22cacca088e58e3f24376e1ff36",
+  "sheng_hid_revision": "71a40e76daeae1bb4127546f96ffa7339c7a06ff",
+  "i2c_physical": "0x22270000",
+  "keypad_physical": "0x641b0000",
+  "gpio_physical": "0x64170000",
+  "clock_gate_set": "0x20004000",
+  "clock_gate_bit": 13,
+  "home_matrix": [
+    3,
+    0
+  ],
+  "home_linux_code": 139,
+  "home_hid_usage_page": 12,
+  "home_hid_usage": 64,
+  "touch_address_7bit": 46,
+  "touch_irq_gpio": 13,
+  "touch_reset_gpio": 14,
+  "touch_axes_inclusive": [
+    320,
+    480
+  ],
+  "contact_limit": 2,
+  "sensor_firmware_update_enabled": false,
+  "test_log": "PASS: E5 key wiring/Home/chords/fast-release, two-contact bounds/lifts, and repeated-start/FIFO/NACK/timeout recovery"
+}

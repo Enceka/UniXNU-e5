@@ -781,6 +781,13 @@ revision = "24098c2"
 reference = "docs/keypad-control.md"
 result = "Control-experiment conclusions, real v9 tty acceptance and pending physical input checks."
 
+[[area.evidence]]
+kind = "host"
+revision = "1f7d67a10afb15877b7c04a3d5881f2db08aa41c"
+reference = "docs/logs/input-host-audit.json"
+command = "clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined scripts/input/tests/protocol.cpp; e5_input_build.py; unixnu build kernel"
+result = "ASan/UBSan protocol checks, original 207-slot HID ABI, deferred registration, source-kernel compile/link/prelink pass. Device and physical input are separate pending qualifications."
+
 [[area]]
 id = "gpu"
 status = "planned"
