@@ -148,7 +148,7 @@ static IpcState ipc;
 static ProcSnaps threads;
 static PcHistory pcHistory;
 static SeedHistory seedHistory;
-static unsigned generation, busy, selectedPid;
+static unsigned generation, busy, selectedPid, lastBackboardPid;
 static thread_call_t worker;
 static bool enabled() {
   return PE_parse_boot_argn("e5-ca-state", nullptr, 0);
@@ -626,7 +626,7 @@ static void snapshotThreads(ProcSnaps &out) {
         arrayCount = arrayCount32;
         if (arrayPtr && arrayCount && arrayCount < 512) {
           for (unsigned e = 0; e < arrayCount && p.images < 16; ++e) {
-            Word entry = arrayPtr + 21 * e * 8;  // dyld_image_info: 3 pointers
+            Word entry = arrayPtr + 3 * e * 8;  // dyld_image_info: 3 pointers
             Word loadAddress = 0, pathPtr = 0, pathAlt = 0;
             if (!r.probeBytes(entry, &loadAddress, 8)) break;
             // r232 delivered a=… p=0 t=- for every entry: the +0x10 slot read
@@ -839,6 +839,7 @@ static void run(thread_call_param_t, thread_call_param_t) {
 
 extern "C" void e5_ca_probe_request(unsigned pid) {
   if (!enabled()) return;
+  __atomic_store_n(&lastBackboardPid, pid, __ATOMIC_RELAXED);
   static unsigned requests;
   if ((++requests & 15U) != 1U) return;
   unsigned expected = 0;
@@ -849,15 +850,17 @@ extern "C" void e5_ca_probe_request(unsigned pid) {
   else __atomic_store_n(&busy, 0U, __ATOMIC_RELEASE);
 }
 
-// r245: unconditional periodic entry from the display paint tick. Runs the
-// census worker with selectedPid 0 - no CA-pool inspect, but the thread/LS
-// snapshot (SpringBoard/backboardd/lsd/... states, seeding-group counter,
-// PC history) executes on every call and lands in the next dump.
+// r277: periodically re-inspect the last observed backboardd as well as
+// threads. The first pool sample often precedes display initialization;
+// forcing selectedPid=0 forever after that left all later CA state unseen.
+// run() verifies the current process name; a dead/reused PID cannot be
+// mistaken for backboardd, and thread sampling still runs without it.
 extern "C" void e5_ca_probe_periodic(void) {
   if (!enabled()) return;
   unsigned expected = 0;
   if (!__atomic_compare_exchange_n(&busy, &expected, 1U, false, __ATOMIC_ACQ_REL, __ATOMIC_RELAXED)) return;
-  __atomic_store_n(&selectedPid, 0U, __ATOMIC_RELAXED);
+  __atomic_store_n(&selectedPid,
+      __atomic_load_n(&lastBackboardPid, __ATOMIC_RELAXED), __ATOMIC_RELAXED);
   if (!worker) worker = thread_call_allocate(run, nullptr);
   if (worker) thread_call_enter(worker);
   else __atomic_store_n(&busy, 0U, __ATOMIC_RELEASE);

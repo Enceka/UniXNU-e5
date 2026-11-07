@@ -97,6 +97,9 @@ static uint64_t e5_win_unstable;
 // Enabled by this board's kernel config; that source-file define is not
 // present in the IOKit archive's compile record.
 extern "C" uint64_t cs_native4k_read_ticks, cs_native4k_hash_ticks, cs_native4k_bytes;
+extern "C" unsigned int vm_page_free_count, vm_page_active_count, vm_page_inactive_count;
+extern "C" unsigned int vm_page_wire_count, vm_page_pageable_internal_count;
+extern "C" unsigned int vm_page_pageable_external_count, vm_page_free_wanted;
 
 // r275: sampled without taking the host lock or issuing any media reads.
 // These are cumulative submitted-request counters (512-byte blocks), not
@@ -115,6 +118,11 @@ extern "C" void e5_emmc_runtime_dump(void) {
   elog("E5CS4K bytes=%llu read_ms=%llu hash_ms=%llu\n",
        (unsigned long long)__atomic_load_n(&cs_native4k_bytes, __ATOMIC_RELAXED),
        (unsigned long long)(readNs / 1000000), (unsigned long long)(hashNs / 1000000));
+  // Approximate lock-free VM census, in this kernel's 4 KiB pages.
+  elog("E5VM free=%u active=%u inactive=%u wired=%u internal=%u external=%u wanted=%u\n",
+       vm_page_free_count, vm_page_active_count, vm_page_inactive_count,
+       vm_page_wire_count, vm_page_pageable_internal_count,
+       vm_page_pageable_external_count, vm_page_free_wanted);
 }
 
 // Report the executing context, not an inferred originating process: APFS
