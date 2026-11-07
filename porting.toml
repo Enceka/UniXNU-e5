@@ -420,6 +420,14 @@ reference = "docs/logs/runtime-r275.json"
 command = "R275 e5-uefi-cycle.sh flash/collect with pre/post window checks, complete payload readback and native USB capture"
 result = "PASS for runtime observations and DMA ownership, UI pending: 37/37 pre/post checks; 19 independent timer samples through uptime 627662ms; SpringBoard PID27, runningboardd PID26, lsd PID99 and backboardd PID57 live. Last census has 123 processes; no CAFEBABE, APFS checksum/corruption, signature-load error or panic markers. SpringBoard waits in LSCopyServerStore while lsd scans built-in Info.plist files. One initial panel CRC, no presentation. Fresh Android return completed. R275 thread CPU values are invalid and corrected in R276."
 
+
+[[area.evidence]]
+kind = "device"
+revision = "5867c41851180e514139f1eabe786570f8a61b32"
+reference = "docs/logs/runtime-r276.json"
+command = "R276 verified e5-uefi-cycle.sh flash/collect; native USB capture; one 600-second watchdog window"
+result = "PASS for CRC-cost reduction and thread CPU accounting, UI pending. Pre/post 37/37 checks and full payload readback pass; large reads fall from about 74 to 31ms/MiB, early boot from 313 to 189s. Native4k work reports 3294543872 bytes, 118828ms read and 16904ms hash. At uptime 627396ms, RD=397006:9864997 and WR=2917:87088:0 with RV=0. No CAFEBABE, APFS corruption, signature-load error or panic markers. SpringBoard remains blocked on LS seeding while the worker advances through app-extension signing/container discovery. Panel unchanged; fresh Android return succeeds."
+
 [[area]]
 id = "display"
 findings = ["R277 diagnostics: periodic CA inspection retains the last observed backboardd PID (with name/lifetime revalidation) instead of clearing it to zero. R275/R276 sampled the array before it was populated and otherwise lost every late display-state snapshot. Fix dyld_image_info stride from 168 to the ABI 24 bytes; the old image enumeration skipped six entries at a time.", "R275 independent timer is live on eMMC-only: E5OBS/E5PROC/E5LIVE and E5DPU appear while PID 1 reads the cache. R275 CPU values exposed an older probe bug: cpu_time_eqos_stats at 0x4f8 is a task field, not a thread field. R276 samples real accumulated absolute ticks through recount_thread_time_mach while task_lock protects the member; prior E5TH cpu values are invalid.", "R274 eMMC-only boots skip SD media publication, so the SD read-completion frame kick never runs and neither the runtime census nor the delivery/DPU timer starts. R275 starts an independent, serialized kernel-priority timer from display startup, samples processes/registry/panel/eMMC counters every approximately 32 seconds, and schedules the 60-second deep thread probe outside display delivery. The native family notification stays on the delivery worker. Census now includes launchd/logd/lsd/watchdogd and IOWatchdog registry presence. Host compilation is verified; R275 device acceptance is pending."]
@@ -671,6 +679,14 @@ revision = "efd49346494edef0210f539684020fc8ac8ba5b8"
 reference = "docs/logs/runtime-r275.json"
 command = "R275 e5-uefi-cycle.sh flash/collect with pre/post window checks, complete payload readback and native USB capture"
 result = "PASS for runtime observations and DMA ownership, UI pending: 37/37 pre/post checks; 19 independent timer samples through uptime 627662ms; SpringBoard PID27, runningboardd PID26, lsd PID99 and backboardd PID57 live. Last census has 123 processes; no CAFEBABE, APFS checksum/corruption, signature-load error or panic markers. SpringBoard waits in LSCopyServerStore while lsd scans built-in Info.plist files. One initial panel CRC, no presentation. Fresh Android return completed. R275 thread CPU values are invalid and corrected in R276."
+
+
+[[area.evidence]]
+kind = "device"
+revision = "5867c41851180e514139f1eabe786570f8a61b32"
+reference = "docs/logs/runtime-r276.json"
+command = "R276 verified e5-uefi-cycle.sh flash/collect; native USB capture; one 600-second watchdog window"
+result = "PASS for CRC-cost reduction and thread CPU accounting, UI pending. Pre/post 37/37 checks and full payload readback pass; large reads fall from about 74 to 31ms/MiB, early boot from 313 to 189s. Native4k work reports 3294543872 bytes, 118828ms read and 16904ms hash. At uptime 627396ms, RD=397006:9864997 and WR=2917:87088:0 with RV=0. No CAFEBABE, APFS corruption, signature-load error or panic markers. SpringBoard remains blocked on LS seeding while the worker advances through app-extension signing/container discovery. Panel unchanged; fresh Android return succeeds."
 
 [[area]]
 id = "input"

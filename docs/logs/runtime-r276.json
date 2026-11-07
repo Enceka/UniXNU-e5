@@ -1,0 +1,116 @@
+{
+  "round": 276,
+  "source": "uefi/build/sb-r276/r276/capture/kernel.log",
+  "source_sha256": "1e560962c9f35fe24cd12d9cbcc9df37893a8ddec199ad18c3b0f45e331c23c5",
+  "device_commit": "5867c41851180e514139f1eabe786570f8a61b32",
+  "payload_sha256": "2fc3a3da680b56b6493daa0a9f27638794c967d4dc4b552c776eec51c851df0c",
+  "markers": {
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "load code signature error": 0,
+    "panic(cpu": 0,
+    "E5OBS uptime_ms": 19,
+    "E5PANELSNAP": 1
+  },
+  "early_boot": [
+    "com.apple.xpc.launchd|1969-12-31 16:03:09.001767 (boot) <Notice>: Early boot complete. Continuing system boot."
+  ],
+  "sampled_large_read_us": [
+    17302,
+    31043,
+    31177,
+    31061,
+    30985,
+    31038,
+    31012,
+    31067,
+    31041,
+    31302,
+    31152,
+    31159,
+    26806,
+    31047,
+    31132,
+    31136,
+    31124,
+    31046,
+    31058,
+    31179,
+    31187,
+    31128,
+    31116,
+    31072,
+    30980
+  ],
+  "result": "Large reads improved from about 74 to 31ms/MiB; early boot at 189s instead of 313s. UI still pending; lsd progresses through built-in bundle/app-extension signature validation and data-container creation; SpringBoard waits for its database.",
+  "last_observation": {
+    "uptime_ms": 627396,
+    "processes": [
+      {
+        "pid": 1,
+        "name": "launchd"
+      },
+      {
+        "pid": 25,
+        "name": "logd"
+      },
+      {
+        "pid": 26,
+        "name": "runningboardd"
+      },
+      {
+        "pid": 27,
+        "name": "SpringBoard"
+      },
+      {
+        "pid": 47,
+        "name": "amfid"
+      },
+      {
+        "pid": 57,
+        "name": "backboardd"
+      },
+      {
+        "pid": 66,
+        "name": "driverkitd"
+      },
+      {
+        "pid": 71,
+        "name": "lockdownd"
+      },
+      {
+        "pid": 87,
+        "name": "notifyd"
+      },
+      {
+        "pid": 99,
+        "name": "chronod"
+      },
+      {
+        "pid": 100,
+        "name": "lsd"
+      },
+      {
+        "pid": 103,
+        "name": "liveactivitiesd"
+      }
+    ],
+    "io": {
+      "read_ops": 397006,
+      "read_blocks": 9864997,
+      "write_ops": 2917,
+      "write_blocks": 87088,
+      "write_failures": 0,
+      "unstable": 0
+    },
+    "native4k": {
+      "bytes": 3294543872,
+      "read_ms": 118828,
+      "hash_ms": 16904
+    },
+    "services": "3c",
+    "process_total": 144,
+    "max_pid": 242
+  }
+}
