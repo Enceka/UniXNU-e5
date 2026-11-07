@@ -740,6 +740,13 @@ reference = "docs/logs/runtime-r279.json"
 command = "R279 same kernel, explicitly authorized 1800-second diagnostic; native USB capture and harvest"
 result = "LS seeding group completed at 675.759s. SpringBoard reached UIApplication run loop; 19 successful SwapBegin/SwapEnd calls, one missing-default-surface error. No visible SpringBoard, retained corruption or CMD25 failure. Final 40139 writes verified; fresh Android returned and spare/guards matched. Later trials restricted to 720 seconds with user upper limit 900."
 
+[[area.evidence]]
+kind = "device"
+revision = "756af5c49e859fa7dddc1eea2bf9e20d7bfabb78"
+reference = "docs/logs/runtime-r280.json"
+command = "R280 720-second warm boot, preserved R279 Data, full payload readback and pre/postflash/postboot window checks"
+result = "First swaps occur between uptime 499345 and 531424ms, within ten minutes. LS group remains zero after allocation; no repeated seeding lock observed. Final 2389 SwapBegin/SwapEnd calls still have no implemented frame copy; fallback default surface fails once. No retained poison/APFS corruption/panic. Android recovers; all 37 postboot chunks pass. This qualifies the short warm window, not visible UI."
+
 [[area]]
 id = "input"
 status = "implemented"
