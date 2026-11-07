@@ -956,7 +956,15 @@ public:
       ok = false;
       elog("NativeEmmc: multi tail poison intact lba %u n %u st %08x\n", lba, n, st);
     }
+    // r272: the stop must LAND before the next CMD18 — if the card never
+    // left the previous stream the next transfer "completes" with the OLD
+    // stream's continuation (r271: Data-window reads served OsRoot bytes;
+    // media held zeros). Poll CMD13 back to ready/TRAN or fail + reset.
     cmdNoData(0x0C1A, 0); // CMD12 stop
+    if (!waitLogReady(20)) {
+      ok = false;
+      elog("NativeEmmc: stop settle timeout lba %u n %u\n", lba, n);
+    }
     if (!ok) resetLines();
     return ok;
   }
@@ -988,7 +996,12 @@ public:
       ok = false;
       elog("NativeEmmc: big tail poison intact lba %u n %u st %08x\n", lba, n, st);
     }
+    // r272: same stop-settle discipline for the bulk path.
     cmdNoData(0x0C1A, 0); // CMD12 stop
+    if (!waitLogReady(20)) {
+      ok = false;
+      elog("NativeEmmc: big stop settle timeout lba %u n %u\n", lba, n);
+    }
     if (!ok) resetLines();
     return ok;
   }
@@ -1128,10 +1141,21 @@ public:
   // both crcs.
   bool windowReadVerifiedDeliver(uint8_t *deliver, uint32_t lba, uint32_t n) {
     static uint8_t shadow2[8192]; // ioLock-serialized; keeps the class under KALLOC_SAFE_ALLOC_SIZE
-    for (unsigned round = 0; round < 2; ++round) {
-      if (!readMulti(lba, n)) return false;
+    bool have = false;
+    // r272: a failed readMulti (poison-intact / settle-timeout / line reset)
+    // retries instead of failing the whole request; the final-read-wins
+    // delivery only happens when at least one full transfer succeeded.
+    for (unsigned round = 0; round < 3; ++round) {
+      if (!readMulti(lba, n)) {
+        elog("NativeEmmc: rv dma fail lba %u round %u\n", lba, round);
+        continue;
+      }
       memcpy(shadow2, winD8, (size_t)n * 512);
-      if (!readMulti(lba, n)) return false;
+      have = true;
+      if (!readMulti(lba, n)) {
+        elog("NativeEmmc: rv dma fail2 lba %u round %u\n", lba, round);
+        continue;
+      }
       if (!memcmp(shadow2, winD8, (size_t)n * 512)) {
         memcpy(deliver, shadow2, (size_t)n * 512);
         return true;
@@ -1140,8 +1164,8 @@ public:
            lba, round, crc32(shadow2, n * 512), crc32(winD8, n * 512));
       __atomic_fetch_add(&e5_win_unstable, 1, __ATOMIC_RELAXED);
     }
+    if (!have) return false;
     // Final read wins, delivered from its verified copy.
-    memcpy(shadow2, winD8, (size_t)n * 512);
     memcpy(deliver, shadow2, (size_t)n * 512);
     return true;
   }
@@ -1752,14 +1776,26 @@ bool NativeEmmc::start(IOService *provider)
     bool osRootOk = false;
     if (systemOS) {
       IOLockLock(ioLock); // r259: journal passes are live by now
-      bool probeOk = E5SystemOS::fits(sectors) && readMulti((uint32_t)E5SystemOS::base, 8) &&
-          memcmp(winD8 + 32, "NXSB", 4) == 0 &&
-          crc32(winD8, 4096) == E5SystemOS::superblockCrc;
+      // r272: the r271 boot refused a media-verified window on the FIRST
+      // single read (read flake) and lost the whole boot to the cryptex
+      // helper timeout — probes retry, each attempt logged with its CRC.
+      bool probeOk = false;
+      for (unsigned a = 0; !probeOk && a < 3; ++a) {
+        probeOk = E5SystemOS::fits(sectors) && readMulti((uint32_t)E5SystemOS::base, 8) &&
+            memcmp(winD8 + 32, "NXSB", 4) == 0 &&
+            crc32(winD8, 4096) == E5SystemOS::superblockCrc;
+        elog("NativeEmmc: SystemOS probe try %u crc %08x %s\n", a, windowCrc(), probeOk ? "y" : "n");
+      }
       // r263: OS root window (bare container, same NXSB-at-+32 shape). Its
       // wrapper media carries the root volume UUID so /chosen root-matching
       // binds here before the SD stack registers.
-      bool rootOk = E5OsRoot::fits(sectors) && readMulti((uint32_t)E5OsRoot::base, 8) &&
-          memcmp(winD8 + 32, "NXSB", 4) == 0;
+      bool rootOk = false;
+      for (unsigned a = 0; !rootOk && a < 3; ++a) {
+        rootOk = E5OsRoot::fits(sectors) && readMulti((uint32_t)E5OsRoot::base, 8) &&
+            memcmp(winD8 + 32, "NXSB", 4) == 0;
+        elog("NativeEmmc: OsRoot probe try %u crc %08x %s\n", a, rootOk ? windowCrc() : 0u,
+             rootOk ? "y" : "n");
+      }
       IOLockUnlock(ioLock);
       if (probeOk) {
         osWindowOk = true;
