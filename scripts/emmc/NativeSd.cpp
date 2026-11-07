@@ -16,7 +16,6 @@
 #include "TransferStatus.h"
 #include "SdProtocol.h"
 #include "SystemOSWindow.h"
-#include "E5SelfTestTables.h"
 
 extern "C" void e5_panic_print(const char *);
 static void sdlog(const char *fmt, ...) {
@@ -926,29 +925,6 @@ public:
     sdlog("NativeSd: publishing read-only SD card %llu sectors\n",
           (unsigned long long)sectors);
     registerService();
-    // r260: SD read-path control. The card container head (LBA 12582912,
-    // the pre-migration SystemOS base) equals systemos.img, so every chunk
-    // CRC must match the shared os table — same content read through a
-    // different controller than the eMMC windows. Boot-arg gated.
-    uint32_t sdSelfTest = 0;
-    PE_parse_boot_argn("e5-sd-selftest", &sdSelfTest, sizeof(sdSelfTest));
-    if (sdSelfTest) {
-      uint32_t bad = 0;
-      for (uint32_t i = 0; i < 256; ++i) {
-        uint32_t lba = 12582912u + i * 8;
-        if (!readSectors(lba, 8)) {
-          sdlog("NativeSd: ST #%u READFAIL lba %u\n", i, lba);
-          ++bad;
-          continue;
-        }
-        uint32_t c = crc32n(buffer, 4096);
-        if (c != E5SelfTest::os[i]) {
-          sdlog("NativeSd: ST #%u lba %u crc %08x want %08x\n", i, lba, c, E5SelfTest::os[i]);
-          ++bad;
-        }
-      }
-      sdlog("NativeSd: SELFTEST %s bad=%u\n", bad ? "FAIL" : "CLEAN", bad);
-    }
     if (systemOS && !publishSystemOS(this)) sdlog("NativeSd: SystemOS publication failed\n");
     if (dataDevice && !publishData(dataDevice, this))
       sdlog("NativeSd: data publication failed\n");
