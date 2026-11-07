@@ -67,7 +67,7 @@ before access. Working Android pinmux/reset/firmware are preserved.
 Transfers use a repeated START, FIFO servicing, NACK checks and a 10ms bound.
 STOP suppression is bit20 **set**; bit20 clear permits STOP. On error the
 controller is reset, polling backs off 500ms, and active HID contacts are lifted.
-Contact IDs are 0/1. Coordinates cover the observed inclusive 0..320 and
+Hardware contact IDs are 0/1 and map to stable HID IDs 1/2. Coordinates cover the observed inclusive 0..320 and
 0..480 axes and normalize to 0..32767. Vanished IDs receive explicit lift
 records with confidence retained. `DigitizerCollectionDispatch` groups the
 fingers into one frame. The first driver polls GPIO13; GPIO IRQ routing,
@@ -82,9 +82,11 @@ repeated-START/FIFO ordering, NACK, timeout and STOP recovery. The mock rejects
 FIFO reads before the data-ready notification. The actual source-kernel compile,
 native link and prelink also pass. [HID ABI audit](logs/input-host-audit.json).
 
-Hardware trials are pending. Physical keys and finger/canvas/UI testing are
+R286 passed the automated HID publication and synthetic Home down/up trial. Physical keys and finger/canvas/UI testing are
 deferred at the user's request; automated device reports and physical input
 will be recorded separately. Preserve the R285 Chinese Data and display path,
 verify the full payload and protected windows, test Home first, then enable
 touch stages individually. GPU preparation follows the display/touch plan;
 these host checks do not establish its physical joint-acceptance gate.
+
+R286 completed 15 copied/retired frames, four successful keyboard/consumer reports, no report errors/drops/stuck state, fresh Android A recovery and 37/37 postboot checks. Physical buttons and desktop effect are still pending. The next descriptor uses independent keyboard and Consumer Control Application collections. `e5-hid-snapshot=1` takes two stable, read-only scanout snapshots around the automatic Home deadline; checksum-verified PNGs are memory evidence. Temporary sensor direct mode reads the firmware/config identity and restores normal mode before packets.

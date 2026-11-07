@@ -1,0 +1,97 @@
+{
+  "round": 286,
+  "verdict": "PASS",
+  "implementation_revision": "1f7d67a10afb15877b7c04a3d5881f2db08aa41c",
+  "kernel_sha256": "4834587298c7cde1e4dcddf97586479fe6cab2e8371a60748bdd9430189c836b",
+  "payload_sha256": "5b3a6eeb6b1bd87c011b974891580f6f91f6428744a9e2227d454f06cb50941c",
+  "source": {
+    "path": "uefi/build/sb-r286/r286/capture/kernel.log",
+    "sha256": "2cee0ac856f128754a6fa7873371ca334b2b6772a17d3daf85f9e4f43ee23317"
+  },
+  "hid_events": [
+    "E5HID load bundle=com.apple.iokit.IOHIDFamily ret=0",
+    "E5HID load bundle=com.apple.iokit.IOHIDEventDriver ret=0",
+    "E5HID publish=1 init=1 attach=1 parent_bytes=208 owned_bytes=288",
+    "E5HID status driver=1 polls=1 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=2002 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=4200 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=6398 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=8398 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=10600 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=12602 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=14602 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=16602 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=18605 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=20605 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=22605 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=24606 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=26606 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID report=1 source=selftest-home id=1 bytes=9 ret=0",
+    "E5HID report=2 source=selftest-home id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=1 driver=1 failures=0",
+    "E5HID report=3 source=selftest-home id=1 bytes=9 ret=0",
+    "E5HID report=4 source=selftest-home id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=0 driver=1 failures=0",
+    "E5HID status driver=1 polls=28607 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=30607 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=32611 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=34614 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=36614 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=38616 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=40617 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=42618 transitions=0 reports=4 failed=0 dropped=0 held=0"
+  ],
+  "automatic_home_press_release_passed": true,
+  "physical_key_actuation_verified": false,
+  "physical_touch_verified": false,
+  "touch_mode": 0,
+  "touch_events": [],
+  "touch_resources_observed": false,
+  "firmware_identity_verified": false,
+  "configuration_sha256": null,
+  "markers": {
+    "panic(cpu": 0,
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "E5CPU copy-failed": 0
+  },
+  "completed_frames": 15,
+  "display_summary": [
+    "E5IMSUM vc=1:44035:44035 d=1:0:e00002bc b=15:15:0 e=15:15:0 over=0"
+  ],
+  "captured_frames": [
+    {
+      "id": 1,
+      "width": 320,
+      "height": 480,
+      "fnv": "b6005dc5"
+    }
+  ],
+  "rejected_captures": [],
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "android_recovered": true,
+  "scope": "Automated original-HID reports and bounded sensor transport checks; physical actuation and UI meaning are separate evidence."
+}
