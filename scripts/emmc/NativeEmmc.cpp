@@ -140,6 +140,13 @@ class NativeEmmc : public IOBlockStorageDevice {
   uint32_t winPhys = 0;
   uint64_t winTraceSeq = 0;
   uint64_t jrPasses = 0;
+  // r268: dedicated 64 KiB physically-contiguous bulk-read buffer — the LS
+  // scan needs megabytes per second and the 8-sector/verify ceiling measured
+  // 0.21 MiB/s (r267). Separate allocation keeps the class struct under
+  // KALLOC_SAFE_ALLOC_SIZE (the r265 readShadow lesson).
+  IOBufferMemoryDescriptor *bigBMD = nullptr;
+  uint8_t *bigV = nullptr;
+  uint32_t bigPhys = 0;
   // r260: window self-test scheduling (journal OFF rounds).
   thread_call_t stCall = nullptr;
   uint32_t stPass = 0;
@@ -943,6 +950,37 @@ public:
     return ok;
   }
 
+  // r268: one multi-block SDMA CMD18 read of n<=128 sectors (64 KiB) into the
+  // dedicated bulk buffer — the readMulti poison/drift/stop discipline at
+  // 16x the transfer size. LS-scan throughput: 3 GiB must fit a 300 s window.
+  bool readMultiBig(uint32_t lba, uint32_t n) {
+    if (!n || n > 128 || !bigV || (r16(0x3E) & 0x1000u) == 0) return false;
+    for (uint32_t i = 0; i < n * 128; ++i) ((uint32_t *)bigV)[i] = 0xCAFEBABEu;
+    cacheClean(bigV, n * 512);
+    cacheInvalidate(bigV, n * 512);
+    w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x18u);
+    w32(SDHCI_INT_STATUS, 0xFFFFFFFFu);
+    w16(SDHCI_BLOCK_SIZE, 512);
+    w32(SDHCI_DMA_ADDR, n);
+    w32(SDHCI_SYSADDR_LOW, bigPhys);
+    w32(SDHCI_SYSADDR_HIGH, 0);
+    w32(SDHCI_ARGUMENT, lba);
+    w32(SDHCI_TRANSFER_MODE_CMD, 0x123A0033u); // CMD18 MULTI|COUNT|DMA|READ
+    uint32_t st = waitDmaDone(2000000 + 100000 * n);
+    bool ok = transferOk(st) && !(r32(SDHCI_RESPONSE) & E5BootLog::r1Errors);
+    uint32_t argNow = r32(SDHCI_ARGUMENT), tmNow = r32(SDHCI_TRANSFER_MODE_CMD);
+    if (ok && (argNow != lba || tmNow != 0x123A0033u))
+      elog("NativeEmmc: xfer drift lba %u arg %08x tm %08x st %08x\n", lba, argNow, tmNow, st);
+    cacheInvalidate(bigV, n * 512);
+    if (ok && ((uint32_t *)bigV)[n * 128 - 1] == 0xCAFEBABEu &&
+        ((uint32_t *)bigV)[n * 128 - 2] == 0xCAFEBABEu) {
+      ok = false;
+      elog("NativeEmmc: big tail poison intact lba %u n %u st %08x\n", lba, n, st);
+    }
+    cmdNoData(0x0C1A, 0); // CMD12 stop
+    if (!ok) resetLines();
+    return ok;
+  }
   // One single-block SDMA CMD24 write from the first 512 bytes of the DMA
   // page — writeLogSector's shape, parameterized for the Data window.
   bool writeSingle(uint32_t lba) {
@@ -977,12 +1015,14 @@ public:
     return true;
   }
 
-  // r257 clock lift: the identify clock (max divider, ~50-400 KB/s) cannot
-  // carry the LS scan. Read the capabilities base clock (0x40 bits 15:8),
-  // lift the divider to <=26 MHz (legacy-mode ceiling; HS + DLL tuning is
-  // deliberately out of scope this round), switch the card to 4-bit, and
-  // verify with repeated LBA1 CRC rereads. Any failure restores the
-  // identify state; windows then still work, just slowly.
+  // r257 clock lift; r268 rewrite: the legacy-mode 26 MHz ceiling capped the
+  // r267 LS scan at 0.21 MiB/s — a 3 GiB scan needs ~13+ MiB/s to fit the
+  // 300 s window. Switch the CARD to High-Speed (EXT_CSD 185) first (legal
+  // ceiling becomes 52 MHz), set 4-bit width once, then walk the divider
+  // ladder FASTEST-FIRST; every rung is stability-gated by repeated LBA1
+  // CRC rereads plus a timed 128-sector bulk probe. SDCLKFS=1 is never tried
+  // (100 MHz at a 200 MHz base is illegal even for HS); any failure walks to
+  // the next-slower rung, ending at the identify clock.
   void setDivider(uint16_t sdclkfs) {
     uint16_t vendor = (uint16_t)(r16(0x2C) & 0x00F8u); // preserve 0xC0-class bits
     w16(0x2C, (uint16_t)((sdclkfs << 8) | vendor | 0x0001u));
@@ -996,48 +1036,76 @@ public:
     uint32_t caps = r32(0x40);
     uint32_t baseMHz = (caps >> 8) & 0xFFu;
     elog("NativeEmmc: caps %08x base %u MHz ref crc %08x\n", caps, baseMHz, ref);
-    uint16_t ladder[3]; unsigned nl = 0;
-    if (baseMHz >= 26 && baseMHz <= 255) {
-      // effective = base/(2*SDCLKFS) <= 26 MHz -> SDCLKFS >= base/52.
-      uint32_t want = (baseMHz + 51) / 52;
-      if (want < 1) want = 1;
-      if (want > 255) want = 255;
-      ladder[nl++] = (uint16_t)want;
-      ladder[nl++] = (uint16_t)(want > 127 ? 255 : want * 2); // slower fallback
-    } else {
-      ladder[nl++] = 8;  // 26 MHz -> 1.6 MHz or 200 MHz -> 12.5 MHz: safe either way
-      ladder[nl++] = 4;
-      ladder[nl++] = 2;
-    }
-    for (unsigned i = 0; i < nl; ++i) {
-      setDivider(ladder[i]);
-      if (!stableLba1(ref)) {
-        elog("NativeEmmc: div %u unstable\n", ladder[i]);
-        continue;
+    bool hs = false;
+    {
+      uint32_t st = cmdNoData(0x061B, (3u << 24) | (185u << 16) | (1u << 8));
+      uint32_t r1 = r32(SDHCI_RESPONSE);
+      if (cmdOk(st) && !(r1 & E5BootLog::r1Errors) && waitLogReady(1000)) {
+        hs = true;
+        elog("NativeEmmc: hs switch y\n");
+      } else {
+        elog("NativeEmmc: hs switch refused st %08x r1 %08x (legacy 26 MHz ceiling)\n", st, r1);
       }
+    }
+    bool wide = false;
+    {
       uint32_t st = cmdNoData(0x061B, (3u << 24) | (183u << 16) | (1u << 8)); // 4-bit
       uint32_t r1 = r32(SDHCI_RESPONSE);
       if (cmdOk(st) && !(r1 & E5BootLog::r1Errors) && waitLogReady(1000)) {
         w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) | 0x02u);
-        if (stableLba1(ref)) {
-          windowSdclkfs = ladder[i]; windowBaseMHz = baseMHz; wideBus = true;
-          uint64_t t0 = 0, t1 = 0;
-          clock_get_uptime(&t0);
-          bool fr = readMulti(1, 8);
-          clock_get_uptime(&t1);
-          uint64_t us = (t1 - t0) / 1000ull;
-          elog("NativeEmmc: fast mode div %u base %u 4-bit y; 8-sector %s in %llu us (%llu KB/s)\n",
-               ladder[i], baseMHz, fr ? "ok" : "FAIL", (unsigned long long)us,
-               (unsigned long long)(us ? (uint64_t)4096 / us : 0));
-          return;
-        }
-        elog("NativeEmmc: 4-bit unstable, reverting\n");
-        w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x02u);
-        cmdNoData(0x061B, (3u << 24) | (183u << 16)); // back to 1-bit
-        waitLogReady(1000);
+        wide = true;
       } else {
         elog("NativeEmmc: width switch refused st %08x r1 %08x\n", st, r1);
       }
+    }
+    uint32_t ceiling = hs ? 52u : 26u; // legal effective MHz
+    uint16_t ladder[6]; unsigned nl = 0;
+    if (baseMHz >= 10 && baseMHz <= 255) {
+      uint32_t want = (baseMHz + 2 * ceiling - 1) / (2 * ceiling);
+      if (want < 1) want = 1;
+      if (want > 255) want = 255;
+      ladder[nl++] = (uint16_t)want;                    // fastest legal rung
+      if (want * 2 <= 255) ladder[nl++] = (uint16_t)(want * 2);
+      if (want * 4 <= 255) ladder[nl++] = (uint16_t)(want * 4);
+      ladder[nl++] = 8;
+      ladder[nl++] = 0xFF;
+    } else {
+      // caps base untrustworthy (reads 0 on this host): never SDCLKFS=1 —
+      // 200 MHz base would mean 100 MHz. Start at 2 (50 MHz @200 base, the
+      // HS ceiling) and walk slower.
+      ladder[nl++] = 2; ladder[nl++] = 4; ladder[nl++] = 8;
+      ladder[nl++] = 16; ladder[nl++] = 0xFF;
+    }
+    for (unsigned i = 0; i < nl; ++i) {
+      uint16_t sd = ladder[i];
+      if (baseMHz >= 10 && baseMHz <= 255) {
+        uint32_t eff = baseMHz / (2u * (uint32_t)sd);
+        if (sd >= 1 && eff > ceiling) continue; // illegal rung for this base
+      }
+      setDivider(sd);
+      if (!stableLba1(ref)) {
+        elog("NativeEmmc: div %u unstable\n", sd);
+        continue;
+      }
+      uint64_t t0 = 0, t1 = 0;
+      clock_get_uptime(&t0);
+      bool fr = readMultiBig(1, 128);
+      clock_get_uptime(&t1);
+      uint64_t us = (t1 - t0) / 1000ull;
+      if (!fr) {
+        elog("NativeEmmc: div %u big probe FAIL\n", sd);
+        continue;
+      }
+      if (!stableLba1(ref)) {
+        elog("NativeEmmc: div %u post-probe unstable\n", sd);
+        continue;
+      }
+      windowSdclkfs = sd; windowBaseMHz = baseMHz; wideBus = wide;
+      elog("NativeEmmc: fast mode div %u base %u %s %s; 128-sector in %llu us (%llu KB/s)\n",
+           sd, baseMHz, hs ? "hs" : "legacy", wide ? "4-bit" : "1-bit",
+           (unsigned long long)us,
+           (unsigned long long)(us ? (uint64_t)65536 / us : 0));
+      return;
     }
     setDivider(0xFF);
     elog("NativeEmmc: fast mode refused, identify clock restored\n");
@@ -1082,6 +1150,11 @@ public:
   // SystemOS window reads for E5SystemOSDeviceEmmc: 8-sector verified chunks
   // under the host lock with the r254 big-read trace shape (the host-side
   // scanner's 'rw+' regexes match the progress lines).
+  // r268: reads of >=64 sectors take the bulk path — 128-sector readMultiBig
+  // chunks into the dedicated 64 KiB buffer, single-read with per-chunk CRC
+  // logging (host-verifiable against the image like r267); the FIRST chunk
+  // of each bulk read is two-agree gated (double read, CRCs must match) as a
+  // cheap per-call integrity canary. 3 GiB in a 300 s window needs this.
   IOReturn windowRead(IOMemoryDescriptor *data, UInt64 block, UInt64 count, uint64_t base) {
     if (!ioLock || !dmaD) return kIOReturnNotReady;
     if (data->getLength() < count * 512) return kIOReturnBadArgument;
@@ -1090,6 +1163,48 @@ public:
                   (unsigned long long)count, (unsigned long long)(base + block));
     __atomic_fetch_add(&e5_win_rd_ops, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&e5_win_rd_blocks, count, __ATOMIC_RELAXED);
+    if (count >= 64 && bigV) {
+      UInt64 chunks = (count + 127) / 128;
+      for (UInt64 c = 0; c < chunks; ++c) {
+        uint32_t n = (uint32_t)((count - c * 128) > 128 ? 128 : count - c * 128);
+        IOLockLock(ioLock);
+        bool ok = cardUp && readMultiBig((uint32_t)(base + block + c * 128), n);
+        uint32_t crc1 = ok ? crc32(bigV, (size_t)n * 512) : 0u;
+        if (ok && c == 0) {
+          // First-chunk two-agree canary: reread and compare CRCs.
+          if (readMultiBig((uint32_t)(base + block + c * 128), n)) {
+            uint32_t crc2 = crc32(bigV, (size_t)n * 512);
+            if (crc1 != crc2) {
+              elog("NativeEmmc: rv disagree big %llx+%u crcA %08x crcB %08x\n",
+                   (unsigned long long)(base + block + c * 128), n, crc1, crc2);
+              __atomic_fetch_add(&e5_win_unstable, 1, __ATOMIC_RELAXED);
+            }
+          } else {
+            ok = false;
+          }
+        }
+        IOLockUnlock(ioLock);
+        uint64_t ts = ++winTraceSeq;
+        if (ts <= 4096 && (ts <= 16 || (c & 63u) == 0))
+          elog("NativeEmmc: wr #%llu ob %llx+%u %s crc %08x\n",
+               (unsigned long long)ts, (unsigned long long)(base + block + c * 128), n,
+               ok ? "y" : "FAIL", ok ? crc32(bigV, n * 512) : 0u);
+        if (!ok) return kIOReturnIOError;
+        if (data->writeBytes(c * 128 * 512, bigV, (size_t)n * 512) != (IOByteCount)(n * 512))
+          return kIOReturnIOError;
+        if (big && ((c + 1) % 64) == 0)
+          elog("NativeEmmc: rw+ %llu/%llu at %llu+%llu\n",
+               (unsigned long long)((c + 1) * 128), (unsigned long long)count,
+               (unsigned long long)(base + block),
+               (unsigned long long)(c * 128 * 512));
+      }
+      if (big) elog("NativeEmmc: rw+ exit full %llu/%llu at %llu RD=%llu:%llu RV=%llu\n",
+                    (unsigned long long)count, (unsigned long long)count,
+                    (unsigned long long)(base + block),
+                    (unsigned long long)e5_win_rd_ops, (unsigned long long)e5_win_rd_blocks,
+                    (unsigned long long)e5_win_unstable);
+      return kIOReturnSuccess;
+    }
     UInt64 chunks = (count + 7) / 8;
     for (UInt64 c = 0; c < chunks; ++c) {
       uint32_t n = (uint32_t)((count - c * 8) > 8 ? 8 : count - c * 8);
@@ -1537,6 +1652,20 @@ bool NativeEmmc::start(IOService *provider)
   winD8 = d8 + 4096; winPhys = (uint32_t)(dva + 4096); // r259 second half-page
   elog("NativeEmmc: dma page %08llx\n", (unsigned long long)dva);
 
+  // r268: 64 KiB physically-contiguous bulk buffer for the LS-scan reads.
+  bigBMD = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(
+      kernel_task,
+      (IOOptionBits)kIODirectionInOut | (IOOptionBits)kIOMemoryPhysicallyContiguous,
+      65536, 0xFFFF0000ull);
+  if (bigBMD) {
+    bigBMD->prepare();
+    bigV = (uint8_t *)bigBMD->getBytesNoCopy();
+    bigPhys = (uint32_t)bigBMD->getPhysicalAddress();
+    elog("NativeEmmc: big page %08x\n", bigPhys);
+  } else {
+    elog("NativeEmmc: big alloc failed (bulk path off)\n");
+  }
+
   cardUp = identifyAndRead(d, d8, dva);
   elog("NativeEmmc: v4 result %s (ocr %08x rca %04x sectors %llu)\n",
        cardUp ? "Success" : "DeviceError", ocr, rca, (unsigned long long)sectors);
@@ -1671,6 +1800,7 @@ bool NativeEmmc::start(IOService *provider)
     return true;
   }
   resetLines();
+  if (bigBMD) { bigBMD->complete(); bigBMD->release(); bigBMD = nullptr; bigV = nullptr; }
   bmd->complete();
   bmd->release();
   map->release();
