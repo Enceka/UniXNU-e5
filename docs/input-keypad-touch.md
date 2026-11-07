@@ -52,7 +52,7 @@ labeled `selftest-home`; they are not physical-key evidence.
 
 The sensor is on I²C3 at PA **`0x22270000`**, address 0x2e. The parent AP-AHB
 range translates the FDT's 0x02270000 offset. AP-AHB gate bit13 is set through
-0x20004000 before controller access. The AP-I2C3 parent mux is at 0x200100a0,
+0x20001000 before controller access. The AP-I2C3 parent mux is at 0x200100a0,
 its divider at 0x2001009c; the first implementation selects ext-26m and 400kHz.
 GPIO13 is IRQ and GPIO14 reset at AON GPIO PA 0x64170000. GPIO clocks are enabled
 before access. Working Android pinmux/reset/firmware are preserved.
@@ -90,3 +90,7 @@ touch stages individually. GPU preparation follows the display/touch plan;
 these host checks do not establish its physical joint-acceptance gate.
 
 R286 completed 15 copied/retired frames, four successful keyboard/consumer reports, no report errors/drops/stuck state, fresh Android A recovery and 37/37 postboot checks. Physical buttons and desktop effect are still pending. The next descriptor uses independent keyboard and Consumer Control Application collections. `e5-hid-snapshot=1` takes two stable, read-only scanout snapshots around the automatic Home deadline; checksum-verified PNGs are memory evidence. Temporary sensor direct mode reads the firmware/config identity and restores normal mode before packets.
+
+R287 resource trial safely refused I2C access when a legacy-comment-derived gate at 0x20003000 read zero before/after the set write. The FDT child reg is address0/size0x3000 under syscon@20000000, so the corrected gate base is 0x20000000 (set0x20001000, reset set/clear0x20001004/0x20002004). The controller was not read on that failure; no kernel panic was observed.
+
+The R287 snapshots100/101 decode with complete checksums and show the Chinese lock screen on both sides of Consumer Menu. The clock font is clipped at the viewport edges. R288 keeps physical key mappings unchanged and uses diagnostic `e5-hid-test=4` to send Consumer Menu, Command-H, Return, then Command-H, with releases between actions. The corrected gate is derived with UniXNU FDT translation; a negative control rejects the old wrong base before MMIO. A separate `e5-touch-test=1` emits synthetic tap/drag/two-contact reports only after real sensor identification/packet readiness, and cancels when real contacts appear.

@@ -16,7 +16,7 @@
   "i2c_physical": "0x22270000",
   "keypad_physical": "0x641b0000",
   "gpio_physical": "0x64170000",
-  "clock_gate_set": "0x20004000",
+  "clock_gate_set": "0x20001000",
   "clock_gate_bit": 13,
   "home_matrix": [
     3,
@@ -34,5 +34,7 @@
   ],
   "contact_limit": 2,
   "sensor_firmware_update_enabled": false,
-  "test_log": "PASS: E5 key wiring/Home/chords/fast-release, two-contact bounds/lifts, and repeated-start/FIFO/NACK/timeout recovery"
+  "test_log": "PASS: E5 key wiring/Home/chords/fast-release, two-contact bounds/lifts, and repeated-start/FIFO/NACK/timeout recovery",
+  "clock_gate_base": "0x20000000",
+  "gate_translation": "apahb-gate reg address0/size0x3000 + syscon parent physical0x20000000"
 }
