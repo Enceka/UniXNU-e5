@@ -94,6 +94,9 @@ static void elog(const char *fmt, ...) {
 static uint64_t e5_win_rd_blocks, e5_win_rd_ops;
 static uint64_t e5_win_wr_blocks, e5_win_wr_ops, e5_win_wr_bad;
 static uint64_t e5_win_unstable;
+// Enabled by this board's kernel config; that source-file define is not
+// present in the IOKit archive's compile record.
+extern "C" uint64_t cs_native4k_read_ticks, cs_native4k_hash_ticks, cs_native4k_bytes;
 
 // r275: sampled without taking the host lock or issuing any media reads.
 // These are cumulative submitted-request counters (512-byte blocks), not
@@ -106,6 +109,12 @@ extern "C" void e5_emmc_runtime_dump(void) {
        (unsigned long long)__atomic_load_n(&e5_win_wr_blocks, __ATOMIC_RELAXED),
        (unsigned long long)__atomic_load_n(&e5_win_wr_bad, __ATOMIC_RELAXED),
        (unsigned long long)__atomic_load_n(&e5_win_unstable, __ATOMIC_RELAXED));
+  uint64_t readNs = 0, hashNs = 0;
+  absolutetime_to_nanoseconds(__atomic_load_n(&cs_native4k_read_ticks, __ATOMIC_RELAXED), &readNs);
+  absolutetime_to_nanoseconds(__atomic_load_n(&cs_native4k_hash_ticks, __ATOMIC_RELAXED), &hashNs);
+  elog("E5CS4K bytes=%llu read_ms=%llu hash_ms=%llu\n",
+       (unsigned long long)__atomic_load_n(&cs_native4k_bytes, __ATOMIC_RELAXED),
+       (unsigned long long)(readNs / 1000000), (unsigned long long)(hashNs / 1000000));
 }
 
 // Report the executing context, not an inferred originating process: APFS
@@ -1254,15 +1263,18 @@ public:
         uint32_t n = (uint32_t)((count - c * 128) > 128 ? 128 : count - c * 128);
         uint32_t crc = 0;
         bool ok;
+        const uint64_t ts = __atomic_add_fetch(&winTraceSeq, 1ULL, __ATOMIC_RELAXED);
+        const bool logCrc = ts <= 4096 && (ts <= 16 || (c & 63u) == 0);
         uint64_t lockStart = trace.enabled ? mach_absolute_time() : 0;
         IOLockLock(ioLock);
         trace.waited(lockStart);
         ok = cardUp && readMultiBig((uint32_t)(base + block + c * 128), n);
-        uint32_t crc1 = ok ? crc32(bigV, (size_t)n * 512) : 0u;
         if (ok && c == 0) {
           // First-chunk two-agree canary: reread and compare CRCs.
+          const uint32_t crc1 = crc32(bigV, (size_t)n * 512);
           if (readMultiBig((uint32_t)(base + block + c * 128), n)) {
             uint32_t crc2 = crc32(bigV, (size_t)n * 512);
+            crc = crc2;
             if (crc1 != crc2) {
               elog("NativeEmmc: rv disagree big %llx+%u crcA %08x crcB %08x\n",
                    (unsigned long long)(base + block + c * 128), n, crc1, crc2);
@@ -1278,13 +1290,15 @@ public:
         // fill (or its verified bytes) into the client — the r273 APFS
         // "cksum 0xcafebabecafebabe size 4096" corruption.
         if (ok) {
-          crc = crc32(bigV, (size_t)n * 512);
+          // r276: CRCs outside the first-chunk canary are diagnostic only.
+          // Once their trace is suppressed, do not CRC every byte twice.
+          // Reuse the canary's CRC of the bytes actually being delivered.
+          if (logCrc && c != 0) crc = crc32(bigV, (size_t)n * 512);
           if (data->writeBytes(c * 128 * 512, bigV, (size_t)n * 512) != (IOByteCount)(n * 512))
             ok = false;
         }
         IOLockUnlock(ioLock);
-        uint64_t ts = ++winTraceSeq;
-        if (ts <= 4096 && (ts <= 16 || (c & 63u) == 0))
+        if (logCrc)
           elog("NativeEmmc: wr #%llu ob %llx+%u %s crc %08x\n",
                (unsigned long long)ts, (unsigned long long)(base + block + c * 128), n,
                ok ? "y" : "FAIL", crc);
@@ -1308,6 +1322,7 @@ public:
       uint32_t n = (uint32_t)((count - c * 8) > 8 ? 8 : count - c * 8);
       uint32_t crc = 0;
       bool ok;
+      const uint64_t ts = __atomic_add_fetch(&winTraceSeq, 1ULL, __ATOMIC_RELAXED);
       uint64_t lockStart = trace.enabled ? mach_absolute_time() : 0;
       IOLockLock(ioLock);
       trace.waited(lockStart);
@@ -1318,12 +1333,11 @@ public:
       // another request's poison fill (r273: APFS read a 4 KiB
       // 0xCAFEBABE-checksum block on disk4s1/disk6s1).
       if (ok) {
-        crc = crc32(winD8, (size_t)n * 512);
+        if (ts <= 4096) crc = crc32(winD8, (size_t)n * 512);
         if (data->writeBytes(c * 8 * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
           ok = false;
       }
       IOLockUnlock(ioLock);
-      uint64_t ts = ++winTraceSeq;
       if (ts <= 4096)
         elog("NativeEmmc: wr #%llu os %llx+%u %s crc %08x\n",
              (unsigned long long)ts, (unsigned long long)(base + block + c * 8), n,
@@ -1361,6 +1375,7 @@ public:
       uint32_t n = (uint32_t)((count - off) > 8 ? 8 : count - off);
       bool ok;
       uint32_t crc = 0;
+      uint64_t ts = 0;
       if (out) {
         // r274: stage AND write under the lock. readBytes used to run before
         // the lock, so a concurrent window read's 0xCAFEBABE pre-fill (or its
@@ -1374,16 +1389,16 @@ public:
           ok = writeSingle((uint32_t)(E5Data::base + block + off + s), s * 512);
         IOLockUnlock(ioLock);
       } else {
+        ts = __atomic_add_fetch(&winTraceSeq, 1ULL, __ATOMIC_RELAXED);
         IOLockLock(ioLock);
         ok = cardUp && windowReadVerifiedDeliver(winD8, (uint32_t)(E5Data::base + block + off), n);
         // r274: deliver inside the lock — see windowRead's note.
         if (ok) {
-          crc = crc32(winD8, (size_t)n * 512);
+          if (ts <= 4096) crc = crc32(winD8, (size_t)n * 512);
           if (data->writeBytes(off * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
             ok = false;
         }
         IOLockUnlock(ioLock);
-        uint64_t ts = ++winTraceSeq;
         if (ts <= 4096)
           elog("NativeEmmc: wr #%llu dm %llx+%u %s crc %08x\n",
                (unsigned long long)ts, (unsigned long long)(E5Data::base + block + off), n,

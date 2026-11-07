@@ -44,6 +44,7 @@ extern "C" void task_lock(task_t);
 extern "C" void task_unlock(task_t);
 extern "C" vm_size_t ml_nofault_copy(vm_offset_t, vm_offset_t, vm_size_t);
 extern "C" uint64_t mach_absolute_time(void);
+extern "C" uint64_t recount_thread_time_mach(thread_t);
 
 namespace {
 using Word = unsigned long long;
@@ -678,13 +679,11 @@ static void snapshotThreads(ProcSnaps &out) {
         Word next = 0;
         if (!kernelRead(th + 0x428, &next, 8)) { t.status = 5; break; }
         kernelRead(th + 0x508, &t.tid, 8);
-        // cpu_time_eqos_stats @ thread+0x4f8 (thread.o DWARF): eight 64-bit
-        // per-QOS mach-absolute accumulators; their sum is the thread's total
-        // CPU time. Read raw under the task lock like every other field.
-        for (unsigned q = 0; q != 8; ++q) {
-          Word v = 0;
-          if (kernelRead(th + 0x4f8 + 8 * q, &v, 8)) t.cpu += v;
-        }
+        // r276: cpu_time_eqos_stats+0x4f8 belongs to task, not thread.
+        // The old sum mixed thread IDs/policy/ledger fields into fake time.
+        // XNU's recount helper returns actual accumulated absolute ticks;
+        // task_lock keeps this queue member alive during the scalar read.
+        t.cpu = recount_thread_time_mach((thread_t)th);
         kernelRead(th + 0x1f8, &t.kernelState, 4);
         kernelRead(th + 0x20, &t.waitEvent, 8);
         kernelRead(th + 0xd8, &t.continuation, 8);
