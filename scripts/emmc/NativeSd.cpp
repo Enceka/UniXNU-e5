@@ -922,12 +922,20 @@ public:
       dataDevice = prepareDataDevice();
       if (!dataDevice) sdlog("NativeSd: data window NXSB refused\n");
     }
-    sdlog("NativeSd: publishing read-only SD card %llu sectors\n",
-          (unsigned long long)sectors);
-    registerService();
-    if (systemOS && !publishSystemOS(this)) sdlog("NativeSd: SystemOS publication failed\n");
-    if (dataDevice && !publishData(dataDevice, this))
-      sdlog("NativeSd: data publication failed\n");
+    // r264: eMMC-only storage. Publishing the card media spawns a GPT slice
+    // and a synthesized OS volume that raced (and beat) the eMMC OsRoot
+    // volume for the /chosen root UUID match in r263. The card stays purely
+    // the watchdog/bring-up host; opt back in with e5-sd-publish.
+    if (PE_parse_boot_argn("e5-sd-publish", nullptr, 0)) {
+      sdlog("NativeSd: publishing read-only SD card %llu sectors\n",
+            (unsigned long long)sectors);
+      registerService();
+      if (systemOS && !publishSystemOS(this)) sdlog("NativeSd: SystemOS publication failed\n");
+      if (dataDevice && !publishData(dataDevice, this))
+        sdlog("NativeSd: data publication failed\n");
+    } else {
+      sdlog("NativeSd: sd media publication skipped (eMMC-only round)\n");
+    }
     // r245: the Data device is media-direct (no RAM image, no flush timer,
     // no write-through gate) — writes land on the card inside their own
     // block I/O, so there is nothing left to arm here.

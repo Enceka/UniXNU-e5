@@ -889,6 +889,16 @@ public:
   // Accessors for the out-of-line publication helpers.
   uint64_t windowCardSectors() const { return sectors; }
   const uint8_t *dmaPeek() const { return winD8; } // r259: window reads land in the second half-page
+  // r264 diagnostics: CRC of the last window read + same-LBA cross-check
+  // through the legacy single-sector SDMA path (first half-page; the
+  // journal is dormant in journal-off rounds).
+  uint32_t windowCrc() { return crc32(winD8, 4096); }
+  bool legacyReadProbe(uint32_t lba) {
+    uint32_t st = sdmaRead512(0x113A, lba, d8, dmaPhys);
+    cacheInvalidate(d8, 512);
+    if (!transferOk(st)) return false;
+    return memcmp(d8 + 32, "NXSB", 4) == 0;
+  }
   // One multi-block SDMA CMD18 read of n<=16 sectors into the DMA page.
   // v4 layout: block count at 0x00, system address at 0x58/0x5C. The manual
   // CMD12 and line-reset-on-failure mirror the SD driver's proven r253 shape.
@@ -1141,15 +1151,22 @@ public:
   void windowSelfTest(const char *tag) {
     struct Area { const char *name; uint32_t base; const uint32_t *crcs;
                   uint32_t count; uint32_t chunkStep; };
-    static const Area areas[4] = {
-      {"oss", (uint32_t)E5SystemOS::base, E5SelfTest::os,
-       (uint32_t)(sizeof(E5SelfTest::os) / 4), 256},
+    // r264 order = diagnostic priority: Data head (r263 base fault), the
+    // cryptex fault region (chunk 6170), then the fault-adjacent dense band,
+    // spare, and only then the wide sparse sweeps.
+    static const Area areas[6] = {
+      {"dmh", (uint32_t)E5Data::base, E5SelfTest::dmh,
+       (uint32_t)(sizeof(E5SelfTest::dmh) / 4), 1},
+      {"osf", (uint32_t)E5SystemOS::base + (E5SelfTest::kOsDenseFirst + 16) * 8,
+       E5SelfTest::osf, (uint32_t)(sizeof(E5SelfTest::osf) / 4), 1},
       {"osd", (uint32_t)E5SystemOS::base + E5SelfTest::kOsDenseFirst * 8,
        E5SelfTest::osd, (uint32_t)(sizeof(E5SelfTest::osd) / 4), 1},
-      {"dms", (uint32_t)E5Data::base, E5SelfTest::dms,
-       (uint32_t)(sizeof(E5SelfTest::dms) / 4), 256},
       {"sp", E5SelfTest::kSpareBase, E5SelfTest::spare,
        (uint32_t)(sizeof(E5SelfTest::spare) / 4), 1},
+      {"oss", (uint32_t)E5SystemOS::base, E5SelfTest::os,
+       (uint32_t)(sizeof(E5SelfTest::os) / 4), 256},
+      {"dms", (uint32_t)E5Data::base, E5SelfTest::dms,
+       (uint32_t)(sizeof(E5SelfTest::dms) / 4), 256},
     };
     if (!ioLock || !winD8) return;
     uint32_t bad = 0;
@@ -1166,8 +1183,8 @@ public:
         clock_interval_to_absolutetime_interval(90, NSEC_PER_SEC, &deadline);
         deadline += t0ns;
         uint64_t chunk = 0, total = 0;
-        for (int a = 0; a < 4; ++a) total += areas[a].count;
-        for (int a = 0; a < 4; ++a) {
+        for (int a = 0; a < 6; ++a) total += areas[a].count;
+        for (int a = 0; a < 6; ++a) {
           elog("NativeEmmc: ST %s %s begin (%u chunks)\n", tag, areas[a].name, areas[a].count);
           for (uint32_t i = 0; i < areas[a].count; ++i) {
             if ((++chunk & 255u) == 0) {
@@ -1431,7 +1448,23 @@ static E5DataDeviceEmmc *prepareDataDeviceEmmc(NativeEmmc *host) {
   }
   const uint8_t *probe = host->dmaPeek();
   if (memcmp(probe + 32, "NXSB", 4)) {
-    elog("NativeEmmc: data window not NXSB\n");
+    // r264: the r263 boot probe failed here — readMulti(base) returned
+    // zeros while the media verified byte-perfect from Android. Dump what
+    // arrived, retry readMulti for consistency, and cross-check the same
+    // LBA through the legacy single-sector path before giving up.
+    elog("NativeEmmc: data window not NXSB (crc %08x first16 %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x)\n",
+         host->windowCrc(),
+         probe[0], probe[1], probe[2], probe[3], probe[4], probe[5], probe[6], probe[7],
+         probe[8], probe[9], probe[10], probe[11], probe[12], probe[13], probe[14], probe[15]);
+    for (unsigned r = 0; r < 2; ++r) {
+      IOSleep(100);
+      if (host->readMulti((uint32_t)E5Data::base, 8))
+        elog("NativeEmmc: data probe retry %u crc %08x\n", r, host->windowCrc());
+    }
+    if (host->legacyReadProbe((uint32_t)E5Data::base))
+      elog("NativeEmmc: data probe legacy sdmaRead512 SEES NXSB (readMulti-only fault)\n");
+    else
+      elog("NativeEmmc: data probe legacy sdmaRead512 also misses NXSB\n");
     return nullptr;
   }
   uint64_t containerBlocks = *(const uint64_t *)(probe + 40);
