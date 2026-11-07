@@ -162,7 +162,7 @@ class NativeEmmc : public IOBlockStorageDevice {
   uint32_t logNonce = 0, logSlot = 0, logLastStatus = 0, logLastR1 = 0;
   uint64_t logGeneration = 0, logSeq = 0, logCursor = 0, logOverrun = 0;
   // r257: window machinery (SystemOS + Data media windows on this eMMC).
-  uint8_t readShadow[8192];      // r253 verify-retry shadow (not a DMA buffer)
+  uint8_t readShadow[16384];     // r253 verify-retry shadow + r265 three-agree shadow2 (not DMA)
   uint16_t windowSdclkfs = 0;    // lifted divider (0 = identify clock)
   uint32_t windowBaseMHz = 0;    // capabilities base clock when lifted
   bool wideBus = false;          // EXT_CSD 4-bit switch held
@@ -1043,8 +1043,37 @@ public:
     elog("NativeEmmc: fast mode refused, identify clock restored\n");
   }
 
-  // One verified n<=8 sector window read: multi CMD18 + r253 verify-retry
-  // (shadow copy, reread, memcmp; <=2 rounds, final read wins).
+  // One verified n<=8 sector window read: three-agree (r265). Read into
+  // winD8, copy to readShadow; reread into winD8, copy to readShadow2;
+  // reread again. All three must agree; deliver the SECOND read's copy
+  // (shadow2) so post-verify winD8 corruption cannot reach the client.
+  // Disagreement logs both crcs so the odd read is identifiable.
+  bool windowReadVerifiedDeliver(uint8_t *deliver, uint32_t lba, uint32_t n) {
+    uint8_t *shadow2 = readShadow + 8192;
+    for (unsigned round = 0; round < 2; ++round) {
+      if (!readMulti(lba, n)) return false;
+      memcpy(readShadow, winD8, (size_t)n * 512);
+      if (!readMulti(lba, n)) return false;
+      memcpy(shadow2, winD8, (size_t)n * 512);
+      if (!memcmp(readShadow, shadow2, (size_t)n * 512)) {
+        if (!readMulti(lba, n)) return false;
+        if (!memcmp(shadow2, winD8, (size_t)n * 512)) {
+          memcpy(deliver, shadow2, (size_t)n * 512);
+          return true;
+        }
+        elog("NativeEmmc: rv3 third disagree lba %u crcB %08x crcC %08x\n",
+             lba, crc32(shadow2, n * 512), crc32(winD8, n * 512));
+      } else {
+        elog("NativeEmmc: rv3 ab disagree lba %u round %u crcA %08x crcB %08x\n",
+             lba, round, crc32(readShadow, n * 512), crc32(shadow2, n * 512));
+      }
+      __atomic_fetch_add(&e5_win_unstable, 1, __ATOMIC_RELAXED);
+    }
+    // Final read wins, delivered from the verified-in-round-2 shadow2 copy.
+    memcpy(deliver, shadow2, (size_t)n * 512);
+    return true;
+  }
+
   bool windowReadVerified(uint32_t lba, uint32_t n) {
     for (unsigned round = 0; round < 2; ++round) {
       if (!readMulti(lba, n)) return false;
@@ -1072,10 +1101,10 @@ public:
     for (UInt64 c = 0; c < chunks; ++c) {
       uint32_t n = (uint32_t)((count - c * 8) > 8 ? 8 : count - c * 8);
       IOLockLock(ioLock);
-      bool ok = cardUp && windowReadVerified((uint32_t)(base + block + c * 8), n);
+      bool ok = cardUp && windowReadVerifiedDeliver(winD8, (uint32_t)(base + block + c * 8), n);
       IOLockUnlock(ioLock);
       uint64_t ts = ++winTraceSeq;
-      if (ts <= 64)
+      if (ts <= 4096)
         elog("NativeEmmc: wr #%llu os %llx+%u %s crc %08x\n",
              (unsigned long long)ts, (unsigned long long)(base + block + c * 8), n,
              ok ? "y" : "FAIL", ok ? crc32(winD8, n * 512) : 0u);
@@ -1121,10 +1150,10 @@ public:
         IOLockUnlock(ioLock);
       } else {
         IOLockLock(ioLock);
-        ok = cardUp && windowReadVerified((uint32_t)(E5Data::base + block + off), n);
+        ok = cardUp && windowReadVerifiedDeliver(winD8, (uint32_t)(E5Data::base + block + off), n);
         IOLockUnlock(ioLock);
         uint64_t ts = ++winTraceSeq;
-        if (ts <= 64)
+        if (ts <= 4096)
           elog("NativeEmmc: wr #%llu dm %llx+%u %s crc %08x\n",
                (unsigned long long)ts, (unsigned long long)(E5Data::base + block + off), n,
                ok ? "y" : "FAIL", ok ? crc32(winD8, n * 512) : 0u);
@@ -1525,6 +1554,18 @@ bool NativeEmmc::start(IOService *provider)
     // r257: the windows need megabytes per second; the identify clock
     // delivers kilobytes. Lift-and-verify, falling back safely.
     liftClock();
+    // r265: turn OFF the eMMC's internal cache (EXT_CSD CACHE_CTRL byte 33).
+    // Volatile cache-on can serve stale pages for interleaved reads; rule it
+    // out as the roaming wrong-content source.
+    {
+      uint32_t st = cmdNoData(0x061B, (3u << 24) | (33u << 16));
+      if (cmdOk(st)) {
+        waitLogReady(1000);
+        elog("NativeEmmc: ext_csd cache ctrl off y\n");
+      } else {
+        elog("NativeEmmc: ext_csd cache ctrl off FAIL st %08x\n", st);
+      }
+    }
     uint32_t logTest = 0;
     if (PE_parse_boot_argn("e5-emmc-log-test", &logTest, sizeof(logTest)) && logTest) {
       IOLockLock(ioLock);
