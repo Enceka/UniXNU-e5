@@ -13,6 +13,7 @@
 #include <mach/kmod.h>
 #include <pexpert/pexpert.h>
 #include <kern/clock.h>
+#include <kern/thread_call.h>
 #include <stdarg.h>
 
 extern "C" void e5_kputc(char);
@@ -21,6 +22,7 @@ extern "C" void e5_touch_poll(void (*)(const E5Input::Frame &,void *),void *);
 extern "C" void e5_touch_stop(void);
 extern "C" bool e5_touch_ready(void);
 extern "C" bool e5_input_capture(unsigned);
+extern "C" bool e5_input_request_capture(unsigned);
 
 namespace {
 void note(const char *format,...) __attribute__((format(printf,1,2)));
@@ -33,6 +35,17 @@ void note(const char *format,...) {
 constexpr unsigned QueueSize=64;
 uint32_t queue[QueueSize],head=0,tail=0,enabled=0,latest=0,dropped=0,polls=0,physicalEvents=0;
 E5Input::MatrixState matrix;
+unsigned observedStage=0,observedTicks=0,observedFlags=0,observedReport=0,observedReports=0;
+uint64_t observedDeadline=0;
+thread_call_t monitorCall=nullptr;
+void monitor(thread_call_param_t,thread_call_param_t) {
+  note("E5HIDOBS stage=%u ticks=%u flags=%x inflight=%u reports=%u deadline=%llx now=%llx",
+       __atomic_load_n(&observedStage,__ATOMIC_RELAXED),__atomic_load_n(&observedTicks,__ATOMIC_RELAXED),
+       __atomic_load_n(&observedFlags,__ATOMIC_RELAXED),__atomic_load_n(&observedReport,__ATOMIC_RELAXED),
+       __atomic_load_n(&observedReports,__ATOMIC_RELAXED),__atomic_load_n(&observedDeadline,__ATOMIC_RELAXED),mach_absolute_time());
+  uint64_t deadline=0;clock_interval_to_deadline(30,1000000000,&deadline);
+  thread_call_enter1_delayed(monitorCall,nullptr,deadline);
+}
 void enqueueHeld(uint32_t held) {
   __atomic_store_n(&latest,held,__ATOMIC_RELEASE);
   const uint32_t h=__atomic_load_n(&head,__ATOMIC_RELAXED);
@@ -96,9 +109,14 @@ class E5HidDevice final:public IOHIDDevice {
   uint64_t touchTestDeadline=0;
   E5Input::TouchState touches;
   IOReturn send(const void *bytes,size_t length,const char *source) {
+    __atomic_store_n(&observedStage,4,__ATOMIC_RELAXED);
+    __atomic_store_n(&observedReport,static_cast<const uint8_t *>(bytes)[0],__ATOMIC_RELAXED);
     IOBufferMemoryDescriptor *buffer=IOBufferMemoryDescriptor::withBytes(bytes,length,kIODirectionNone);
     const IOReturn result=buffer?handleReport(buffer,0,0):kIOReturnNoMemory;
     OSSafeReleaseNULL(buffer);++reports;if(result!=kIOReturnSuccess)++failures;
+    __atomic_store_n(&observedReports,reports,__ATOMIC_RELAXED);
+    __atomic_store_n(&observedReport,0,__ATOMIC_RELAXED);
+    __atomic_store_n(&observedStage,5,__ATOMIC_RELAXED);
     if(reports<=16 || result!=kIOReturnSuccess)
       note("E5HID report=%u source=%s id=%u bytes=%u ret=%x",reports,source,
            static_cast<const uint8_t *>(bytes)[0],static_cast<unsigned>(length),static_cast<unsigned>(result));
@@ -152,6 +170,11 @@ class E5HidDevice final:public IOHIDDevice {
   }
   static void tick(OSObject *owner,IOTimerEventSource *source) {
     auto *self=OSDynamicCast(E5HidDevice,owner);if(!self)return;
+    __atomic_store_n(&observedStage,1,__ATOMIC_RELAXED);
+    __atomic_add_fetch(&observedTicks,1,__ATOMIC_RELAXED);
+    __atomic_store_n(&observedFlags,(self->test?1:0)|(self->snapshots?2:0)|(self->probe?4:0)|(self->touch?8:0)|(self->testDone?16:0),__ATOMIC_RELAXED);
+    __atomic_store_n(&observedDeadline,self->testDeadline,__ATOMIC_RELAXED);
+    __atomic_store_n(&observedStage,2,__ATOMIC_RELAXED);
     if((self->ticks++%64)==0)self->driver=eventDriver(self,4);
     if(self->driver) {
       uint32_t state;
@@ -174,11 +197,13 @@ class E5HidDevice final:public IOHIDDevice {
         else clock_interval_to_deadline(5,1000000000,&self->testDeadline);
       }
     }
+    __atomic_store_n(&observedStage,6,__ATOMIC_RELAXED);
     if(self->probe)e5_touch_poll(self->touch && self->driver?touchReady:nullptr,self);
     if(self->touch && self->driver && self->touchTest && !self->touchTestDone &&
         e5_touch_ready() && mach_absolute_time()>=self->touchTestDeadline)self->testTouchStep();
     if(self->snapshots && self->snapshotStage<2 && mach_absolute_time()>=self->snapshotDeadline) {
-      const bool captured=e5_input_capture(100+self->snapshotStage);
+      __atomic_store_n(&observedStage,8,__ATOMIC_RELAXED);
+      const bool captured=e5_input_request_capture(100+self->snapshotStage);
       if(captured || ++self->snapshotAttempts>=5) {
         ++self->snapshotStage;self->snapshotAttempts=0;
         clock_interval_to_deadline(self->snapshotStage==1?40:1,1000000000,&self->snapshotDeadline);
@@ -187,7 +212,7 @@ class E5HidDevice final:public IOHIDDevice {
     if((self->ticks%2000)==1)note("E5HID status driver=%u polls=%u transitions=%u reports=%u failed=%u dropped=%u held=%x",
        self->driver?1:0,__atomic_load_n(&polls,__ATOMIC_RELAXED),__atomic_load_n(&physicalEvents,__ATOMIC_RELAXED),
        self->reports,self->failures,__atomic_load_n(&dropped,__ATOMIC_RELAXED),self->held);
-    source->setTimeoutMS(16);
+    __atomic_store_n(&observedStage,10,__ATOMIC_RELAXED);source->setTimeoutMS(16);
   }
 public:
   IOWorkLoop *getWorkLoop() const override {return loop;}
@@ -220,6 +245,8 @@ public:
     clock_interval_to_deadline(testAt,1000000000,&testDeadline);
     clock_interval_to_deadline(testAt>=40?testAt-10:testAt,1000000000,&snapshotDeadline);
     clock_interval_to_deadline(testAt+50,1000000000,&touchTestDeadline);
+    note("E5HID options test=%u actions=%u snapshots=%u touch=%u touch_test=%u at=%u deadline=%llx",
+         test?1:0,homeActions,snapshots?1:0,touch?1:0,touchTest?1:0,testAt,testDeadline);
     timer->setTimeoutMS(16);return true;
   }
   void stop(IOService *provider) override {
@@ -259,7 +286,9 @@ extern "C" int e5_input_start(void) {
   auto *device=OSDynamicCast(E5HidDevice,OSMetaClass::allocClassWithName("E5HidDevice"));
   bool initialized=false,attached=false,live=false;
   if(provider && device){initialized=device->init();if(initialized)attached=device->attach(provider);if(attached)live=device->start(provider);}
-  if(live){device->registerService();__atomic_store_n(&enabled,1,__ATOMIC_RELEASE);}
+  if(live){device->registerService();__atomic_store_n(&enabled,1,__ATOMIC_RELEASE);
+    monitorCall=thread_call_allocate_with_options(monitor,nullptr,THREAD_CALL_PRIORITY_KERNEL,THREAD_CALL_OPTIONS_ONCE);
+    if(monitorCall){uint64_t deadline=0;clock_interval_to_deadline(30,1000000000,&deadline);thread_call_enter1_delayed(monitorCall,nullptr,deadline);}}
   else if(attached)device->detach(provider);
   note("E5HID publish=%u init=%u attach=%u parent_bytes=%u owned_bytes=%u",live?1:0,initialized?1:0,attached?1:0,parent->getClassSize(),static_cast<unsigned>(sizeof(E5HidDevice)));
   OSSafeReleaseNULL(provider);OSSafeReleaseNULL(device);return live?1:0;
