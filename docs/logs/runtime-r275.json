@@ -1,0 +1,127 @@
+{
+  "round": 275,
+  "source": "uefi/build/sb-r275/r275/capture/kernel.log",
+  "source_sha256": "cf1cc3022e70605612cc1015433033f1c51f5f09f8972ffe8d7e8e0a452fde57",
+  "device_commit": "efd49346494edef0210f539684020fc8ac8ba5b8",
+  "preflight": "PASS 37/37",
+  "postflash": "PASS 37/37",
+  "payload_sha256": "cc9a127e22690643466d6f362d5b31f0386d0cf9f68d4ab152a83ee9e2ab3976",
+  "markers": {
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "load code signature error": 0,
+    "panic(cpu": 0,
+    "E5OBS uptime_ms": 19,
+    "E5PANELSNAP": 1
+  },
+  "cpu_warning": "E5TH cpu is invalid in R275: task field offset was applied to thread; fixed in R276",
+  "early_boot": [
+    "com.apple.xpc.launchd|1969-12-31 16:05:13.785566 (boot) <Notice>: Early boot complete. Continuing system boot."
+  ],
+  "panel": "one initial CRC 557a87bd; no subsequent frame change",
+  "thread_conclusion": "SpringBoard main waits in LSCopyServerStore; lsd worker scans application Info.plist files through MIFilesystemScanner; missing IOWatchdog registry service matches the known watchdogd assertion; UI not achieved",
+  "first_observation": {
+    "uptime_ms": 43263,
+    "processes": [
+      {
+        "pid": 1,
+        "name": "launchd"
+      }
+    ],
+    "io": {
+      "read_ops": 615,
+      "read_blocks": 118997,
+      "write_ops": 1,
+      "write_blocks": 8,
+      "write_failures": 0,
+      "unstable": 0
+    },
+    "services": "3c",
+    "process_total": 1,
+    "max_pid": 1
+  },
+  "last_observation": {
+    "uptime_ms": 627662,
+    "processes": [
+      {
+        "pid": 1,
+        "name": "launchd"
+      },
+      {
+        "pid": 25,
+        "name": "logd"
+      },
+      {
+        "pid": 26,
+        "name": "runningboardd"
+      },
+      {
+        "pid": 27,
+        "name": "SpringBoard"
+      },
+      {
+        "pid": 47,
+        "name": "amfid"
+      },
+      {
+        "pid": 57,
+        "name": "backboardd"
+      },
+      {
+        "pid": 66,
+        "name": "driverkitd"
+      },
+      {
+        "pid": 71,
+        "name": "lockdownd"
+      },
+      {
+        "pid": 87,
+        "name": "notifyd"
+      },
+      {
+        "pid": 98,
+        "name": "chronod"
+      },
+      {
+        "pid": 99,
+        "name": "lsd"
+      },
+      {
+        "pid": 104,
+        "name": "liveactivitiesd"
+      },
+      {
+        "pid": 177,
+        "name": "watchdogd"
+      }
+    ],
+    "io": {
+      "read_ops": 268954,
+      "read_blocks": 8531989,
+      "write_ops": 1297,
+      "write_blocks": 38648,
+      "write_failures": 0,
+      "unstable": 0
+    },
+    "services": "3c",
+    "process_total": 123,
+    "max_pid": 189
+  },
+  "observed_processes": [
+    "SpringBoard",
+    "amfid",
+    "backboardd",
+    "chronod",
+    "driverkitd",
+    "launchd",
+    "liveactivitiesd",
+    "lockdownd",
+    "logd",
+    "lsd",
+    "notifyd",
+    "runningboardd",
+    "watchdogd"
+  ]
+}

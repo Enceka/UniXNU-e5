@@ -412,6 +412,14 @@ revision = "9fe0c1200aaaaca75e3d868afb057f844a165cec"
 command = "Rebuild the pinned kernel; verify independent FAT kernel extraction and full boot_b readback; boot journal trials with B_TRIES=2 and watchdog intervals 120s/60s; harvest and decode the raw journal; compare complete before/after partitions and the previous boot slot."
 result = "PASS: Android A returns in 185s and 125s. Both journal generations decode with 86 and 73 records, zero reported loss, invalid records or gaps; the previous 256 KiB slot is byte-identical. All boot_b bytes outside the journal and the primary GPT are unchanged. CACHE_CTRL=0; cold power loss, interrupted writes and full rotation are not qualified."
 
+
+[[area.evidence]]
+kind = "device"
+revision = "efd49346494edef0210f539684020fc8ac8ba5b8"
+reference = "docs/logs/runtime-r275.json"
+command = "R275 e5-uefi-cycle.sh flash/collect with pre/post window checks, complete payload readback and native USB capture"
+result = "PASS for runtime observations and DMA ownership, UI pending: 37/37 pre/post checks; 19 independent timer samples through uptime 627662ms; SpringBoard PID27, runningboardd PID26, lsd PID99 and backboardd PID57 live. Last census has 123 processes; no CAFEBABE, APFS checksum/corruption, signature-load error or panic markers. SpringBoard waits in LSCopyServerStore while lsd scans built-in Info.plist files. One initial panel CRC, no presentation. Fresh Android return completed. R275 thread CPU values are invalid and corrected in R276."
+
 [[area]]
 id = "display"
 findings = ["R275 independent timer is live on eMMC-only: E5OBS/E5PROC/E5LIVE and E5DPU appear while PID 1 reads the cache. R275 CPU values exposed an older probe bug: cpu_time_eqos_stats at 0x4f8 is a task field, not a thread field. R276 samples real accumulated absolute ticks through recount_thread_time_mach while task_lock protects the member; prior E5TH cpu values are invalid.", "R274 eMMC-only boots skip SD media publication, so the SD read-completion frame kick never runs and neither the runtime census nor the delivery/DPU timer starts. R275 starts an independent, serialized kernel-priority timer from display startup, samples processes/registry/panel/eMMC counters every approximately 32 seconds, and schedules the 60-second deep thread probe outside display delivery. The native family notification stays on the delivery worker. Census now includes launchd/logd/lsd/watchdogd and IOWatchdog registry presence. Host compilation is verified; R275 device acceptance is pending."]
@@ -655,6 +663,14 @@ reference = "docs/logs/display-throttle-round151.json"
 result = "PASS: 1.8kHz thread_call spin (relative delay passed as absolute deadline since r137) starved all display clients; 20Hz wall-clock throttle restored u=3:3 client connects, ak=08 kind-3 FrameInfo registration, F=96 panel changes; SwapBegin band still uncalled."
 command = "python3 run-board-cycle.py board-r151"
 revision = "706ba471d5b8ff00989de80d66cc44b25fb889e1"
+
+
+[[area.evidence]]
+kind = "device"
+revision = "efd49346494edef0210f539684020fc8ac8ba5b8"
+reference = "docs/logs/runtime-r275.json"
+command = "R275 e5-uefi-cycle.sh flash/collect with pre/post window checks, complete payload readback and native USB capture"
+result = "PASS for runtime observations and DMA ownership, UI pending: 37/37 pre/post checks; 19 independent timer samples through uptime 627662ms; SpringBoard PID27, runningboardd PID26, lsd PID99 and backboardd PID57 live. Last census has 123 processes; no CAFEBABE, APFS checksum/corruption, signature-load error or panic markers. SpringBoard waits in LSCopyServerStore while lsd scans built-in Info.plist files. One initial panel CRC, no presentation. Fresh Android return completed. R275 thread CPU values are invalid and corrected in R276."
 
 [[area]]
 id = "input"
