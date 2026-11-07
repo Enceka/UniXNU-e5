@@ -25,4 +25,4 @@ inspection passed. With -fapple-kext the qualified base call uses the original
 base vtable; its slot 354 remains 0xfffffff0057970cc. R282's owned slot 354 is
 the logging wrapper. Payload comparison against R281 changes only kernel.macho;
 the 720-second watchdog, firmware, EFI files, ADT, trustcache and seed match.
-Artifacts: e5-xnu/uefi/build/sb-r282. Runtime result is not yet available.
+Hardware result: 6,663 successful swap calls, zero CPU validation offers. Both observed original setter calls leave requested=0 and powered=1. No integrity/panic markers; Android recovered and 37/37 protected-window chunks passed. See docs/logs/runtime-r282.json. Artifacts: e5-xnu/uefi/build/sb-r282. This confirms the powered report but does not qualify physical presentation.

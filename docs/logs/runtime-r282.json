@@ -1,0 +1,42 @@
+{
+  "round": 282,
+  "device_source_revision": "7e3fa48a4f42d6be4343e76e88ae46355e9a0fb7",
+  "kernel_sha256": "717a6cbf194adbe1ac92821b18c53b60aa5862efdd374864831a983e97beb567",
+  "payload_sha256": "a4d85a9f403beebfb0fe2a36565bf92d8807b5840f3d7c8efdd974994f326879",
+  "watchdog_seconds": 720,
+  "source": {
+    "path": "uefi/build/sb-r282/r282/capture/kernel.log",
+    "sha256": "3666f7065ca360c9dbd3a3ea029fb62f20b69c4e2abacaa2c1e7a5f7a7c901e6"
+  },
+  "markers": {
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "load code signature error": 0,
+    "panic(cpu": 0,
+    "E5CPU offer": 0,
+    "E5CPU copied": 0
+  },
+  "power_transitions": [
+    "E5POWER n=1 skip=1:0 input=0:1 requested=0 powered=1 ret=0",
+    "E5POWER n=2 skip=1:0 input=2863311530:1 requested=0 powered=1 ret=0"
+  ],
+  "presenter_ready": [
+    "E5CPU ready map=0xfffffff1e6dfce40 requested=0 powered=1"
+  ],
+  "first_swap_after_sample_ms": 499246,
+  "last_display_summary": [
+    "E5IMSUM vc=1:44188:44188 d=1:0:e00002bc b=6663:6663:0 e=6663:6663:0 over=0"
+  ],
+  "panel_crc_changes": [],
+  "last_uptime_ms": 756001,
+  "user_visible_springboard": false,
+  "result": "Powered word=1 while requested remains zero. Successful swap APIs never reach the visible CPU validation hook. Exact original code gates submission on requested. Android recovered; all 37 protected-window chunks passed and R283 supervisor verified restored spare guards before its next flash.",
+  "postboot_verification": {
+    "expected_chunks": 37,
+    "observed_chunks": 37,
+    "matched": 37,
+    "mismatched": 0,
+    "missing": 0
+  }
+}
