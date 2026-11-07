@@ -15,6 +15,7 @@ using e5_notify_fn = void (*)(void *, void *);
 #include <sys/proc.h>
 #include <kern/task.h>
 #include <kern/clock.h> // r245: clock_interval_to_deadline for the census cadence
+#include <kern/thread_call.h>
 
 // E5TW only: printf would change the framebuffer being measured.
 #include <stdarg.h>
@@ -30,6 +31,7 @@ extern "C" void e5_iomfb_trace_dump(void);
 extern "C" void e5_display_state_dump(void);
 extern "C" void e5_display_vsync_fire(void); // v27
 extern "C" void e5_display_async_kick(void); // v29.1: arm the delivery timer
+extern "C" void e5_emmc_runtime_dump(void);
 static void e5_display_tracef(const char *format, ...) {
   if (e5_quiet) return;
   char line[256];
@@ -42,18 +44,21 @@ static void e5_display_tracef(const char *format, ...) {
 
 // R128: a bounded process/registry snapshot after native readiness completed
 // without any surface calls. No task_info/map locks, user-memory reads,
-// suspension or signals from this media-read checkpoint. A proc reference
+// suspension or signals from this timer checkpoint. A proc reference
 // protects each process while the pinned task's scalar state is sampled.
 static void e5_display_runtime_census() {
   static unsigned sequence;
   const unsigned sample = ++sequence;
   static const char *const targets[] = {
       "SpringBoard", "backboardd", "runningboardd", "frontboardd",
-      "liveactivitiesd", "launchd", "WindowServer", "chronod", "lockdownd"};
-  unsigned seen = 0;
+      "liveactivitiesd", "launchd", "WindowServer", "chronod", "lockdownd",
+      "lsd", "logd", "watchdogd", "amfid", "notifyd", "driverkitd"};
+  unsigned seen = 0, total = 0, maxPid = 0;
   for (int pid = 1; pid < 512; ++pid) {
     proc_t process = proc_find(pid);
     if (!process) continue;
+    ++total;
+    maxPid = (unsigned)pid;
     char name[32] = {};
     proc_name(pid, name, sizeof(name));
     for (unsigned i = 0; i < sizeof(targets) / sizeof(targets[0]); ++i) {
@@ -72,7 +77,7 @@ static void e5_display_runtime_census() {
   }
   static const char *const services[] = {
       "IOGPU", "IOAccelerator", "AppleKeyStore", "IOSurfaceRoot",
-      "IOMobileFramebuffer", "IOCoreSurfaceRoot"};
+      "IOMobileFramebuffer", "IOCoreSurfaceRoot", "IOWatchdog"};
   unsigned published = 0;
   for (unsigned i = 0; i < sizeof(services) / sizeof(services[0]); ++i) {
     OSDictionary *matching = i == 5 ? IOService::nameMatching(services[i])
@@ -86,8 +91,8 @@ static void e5_display_runtime_census() {
     matching->release();
   }
   { if (!e5_quiet)
-      e5_display_tracef("E5LIVE seq=%u pid_limit=512 seen=%02x services=%02x\n",
-      sample, seen, published); }
+      e5_display_tracef("E5LIVE seq=%u pid_limit=512 seen=%02x services=%02x total=%u max_pid=%u\n",
+      sample, seen, published, total, maxPid); }
   // r224: replay the slot-224 (sel 79) argument captures at census cadence —
   // the in-call prints happen during early display configuration and scroll
   // out of the 32 KiB ring before harvest.
@@ -162,6 +167,7 @@ extern "C" unsigned e5_display_frame_crc = 0;
 static IODeviceMemory *sPanelMemory = nullptr;
 static IOMemoryMap *sPanelMap = nullptr;
 static unsigned sPanelKicks = 0;
+static unsigned sLegacyNotifyPending;
 
 static uint32_t e5_display_crc32(const volatile uint8_t *p, size_t n) {
   uint32_t crc = 0xFFFFFFFFu;
@@ -176,6 +182,11 @@ static uint32_t e5_display_crc32(const volatile uint8_t *p, size_t n) {
 extern "C" void e5_display_frame_kick(void) {
   static unsigned traceKicks;
   if ((traceKicks++ % 16) == 0) {
+    uint64_t ns = 0;
+    absolutetime_to_nanoseconds(mach_absolute_time(), &ns);
+    e5_display_tracef("E5OBS uptime_ms=%llu source=timer\n",
+                     (unsigned long long)(ns / 1000000));
+    e5_emmc_runtime_dump();
     { if (!e5_quiet) e5_iomfb_trace_dump(); }
     e5_display_runtime_census();
   }
@@ -196,7 +207,7 @@ extern "C" void e5_display_frame_kick(void) {
   __atomic_store_n(&e5_display_power_last, e5_display_power_read(), __ATOMIC_RELAXED);
   if (!sPanelMap) return;
   sPanelKicks++;
-  if ((sPanelKicks % 16) != 2) return; // ~every 16th big-read echo batch
+  if ((sPanelKicks % 16) != 2) return; // every 32 s on the runtime timer
   const volatile uint16_t *px = (const volatile uint16_t *)sPanelMap->getVirtualAddress();
   uint32_t crc = e5_display_crc32((const volatile uint8_t *)px, 0x4B000);
   if (crc != e5_display_frame_crc) {
@@ -300,7 +311,13 @@ extern "C" void e5_display_frame_kick(void) {
       e5_display_tracef("\n");
     }
   }
-  {
+  __atomic_store_n(&sLegacyNotifyPending, 1U, __ATOMIC_RELEASE);
+}
+
+// The native family callback can take its command gate; run it only on
+// the delivery worker, never on the independent observation worker.
+extern "C" void e5_display_legacy_notify(void) {
+  if (__atomic_exchange_n(&sLegacyNotifyPending, 0U, __ATOMIC_ACQ_REL)) {
     extern void *e5_display_service_instance();
     void *svc = e5_display_service_instance();
     if (svc) {
@@ -312,6 +329,46 @@ extern "C" void e5_display_frame_kick(void) {
       }
     }
   }
+}
+
+// r275: start from the display startup path, even when SD media publication
+// is skipped. Only this worker calls frame_kick; DMA completion never runs
+// process/registry walks, CRCs or native display notifications. Keep this
+// timer separate from the async-delivery timer so a blocked display gate
+// cannot suppress E5OBS/E5PROC. Built-in diagnostics live until shutdown.
+static thread_call_t sRuntimeTimer;
+static void e5_display_runtime_tick(thread_call_param_t, thread_call_param_t) {
+  e5_display_frame_kick();
+  // Schedule the existing deep probe independently of display delivery.
+  static uint64_t nextProbe = 0, nextDump = 0;
+  uint64_t now = mach_absolute_time();
+  if (!nextProbe) clock_interval_to_deadline(90, NSEC_PER_SEC, &nextProbe);
+  if (nextDump && now >= nextDump) {
+    nextDump = 0;
+    e5_ca_probe_dump();
+  } else if (now >= nextProbe) {
+    e5_ca_probe_periodic();
+    clock_interval_to_deadline(2, NSEC_PER_SEC, &nextDump);
+    clock_interval_to_deadline(60, NSEC_PER_SEC, &nextProbe);
+  }
+  uint64_t deadline = 0;
+  clock_interval_to_deadline(2, NSEC_PER_SEC, &deadline);
+  thread_call_enter1_delayed(sRuntimeTimer, nullptr, deadline);
+}
+extern "C" void e5_display_runtime_start(void) {
+  static unsigned started;
+  if (__atomic_exchange_n(&started, 1U, __ATOMIC_ACQ_REL)) return;
+  sRuntimeTimer = thread_call_allocate_with_options(e5_display_runtime_tick,
+      nullptr, THREAD_CALL_PRIORITY_KERNEL, THREAD_CALL_OPTIONS_ONCE);
+  if (!sRuntimeTimer) {
+    e5_display_tracef("E5OBS timer allocation failed\n");
+    __atomic_store_n(&started, 0U, __ATOMIC_RELEASE);
+    return;
+  }
+  uint64_t deadline = 0;
+  clock_interval_to_deadline(5, NSEC_PER_SEC, &deadline);
+  thread_call_enter1_delayed(sRuntimeTimer, nullptr, deadline);
+  e5_display_tracef("E5OBS timer armed first_s=5 period_s=2 census_ticks=16\n");
 }
 
 extern "C" int e5_concrete_display_probe(void) {
@@ -527,24 +584,7 @@ extern "C" void e5_dpu_tick(void) {
   // continuous dynamic output: step the paint pattern; every 8th tick also
   // pulse the backlight to 1/4 duty and back (panel/backlight acceptance)
   e5_dpu_paint_step();
-  // r245: force a thread/LS census every 60 s of wall clock. r243 sampled
-  // exactly once in 3600 s because the CA-state trigger chain needs a
-  // backboardd request; the LS slow-versus-looping question needs a series.
-  // The probe runs on its own worker, so the dump follows two seconds later
-  // to print a completed snapshot; the deadline helpers handle tick units.
-  {
-    static uint64_t nextProbe = 0, nextDump = 0;
-    uint64_t now = mach_absolute_time();
-    if (!nextProbe) clock_interval_to_deadline(90, NSEC_PER_SEC, &nextProbe);
-    if (nextDump && now >= nextDump) {
-      nextDump = 0;
-      e5_ca_probe_dump();
-    } else if (now >= nextProbe) {
-      e5_ca_probe_periodic();
-      clock_interval_to_deadline(2, NSEC_PER_SEC, &nextDump);
-      clock_interval_to_deadline(60, NSEC_PER_SEC, &nextProbe);
-    }
-  }
+  // r275: thread/LS sampling is driven by the independent runtime timer.
   // r148: i2c tick disabled (r147 regression bisect: keep D2 paint only)
 
   if (sDpuMap) {

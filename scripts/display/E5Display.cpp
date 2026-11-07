@@ -362,6 +362,7 @@ extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
 }
 static thread_call_t sFireTimer = nullptr;
 extern "C" void e5_dpu_tick(void); // E5DisplayProbe.cpp: D2 v1 paint + backlight
+extern "C" void e5_display_legacy_notify(void);
 // r150: thread_call_enter1_delayed takes an ABSOLUTE deadline, not a
 // relative delay. Passing 100ms as a deadline fired the timer ~1.8kHz
 // (r140 measured 1,090,560 ticks in 600s); that spin starved every display
@@ -398,6 +399,7 @@ static void e5_fire_timer_fn(thread_call_param_t, thread_call_param_t) {
     if (registered || (((++sFireDivider) & 0x3Fu) == 0))
       e5_display_async_fire();
     e5_dpu_tick(); // D2 v1: native scanout pattern + backlight pulse (timer ctx)
+    e5_display_legacy_notify();
   }
   // v1.2: reschedule UNCONDITIONALLY. r138 proved the first fire lands
   // ~100ms after the first pager echo — before display start() sets

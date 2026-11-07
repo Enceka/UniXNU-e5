@@ -46,7 +46,7 @@ extern "C" unsigned e5_display_pw_calls, e5_display_pw_results;
 extern "C" unsigned e5_display_wait_calls, e5_display_wait_last;
 extern "C" unsigned e5_display_swap_mask;
 extern "C" int e5_diag_stage;
-extern "C" void e5_display_frame_kick(void);
+extern "C" void e5_display_runtime_start(void);
 extern int e5_display_metaclasses;
 extern int e5_display_kext_state;
 extern int e5_display_load_result;
@@ -1082,9 +1082,8 @@ public:
       unsigned bmask = __atomic_load_n(&e5_display_backend_slots, __ATOMIC_RELAXED);
       unsigned bslot = __atomic_load_n(&e5_display_backend_last_slot, __ATOMIC_RELAXED);
       unsigned bsel = __atomic_load_n(&e5_display_backend_last_sel, __ATOMIC_RELAXED);
-      // r97: frame-acceptance probe — crc32 the panel scanout window at a
-      // slow cadence; F=<changes>:<crc> rides the echo line.
-      e5_display_frame_kick();
+      // r275: the independent runtime timer owns the panel/process probe.
+      // The echo only reads its published counters, including F below.
       // r90: slot 213 left the soft-guard set for a real capability answer;
       // C=<calls>:<status> tracks it on the same echo line.
       // r176: throttle the echo line itself — the video console paints every
@@ -1328,11 +1327,20 @@ IOReturn NativeSd::dataMediaIO(IOMemoryDescriptor *data, UInt64 block, UInt64 co
     // written for (16-sector CMD18 reads stay proven, but r245 never got far
     // enough to distinguish; keep one shape until the path is qualified).
     uint32_t n = (count - off) > 8 ? 8 : (uint32_t)(count - off);
-    if (out) data->readBytes(off * 512, buffer, (size_t)n * 512);
+    // r274: stage, transfer and deliver all under the host lock. `buffer` is
+    // the DMA target of every readSector/readSectors, which pre-fill it with
+    // 0xcafebabe; copying into it before the lock (write path) or out of it
+    // after the unlock (read path) let a concurrent request's fill or bytes
+    // reach the client/media.
     IOLockLock(lock);
     if (!cardUp) { IOLockUnlock(lock); return kIOReturnNotReady; }
-    bool ok = out ? writeSectors((uint32_t)(E5Data::base + block + off), n)
-                  : readSectors((uint32_t)(E5Data::base + block + off), n);
+    bool ok = true;
+    if (out && data->readBytes(off * 512, buffer, (size_t)n * 512) != (IOByteCount)(n * 512))
+      ok = false;
+    if (ok) ok = out ? writeSectors((uint32_t)(E5Data::base + block + off), n)
+                     : readSectors((uint32_t)(E5Data::base + block + off), n);
+    if (ok && !out && data->writeBytes(off * 512, buffer, (size_t)n * 512) != (IOByteCount)(n * 512))
+      ok = false;
     IOLockUnlock(lock);
     if (!ok) {
       if (out) __atomic_add_fetch(&e5_sd_wr_bad, 1, __ATOMIC_RELAXED);
@@ -1341,7 +1349,6 @@ IOReturn NativeSd::dataMediaIO(IOMemoryDescriptor *data, UInt64 block, UInt64 co
             __atomic_load_n(&e5_sd_wr_bad, __ATOMIC_RELAXED));
       return kIOReturnIOError;
     }
-    if (!out) data->writeBytes(off * 512, buffer, (size_t)n * 512);
   }
   return kIOReturnSuccess;
 }
@@ -1509,6 +1516,7 @@ extern "C" int e5_display_probe(void) {
 extern "C" int e5_display_start(void) {
   e5_keystore_start();  // r213: publish before any daemon opens AppleKeyStore.
   if (PE_parse_boot_argn("e5-display-off", nullptr, 0)) return 0;
+  e5_display_runtime_start(); // r275: no dependency on SD I/O or lcd publication
   e5_display_attach = 0;
   mach_timespec_t ts = {20, 0};
   IOService *nub = IOService::waitForService(IOService::nameMatching("lcd"), &ts);

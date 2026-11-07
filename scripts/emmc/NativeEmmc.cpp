@@ -36,6 +36,7 @@
 #include <kern/thread.h>
 #include <kern/clock.h>
 #include <kern/thread_call.h>
+#include <sys/proc.h>
 #include <pexpert/pexpert.h>
 #include "TransferStatus.h"
 #include "BootLog.h"
@@ -89,10 +90,58 @@ static void elog(const char *fmt, ...) {
   e5_panic_print(buf);
 }
 
-// r257: window I/O telemetry (RD=blocks:ops WR=blocks:ops:failures RV=unstable).
+// Window I/O telemetry (RD=ops:blocks WR=ops:blocks:failures RV=unstable).
 static uint64_t e5_win_rd_blocks, e5_win_rd_ops;
 static uint64_t e5_win_wr_blocks, e5_win_wr_ops, e5_win_wr_bad;
 static uint64_t e5_win_unstable;
+
+// r275: sampled without taking the host lock or issuing any media reads.
+// These are cumulative submitted-request counters (512-byte blocks), not
+// successful completions or a transactionally consistent tuple.
+extern "C" void e5_emmc_runtime_dump(void) {
+  elog("E5IO RD=%llu:%llu WR=%llu:%llu:%llu RV=%llu\n",
+       (unsigned long long)__atomic_load_n(&e5_win_rd_ops, __ATOMIC_RELAXED),
+       (unsigned long long)__atomic_load_n(&e5_win_rd_blocks, __ATOMIC_RELAXED),
+       (unsigned long long)__atomic_load_n(&e5_win_wr_ops, __ATOMIC_RELAXED),
+       (unsigned long long)__atomic_load_n(&e5_win_wr_blocks, __ATOMIC_RELAXED),
+       (unsigned long long)__atomic_load_n(&e5_win_wr_bad, __ATOMIC_RELAXED),
+       (unsigned long long)__atomic_load_n(&e5_win_unstable, __ATOMIC_RELAXED));
+}
+
+// Report the executing context, not an inferred originating process: APFS
+// may submit reads on a kernel worker. Bound trace volume during the scan.
+class E5WindowReadTrace {
+  uint64_t sequence = 0, start = 0, waiting = 0;
+  uint64_t lba, blocks;
+  int pid = 0;
+  char name[32] = {};
+public:
+  bool enabled = false;
+  IOReturn result = kIOReturnIOError;
+  E5WindowReadTrace(uint64_t at, uint64_t count) : lba(at), blocks(count) {
+    if (count < 512) return;
+    static uint64_t samples;
+    sequence = __atomic_add_fetch(&samples, 1ULL, __ATOMIC_RELAXED);
+    enabled = sequence <= 4 || (sequence % 128) == 0;
+    if (!enabled) return;
+    start = mach_absolute_time();
+    pid = proc_selfpid();
+    proc_name(pid, name, sizeof(name));
+    elog("E5READ begin id=%llu lba=%llu blocks=%llu ctx_pid=%d ctx=%s\n",
+         (unsigned long long)sequence, (unsigned long long)lba,
+         (unsigned long long)blocks, pid, name);
+  }
+  void waited(uint64_t since) { if (enabled) waiting += mach_absolute_time() - since; }
+  ~E5WindowReadTrace() {
+    if (!enabled) return;
+    uint64_t ns = 0, waitNs = 0;
+    absolutetime_to_nanoseconds(mach_absolute_time() - start, &ns);
+    absolutetime_to_nanoseconds(waiting, &waitNs);
+    elog("E5READ end id=%llu us=%llu lock_us=%llu ret=%x\n",
+         (unsigned long long)sequence, (unsigned long long)(ns / 1000),
+         (unsigned long long)(waitNs / 1000), (unsigned)result);
+  }
+};
 
 // Console context never sleeps, allocates or performs storage I/O. A failed
 // try-lock drops a byte instead of waiting behind an interrupted producer.
@@ -1193,6 +1242,7 @@ public:
   IOReturn windowRead(IOMemoryDescriptor *data, UInt64 block, UInt64 count, uint64_t base) {
     if (!ioLock || !dmaD) return kIOReturnNotReady;
     if (data->getLength() < count * 512) return kIOReturnBadArgument;
+    E5WindowReadTrace trace(base + block, count);
     bool big = count >= 512;
     if (big) elog("NativeEmmc: rw+ enter %llu at %llu\n",
                   (unsigned long long)count, (unsigned long long)(base + block));
@@ -1202,8 +1252,12 @@ public:
       UInt64 chunks = (count + 127) / 128;
       for (UInt64 c = 0; c < chunks; ++c) {
         uint32_t n = (uint32_t)((count - c * 128) > 128 ? 128 : count - c * 128);
+        uint32_t crc = 0;
+        bool ok;
+        uint64_t lockStart = trace.enabled ? mach_absolute_time() : 0;
         IOLockLock(ioLock);
-        bool ok = cardUp && readMultiBig((uint32_t)(base + block + c * 128), n);
+        trace.waited(lockStart);
+        ok = cardUp && readMultiBig((uint32_t)(base + block + c * 128), n);
         uint32_t crc1 = ok ? crc32(bigV, (size_t)n * 512) : 0u;
         if (ok && c == 0) {
           // First-chunk two-agree canary: reread and compare CRCs.
@@ -1218,15 +1272,23 @@ public:
             ok = false;
           }
         }
+        // r274: deliver INSIDE the lock. bigV is the DMA target of every bulk
+        // transfer and readMultiBig fills it with 0xCAFEBABE before each one,
+        // so a copy made after the unlock can carry another request's poison
+        // fill (or its verified bytes) into the client — the r273 APFS
+        // "cksum 0xcafebabecafebabe size 4096" corruption.
+        if (ok) {
+          crc = crc32(bigV, (size_t)n * 512);
+          if (data->writeBytes(c * 128 * 512, bigV, (size_t)n * 512) != (IOByteCount)(n * 512))
+            ok = false;
+        }
         IOLockUnlock(ioLock);
         uint64_t ts = ++winTraceSeq;
         if (ts <= 4096 && (ts <= 16 || (c & 63u) == 0))
           elog("NativeEmmc: wr #%llu ob %llx+%u %s crc %08x\n",
                (unsigned long long)ts, (unsigned long long)(base + block + c * 128), n,
-               ok ? "y" : "FAIL", ok ? crc32(bigV, n * 512) : 0u);
+               ok ? "y" : "FAIL", crc);
         if (!ok) return kIOReturnIOError;
-        if (data->writeBytes(c * 128 * 512, bigV, (size_t)n * 512) != (IOByteCount)(n * 512))
-          return kIOReturnIOError;
         if (big && ((c + 1) % 64) == 0)
           elog("NativeEmmc: rw+ %llu/%llu at %llu+%llu\n",
                (unsigned long long)((c + 1) * 128), (unsigned long long)count,
@@ -1238,22 +1300,35 @@ public:
                     (unsigned long long)(base + block),
                     (unsigned long long)e5_win_rd_ops, (unsigned long long)e5_win_rd_blocks,
                     (unsigned long long)e5_win_unstable);
+      trace.result = kIOReturnSuccess;
       return kIOReturnSuccess;
     }
     UInt64 chunks = (count + 7) / 8;
     for (UInt64 c = 0; c < chunks; ++c) {
       uint32_t n = (uint32_t)((count - c * 8) > 8 ? 8 : count - c * 8);
+      uint32_t crc = 0;
+      bool ok;
+      uint64_t lockStart = trace.enabled ? mach_absolute_time() : 0;
       IOLockLock(ioLock);
-      bool ok = cardUp && windowReadVerifiedDeliver(winD8, (uint32_t)(base + block + c * 8), n);
+      trace.waited(lockStart);
+      ok = cardUp && windowReadVerifiedDeliver(winD8, (uint32_t)(base + block + c * 8), n);
+      // r274: deliver inside the lock — winD8 is the DMA target of every
+      // window transfer and readMulti re-poisons it with 0xCAFEBABE before
+      // each one, so a copy taken after the unlock can hand the client
+      // another request's poison fill (r273: APFS read a 4 KiB
+      // 0xCAFEBABE-checksum block on disk4s1/disk6s1).
+      if (ok) {
+        crc = crc32(winD8, (size_t)n * 512);
+        if (data->writeBytes(c * 8 * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
+          ok = false;
+      }
       IOLockUnlock(ioLock);
       uint64_t ts = ++winTraceSeq;
       if (ts <= 4096)
         elog("NativeEmmc: wr #%llu os %llx+%u %s crc %08x\n",
              (unsigned long long)ts, (unsigned long long)(base + block + c * 8), n,
-             ok ? "y" : "FAIL", ok ? crc32(winD8, n * 512) : 0u);
+             ok ? "y" : "FAIL", crc);
       if (!ok) return kIOReturnIOError;
-      if (data->writeBytes(c * 8 * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
-        return kIOReturnIOError;
       if (big && ((c + 1) % 64) == 0)
         elog("NativeEmmc: rw+ %llu/%llu at %llu+%llu\n",
              (unsigned long long)((c + 1) * 8), (unsigned long long)count,
@@ -1265,6 +1340,7 @@ public:
                   (unsigned long long)(base + block),
                   (unsigned long long)e5_win_rd_ops, (unsigned long long)e5_win_rd_blocks,
                   (unsigned long long)e5_win_unstable);
+    trace.result = kIOReturnSuccess;
     return kIOReturnSuccess;
   }
 
@@ -1284,23 +1360,34 @@ public:
     for (UInt64 off = 0; off < count; off += 8) {
       uint32_t n = (uint32_t)((count - off) > 8 ? 8 : count - off);
       bool ok;
+      uint32_t crc = 0;
       if (out) {
-        data->readBytes(off * 512, winD8, (size_t)n * 512);
+        // r274: stage AND write under the lock. readBytes used to run before
+        // the lock, so a concurrent window read's 0xCAFEBABE pre-fill (or its
+        // verified bytes) landed in the staged sector and was then written to
+        // media — the r272-era zero/foreign-crc write trace.
         IOLockLock(ioLock);
         ok = cardUp;
+        if (ok && data->readBytes(off * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
+          ok = false;
         for (uint32_t s = 0; ok && s < n; ++s)
           ok = writeSingle((uint32_t)(E5Data::base + block + off + s), s * 512);
         IOLockUnlock(ioLock);
       } else {
         IOLockLock(ioLock);
         ok = cardUp && windowReadVerifiedDeliver(winD8, (uint32_t)(E5Data::base + block + off), n);
+        // r274: deliver inside the lock — see windowRead's note.
+        if (ok) {
+          crc = crc32(winD8, (size_t)n * 512);
+          if (data->writeBytes(off * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
+            ok = false;
+        }
         IOLockUnlock(ioLock);
         uint64_t ts = ++winTraceSeq;
         if (ts <= 4096)
           elog("NativeEmmc: wr #%llu dm %llx+%u %s crc %08x\n",
                (unsigned long long)ts, (unsigned long long)(E5Data::base + block + off), n,
-               ok ? "y" : "FAIL", ok ? crc32(winD8, n * 512) : 0u);
-        if (ok) data->writeBytes(off * 512, winD8, (size_t)n * 512);
+               ok ? "y" : "FAIL", crc);
       }
       if (!ok) {
         if (out) __atomic_fetch_add(&e5_win_wr_bad, 1, __ATOMIC_RELAXED);

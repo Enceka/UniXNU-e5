@@ -113,7 +113,7 @@ struct ProcSnap {
   Word stamp, seedGroup, seedIsa, seedBefore, seedAfter, seedReadBefore, seedReadAfter;
   ThreadSnap thread[12];
 };
-static const unsigned kMaxProcs = 6;
+static const unsigned kMaxProcs = 10;
 static const unsigned kMaxThreads = 12;
 static const unsigned kFrames = 24;
 struct ProcSnaps { unsigned count; ProcSnap proc[kMaxProcs]; };
@@ -565,7 +565,8 @@ static void recordPcHistory(const ProcSnaps &snaps) {
   pcHistory = buffer;
 }
 static void snapshotThreads(ProcSnaps &out) {
-  static const char *const wanted[] = {"SpringBoard", "liveactivitiesd", "chronod", "backboardd", "lsd"};
+  static const char *const wanted[] = {"SpringBoard", "liveactivitiesd", "chronod", "backboardd", "lsd",
+                                      "launchd", "logd", "runningboardd", "watchdogd"};
   bzero(&out, sizeof(out));
   for (int pid = 1; pid < 512 && out.count < kMaxProcs; ++pid) {
     proc_t process = proc_find(pid);
@@ -712,6 +713,12 @@ static void snapshotThreads(ProcSnaps &out) {
     }
     task_unlock(task);
     p.threads = count;
+    // r275: new boot-graph targets use only no-fault kernel snapshots.
+    // Do not fault their userspace stacks in merely to observe a slow boot.
+    if (slot >= 5) {
+      task_deallocate(task);
+      continue;
+    }
     for (unsigned i = 0; i != count; ++i) {
       ThreadSnap &t = p.thread[i];
       // cthread_self is TPIDRRO_EL0, i.e. the TSD base. Original pthread and
@@ -815,13 +822,11 @@ static void run(thread_call_param_t, thread_call_param_t) {
       ipcCensus(task, snapshot[0].timer.portName, ipcSnapshot);
       task_deallocate(task);
     }
-    // r245: the thread/LS snapshot no longer depends on a backboardd task.
-    // r243 got exactly one sample in 3600 s because the whole chain needed
-    // one; the periodic entry below runs this on a wall-clock cadence with
-    // selectedPid 0 (the CA-pool inspect above stays backboardd-driven).
-    snapshotThreads(threadSnapshot);
-    recordPcHistory(threadSnapshot);
   }
+  // r275: also snapshot when selectedPid is absent/exited; the periodic
+  // entry must not depend on proc_find(0) succeeding.
+  snapshotThreads(threadSnapshot);
+  recordPcHistory(threadSnapshot);
   __atomic_add_fetch(&generation, 1U, __ATOMIC_ACQ_REL);
   for (unsigned i = 0; i != Fields; ++i) __atomic_store_n(&values[i], state[i], __ATOMIC_RELAXED);
   for (unsigned i = 0; i != kMaxEntries; ++i) entries[i] = snapshot[i];
