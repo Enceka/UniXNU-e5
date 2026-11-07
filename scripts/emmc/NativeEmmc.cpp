@@ -162,7 +162,7 @@ class NativeEmmc : public IOBlockStorageDevice {
   uint32_t logNonce = 0, logSlot = 0, logLastStatus = 0, logLastR1 = 0;
   uint64_t logGeneration = 0, logSeq = 0, logCursor = 0, logOverrun = 0;
   // r257: window machinery (SystemOS + Data media windows on this eMMC).
-  uint8_t readShadow[16384];     // r253 verify-retry shadow + r265 three-agree shadow2 (not DMA)
+  uint8_t readShadow[8192];      // r253 verify-retry shadow (not a DMA buffer)
   uint16_t windowSdclkfs = 0;    // lifted divider (0 = identify clock)
   uint32_t windowBaseMHz = 0;    // capabilities base clock when lifted
   bool wideBus = false;          // EXT_CSD 4-bit switch held
@@ -1049,7 +1049,7 @@ public:
   // (shadow2) so post-verify winD8 corruption cannot reach the client.
   // Disagreement logs both crcs so the odd read is identifiable.
   bool windowReadVerifiedDeliver(uint8_t *deliver, uint32_t lba, uint32_t n) {
-    uint8_t *shadow2 = readShadow + 8192;
+    static uint8_t shadow2[8192]; // ioLock-serialized; keeps the class under KALLOC_SAFE_ALLOC_SIZE
     for (unsigned round = 0; round < 2; ++round) {
       if (!readMulti(lba, n)) return false;
       memcpy(readShadow, winD8, (size_t)n * 512);
