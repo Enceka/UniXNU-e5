@@ -1,0 +1,66 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+// Register/STOP/divider semantics are from Linux i2c-sprd.c, reimplemented
+// for bounded polling. Registers supplies read/write32, read/write8, delayUs.
+#pragma once
+#include <stdint.h>
+#include <stddef.h>
+
+namespace E5Touch {
+enum class Transfer { Good, Argument, Nack, Timeout, ShortRead };
+template<class Registers> class I2c {
+  Registers &io;
+  static constexpr uint32_t Control=0,Address=4,Count=8,Rx=12,Tx=16,Status=20;
+  static constexpr uint32_t Start=1,Enable=4,Read=8,Interrupt=4,Nack=2,Empty=8;
+  static constexpr uint32_t SuppressStop=1u<<20,FullEnable=1u<<10;
+  static constexpr uint32_t Configuration=(1u<<8)|(1u<<2)|(1u<<1)|(8u<<16)|(4u<<12);
+  void clear() {io.write32(Status,io.read32(Status)&~(Interrupt|Nack));}
+  Transfer message(const uint8_t *write,uint8_t *read,size_t size,bool stop) {
+    if(!size || size>64 || (!read && (!write || size>12)))return Transfer::Argument;
+    io.write32(0x2c,1);clear();io.write32(Address,0x2e<<1);io.write32(Count,static_cast<uint32_t>(size));
+    uint32_t control=Configuration|(read?(Read|FullEnable):0)|(stop?0:SuppressStop);
+    io.write32(Control,control);
+    if(write)for(size_t i=0;i<size;++i)io.write8(Tx,write[i]);
+    io.write32(Control,control|Start);
+    size_t received=0;
+    for(unsigned elapsed=0;elapsed<10000;elapsed+=10) {
+      uint32_t status=io.read32(Status);
+      if(status&Nack){abort();return Transfer::Nack;}
+      if(read && (status&Interrupt)) {
+        while(received<size && !(io.read32(Status)&Empty))read[received++]=io.read8(Rx);
+      }
+      if(read && received==size && !(io.read32(Status)&1)) {io.write32(Control,control);clear();return Transfer::Good;}
+      if(status&Interrupt) {
+        if(!read || (received==size && !(status&1))){io.write32(Control,control);clear();return Transfer::Good;}
+        // FIFO threshold notification: drain it and keep receiving. An early
+        // completion with an empty FIFO must not be reported as a full read.
+        if(!(status&1)){abort();return Transfer::ShortRead;}
+        clear();
+      }
+      io.delayUs(10);
+    }
+    abort();return Transfer::Timeout;
+  }
+public:
+  constexpr explicit I2c(Registers &registers):io(registers){}
+  void configure() {
+    // ext-26m -> 400 kHz, with 40/60 percent high/low timing.
+    constexpr uint32_t divider=26000000/(4*400000)-1;
+    constexpr uint32_t high=(divider*4)/5,low=(divider*6)/5;
+    io.write32(Control,1u<<8);
+    io.write32(0x20,(high<<16)|low);io.write32(0x24,0);io.write32(0x28,15);
+    io.write32(0x2c,1);clear();io.write32(Control,Configuration);
+  }
+  void abort() {
+    io.write32(Control,Configuration); // bit20 clear enables STOP, not suppresses it
+    io.write32(0x2c,1);clear();
+  }
+  Transfer readRegister(uint8_t reg,uint8_t *data,size_t size) {
+    if(!data || !size || size>64)return Transfer::Argument;
+    const Transfer first=message(&reg,nullptr,1,false);
+    return first==Transfer::Good?message(nullptr,data,size,true):first;
+  }
+  Transfer writeRegister(uint8_t reg,uint8_t value) {
+    const uint8_t bytes[]={reg,value};return message(bytes,nullptr,sizeof(bytes),true);
+  }
+};
+} // namespace E5Touch

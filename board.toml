@@ -23,6 +23,7 @@
   "e5_ufs_stub.py .",
   "e5_emmc_build.py .",
   "e5_display_build.py .",
+  "e5_input_build.py .",
   "build-software-aes-bindings.py",
   "build-mockfs-fixture.py",
   "build-libpthread-kernel.py",
@@ -40,7 +41,7 @@
 ["payload"]
 "title" = "Boot E5"
 "dram_size" = "0x80000000"
-"kernel_args" = ["-v", "serial=3", "e5-usb=1"]
+"kernel_args" = ["-v", "serial=3", "e5-usb=1", "e5-hid=1"]
 
 [payload.adt]
 owned_memory_size = "0x28000000"

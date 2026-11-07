@@ -90,6 +90,7 @@ extern "C" unsigned e5_mali_stage, e5_mali_gpu_id, e5_mali_shader;
 // first inside e5_display_start() so the service exists before launchd
 // starts daemons; independent of display qualification and of e5-display-off.
 extern "C" int e5_keystore_start(void);
+extern "C" int e5_input_start(void);
 
 static bool publishSystemOS(NativeSd *host);
 class E5DataDevice;
@@ -1514,6 +1515,7 @@ extern "C" int e5_display_probe(void) {
 }
 
 extern "C" int e5_display_start(void) {
+  e5_input_start();    // publish qualified E5 keyboard/consumer input before launchd
   e5_keystore_start();  // r213: publish before any daemon opens AppleKeyStore.
   if (PE_parse_boot_argn("e5-display-off", nullptr, 0)) return 0;
   e5_display_runtime_start(); // r275: no dependency on SD I/O or lcd publication
