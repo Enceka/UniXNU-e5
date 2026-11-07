@@ -13,6 +13,7 @@ struct MockBus {
   unsigned time=0,phase=0,availableAt=0,readBytes=0,available=0,expected=0;
   uint32_t control=0,registers[16]={};bool active=false,isRead=false;
   std::vector<uint32_t> starts;
+  std::vector<uint8_t> writes;
   uint32_t read32(unsigned offset) {
     if(offset!=20)return registers[offset/4];
     if(!active)return 8;
@@ -38,7 +39,7 @@ struct MockBus {
       available=next<expected?next:expected;
     }
   }
-  void write8(unsigned offset,uint8_t){assert(offset==16);}
+  void write8(unsigned offset,uint8_t byte){assert(offset==16);writes.push_back(byte);}
   uint8_t read8(unsigned offset) {
     assert(offset==12 && active && isRead && time>=availableAt && readBytes<available);
     return static_cast<uint8_t>(readBytes++);
@@ -47,6 +48,21 @@ struct MockBus {
 };
 
 int main() {
+  unsigned page=0,usage=0,depth=0,application=0,size=0,count=0,reportId=0,bits[3]={};
+  for(unsigned at=0;at<sizeof(KeyboardDescriptor);) {
+    const unsigned item=KeyboardDescriptor[at++],bytes=(item&3)==3?4:item&3;
+    unsigned value=0;for(unsigned i=0;i<bytes;++i)value|=unsigned(KeyboardDescriptor[at++])<<(8*i);
+    switch(item&0xfc) {
+      case 0x04:page=value;break;case 0x08:usage=value;break;
+      case 0x74:size=value;break;case 0x94:count=value;break;case 0x84:reportId=value;break;
+      case 0xa0:
+        if(depth==0){assert(value==1);assert(application==0?(page==1 && usage==6):(page==12 && usage==1));++application;}
+        ++depth;break;
+      case 0xc0:assert(depth);--depth;break;
+      case 0x80:assert(reportId>=1 && reportId<=2);bits[reportId]+=size*count;break;
+    }
+  }
+  assert(application==2 && depth==0 && bits[1]==64 && bits[2]==8);
   unsigned wired=0;for(const auto &key:Keys)wired+=key.linuxCode!=0;assert(wired==20);
   KeyboardReport k;ConsumerReport c;
   reports(1u<<21,k,c);assert(c.buttons==1 && k.keys[0]==0); // physical Menu -> iOS Home
@@ -67,10 +83,10 @@ int main() {
   uint8_t packet[18]={};packet[3]=packet[9]=0xc0;Frame frame;
   packet[2]=1;packet[3]=0;packet[4]=0;packet[5]=0;packet[6]=0;
   assert(decode(packet,18,frame)==PacketResult::Good && frame.count==1 && frame.contacts[0].id==0);
-  TouchState touch;auto report=touch.report(frame);assert(report.count==1 && report.fingers[0][0]==3);
+  TouchState touch;auto report=touch.report(frame);assert(report.count==1 && report.fingers[0][0]==3 && report.fingers[0][1]==1);
   packet[2]=2;packet[9]=1;packet[10]=0x40;packet[11]=0x11;packet[12]=0xe0;
   assert(decode(packet,18,frame)==PacketResult::Good && frame.count==2);
-  report=touch.report(frame);assert(report.count==2 && report.fingers[1][1]==1);
+  report=touch.report(frame);assert(report.count==2 && report.fingers[1][1]==2);
   assert(report.fingers[1][2]==0xff && report.fingers[1][3]==0x7f && report.fingers[1][4]==0xff && report.fingers[1][5]==0x7f);
   report=touch.report(Frame{});assert(report.count==2 && report.fingers[0][0]==2 && report.fingers[1][0]==2);
   assert(touch.report(Frame{}).count==0); // each vanished ID has one lift
@@ -96,5 +112,9 @@ int main() {
   }
   MockBus invalid;E5Touch::I2c<MockBus> bounded(invalid);
   assert(bounded.readRegister(0,data,65)==E5Touch::Transfer::Argument && invalid.phase==0);
+  MockBus direct;E5Touch::I2c<MockBus> addresses(direct);addresses.configure();
+  assert(addresses.readAddress(0x8008,data,12)==E5Touch::Transfer::Good);
+  assert(direct.writes.size()==2 && direct.writes[0]==0x80 && direct.writes[1]==8);
+  assert(addresses.writeAddress(0x42bd,data,11)==E5Touch::Transfer::Argument);
   puts("PASS: E5 key wiring/Home/chords/fast-release, two-contact bounds/lifts, and repeated-start/FIFO/NACK/timeout recovery");
 }

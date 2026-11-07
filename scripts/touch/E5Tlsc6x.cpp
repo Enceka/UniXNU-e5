@@ -20,7 +20,8 @@ void note(const char *format,...) {
 // Board addresses include the parent bus translation, not the FDT unit offset.
 constexpr uint64_t I2cAddress=0x22270000,GateAddress=0x20003000;
 constexpr uint64_t ClockAddress=0x20010000,AonAddress=0x64900000,GpioAddress=0x64170000;
-IOMemoryMap *controller=nullptr,*gate=nullptr,*clockMap=nullptr,*aon=nullptr,*gpio=nullptr;
+IOMemoryMap *controller=nullptr,*gateMap=nullptr,*clockMap=nullptr,*aon=nullptr,*gpio=nullptr;
+uint32_t gpioMaskBefore=0,gpioDirectionBefore=0,gpioInputBefore=0;
 IOMemoryMap *map(uint64_t address,size_t bytes) {
   IODeviceMemory *memory=IODeviceMemory::withRange(address,bytes);
   IOMemoryMap *mapping=memory?memory->map():nullptr;OSSafeReleaseNULL(memory);return mapping;
@@ -44,11 +45,11 @@ unsigned mode=0,stage=0,polls=0,good=0,bad=0,recoveries=0,lastCount=0;
 uint64_t retryDeadline=0;
 uint8_t previous[18]={};bool havePrevious=false;
 bool initialize() {
-  gate=map(GateAddress,0x3000);clockMap=map(ClockAddress,0x1000);aon=map(AonAddress,0x3000);
-  if(!gate || !clockMap || !aon){note("E5TOUCH map refused");return false;}
-  const uint32_t before=read(gate,0);
-  write(gate,0x1000,1u<<13);IODelay(1000);
-  const uint32_t after=read(gate,0);
+  gateMap=map(GateAddress,0x3000);clockMap=map(ClockAddress,0x1000);aon=map(AonAddress,0x3000);
+  if(!gateMap || !clockMap || !aon){note("E5TOUCH map refused");return false;}
+  const uint32_t before=read(gateMap,0);
+  write(gateMap,0x1000,1u<<13);IODelay(1000);
+  const uint32_t after=read(gateMap,0);
   if(!(after&(1u<<13))){note("E5TOUCH clock gate refused before=%x after=%x",before,after);return false;}
   // SPRD_COMP_CLK_DATA_OFFSET: mux at 0xa0, divider offset -4 at 0x9c.
   const uint32_t clockBefore=read(clockMap,0xa0);
@@ -60,21 +61,98 @@ bool initialize() {
   if(!controller || !gpio)return false;
   const uint32_t version=read(controller,0x1c);
   if(version==0xffffffff){note("E5TOUCH controller version refused");return false;}
-  write(gpio,4,read(gpio,4)|(1u<<13));
+  gpioMaskBefore=read(gpio,4);gpioDirectionBefore=read(gpio,8);gpioInputBefore=read(gpio,0x28);
+  write(gpio,4,read(gpio,4)|(1u<<13)|(1u<<14));
   write(gpio,8,read(gpio,8)&~(1u<<13));write(gpio,0x28,read(gpio,0x28)|(1u<<13));
   // Keep the working Android pinmux, reset and firmware state. Stage 1 is
   // resource qualification; no sensor reset or firmware update is performed.
   note("E5TOUCH resources pa=%llx gate=%x:%x clock=%x:%x version=%x irq=%u reset=%u",
        I2cAddress,before,after,clockBefore,read(clockMap,0xa0),version,
        (read(gpio,0)>>13)&1,(read(gpio,0)>>14)&1);
-  if(mode>=2)bus.configure();stage=1;return true;
+  if(mode>=2) {
+    const bool resetWasLow=(read(gpio,0)&(1u<<14))==0;
+    // Deassert the owned active-low reset without pulsing a running sensor.
+    // Write the output latch first to avoid a glitch when changing direction.
+    write(gpio,0,read(gpio,0)|(1u<<14));
+    write(gpio,0x28,read(gpio,0x28)&~(1u<<14));write(gpio,8,read(gpio,8)|(1u<<14));
+    if(resetWasLow)IOSleep(60);
+    bus.configure();
+  }
+  stage=1;return true;
+}
+bool directMode(bool &direct) {
+  uint8_t data[3]={};
+  if(bus.readAddress(1,data,sizeof(data))!=E5Touch::Transfer::Good)return false;
+  direct=(data[0]>>1)==0x2e && data[2]==1;return true;
+}
+bool normalMode() {
+  const uint8_t normal=5;
+  for(unsigned i=0;i<2;++i) {
+    if(bus.writeAddress(3,&normal,1)!=E5Touch::Transfer::Good)return false;
+    IOSleep(5);bool direct=true;
+    if(directMode(direct) && !direct)return true;
+  }
+  return false;
+}
+uint32_t word(const uint8_t *p) {
+  return uint32_t(p[0])|(uint32_t(p[1])<<8)|(uint32_t(p[2])<<16)|(uint32_t(p[3])<<24);
+}
+bool identifyFirmware() {
+  bool direct=false;
+  if(!directMode(direct))return false;
+  const uint8_t command[]={0x28,0x35,0xc1,0,0x35,0xae},key=0x66;
+  for(unsigned i=0;!direct && i<2;++i) {
+    IOSleep(10);
+    if(bus.writeAddress(0x42bd,command,sizeof(command))!=E5Touch::Transfer::Good)break;
+    IOSleep(20);
+    if(bus.writeAddress(0x040f,&key,1)!=E5Touch::Transfer::Good || !directMode(direct))break;
+  }
+  uint8_t boot[12]={},config[204]={};bool valid=false;
+  if(direct && bus.readAddress(0x8000,boot,sizeof(boot))==E5Touch::Transfer::Good) {
+    const uint32_t entry=word(boot),signature=word(boot+8);
+    const uint16_t address=entry==0x35368008?0x9e00:entry==0x35358008?0xd6e0:0;
+    if(signature==0x544c4e4b && address) {
+      valid=true;
+      for(unsigned offset=0;offset<sizeof(config);offset+=64) {
+        const unsigned count=sizeof(config)-offset<64?sizeof(config)-offset:64;
+        if(bus.readAddress(static_cast<uint16_t>(address+offset),config+offset,count)!=E5Touch::Transfer::Good){valid=false;break;}
+      }
+      if(valid) {
+        note("E5TOUCH firmware entry=%x boot_version=%x config_version=%x chip_code=%x config_bytes=204",
+             entry,unsigned(boot[4])|(unsigned(boot[5])<<8),word(config),unsigned(config[106])|(unsigned(config[107])<<8));
+        const char hex[]="0123456789abcdef";
+        for(unsigned offset=0;offset<sizeof(config);offset+=64) {
+          const unsigned count=sizeof(config)-offset<64?sizeof(config)-offset:64;char text[129];
+          for(unsigned i=0;i<count;++i){text[2*i]=hex[config[offset+i]>>4];text[2*i+1]=hex[config[offset+i]&15];}
+          text[2*count]=0;note("E5TOUCH config offset=%u len=%u hex=%s",offset,count,text);
+        }
+      }
+    } else note("E5TOUCH firmware unknown entry=%x signature=%x (no download or flash update)",entry,signature);
+  }
+  // Always restore normal sensor mode before any touch packet read, including
+  // failed identification. The magic commands change RAM/protocol mode only.
+  const bool restored=normalMode();
+  note("E5TOUCH identity valid=%u normal_mode=%u",valid?1:0,restored?1:0);
+  return valid && restored;
 }
 void recover() {
-  bus.abort();write(gate,0x1004,1u<<19);IODelay(100);
-  write(gate,0x2004,1u<<19);IODelay(100);bus.configure();++recoveries;
+  bus.abort();write(gateMap,0x1004,1u<<19);IODelay(100);
+  write(gateMap,0x2004,1u<<19);IODelay(100);bus.configure();++recoveries;
   havePrevious=false;lastCount=0;
   clock_interval_to_deadline(500,1000000,&retryDeadline);
 }
+}
+
+extern "C" void e5_touch_stop(void) {
+  if(controller && mode>=2)bus.abort();
+  if(gpio) {
+    write(gpio,4,(read(gpio,4)&~(1u<<13))|(gpioMaskBefore&(1u<<13)));
+    write(gpio,8,(read(gpio,8)&~(1u<<13))|(gpioDirectionBefore&(1u<<13)));
+    write(gpio,0x28,(read(gpio,0x28)&~(1u<<13))|(gpioInputBefore&(1u<<13)));
+  }
+  OSSafeReleaseNULL(controller);OSSafeReleaseNULL(gateMap);OSSafeReleaseNULL(clockMap);
+  OSSafeReleaseNULL(aon);OSSafeReleaseNULL(gpio);
+  stage=0;mode=0;havePrevious=false;lastCount=0;retryDeadline=0;
 }
 
 extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *context) {
@@ -93,6 +171,7 @@ extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *
     const E5Touch::Transfer awake=bus.writeRegister(0xa5,0);
     note("E5TOUCH wake result=%u",static_cast<unsigned>(awake));
     if(awake!=E5Touch::Transfer::Good){recover();return;}
+    if(!identifyFirmware()){recover();return;}
     stage=2;
   }
   if(mode==2)return;

@@ -62,5 +62,17 @@ public:
   Transfer writeRegister(uint8_t reg,uint8_t value) {
     const uint8_t bytes[]={reg,value};return message(bytes,nullptr,sizeof(bytes),true);
   }
+  Transfer readAddress(uint16_t address,uint8_t *data,size_t size) {
+    if(!data || !size || size>64)return Transfer::Argument;
+    const uint8_t prefix[]={static_cast<uint8_t>(address>>8),static_cast<uint8_t>(address)};
+    const Transfer first=message(prefix,nullptr,sizeof(prefix),false);
+    return first==Transfer::Good?message(nullptr,data,size,true):first;
+  }
+  Transfer writeAddress(uint16_t address,const uint8_t *data,size_t size) {
+    if(!data || !size || size>10)return Transfer::Argument;
+    uint8_t bytes[12]={static_cast<uint8_t>(address>>8),static_cast<uint8_t>(address)};
+    for(size_t i=0;i<size;++i)bytes[2+i]=data[i];
+    return message(bytes,nullptr,size+2,true);
+  }
 };
 } // namespace E5Touch

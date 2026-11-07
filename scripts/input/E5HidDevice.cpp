@@ -18,6 +18,8 @@
 extern "C" void e5_kputc(char);
 extern "C" kmod_info_t g_kernel_kmod_info;
 extern "C" void e5_touch_poll(void (*)(const E5Input::Frame &,void *),void *);
+extern "C" void e5_touch_stop(void);
+extern "C" bool e5_input_capture(unsigned);
 
 namespace {
 void note(const char *format,...) __attribute__((format(printf,1,2)));
@@ -43,18 +45,11 @@ bool dequeueHeld(uint32_t &held) {
   if(t==__atomic_load_n(&head,__ATOMIC_ACQUIRE))return false;
   held=queue[t];__atomic_store_n(&tail,(t+1)%QueueSize,__ATOMIC_RELEASE);return true;
 }
-const unsigned char keyboardDescriptor[]={
-  0x05,1,0x09,6,0xa1,1,0x85,1,
-  0x05,7,0x19,0xe0,0x29,0xe7,0x15,0,0x25,1,0x75,1,0x95,8,0x81,2,
-  0x75,8,0x95,1,0x81,3,0x19,0,0x29,0x65,0x15,0,0x25,0x65,0x75,8,0x95,6,0x81,0,
-  // Consumer Menu is the iOS Home button; keyboard Home (0x4a) is navigation.
-  0x85,2,0x05,0x0c,0x09,0x40,0x09,0x30,0x09,0xe9,0x09,0xea,
-  0x15,0,0x25,1,0x75,1,0x95,4,0x81,2,0x75,4,0x95,1,0x81,3,0xc0
-};
+using E5Input::KeyboardDescriptor;
 #define FINGER_DESCRIPTOR \
   0x09,0x22,0xa1,2,0x09,0x42,0x15,0,0x25,1,0x75,1,0x95,1,0x81,2, \
   0x09,0x47,0x81,2,0x75,6,0x95,1,0x81,3, \
-  0x09,0x51,0x75,8,0x95,1,0x15,0,0x25,1,0x81,2, \
+  0x09,0x51,0x75,8,0x95,1,0x15,0,0x25,2,0x81,2, \
   0x05,1,0x09,0x30,0x15,0,0x26,0xff,0x7f,0x75,16,0x95,1,0x81,2, \
   0x09,0x31,0x81,2,0x05,0x0d,0xc0,
 const unsigned char touchDescriptor[]={
@@ -88,10 +83,12 @@ class E5HidDevice final:public IOHIDDevice {
   OSDeclareDefaultStructors(E5HidDevice)
   IOWorkLoop *loop=nullptr;
   IOTimerEventSource *timer=nullptr;
-  bool driver=false,touch=false,probe=false,test=false,testDown=false,testDone=false;
+  bool driver=false,touch=false,probe=false,test=false,testDown=false,testDone=false,snapshots=false;
   unsigned ticks=0,reports=0,failures=0,lastDropped=0,testAt=450;
   uint32_t held=0;
   uint64_t testDeadline=0;
+  uint64_t snapshotDeadline=0;
+  unsigned snapshotStage=0,snapshotAttempts=0;
   E5Input::TouchState touches;
   IOReturn send(const void *bytes,size_t length,const char *source) {
     IOBufferMemoryDescriptor *buffer=IOBufferMemoryDescriptor::withBytes(bytes,length,kIODirectionNone);
@@ -136,6 +133,13 @@ class E5HidDevice final:public IOHIDDevice {
       }
     }
     if(self->probe)e5_touch_poll(self->touch && self->driver?touchReady:nullptr,self);
+    if(self->snapshots && self->snapshotStage<2 && mach_absolute_time()>=self->snapshotDeadline) {
+      const bool captured=e5_input_capture(100+self->snapshotStage);
+      if(captured || ++self->snapshotAttempts>=5) {
+        ++self->snapshotStage;self->snapshotAttempts=0;
+        clock_interval_to_deadline(self->snapshotStage==1?40:1,1000000000,&self->snapshotDeadline);
+      } else clock_interval_to_deadline(1,1000000000,&self->snapshotDeadline);
+    }
     if((self->ticks%2000)==1)note("E5HID status driver=%u polls=%u transitions=%u reports=%u failed=%u dropped=%u held=%x",
        self->driver?1:0,__atomic_load_n(&polls,__ATOMIC_RELAXED),__atomic_load_n(&physicalEvents,__ATOMIC_RELAXED),
        self->reports,self->failures,__atomic_load_n(&dropped,__ATOMIC_RELAXED),self->held);
@@ -147,18 +151,19 @@ public:
   OSString *newProductString() const override {return OSString::withCString("Rongyue E5 keypad and touchscreen");}
   IOReturn newReportDescriptor(IOMemoryDescriptor **out) const override {
     if(!out)return kIOReturnBadArgument;
-    uint8_t descriptor[sizeof(keyboardDescriptor)+sizeof(touchDescriptor)];
-    memcpy(descriptor,keyboardDescriptor,sizeof(keyboardDescriptor));size_t size=sizeof(keyboardDescriptor);
+    uint8_t descriptor[sizeof(KeyboardDescriptor)+sizeof(touchDescriptor)];
+    memcpy(descriptor,KeyboardDescriptor,sizeof(KeyboardDescriptor));size_t size=sizeof(KeyboardDescriptor);
     if(touch){memcpy(descriptor+size,touchDescriptor,sizeof(touchDescriptor));size+=sizeof(touchDescriptor);}
     *out=IOBufferMemoryDescriptor::withBytes(descriptor,size,kIODirectionNone);
     return *out?kIOReturnSuccess:kIOReturnNoMemory;
   }
   bool start(IOService *provider) override {
     loop=IOWorkLoop::workLoop();if(!loop)return false;
-    unsigned touchMode=0,testMode=0;
+    unsigned touchMode=0,testMode=0,snapshotMode=0;
     touch=PE_parse_boot_argn("e5-touch",&touchMode,sizeof(touchMode)) && touchMode>=3;
     probe=touchMode>=1 && touchMode<=3;
     test=PE_parse_boot_argn("e5-hid-test",&testMode,sizeof(testMode)) && testMode==1;
+    snapshots=PE_parse_boot_argn("e5-hid-snapshot",&snapshotMode,sizeof(snapshotMode)) && snapshotMode==1;
     PE_parse_boot_argn("e5-hid-test-at",&testAt,sizeof(testAt));
     if(testAt<30 || testAt>600)testAt=450;
     if(!setProperty("HIDDefaultBehavior",true) || !setProperty("Built-In",true))return false;
@@ -167,12 +172,14 @@ public:
     timer=IOTimerEventSource::timerEventSource(this,tick);
     if(!timer || loop->addEventSource(timer)!=kIOReturnSuccess){OSSafeReleaseNULL(timer);IOHIDDevice::stop(provider);return false;}
     clock_interval_to_deadline(testAt,1000000000,&testDeadline);
+    clock_interval_to_deadline(testAt>=40?testAt-10:testAt,1000000000,&snapshotDeadline);
     timer->setTimeoutMS(16);return true;
   }
   void stop(IOService *provider) override {
     __atomic_store_n(&enabled,0,__ATOMIC_RELEASE);
     if(timer){timer->cancelTimeout();loop->removeEventSource(timer);OSSafeReleaseNULL(timer);}
     sendKeys(0,"stop");if(touch)touchReady(E5Input::Frame{},this);
+    if(probe)e5_touch_stop();
     IOHIDDevice::stop(provider);
   }
   void free() override {OSSafeReleaseNULL(loop);IOHIDDevice::free();}

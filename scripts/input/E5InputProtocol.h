@@ -7,6 +7,15 @@
 namespace E5Input {
 constexpr unsigned Width = 320, Height = 480, Contacts = 2;
 constexpr uint32_t VolumeDown = 1u << 28;
+// Separate Application collections let the native stack classify keyboard
+// and Consumer Control interfaces independently. Menu is the iOS Home usage.
+constexpr uint8_t KeyboardDescriptor[]={
+  0x05,1,0x09,6,0xa1,1,0x85,1,
+  0x05,7,0x19,0xe0,0x29,0xe7,0x15,0,0x25,1,0x75,1,0x95,8,0x81,2,
+  0x75,8,0x95,1,0x81,3,0x19,0,0x29,0x65,0x15,0,0x25,0x65,0x75,8,0x95,6,0x81,0,0xc0,
+  0x05,0x0c,0x09,1,0xa1,1,0x85,2,0x09,0x40,0x09,0x30,0x09,0xe9,0x09,0xea,
+  0x15,0,0x25,1,0x75,1,0x95,4,0x81,2,0x75,4,0x95,1,0x81,3,0xc0
+};
 struct Key { uint16_t linuxCode; uint8_t usage, modifiers, consumer; };
 // row 0/1/3 are populated; row 2 and unwired cells never produce a key.
 constexpr Key Keys[28] = {
@@ -110,7 +119,7 @@ struct TouchState {
       if (!contact) continue;
       uint8_t *slot=result.fingers[result.count++];
       const uint16_t x=normalize(contact->x,Width),y=normalize(contact->y,Height);
-      slot[0]=down?3:2;slot[1]=static_cast<uint8_t>(id); // confidence stays set on lift
+      slot[0]=down?3:2;slot[1]=static_cast<uint8_t>(id+1); // HID IDs 1/2; confidence stays set on lift
       slot[2]=static_cast<uint8_t>(x);slot[3]=static_cast<uint8_t>(x>>8);
       slot[4]=static_cast<uint8_t>(y);slot[5]=static_cast<uint8_t>(y>>8);
     }
