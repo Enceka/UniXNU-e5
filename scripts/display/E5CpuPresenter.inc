@@ -3,9 +3,13 @@
 // NativeLegacyDisplay reference; the E5 destination is 320x480 RGB565.
 private:
   struct CpuState {
+    struct Validated {
+      const OriginalLegacySwapRequest *request;
+      OSObject *surface; // Identity only; the original pending request owns it.
+    };
     IOMemoryMap *scanout;
     IOTimerEventSource *retry;
-    const OriginalLegacySwapRequest *validated[8];
+    Validated validated[8];
     uint32_t offered, accepted, copied, retired, failed, fenceWaits, snapshots;
     bool kicking, stopped, timerAdded;
   };
@@ -68,8 +72,19 @@ private:
   }
   bool knownRequest(const OriginalLegacySwapRequest *request) const {
     if (!cpu || !request) return false;
-    for (auto entry : cpu->validated) if (entry == request) return true;
+    for (auto entry : cpu->validated) if (entry.request == request) return true;
     return false;
+  }
+  unsigned inspectSurface(OSObject *surface) {
+    if (!surface) return 0; // Only called for a previously validated blank plan.
+    if (!surface->metaCast("IOSurface")) return 6;
+    if (e5_surface_format(surface) != 0x42475241U || e5_surface_planes(surface)) return 8;
+    IOMemoryDescriptor *memory = e5_surface_descriptor(surface);
+    const uint64_t stride = e5_surface_stride(surface), allocation = e5_surface_allocation(surface);
+    if (e5_surface_width(surface) < 320 || e5_surface_height(surface) < 480 ||
+        !memory || !memory->metaCast("IOMemoryDescriptor") || stride < 1280 ||
+        stride > UINT64_MAX / 480 || allocation < stride * 480 || memory->getLength() < allocation) return 9;
+    return 0;
   }
   unsigned inspectRequest(const OriginalLegacySwapRequest *request) {
     if (!cpu || cpu->stopped || !cpu->scanout || !bootValidated || !request) return 1;
@@ -89,24 +104,24 @@ private:
       if (rect[0] || rect[1] || rect[2] != 320 || rect[3] != 480) return 7;
     }
     // Compressed spellings require a producer contract E5 does not yet have.
-    if (e5_surface_format(surface) != 0x42475241U || e5_surface_planes(surface)) return 8;
-    IOMemoryDescriptor *memory = e5_surface_descriptor(surface);
-    const uint64_t stride = e5_surface_stride(surface), allocation = e5_surface_allocation(surface);
-    if (e5_surface_width(surface) < 320 || e5_surface_height(surface) < 480 ||
-        !memory || !memory->metaCast("IOMemoryDescriptor") || stride < 1280 ||
-        stride > UINT64_MAX / 480 || allocation < stride * 480 || memory->getLength() < allocation) return 9;
-    return 0;
+    return inspectSurface(surface);
   }
   bool validateCpuRequest(const OriginalLegacySwapRequest *request) {
     if (!cpu) return false;
     unsigned reason = inspectRequest(request);
     ++cpu->offered;
-    if (!reason && !knownRequest(request)) {
+    if (!reason) {
       unsigned i = 0;
-      while (i < 8 && cpu->validated[i]) ++i;
+      while (i < 8 && cpu->validated[i].request != request) ++i;
+      if (i == 8) {
+        i = 0;
+        while (i < 8 && cpu->validated[i].request) ++i;
+      }
       if (i == 8) reason = 10;
-      else cpu->validated[i] = request;
+      else cpu->validated[i] = {request, requestSurface(request, 0)};
     }
+    if (reason) for (auto &entry : cpu->validated)
+      if (entry.request == request) entry = {};
     if (!reason) ++cpu->accepted;
     OSObject *surface = request ? requestSurface(request, 0) : nullptr;
     if (cpu->offered <= 16 || !(cpu->offered & (cpu->offered - 1)))
@@ -186,9 +201,18 @@ private:
           break;
         }
       }
-      unsigned reason = inspectRequest(request);
       bool copied = false;
       OSObject *surface = requestSurface(request, 0);
+      // Original post-validation layer bookkeeping ORs consumed bits into
+      // request+796. Those mutable words no longer describe the submitted
+      // composition. Use the accepted full-frame plan, require the same
+      // retained surface, and recheck only its format/backing bounds here.
+      unsigned reason = 11;
+      for (auto entry : cpu->validated)
+        if (entry.request == request && entry.surface == surface) reason = inspectSurface(surface);
+      if (cpu->copied < 16)
+        e5_cpu_log("E5CPU pending req=%p surface=%p masks=%x:%x reason=%u",
+            request, surface, requestWord(request, 792), requestWord(request, 796), reason);
       if (!reason) {
         volatile void *destination = (volatile void *)cpu->scanout->getVirtualAddress();
         if (!surface) copied = e5_blank_rgb565(destination, cpu->scanout->getLength(), 640, 320, 480);
@@ -217,7 +241,7 @@ private:
         e5_cpu_log("E5CPU activation-failed=%u req=%p", cpu->failed, request);
         break;
       }
-      for (auto &entry : cpu->validated) if (entry == request) entry = nullptr;
+      for (auto &entry : cpu->validated) if (entry.request == request) entry = {};
       IOMobileFramebufferLegacy::completeCurrentSwap();
       ++cpu->retired;
       if (cpu->retired <= 16 || !(cpu->retired & (cpu->retired - 1)))
