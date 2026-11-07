@@ -150,6 +150,14 @@ class NativeEmmc : public IOBlockStorageDevice {
   // r260: window self-test scheduling (journal OFF rounds).
   thread_call_t stCall = nullptr;
   uint32_t stPass = 0;
+  // r269: LK's live eMMC clock/ADMA/DLL state, snapshotted BEFORE the
+  // identify re-init clobbers it. LK reads the kernel at tens of MB/s with
+  // clk=0207 hc1=20 dll=a0000102 — our 0xFFC1 re-id writes the slow parent
+  // into the clock-source mux bits (0xC0) and that capped EVERYTHING at
+  // ~2.3 MB/s regardless of divider (r267/r268 lesson).
+  uint16_t inhClk = 0;
+  uint8_t  inhHc1 = 0;
+  uint32_t inhDll = 0, inhDly = 0, inhOff = 0;
   uint16_t rca = 0;
   uint32_t ocr = 0;
   uint32_t cid[4] = {0, 0, 0, 0};
@@ -622,6 +630,9 @@ private:
          r8(SDHCI_HOST_CONTROL), r16(0x3E), r16(0x2C), r8(SDHCI_SOFTWARE_RESET));
     elog("NativeEmmc: inherit dll %08x dly %08x off %08x ps %08x\n",
          r32(0x200), r32(0x204), r32(0x208), r32(SDHCI_PRESENT_STATE));
+    // r269: snapshot before any write below clobbers the live fast state.
+    inhClk = r16(0x2C); inhHc1 = r8(SDHCI_HOST_CONTROL);
+    inhDll = r32(0x200); inhDly = r32(0x204); inhOff = r32(0x208);
     st = cmdNoData(0x0D1A, 0x00010000u);   // CMD13, LK's RCA
     elog("NativeEmmc: inherit cmd13 st %08x r1 %08x\n", st, r32(SDHCI_RESPONSE));
     w32(SDHCI_INT_ENABLE, 0x1B7F413Bu);    // unmask status+error bits for polling
@@ -1015,76 +1026,72 @@ public:
     return true;
   }
 
-  // r257 clock lift; r268 rewrite: the legacy-mode 26 MHz ceiling capped the
-  // r267 LS scan at 0.21 MiB/s — a 3 GiB scan needs ~13+ MiB/s to fit the
-  // 300 s window. Switch the CARD to High-Speed (EXT_CSD 185) first (legal
-  // ceiling becomes 52 MHz), set 4-bit width once, then walk the divider
-  // ladder FASTEST-FIRST; every rung is stability-gated by repeated LBA1
-  // CRC rereads plus a timed 128-sector bulk probe. SDCLKFS=1 is never tried
-  // (100 MHz at a 200 MHz base is illegal even for HS); any failure walks to
-  // the next-slower rung, ending at the identify clock.
+  // r257 clock lift; r269 rewrite. r267/r268 lesson: every divider rung
+  // delivered the same ~2.3 MB/s because the identify re-init (0xFFC1) had
+  // muxed the SLOW parent into the clock-source bits (0xC0), and LK's fast
+  // state (clk=0207: SDCLKFS=2 + source 0x07, hc1=0x20: 8-BIT bus, tuned
+  // vendor DLL a0000102/3434b760/00202000) was never restored. New order:
+  // restore DLL/delay regs, switch the CARD to 8-bit (CMD6 183=2, HC1 bit5),
+  // then walk SDCLKFS rungs on the INHERITED source bits with stability
+  // gates; probe with the 64 KiB bulk read. 4-bit is the fallback. HS/DDR
+  // stay out — LK runs none of it.
+  uint16_t clkSrcBits = 0x00C0u; // r269: from inhClk (identify sets slow mux)
   void setDivider(uint16_t sdclkfs) {
-    uint16_t vendor = (uint16_t)(r16(0x2C) & 0x00F8u); // preserve 0xC0-class bits
-    w16(0x2C, (uint16_t)((sdclkfs << 8) | vendor | 0x0001u));
+    w16(0x2C, (uint16_t)((sdclkfs << 8) | clkSrcBits | 0x0001u));
     waitClockStable();
-    w16(0x2C, (uint16_t)((sdclkfs << 8) | vendor | 0x0005u));
+    w16(0x2C, (uint16_t)((sdclkfs << 8) | clkSrcBits | 0x0005u));
     IODelay(2000);
   }
   void liftClock() {
     uint32_t ref = 0;
     if (!lba1Crc(&ref)) { elog("NativeEmmc: lift ref read failed\n"); return; }
     uint32_t caps = r32(0x40);
-    uint32_t baseMHz = (caps >> 8) & 0xFFu;
-    elog("NativeEmmc: caps %08x base %u MHz ref crc %08x\n", caps, baseMHz, ref);
-    bool hs = false;
+    elog("NativeEmmc: caps %08x inh clk %04x hc1 %02x ref crc %08x\n",
+         caps, inhClk, inhHc1, ref);
+    // Restore LK's vendor DLL/delay tuning (idempotent if untouched).
+    w32(0x200, inhDll);
+    w32(0x204, inhDly);
+    w32(0x208, inhOff);
+    // Bus width: 8-bit like LK; 4-bit fallback.
+    bool wide8 = false, wide4 = false;
     {
-      uint32_t st = cmdNoData(0x061B, (3u << 24) | (185u << 16) | (1u << 8));
+      uint32_t st = cmdNoData(0x061B, (3u << 24) | (183u << 16) | (2u << 8)); // 8-bit
       uint32_t r1 = r32(SDHCI_RESPONSE);
       if (cmdOk(st) && !(r1 & E5BootLog::r1Errors) && waitLogReady(1000)) {
-        hs = true;
-        elog("NativeEmmc: hs switch y\n");
+        w8(SDHCI_HOST_CONTROL, (r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x02u) | 0x20u);
+        wide8 = true;
+        elog("NativeEmmc: 8-bit switch y\n");
       } else {
-        elog("NativeEmmc: hs switch refused st %08x r1 %08x (legacy 26 MHz ceiling)\n", st, r1);
+        elog("NativeEmmc: 8-bit switch refused st %08x r1 %08x\n", st, r1);
+        st = cmdNoData(0x061B, (3u << 24) | (183u << 16) | (1u << 8)); // 4-bit
+        r1 = r32(SDHCI_RESPONSE);
+        if (cmdOk(st) && !(r1 & E5BootLog::r1Errors) && waitLogReady(1000)) {
+          w8(SDHCI_HOST_CONTROL, (r8(SDHCI_HOST_CONTROL) & (uint8_t)~0x20u) | 0x02u);
+          wide4 = true;
+          elog("NativeEmmc: 4-bit switch y\n");
+        } else {
+          elog("NativeEmmc: width switches refused st %08x r1 %08x\n", st, r1);
+        }
       }
     }
-    bool wide = false;
-    {
-      uint32_t st = cmdNoData(0x061B, (3u << 24) | (183u << 16) | (1u << 8)); // 4-bit
-      uint32_t r1 = r32(SDHCI_RESPONSE);
-      if (cmdOk(st) && !(r1 & E5BootLog::r1Errors) && waitLogReady(1000)) {
-        w8(SDHCI_HOST_CONTROL, r8(SDHCI_HOST_CONTROL) | 0x02u);
-        wide = true;
-      } else {
-        elog("NativeEmmc: width switch refused st %08x r1 %08x\n", st, r1);
-      }
-    }
-    uint32_t ceiling = hs ? 52u : 26u; // legal effective MHz
-    uint16_t ladder[6]; unsigned nl = 0;
-    if (baseMHz >= 10 && baseMHz <= 255) {
-      uint32_t want = (baseMHz + 2 * ceiling - 1) / (2 * ceiling);
-      if (want < 1) want = 1;
-      if (want > 255) want = 255;
-      ladder[nl++] = (uint16_t)want;                    // fastest legal rung
-      if (want * 2 <= 255) ladder[nl++] = (uint16_t)(want * 2);
-      if (want * 4 <= 255) ladder[nl++] = (uint16_t)(want * 4);
-      ladder[nl++] = 8;
-      ladder[nl++] = 0xFF;
-    } else {
-      // caps base untrustworthy (reads 0 on this host): never SDCLKFS=1 —
-      // 200 MHz base would mean 100 MHz. Start at 2 (50 MHz @200 base, the
-      // HS ceiling) and walk slower.
-      ladder[nl++] = 2; ladder[nl++] = 4; ladder[nl++] = 8;
+    // Rung order: LK's own SDCLKFS first, then slower. Source bits are the
+    // INHERITED ones (fast parent), not whatever identify left in 0x2C.
+    clkSrcBits = (uint16_t)(inhClk & 0x00F8u);
+    uint16_t inhSd = (uint16_t)((inhClk >> 8) & 0xFFu);
+    uint16_t ladder[5]; unsigned nl = 0;
+    if (inhSd >= 1 && inhSd <= 0xFE) {
+      ladder[nl++] = inhSd;
+      if (inhSd != 4) ladder[nl++] = 4;
+      if (inhSd != 8) ladder[nl++] = 8;
       ladder[nl++] = 16; ladder[nl++] = 0xFF;
+    } else {
+      ladder[nl++] = 2; ladder[nl++] = 4; ladder[nl++] = 8; ladder[nl++] = 16;
+      ladder[nl++] = 0xFF;
     }
     for (unsigned i = 0; i < nl; ++i) {
-      uint16_t sd = ladder[i];
-      if (baseMHz >= 10 && baseMHz <= 255) {
-        uint32_t eff = baseMHz / (2u * (uint32_t)sd);
-        if (sd >= 1 && eff > ceiling) continue; // illegal rung for this base
-      }
-      setDivider(sd);
+      setDivider(ladder[i]);
       if (!stableLba1(ref)) {
-        elog("NativeEmmc: div %u unstable\n", sd);
+        elog("NativeEmmc: div %u unstable\n", ladder[i]);
         continue;
       }
       uint64_t t0 = 0, t1 = 0;
@@ -1093,16 +1100,16 @@ public:
       clock_get_uptime(&t1);
       uint64_t us = (t1 - t0) / 1000ull;
       if (!fr) {
-        elog("NativeEmmc: div %u big probe FAIL\n", sd);
+        elog("NativeEmmc: div %u big probe FAIL\n", ladder[i]);
         continue;
       }
       if (!stableLba1(ref)) {
-        elog("NativeEmmc: div %u post-probe unstable\n", sd);
+        elog("NativeEmmc: div %u post-probe unstable\n", ladder[i]);
         continue;
       }
-      windowSdclkfs = sd; windowBaseMHz = baseMHz; wideBus = wide;
-      elog("NativeEmmc: fast mode div %u base %u %s %s; 128-sector in %llu us (%llu KB/s)\n",
-           sd, baseMHz, hs ? "hs" : "legacy", wide ? "4-bit" : "1-bit",
+      windowSdclkfs = ladder[i]; windowBaseMHz = 0; wideBus = wide8 || wide4;
+      elog("NativeEmmc: fast mode div %u src %02x %s; 128-sector in %llu us (%llu KB/s)\n",
+           ladder[i], clkSrcBits, wide8 ? "8-bit" : (wide4 ? "4-bit" : "1-bit"),
            (unsigned long long)us,
            (unsigned long long)(us ? (uint64_t)65536 / us : 0));
       return;
