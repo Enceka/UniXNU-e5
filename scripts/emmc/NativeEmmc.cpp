@@ -1102,7 +1102,7 @@ public:
              (unsigned long long)ts, (unsigned long long)(base + block + c * 8), n,
              ok ? "y" : "FAIL", ok ? crc32(winD8, n * 512) : 0u);
       if (!ok) return kIOReturnIOError;
-      if (data->writeBytes(c * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
+      if (data->writeBytes(c * 8 * 512, winD8, (size_t)n * 512) != (IOByteCount)(n * 512))
         return kIOReturnIOError;
       if (big && ((c + 1) % 64) == 0)
         elog("NativeEmmc: rw+ %llu/%llu at %llu+%llu\n",
