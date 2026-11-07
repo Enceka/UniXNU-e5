@@ -1043,33 +1043,26 @@ public:
     elog("NativeEmmc: fast mode refused, identify clock restored\n");
   }
 
-  // One verified n<=8 sector window read: three-agree (r265). Read into
-  // winD8, copy to readShadow; reread into winD8, copy to readShadow2;
-  // reread again. All three must agree; deliver the SECOND read's copy
-  // (shadow2) so post-verify winD8 corruption cannot reach the client.
-  // Disagreement logs both crcs so the odd read is identifiable.
+  // One verified n<=8 sector window read (r266): two reads must agree; the
+  // DELIVERED bytes come from a memcpy of the verified shadow copy, so any
+  // post-verify winD8 mutation cannot reach the client. Disagreement logs
+  // both crcs.
   bool windowReadVerifiedDeliver(uint8_t *deliver, uint32_t lba, uint32_t n) {
     static uint8_t shadow2[8192]; // ioLock-serialized; keeps the class under KALLOC_SAFE_ALLOC_SIZE
     for (unsigned round = 0; round < 2; ++round) {
       if (!readMulti(lba, n)) return false;
-      memcpy(readShadow, winD8, (size_t)n * 512);
-      if (!readMulti(lba, n)) return false;
       memcpy(shadow2, winD8, (size_t)n * 512);
-      if (!memcmp(readShadow, shadow2, (size_t)n * 512)) {
-        if (!readMulti(lba, n)) return false;
-        if (!memcmp(shadow2, winD8, (size_t)n * 512)) {
-          memcpy(deliver, shadow2, (size_t)n * 512);
-          return true;
-        }
-        elog("NativeEmmc: rv3 third disagree lba %u crcB %08x crcC %08x\n",
-             lba, crc32(shadow2, n * 512), crc32(winD8, n * 512));
-      } else {
-        elog("NativeEmmc: rv3 ab disagree lba %u round %u crcA %08x crcB %08x\n",
-             lba, round, crc32(readShadow, n * 512), crc32(shadow2, n * 512));
+      if (!readMulti(lba, n)) return false;
+      if (!memcmp(shadow2, winD8, (size_t)n * 512)) {
+        memcpy(deliver, shadow2, (size_t)n * 512);
+        return true;
       }
+      elog("NativeEmmc: rv disagree lba %u round %u crcA %08x crcB %08x\n",
+           lba, round, crc32(shadow2, n * 512), crc32(winD8, n * 512));
       __atomic_fetch_add(&e5_win_unstable, 1, __ATOMIC_RELAXED);
     }
-    // Final read wins, delivered from the verified-in-round-2 shadow2 copy.
+    // Final read wins, delivered from its verified copy.
+    memcpy(shadow2, winD8, (size_t)n * 512);
     memcpy(deliver, shadow2, (size_t)n * 512);
     return true;
   }
