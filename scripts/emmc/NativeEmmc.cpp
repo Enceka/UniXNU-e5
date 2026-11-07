@@ -1130,17 +1130,26 @@ public:
     return kIOReturnSuccess;
   }
 
-  // r260: deterministic window self-test, host-verifiable. Journal OFF is
-  // the variable under test (r258/r259 served journal bytes to Data-window
-  // reads); tables: os = systemos.img head (also the SD container head),
-  // dm = Data window head, sp = E5TEST01 LBA-indexed pattern past the Data
-  // window. Single readMulti per chunk — no two-agree masking.
+  // r260/r262: deterministic window self-test, host-verifiable. Journal OFF
+  // is the variable under test (r258/r259 served journal bytes to Data-window
+  // reads; r261 with journal off still corrupted one 16 KiB read at window
+  // chunk 6170 — APFS hash-mismatched inode 49, media verified clean). The
+  // r262 tables: sparse 1-per-1MiB maps of both windows (corruption map),
+  // dense coverage of the fault region, and the spare pattern. Single
+  // readMulti per chunk — no two-agree masking. Wrong chunks dump their
+  // first 32 bytes so the wrong-content source is identifiable offline.
   void windowSelfTest(const char *tag) {
-    struct Area { const char *name; uint32_t base; const uint32_t *crcs; };
-    static const Area areas[3] = {
-      {"os", (uint32_t)E5SystemOS::base, E5SelfTest::os},
-      {"dm", (uint32_t)E5Data::base, E5SelfTest::data},
-      {"sp", E5SelfTest::kSpareBase, E5SelfTest::spare},
+    struct Area { const char *name; uint32_t base; const uint32_t *crcs;
+                  uint32_t count; uint32_t chunkStep; };
+    static const Area areas[4] = {
+      {"oss", (uint32_t)E5SystemOS::base, E5SelfTest::os,
+       (uint32_t)(sizeof(E5SelfTest::os) / 4), 256},
+      {"osd", (uint32_t)E5SystemOS::base + E5SelfTest::kOsDenseFirst * 8,
+       E5SelfTest::osd, (uint32_t)(sizeof(E5SelfTest::osd) / 4), 1},
+      {"dms", (uint32_t)E5Data::base, E5SelfTest::dms,
+       (uint32_t)(sizeof(E5SelfTest::dms) / 4), 256},
+      {"sp", E5SelfTest::kSpareBase, E5SelfTest::spare,
+       (uint32_t)(sizeof(E5SelfTest::spare) / 4), 1},
     };
     if (!ioLock || !winD8) return;
     uint32_t bad = 0;
@@ -1151,9 +1160,9 @@ public:
       IOLockLock(ioLock);
       dead = !cardUp; // re-check under the lock
       if (!dead) {
-        for (int a = 0; a < 3; ++a) {
-          for (uint32_t i = 0; i < 256; ++i) {
-            uint32_t lba = areas[a].base + i * 8;
+        for (int a = 0; a < 4; ++a) {
+          for (uint32_t i = 0; i < areas[a].count; ++i) {
+            uint32_t lba = areas[a].base + i * areas[a].chunkStep * 8;
             if (!readMulti(lba, 8)) {
               elog("NativeEmmc: ST %s %s#%u READFAIL lba %u\n", tag, areas[a].name, i, lba);
               ++bad;
@@ -1161,8 +1170,15 @@ public:
             }
             uint32_t c = crc32(winD8, 4096);
             if (c != areas[a].crcs[i]) {
-              elog("NativeEmmc: ST %s %s#%u lba %u crc %08x want %08x\n",
-                   tag, areas[a].name, i, lba, c, areas[a].crcs[i]);
+              char hex[65];
+              static const char xd[] = "0123456789abcdef";
+              for (int k = 0; k < 32; ++k) {
+                hex[k * 2] = xd[winD8[k] >> 4];
+                hex[k * 2 + 1] = xd[winD8[k] & 15];
+              }
+              hex[64] = 0;
+              elog("NativeEmmc: ST %s %s#%u lba %u crc %08x want %08x got32 %s\n",
+                   tag, areas[a].name, i, lba, c, areas[a].crcs[i], hex);
               ++bad;
             }
           }
