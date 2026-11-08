@@ -1,0 +1,72 @@
+{
+  "verdict": "PASS",
+  "boot_uuid": "AFAA3940-3EC0-4ABE-9D9D-93B73EAD1194",
+  "bundle": "com.apple.mobileslideshow",
+  "target": [
+    195,
+    425
+  ],
+  "direct_touch_hit_observed": true,
+  "icon_launch_observed": true,
+  "home_to_app_transition_complete": true,
+  "ordered_transition_verified": true,
+  "evidence": [
+    {
+      "bootUUID": "AFAA3940-3EC0-4ABE-9D9D-93B73EAD1194",
+      "machTimestamp": 16620639353,
+      "timestamp": "1969-12-31 16:10:39.255359-0800",
+      "processImagePath": "/System/Library/CoreServices/SpringBoard.app/SpringBoard",
+      "processImageUUID": "97498F96-FA26-38C9-B5E5-F8A2AE583106",
+      "eventMessage": "SBIconView touches began with event: <UITouchesEvent: 0x302485260> timestamp: 638.109 touches: {(\n    <UITouch: 0x155242b90> type: Direct phase: Began tap count: 1 force: 0.000 window: <SBFloatingDockWindow: 0x1550f5ad0; FloatingDock-0x1550f5ad0-13; baseClass = UIWindow; frame = (0 0; 320 480); opaque = NO; gestureRecognizers = <NSArray: 0x3012966a0>; layer = <UIWindowLayer: 0x301296580>> responder: <SBIconView: 0x1541dd000; frame: {{137, 9}, {60, 60}}; icon: <SBApplicationIcon: 0x3033c3a00; nodeID: com.apple.mobileslideshow; bundleID: com.apple.mobileslideshow>; location: SBIconLocationFloatingDock; iconContentScale: 0.833333; allowsLabelArea: NO; isLabelHidden: YES; isLabelAccessoryHidden: YES; isTouchDownInIcon: YES> location in window: {195, 425} previous location in window: {195, 425} location in view: {32.5, 28} previous location in view: {32.5, 28}\n)}, tap gesture: <SBIconTapGestureRecognizer: 0x1550f1b80; baseClass = UITapGestureRecognizer; state = Possible; view = <SBIconView: 0x1541dd000>; target= <(action=tapGestureDidChange:, target",
+      "category": "Icon"
+    },
+    {
+      "bootUUID": "AFAA3940-3EC0-4ABE-9D9D-93B73EAD1194",
+      "machTimestamp": 16703732793,
+      "timestamp": "1969-12-31 16:10:42.451261-0800",
+      "processImagePath": "/System/Library/CoreServices/SpringBoard.app/SpringBoard",
+      "processImageUUID": "97498F96-FA26-38C9-B5E5-F8A2AE583106",
+      "eventMessage": "Launching application com.apple.mobileslideshow from icon <private>, location: SBIconLocationFloatingDock",
+      "category": "Icon"
+    },
+    {
+      "bootUUID": "AFAA3940-3EC0-4ABE-9D9D-93B73EAD1194",
+      "machTimestamp": 17438229308,
+      "timestamp": "1969-12-31 16:11:10.701127-0800",
+      "processImagePath": "/System/Library/CoreServices/SpringBoard.app/SpringBoard",
+      "processImageUUID": "97498F96-FA26-38C9-B5E5-F8A2AE583106",
+      "eventMessage": "[Main] dispatch event:\n<SBTransitionSwitcherModifierEvent: 0x1553dfb60; type: MainTransition; transitionID: 89FF835A-2C16-4783-9578-6C6AC5746A8D; phase: Complete; animated: YES; fromAppLayout: 0x0; toAppLayout: <SBAppLayout: 0x30329d480; primary: com.apple.mobileslideshow:default; environment: main>; fromEnvironmentMode: home-screen; toEnvironmentMode: application; fromSpaceConfiguration: undefined; toSpaceConfiguration: full; pendingTermination: {(\n)}; activating: <SBAppLayout: 0x30329d480; primary: com.apple.mobileslideshow:default; environment: main>; morphingPIPLayoutRole: undefined; isLaunchingFromDockTransition: YES>",
+      "category": "AppSwitcher"
+    }
+  ],
+  "physical_touch_verified": false,
+  "visible_pixels_verified": false,
+  "scope": "Device UIKit Direct Touch hit and ordered Dock app transition; physical actuation and visible pixels are separate.",
+  "source": {
+    "path": "selected original records recovered from R296-before Data, see provenance",
+    "sha256": "63286342fe4540d9b1960165f1e85da72ea9e1068e817454b78830dedc37714e"
+  },
+  "round": 295,
+  "provenance": {
+    "data_backup": "uefi/build/sb-r296/data-before.img",
+    "data_sha256": "dbf02843daa35813ca2eb4e9c2b7070d012cf2052b63cee65cf1a8d6e366a524",
+    "data_volume_uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+    "mount": "read-only; owners off",
+    "extraction": "/usr/bin/log show --directory /private/tmp/r296-data-before-mnt/db/diagnostics --style ndjson --info --debug --predicate process==SpringBoard (and backboardd separately)",
+    "springboard_ndjson_sha256": "c5ab975a2252bc995716a6306b9198f1b2c2ada206da3f32313597be5ae6ce93",
+    "backboard_ndjson_sha256": "db69b1ce848dc812d3f0194d87b8ee5c473ae041f690c8d585c52ac46d65e523",
+    "association": "Only R295 used isolated Photos Dock195,425 in this backup; BB single down/up from native digitizer1000001C2 matches R295 report17/18 and mach-time observer3dd0c246d. Previous R294 used Settings274,190 followed by gestures."
+  },
+  "transport_caveat": "R295 still overall FAIL: one I2C timeout and missing after-capture102. This later recovery establishes UI semantics from Data logs, not pixels.",
+  "backboard_touch_stats": [
+    {
+      "bootUUID": "AFAA3940-3EC0-4ABE-9D9D-93B73EAD1194",
+      "machTimestamp": 17301543015,
+      "timestamp": "1969-12-31 16:11:05.443961-0800",
+      "processImagePath": "/usr/libexec/backboardd",
+      "processImageUUID": "A07C4B68-D96D-32CE-98D8-018075585471",
+      "eventMessage": "touchstats 1000001C2-<main> events starting 15.4459s ago: [\n    down: 1,\n    up: 1,\n    rangeIn: 1,\n    rangeOut: 1,\n    pathsSeen: 1,\n    destinations: {\n        SpringBoard.27 contextID F2B1560A: {\n            touchIDs: 1;\n        };\n    },\n    averageProcessingTime (\u00b5s): 109612.52\n]",
+      "category": "TouchEvents"
+    }
+  ]
+}

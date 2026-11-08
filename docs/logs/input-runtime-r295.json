@@ -2028,6 +2028,8 @@
   "runner_completed": false,
   "capture_incomplete": true,
   "scope": "Automated original-HID reports and bounded sensor transport checks; physical actuation and UI meaning are separate evidence.",
-  "ui_result": "Unresolved: capture ended before the after-tap frame102. The Photos down/up events reached backboardd and the queue was consumed; UI effect cannot be inferred.",
-  "capture_scope": "USB capture ended around621s. No original runner result survived; Android A and postboot37/37 were independently verified on resume. At least24 frames in retained log; no panic markers in retained evidence."
+  "ui_result": "Recovered device unified logs verify UIKit Direct Touch at195,425 on Photos Dock icon, app launch and completed home-to-app transition. After-capture102 and physical actuation remain unqualified.",
+  "capture_scope": "USB capture ended around621s. No original runner result survived; Android A and postboot37/37 were independently verified on resume. At least24 frames in retained log; no panic markers in retained evidence.",
+  "native_ui_touch_verified": true,
+  "ui_evidence": "r295-touch-ui-result.json in e5-xnu docs; input-ui-r295.json in device docs/logs"
 }

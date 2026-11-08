@@ -206,3 +206,10 @@ postboot37/37 passes; retained logs contain at least24 frames and no panic marke
 Another 16/18-byte timeout has status0x310420. Overall R295 is FAIL/incomplete;
 see logs/input-runtime-r295.json. R296 keeps the same HID and UI test configuration
 and adds only the qualified terminal FIFO fix, with complete capture required.
+
+R295's UI conclusion is superseded by recovered device unified logs from the
+fresh read-only R296 Data backup. UIKit records Direct Touch at195,425 on the
+Photos Dock icon, app launch and a completed home-screen→application transition;
+backboardd records one down/up and a SpringBoard destination. This verifies
+automatic touch UI action. Missing screenshot102, physical finger input and
+the single bus timeout remain separate limitations. See logs/input-ui-r295.json.
