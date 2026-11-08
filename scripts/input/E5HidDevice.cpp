@@ -39,10 +39,12 @@ unsigned observedStage=0,observedTicks=0,observedFlags=0,observedReport=0,observ
 uint64_t observedDeadline=0;
 thread_call_t monitorCall=nullptr;
 void monitor(thread_call_param_t,thread_call_param_t) {
-  note("E5HIDOBS stage=%u ticks=%u flags=%x inflight=%u reports=%u deadline=%llx now=%llx",
+  note("E5HIDOBS stage=%u ticks=%u flags=%x inflight=%u reports=%u enabled=%u polls=%u dropped=%u deadline=%llx now=%llx",
        __atomic_load_n(&observedStage,__ATOMIC_RELAXED),__atomic_load_n(&observedTicks,__ATOMIC_RELAXED),
        __atomic_load_n(&observedFlags,__ATOMIC_RELAXED),__atomic_load_n(&observedReport,__ATOMIC_RELAXED),
-       __atomic_load_n(&observedReports,__ATOMIC_RELAXED),__atomic_load_n(&observedDeadline,__ATOMIC_RELAXED),mach_absolute_time());
+       __atomic_load_n(&observedReports,__ATOMIC_RELAXED),__atomic_load_n(&enabled,__ATOMIC_RELAXED),
+       __atomic_load_n(&polls,__ATOMIC_RELAXED),__atomic_load_n(&dropped,__ATOMIC_RELAXED),
+       __atomic_load_n(&observedDeadline,__ATOMIC_RELAXED),mach_absolute_time());
   uint64_t deadline=0;clock_interval_to_deadline(30,1000000000,&deadline);
   thread_call_enter1_delayed(monitorCall,nullptr,deadline);
 }
@@ -175,10 +177,13 @@ class E5HidDevice final:public IOHIDDevice {
     __atomic_store_n(&observedFlags,(self->test?1:0)|(self->snapshots?2:0)|(self->probe?4:0)|(self->touch?8:0)|(self->testDone?16:0),__ATOMIC_RELAXED);
     __atomic_store_n(&observedDeadline,self->testDeadline,__ATOMIC_RELAXED);
     __atomic_store_n(&observedStage,2,__ATOMIC_RELAXED);
-    if((self->ticks++%64)==0)self->driver=eventDriver(self,4);
+    const unsigned tickNumber=self->ticks++;
+    // Cache the attached event driver for this built-in device. A registry
+    // walk under a command gate can invert the registry/workloop lock order.
+    if(!self->driver && (tickNumber%64)==0)self->driver=eventDriver(self,4);
     if(self->driver) {
       uint32_t state;
-      for(unsigned i=0;i<QueueSize && dequeueHeld(state);++i) {
+      for(unsigned i=0;i<8 && dequeueHeld(state);++i) {
         self->held=state;
         self->sendKeys(state|(self->testDown && self->homeAction==0?(1u<<21):0),"matrix");
       }
@@ -250,6 +255,7 @@ public:
     timer->setTimeoutMS(16);return true;
   }
   void stop(IOService *provider) override {
+    note("E5HID stop entered reports=%u held=%x",reports,held);
     __atomic_store_n(&enabled,0,__ATOMIC_RELEASE);
     if(timer){timer->cancelTimeout();loop->removeEventSource(timer);OSSafeReleaseNULL(timer);}
     sendKeys(0,"stop");if(touch)touchReady(E5Input::Frame{},this);

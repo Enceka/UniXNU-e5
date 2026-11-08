@@ -24,7 +24,9 @@ template<class Registers> class I2c {
     size_t received=0;
     for(unsigned elapsed=0;elapsed<10000;elapsed+=10) {
       uint32_t status=io.read32(Status);
-      if(status&Nack){abort();return Transfer::Nack;}
+      // RX_ACK is qualified at an interrupt/transfer completion, as in the
+      // BSP ISR. Its value before completion must not abort an in-flight byte.
+      if((status&Interrupt) && (status&Nack)){abort();return Transfer::Nack;}
       if(read && (status&Interrupt)) {
         while(received<size && !(io.read32(Status)&Empty))read[received++]=io.read8(Rx);
       }

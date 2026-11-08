@@ -9,7 +9,7 @@
 
 using namespace E5Input;
 struct MockBus {
-  enum Fault { None, WriteNack, ReadNack, Stall, Short } fault=None;
+  enum Fault { None, WriteNack, ReadNack, Stall, Short, PendingAck } fault=None;
   unsigned time=0,phase=0,availableAt=0,readBytes=0,available=0,expected=0;
   uint32_t control=0,registers[16]={};bool active=false,isRead=false;
   std::vector<uint32_t> starts;
@@ -17,7 +17,7 @@ struct MockBus {
   uint32_t read32(unsigned offset) {
     if(offset!=20)return registers[offset/4];
     if(!active)return 8;
-    if(fault==Stall || time<availableAt)return 9;
+    if(fault==Stall || time<availableAt)return fault==PendingAck?11:9;
     if((fault==WriteNack && !isRead)||(fault==ReadNack && isRead))return 6;
     if(!isRead)return 4|((control&(1u<<20))?1:0);
     const unsigned limit=fault==Short?3:expected;
@@ -120,5 +120,7 @@ int main() {
   assert(addresses.readAddress(0x8008,data,12)==E5Touch::Transfer::Good);
   assert(direct.writes.size()==2 && direct.writes[0]==0x80 && direct.writes[1]==8);
   assert(addresses.writeAddress(0x42bd,data,11)==E5Touch::Transfer::Argument);
+  MockBus pending;pending.fault=MockBus::PendingAck;E5Touch::I2c<MockBus> settled(pending);settled.configure();
+  assert(settled.readRegister(0,data,18)==E5Touch::Transfer::Good); // pre-IRQ ACK state is not terminal
   puts("PASS: E5 key wiring/Home/chords/fast-release, two-contact bounds/lifts, and repeated-start/FIFO/NACK/timeout recovery");
 }
