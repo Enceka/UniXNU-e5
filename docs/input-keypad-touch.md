@@ -156,3 +156,14 @@ quiet, instead of cancelling a test several minutes in advance; input during
 the suite still cancels it. Readiness requires a valid packet after recovery.
 The next trial moves the keyboard deadline to550s and touch target to600s,
 with snapshot102 around640s, inside the720s watchdog window.
+
+R293's split service publishes but is selected by AppleUserHIDEventDriver,
+which waits for `com.apple.driverkit.AppleUserHIDDrivers` and times out.
+Its Digitizer/DebugState properties are absent; registry presence alone is
+not readiness. The original kernelcache's generic native personalities do not
+include a normal Touch Screen13/4 match (only a vendor-specific SafeBoot match).
+`e5-touch-native=1` now adds an owned IOCatalogue personality for13/4 with
+native IOHIDEventDriver/IOHIDFamily and score60000 before service publication.
+It changes matching configuration only; original family code/vtables stay intact.
+Driver discovery requires the public DebugState property, and probe logs include
+the actual driver class to distinguish a waiting DriverKit proxy.
