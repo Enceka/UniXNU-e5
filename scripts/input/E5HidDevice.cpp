@@ -171,12 +171,18 @@ class E5HidDevice final:public IOHIDDevice {
   uint64_t touchTestDeadline=0;
   uint64_t hardwareQuietDeadline=0;
   E5Input::TouchState touches;
+  static IOReturn submitOnGate(OSObject *owner,void *report,void *,void *,void *) {
+    auto *self=OSDynamicCast(E5HidDevice,owner);
+    return self?self->handleReport(static_cast<IOMemoryDescriptor *>(report),0,0):kIOReturnNoDevice;
+  }
   IOReturn send(const void *bytes,size_t length,const char *source) {
     __atomic_store_n(&observedStage,4,__ATOMIC_RELAXED);
     __atomic_store_n(&observedReport,static_cast<const uint8_t *>(bytes)[0],__ATOMIC_RELAXED);
     IOBufferMemoryDescriptor *buffer=IOBufferMemoryDescriptor::withBytes(bytes,length,kIODirectionNone);
     IOHIDDevice *target=static_cast<const uint8_t *>(bytes)[0]==3 && splitTouch?digitizer:this;
-    const IOReturn result=buffer?(target?target->handleReport(buffer,0,0):kIOReturnNoDevice):kIOReturnNoMemory;
+    const IOReturn result=buffer?(target?
+        (target==digitizer?(digitizer->loop?digitizer->loop->runAction(submitOnGate,digitizer,buffer):kIOReturnNoDevice):handleReport(buffer,0,0)):
+        kIOReturnNoDevice):kIOReturnNoMemory;
     OSSafeReleaseNULL(buffer);++reports;if(result!=kIOReturnSuccess)++failures;
     __atomic_store_n(&observedReports,reports,__ATOMIC_RELAXED);
     __atomic_store_n(&observedReport,0,__ATOMIC_RELAXED);
