@@ -167,3 +167,22 @@ native IOHIDEventDriver/IOHIDFamily and score60000 before service publication.
 It changes matching configuration only; original family code/vtables stay intact.
 Driver discovery requires the public DebugState property, and probe logs include
 the actual driver class to distinguish a waiting DriverKit proxy.
+
+R294 attaches the native IOHIDEventDriver to the separate digitizer. Public
+DebugState records processed reports, two transducers and collection dispatch.
+All 16 synthetic touch phases finish with zero active contacts and zero HID
+failures, but checked snapshots 101/102 retain the Chinese desktop: Settings
+does not open. This proves native report processing, not event delivery to a
+UI client. One I2C packet transfer times out (status 0x310420); the overall
+automatic result is FAIL. At least 33 display frames retire, all three 37/37
+window checks and full payload readback pass, and fresh Android A returns
+without retained panic markers. See logs/input-runtime-r294.json.
+
+R295 preparation adds public event-service and user-client observations to the
+existing independent monitor: identity/properties, client open state, creator,
+event enqueue/drop counters, last type/time and bounded EventQueue XML. These
+read-only observations do not register a diagnostic HID client.
+`e5-touch-test=2` performs only a down/up on the unobscured Photos Dock icon
+at195,425, then waits for snapshot102. Mode1 retains the full gesture suite.
+This avoids the partly occluded Settings target and subsequent synthetic
+gestures interfering with an application launch. Runtime qualification pending.

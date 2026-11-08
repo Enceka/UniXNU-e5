@@ -64,6 +64,50 @@ bool installTouchMatch() {
   OSSafeReleaseNULL(score);OSSafeReleaseNULL(kind);OSSafeReleaseNULL(page);OSSafeReleaseNULL(drivers);
   OSSafeReleaseNULL(pairs);OSSafeReleaseNULL(usage);OSSafeReleaseNULL(match);return ok;
 }
+OSDictionary *copySerializedState(IORegistryEntry *entry) {
+  OSObject *state=entry->copyProperty("DebugState");
+  OSSerialize *xml=OSSerialize::withCapacity(512);
+  OSObject *decoded=state && xml && state->serialize(xml)?OSUnserializeXML(xml->text(),nullptr):nullptr;
+  auto *dictionary=OSDynamicCast(OSDictionary,decoded);
+  if(decoded && !dictionary)decoded->release();
+  OSSafeReleaseNULL(xml);OSSafeReleaseNULL(state);return dictionary;
+}
+uint64_t number(OSDictionary *state,const char *key) {
+  auto *value=OSDynamicCast(OSNumber,state?state->getObject(key):nullptr);
+  return value?value->unsigned64BitValue():0;
+}
+void clientState(IORegistryEntry *driver,const char *role) {
+  OSIterator *it=driver->getChildIterator(gIOServicePlane);if(!it)return;
+  unsigned clients=0;
+  while(OSObject *object=it->getNextObject()) {
+    auto *entry=OSDynamicCast(IORegistryEntry,object);if(!entry)continue;
+    ++clients;
+    OSDictionary *state=copySerializedState(entry);
+    OSObject *creator=entry->copyProperty("IOUserClientCreator");
+    auto *name=OSDynamicCast(OSString,creator);
+    auto *queue=OSDynamicCast(OSDictionary,state?state->getObject("EventQueue"):nullptr);
+    auto *service=OSDynamicCast(IOService,driver),*client=OSDynamicCast(IOService,entry);
+    note("E5HIDCLIENT role=%s id=%llx class=%s open=%u decoded=%u enqueued=%llu dropped=%llu type=%llu age_ns=%llu",
+         role,entry->getRegistryEntryID(),entry->getMetaClass()->getClassName(),
+         service && client && service->isOpen(client)?1:0,state?1:0,
+         number(state,"EnqueueEventCount"),number(state,"DroppedEventCount"),
+         number(state,"LastEventType"),number(state,"LastEventTime"));
+    note("E5HIDCLIENT owner=%s queue=%u",name?name->getCStringNoCopy():"unknown",queue?1:0);
+    // Queue field names vary by family version. Retain its bounded public XML
+    // to distinguish enqueued events from a queue consumed by userland.
+    if(queue) {
+      OSSerialize *xml=OSSerialize::withCapacity(256);
+      if(xml && queue->serialize(xml) && xml->getLength()<1800) {
+        const char *at=xml->text();unsigned part=0;
+        while(*at){char chunk[161];unsigned n=0;while(*at && n<160){chunk[n++]=*at=='\n'?' ':*at;++at;}chunk[n]=0;
+          note("E5HIDQUEUE id=%llx part=%u xml=%s",entry->getRegistryEntryID(),part++,chunk);}
+      }
+      OSSafeReleaseNULL(xml);
+    }
+    OSSafeReleaseNULL(creator);OSSafeReleaseNULL(state);
+  }
+  note("E5HIDCLIENT role=%s children=%u",role,clients);it->release();
+}
 void eventState(IORegistryEntry *parent,const char *role,unsigned depth) {
   if(!parent || !depth)return;
   OSIterator *it=parent->getChildIterator(gIOServicePlane);if(!it)return;
@@ -82,6 +126,14 @@ void eventState(IORegistryEntry *parent,const char *role,unsigned depth) {
            role,entry->getRegistryEntryID(),keyboard?1:0,touch?1:0,transducers?transducers->getCount():0,
            digits && digits->getObject("collectionDispatch")==kOSBooleanTrue?1:0,
            serialized?1:0,dictionary?1:0,age?1:0,age?age->unsigned64BitValue():0,entry->getMetaClass()->getClassName());
+      const char *const properties[]={"PrimaryUsagePage","PrimaryUsage","DisplayIntegrated","Built-In","HIDServiceSupport","IOUserClientClass","Transport"};
+      for(const char *key:properties) {
+        OSObject *value=entry->copyProperty(key);auto *n=OSDynamicCast(OSNumber,value);auto *s=OSDynamicCast(OSString,value);
+        note("E5HIDPROP role=%s key=%s present=%u bool=%u number=%llu string=%s",role,key,value?1:0,
+             value==kOSBooleanTrue?1:0,n?n->unsigned64BitValue():0,s?s->getCStringNoCopy():"-");
+        OSSafeReleaseNULL(value);
+      }
+      clientState(entry,role);
       OSSafeReleaseNULL(decoded);OSSafeReleaseNULL(encoded);OSSafeReleaseNULL(debug);
       OSSafeReleaseNULL(touch);OSSafeReleaseNULL(keyboard);
     } else eventState(entry,role,depth-1);
@@ -167,7 +219,7 @@ class E5HidDevice final:public IOHIDDevice {
   uint64_t testDeadline=0;
   uint64_t snapshotDeadline=0;
   unsigned snapshotStage=0,snapshotAttempts=0;
-  unsigned touchTestStep=0;
+  unsigned touchTestStep=0,touchTestKind=0;
   uint64_t touchTestDeadline=0;
   uint64_t hardwareQuietDeadline=0;
   E5Input::TouchState touches;
@@ -237,6 +289,17 @@ class E5HidDevice final:public IOHIDDevice {
   }
   void testTouchStep() {
     E5Input::Frame frame{};const unsigned step=touchTestStep++;
+    // Mode 2 taps the fully visible Photos Dock icon and then leaves the UI
+    // alone for the after-capture. The Settings icon is partly occluded in
+    // R294, and the full gesture suite can disrupt an app-launch transition.
+    if(touchTestKind==2) {
+      if(step==0){frame.count=1;frame.contacts[0]={0,195,425,true};}
+      emitTouch(frame,"selftest-touch");touchTestStarted=true;
+      note("E5HID selftest=touch phase=%u contacts=%u failed=%u target=photos-dock (synthetic)",step,frame.count,failures);
+      if(step==1){touchTestDone=true;note("E5HID selftest=touch complete=1 active=%u failed=%u (synthetic)",touches.previous.count,failures);}
+      else clock_interval_to_deadline(100,1000000,&touchTestDeadline);
+      return;
+    }
     // R289/R290 desktop captures place the Chinese Settings icon/label here.
     // This local app gives the synthetic tap a reviewable UI target.
     if(step==0){frame.count=1;frame.contacts[0]={0,274,190,true};}
@@ -336,7 +399,8 @@ public:
     homeActions=testMode==4?4:1;
     homeActionLimit=homeAction+homeActions;
     snapshots=!touchOnly && PE_parse_boot_argn("e5-hid-snapshot",&snapshotMode,sizeof(snapshotMode)) && snapshotMode==1;
-    touchTest=!touchOnly && PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode==1;
+    touchTest=!touchOnly && PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode>=1 && touchTestMode<=2;
+    touchTestKind=touchTestMode;
     touchSnapshot=touchTest;
     PE_parse_boot_argn("e5-hid-test-at",&testAt,sizeof(testAt));
     if(testAt<30 || testAt>600)testAt=450;
