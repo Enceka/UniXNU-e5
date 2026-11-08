@@ -27,7 +27,7 @@ so the decoder remembers the key assigned to each of four hardware slots.
 
 | Matrix position | Linux key | iOS report |
 | --- | --- | --- |
-| row 3, col 0 | KEY_MENU | Consumer Menu, usage page 0x0c / usage 0x40: **Home** |
+| row 3, col 0 | KEY_MENU | Consumer Menu, usage page 0x0c / usage 0x40; physical Home effect unqualified |
 | row 0, col 0 | KEY_BACK | Keyboard Escape |
 | row 1, col 0 | KEY_SELECT | Keyboard Return |
 | row 3, col 1 | KEY_PHONE | Keyboard Return/confirm |
@@ -43,10 +43,14 @@ set-mirror clock writes. PMIC volume-up/power keys are not connected yet.
 
 `e5-hid=1` enables publication. The default profile selects it; the saved
 R285 payload needs the argument appended when preparing the new trial.
-`e5-hid-test=1` emits one Home press and release through the original
+`e5-hid-test=1` emits one Consumer Menu press and release through the original
 `handleReport` path after an event driver attaches and the default 450-second
 deadline. `e5-hid-test-at=N` selects 30..600 seconds. Test reports are explicitly
 labeled `selftest-home`; they are not physical-key evidence.
+`e5-hid-test=2` isolates Command-H and `=3` isolates Return, each with one
+down/up pair. Mode4 sends Consumer Menu, Command-H, Return, Command-H.
+Before/after snapshots and the single-action modes isolate UI effects before
+changing the physical Menu mapping.
 
 ## TLSC6x stages
 
@@ -93,4 +97,8 @@ R286 completed 15 copied/retired frames, four successful keyboard/consumer repor
 
 R287 resource trial safely refused I2C access when a legacy-comment-derived gate at 0x20003000 read zero before/after the set write. The FDT child reg is address0/size0x3000 under syscon@20000000, so the corrected gate base is 0x20000000 (set0x20001000, reset set/clear0x20001004/0x20002004). The controller was not read on that failure; no kernel panic was observed.
 
-The R287 snapshots100/101 decode with complete checksums and show the Chinese lock screen on both sides of Consumer Menu. The clock font is clipped at the viewport edges. R288 keeps physical key mappings unchanged and uses diagnostic `e5-hid-test=4` to send Consumer Menu, Command-H, Return, then Command-H, with releases between actions. The corrected gate is derived with UniXNU FDT translation; a negative control rejects the old wrong base before MMIO. A separate `e5-touch-test=1` emits synthetic tap/drag/two-contact reports only after real sensor identification/packet readiness, and cancels when real contacts appear.
+The R287 snapshots100/101 decode with complete checksums and show the Chinese lock screen on both sides of Consumer Menu. The clock font is clipped at the viewport edges. R288's user test found no key/touch UI response despite 18 matrix transitions and 36 accepted reports; touch mode1 was resource-only, and the HID timer stopped progressing before the scheduled diagnostics.
+
+R289 completes all four diagnostic actions with 16 reports and a live independent observer. Its checksummed after-snapshot shows the desktop with Chinese Settings and dock icons; at least35 display frames retire. This qualifies the sequence effect, not individual or physical Home. Touch mode2 still NACKs, so its overall identity/configuration check fails. Android A and postboot37/37 recover. R290 tests3e6a554's IRQ-qualified ACK, cached event-driver discovery and bounded queue drain without new sensor-reset/pad writes.
+
+The corrected gate is derived with UniXNU FDT translation; a negative control rejects the old wrong base before MMIO. A separate `e5-touch-test=1` emits synthetic tap/drag/two-contact reports only after real sensor identification/packet readiness, and cancels when real contacts appear.
