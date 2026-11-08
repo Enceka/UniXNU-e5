@@ -100,7 +100,7 @@ class E5HidDevice final:public IOHIDDevice {
   IOWorkLoop *loop=nullptr;
   IOTimerEventSource *timer=nullptr;
   bool driver=false,touch=false,probe=false,test=false,testDown=false,testDone=false,snapshots=false;
-  bool touchTest=false,touchTestStarted=false,touchTestDone=false;
+  bool touchTest=false,touchTestStarted=false,touchTestDone=false,touchSnapshot=false;
   unsigned ticks=0,reports=0,failures=0,lastDropped=0,testAt=450;
   unsigned homeAction=0,homeActions=1,homeActionLimit=1;
   uint32_t held=0;
@@ -127,10 +127,17 @@ class E5HidDevice final:public IOHIDDevice {
   void sendKeys(uint32_t state,const char *source) {
     E5Input::KeyboardReport keyboard;E5Input::ConsumerReport consumer;
     E5Input::reports(state,keyboard,consumer);
+    if(testDown && homeAction==0)consumer.buttons|=1;
+    if(reports<64)
+      note("E5HID keys source=%s held=%x modifiers=%x usages=%02x,%02x,%02x,%02x,%02x,%02x consumer=%x",
+           source,state,unsigned(keyboard.modifiers),unsigned(keyboard.keys[0]),unsigned(keyboard.keys[1]),
+           unsigned(keyboard.keys[2]),unsigned(keyboard.keys[3]),unsigned(keyboard.keys[4]),unsigned(keyboard.keys[5]),unsigned(consumer.buttons));
     send(&keyboard,sizeof(keyboard),source);send(&consumer,sizeof(consumer),source);
   }
   void sendHomeAction(bool down) {
-    if(homeAction==0){sendKeys(held|(down?(1u<<21):0),"selftest-home");return;}
+    // The diagnostic Consumer Menu pulse is independent of physical Menu's
+    // keyboard mapping, so changing that key cannot relabel a Command-H test.
+    if(homeAction==0){sendKeys(held,"selftest-home");return;}
     E5Input::KeyboardReport keyboard;E5Input::ConsumerReport consumer;
     E5Input::reports(held,keyboard,consumer);
     if(down) {
@@ -150,13 +157,16 @@ class E5HidDevice final:public IOHIDDevice {
     auto *self=static_cast<E5HidDevice *>(context);
     if(frame.count && self->touchTest) {
       if(self->touchTestStarted)self->emitTouch(E5Input::Frame{},"selftest-cancel");
+      note("E5HID selftest=touch cancelled=1 hardware_contacts=%u started=%u",frame.count,self->touchTestStarted?1:0);
       self->touchTest=false;self->touchTestDone=true;
     }
     self->emitTouch(frame,"tlsc6x");
   }
   void testTouchStep() {
     E5Input::Frame frame{};const unsigned step=touchTestStep++;
-    if(step==0){frame.count=1;frame.contacts[0]={0,160,240,true};}
+    // R289/R290 desktop captures place the Chinese Settings icon/label here.
+    // This local app gives the synthetic tap a reviewable UI target.
+    if(step==0){frame.count=1;frame.contacts[0]={0,274,190,true};}
     else if(step>=2 && step<=12) {
       frame.count=1;frame.contacts[0]={0,static_cast<uint16_t>(80+(step-2)*16),static_cast<uint16_t>(120+(step-2)*24),true};
     } else if(step==14){frame.count=2;frame.contacts[0]={0,100,200,true};frame.contacts[1]={1,220,280,true};}
@@ -185,12 +195,12 @@ class E5HidDevice final:public IOHIDDevice {
       uint32_t state;
       for(unsigned i=0;i<8 && dequeueHeld(state);++i) {
         self->held=state;
-        self->sendKeys(state|(self->testDown && self->homeAction==0?(1u<<21):0),"matrix");
+        self->sendKeys(state,"matrix");
       }
       const uint32_t lost=__atomic_load_n(&dropped,__ATOMIC_RELAXED);
       if(lost!=self->lastDropped) {
         self->lastDropped=lost;self->held=__atomic_load_n(&latest,__ATOMIC_ACQUIRE);
-        self->sendKeys(self->held|(self->testDown && self->homeAction==0?(1u<<21):0),"overflow-reconcile");
+        self->sendKeys(self->held,"overflow-reconcile");
       }
       if(self->test && !self->testDone && mach_absolute_time()>=self->testDeadline) {
         self->testDown=!self->testDown;
@@ -206,12 +216,13 @@ class E5HidDevice final:public IOHIDDevice {
     if(self->probe)e5_touch_poll(self->touch && self->driver?touchReady:nullptr,self);
     if(self->touch && self->driver && self->touchTest && !self->touchTestDone &&
         e5_touch_ready() && mach_absolute_time()>=self->touchTestDeadline)self->testTouchStep();
-    if(self->snapshots && self->snapshotStage<2 && mach_absolute_time()>=self->snapshotDeadline) {
+    if(self->snapshots && self->snapshotStage<(self->touchSnapshot?3u:2u) && mach_absolute_time()>=self->snapshotDeadline) {
       __atomic_store_n(&observedStage,8,__ATOMIC_RELAXED);
       const bool captured=e5_input_request_capture(100+self->snapshotStage);
       if(captured || ++self->snapshotAttempts>=5) {
         ++self->snapshotStage;self->snapshotAttempts=0;
-        clock_interval_to_deadline(self->snapshotStage==1?40:1,1000000000,&self->snapshotDeadline);
+        const unsigned seconds=self->snapshotStage==1?40:self->snapshotStage==2 && self->touchSnapshot?60:1;
+        clock_interval_to_deadline(seconds,1000000000,&self->snapshotDeadline);
       } else clock_interval_to_deadline(1,1000000000,&self->snapshotDeadline);
     }
     if((self->ticks%2000)==1)note("E5HID status driver=%u polls=%u transitions=%u reports=%u failed=%u dropped=%u held=%x",
@@ -242,6 +253,7 @@ public:
     homeActionLimit=homeAction+homeActions;
     snapshots=PE_parse_boot_argn("e5-hid-snapshot",&snapshotMode,sizeof(snapshotMode)) && snapshotMode==1;
     touchTest=PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode==1;
+    touchSnapshot=touchTest;
     PE_parse_boot_argn("e5-hid-test-at",&testAt,sizeof(testAt));
     if(testAt<30 || testAt>600)testAt=450;
     if(!setProperty("HIDDefaultBehavior",true) || !setProperty("Built-In",true))return false;
@@ -260,7 +272,7 @@ public:
     note("E5HID stop entered reports=%u held=%x",reports,held);
     __atomic_store_n(&enabled,0,__ATOMIC_RELEASE);
     if(timer){timer->cancelTimeout();loop->removeEventSource(timer);OSSafeReleaseNULL(timer);}
-    sendKeys(0,"stop");if(touch)touchReady(E5Input::Frame{},this);
+    testDown=false;sendKeys(0,"stop");if(touch)touchReady(E5Input::Frame{},this);
     if(probe)e5_touch_stop();
     IOHIDDevice::stop(provider);
   }

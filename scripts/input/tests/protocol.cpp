@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 #include "../E5InputProtocol.h"
 #include "../../touch/E5I2cProtocol.h"
+#include "../../touch/E5Tlsc6xConfig.h"
+#include "tlsc6x-config-r291.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -65,11 +67,14 @@ int main() {
   assert(application==2 && depth==0 && bits[1]==64 && bits[2]==8);
   unsigned wired=0;for(const auto &key:Keys)wired+=key.linuxCode!=0;assert(wired==20);
   KeyboardReport k;ConsumerReport c;
-  reports(1u<<21,k,c);assert(c.buttons==1 && k.keys[0]==0); // physical Menu -> iOS Home
+  reports(1u<<21,k,c);assert(c.buttons==0 && k.modifiers==8 && k.keys[0]==0x0b); // physical Menu -> Command-H
+  reports(0,k,c);assert(c.buttons==0 && k.modifiers==0 && k.keys[0]==0); // release GUI and H
+  reports((1u<<21)|(1u<<6),k,c);assert(k.modifiers==8 && k.keys[0]==0x52 && k.keys[1]==0x0b);
+  reports(1u<<6,k,c);assert(k.modifiers==0 && k.keys[0]==0x52 && k.keys[1]==0);
   reports((1u<<4)|(1u<<3)|VolumeDown,k,c);assert(k.modifiers==2 && k.keys[0]==0x26 && k.keys[1]==0x20 && c.buttons==8);
   reports((1u<<5)|(1u<<6)|(1u<<7)|(1u<<8),k,c);
   assert(k.keys[0]==0x4f && k.keys[1]==0x52 && k.keys[2]==0x28 && k.keys[3]==0x50);
-  reports((1u<<28)-1,k,c);assert(k.keys[0]==1 && c.buttons==1); // rollover still carries Home
+  reports((1u<<28)-1,k,c);assert(k.keys[0]==1 && k.modifiers==10 && c.buttons==0);
   MatrixState matrix;std::vector<uint32_t> events;
   auto emit=[&](uint32_t held){events.push_back(held);};
   matrix.update(0x11,0x77777730,false,emit);
@@ -129,5 +134,13 @@ int main() {
   assert(addresses.writeAddress(0x42bd,data,11)==E5Touch::Transfer::Argument);
   MockBus pending;pending.fault=MockBus::PendingAck;E5Touch::I2c<MockBus> settled(pending);settled.configure();
   assert(settled.readRegister(0,data,18)==E5Touch::Transfer::Good); // pre-IRQ ACK state is not terminal
+  assert(E5Touch::validateConfiguration(Tlsc6xConfigR291,sizeof(Tlsc6xConfigR291))==E5Touch::ConfigResult::Good);
+  auto damaged=std::array<uint8_t,204>{};memcpy(damaged.data(),Tlsc6xConfigR291,204);
+  damaged[20]^=1;
+  assert(E5Touch::validateConfiguration(damaged.data(),204)==E5Touch::ConfigResult::Checksum);
+  memcpy(damaged.data(),Tlsc6xConfigR291,204);damaged[106]=0x5e;
+  damaged[202]-=2; // preserve the zero-sum checksum while changing the slave address
+  assert(E5Touch::validateConfiguration(damaged.data(),204)==E5Touch::ConfigResult::Address);
+  assert(E5Touch::validateConfiguration(Tlsc6xConfigR291,203)==E5Touch::ConfigResult::Length);
   puts("PASS: E5 key wiring/Home/chords/fast-release, two-contact bounds/lifts, and repeated-start/FIFO/NACK/timeout recovery");
 }

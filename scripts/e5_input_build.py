@@ -153,7 +153,7 @@ public:
                 bindings={name:hex(value) for name,value in bindings.items()},
                 automatic_initializer_removed=True,owned_code_unchanged=True,
                 source_sha256={str(p.relative_to(SOURCE)):hashlib.sha256(p.read_bytes()).hexdigest()
-                               for p in [SOURCE/'input/E5HidDevice.cpp',SOURCE/'input/E5InputProtocol.h',SOURCE/'input/E5InputCapture.cpp',SOURCE/'touch/E5Tlsc6x.cpp',SOURCE/'touch/E5I2cProtocol.h',Path(__file__)]},
+                               for p in [SOURCE/'input/E5HidDevice.cpp',SOURCE/'input/E5InputProtocol.h',SOURCE/'input/E5InputCapture.cpp',SOURCE/'touch/E5Tlsc6x.cpp',SOURCE/'touch/E5I2cProtocol.h',SOURCE/'touch/E5Tlsc6xConfig.h',Path(__file__)]},
                 runtime_qualified=False)
     (OUT/'abi-audit.json').write_text(json.dumps(report,indent=2)+'\n')
     print('e5-input: original 207-slot HID interface and deferred E5 archive verified')

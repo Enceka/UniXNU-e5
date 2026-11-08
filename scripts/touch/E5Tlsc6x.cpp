@@ -3,6 +3,7 @@
 // Hardware/protocol: sprd-linux-devs/linux e5-6.18 @6b355f72 and live E5 FDT.
 #include "E5InputProtocol.h"
 #include "E5I2cProtocol.h"
+#include "E5Tlsc6xConfig.h"
 #include <IOKit/IOLib.h>
 #include <IOKit/IOMemoryDescriptor.h>
 #include <IOKit/IODeviceMemory.h>
@@ -166,6 +167,11 @@ bool identifyFirmware() {
         if(bus.readAddress(static_cast<uint16_t>(address+offset),config+offset,count)!=E5Touch::Transfer::Good){valid=false;break;}
       }
       if(valid) {
+        const auto checked=E5Touch::validateConfiguration(config,sizeof(config));
+        valid=checked==E5Touch::ConfigResult::Good;
+        note("E5TOUCH config-validation result=%u bytes=204",static_cast<unsigned>(checked));
+      }
+      if(valid) {
         note("E5TOUCH firmware entry=%x boot_version=%x config_version=%x chip_code=%x config_bytes=204",
              entry,unsigned(boot[4])|(unsigned(boot[5])<<8),word(config),unsigned(config[106])|(unsigned(config[107])<<8));
         const char hex[]="0123456789abcdef";
@@ -246,8 +252,9 @@ extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *
   }
   if(mode==2)return;
   uint8_t packet[18]={};++polls;
-  // IRQ13 is sampled, with periodic reads for lost edges and all-up recovery.
-  if(((read(gpio,0)>>13)&1) && (polls%32)!=1)return;
+  // Until GPIO IRQ routing is implemented, read every 16ms tick. A short
+  // falling-edge pulse must not turn a tap/lift into a 500ms polling gap.
+  const unsigned irqLevel=(read(gpio,0)>>13)&1;
   const E5Touch::Transfer result=bus.readRegister(0,packet,sizeof(packet));
   E5Input::Frame frame;
   const E5Input::PacketResult decoded=result==E5Touch::Transfer::Good?
@@ -266,5 +273,5 @@ extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *
     }
     memcpy(previous,packet,sizeof(packet));havePrevious=true;lastCount=frame.count;
   }
-  if((polls%2048)==1)note("E5TOUCH status polls=%u good=%u bad=%u recoveries=%u mode=%u (GPIO polling)",polls,good,bad,recoveries,mode);
+  if((polls%2048)==1)note("E5TOUCH status polls=%u good=%u bad=%u recoveries=%u mode=%u irq=%u (16ms polling)",polls,good,bad,recoveries,mode,irqLevel);
 }
