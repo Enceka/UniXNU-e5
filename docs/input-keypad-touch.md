@@ -136,3 +136,23 @@ using the actual R291 capture as a host-test fixture. Its synthetic tap targets
 the visible Settings icon/label at274,190 and requests an additional snapshot102
 after the touch window. This tests a concrete UI action instead of inferring it
 from successful report return codes.
+
+The R292 user reaches the desktop but reports no touch UI response despite
+accepted hardware coordinates/moves/lifts. Initial snapshot100 is still black
+at440s, and snapshots101/102 show lock screen, so450s is not a reliable UI-ready
+test deadline on this boot. Real input cancels the synthetic test before it starts.
+
+The next isolated trial uses `e5-touch-split=1`: a second instance of the same
+qualified207-slot class publishes only the Touch Screen descriptor; the main
+instance retains keyboard/consumer reports and exclusively owns the sensor
+poller. The digitizer has its own workloop and Built-In/DisplayIntegrated/
+collectionDispatch properties. Both services are registered after start.
+`e5-hid-event-probe=1` reads public Keyboard/Digitizer/DebugState properties on
+the independent observer, recording transducer count/grouping and LastReportTime
+age. No original driver vtable or private HID event ABI is changed.
+
+Touch input before the synthetic suite starts now defers it until all-up and2s
+quiet, instead of cancelling a test several minutes in advance; input during
+the suite still cancels it. Readiness requires a valid packet after recovery.
+The next trial moves the keyboard deadline to550s and touch target to600s,
+with snapshot102 around640s, inside the720s watchdog window.
