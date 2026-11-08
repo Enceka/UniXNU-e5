@@ -25,17 +25,28 @@ template<class Registers> class I2c {
     if(write)for(size_t i=0;i<size;++i)io.write8(Tx,write[i]);
     io.write32(Control,control|Start);
     sampledRead=read!=nullptr;
-    size_t received=0;
+    size_t received=0;bool receiveQualified=false;
     for(unsigned elapsed=0;elapsed<10000;elapsed+=10) {
       uint32_t status=io.read32(Status);
       sampledStatus=status;sampledElapsed=elapsed;
       // RX_ACK is qualified at an interrupt/transfer completion, as in the
       // BSP ISR. Its value before completion must not abort an in-flight byte.
-      if((status&Interrupt) && (status&Nack)){abort();return Transfer::Nack;}
-      if(read && (status&Interrupt)) {
+      if(read && (status&Interrupt))receiveQualified=true;
+      // A final notification can arrive while the previous FIFO interrupt is
+      // being acknowledged. Once this read has seen an interrupt, idle status
+      // also qualifies its terminal ACK/FIFO tail; never grant that permission
+      // from FIFO_EMPTY alone before the first notification of this message.
+      const bool terminalRead=read && receiveQualified && !(status&1);
+      if(((status&Interrupt) || terminalRead) && (status&Nack)){abort();return Transfer::Nack;}
+      if(read && ((status&Interrupt) || terminalRead)) {
         while(received<size && !(io.read32(Status)&Empty))read[received++]=io.read8(Rx);
       }
-      if(read && received==size && !(io.read32(Status)&1)) {io.write32(Control,control);clear();return Transfer::Good;}
+      if(read && received==size) {
+        const uint32_t finalStatus=io.read32(Status);
+        sampledStatus=finalStatus;
+        if(((finalStatus&Interrupt) || !(finalStatus&1)) && (finalStatus&Nack)){abort();return Transfer::Nack;}
+        if(!(finalStatus&1)){io.write32(Control,control);clear();return Transfer::Good;}
+      }
       if(status&Interrupt) {
         if(!read || (received==size && !(status&1))){io.write32(Control,control);clear();return Transfer::Good;}
         // FIFO threshold notification: drain it and keep receiving. An early
@@ -43,6 +54,7 @@ template<class Registers> class I2c {
         if(!(status&1)){abort();return Transfer::ShortRead;}
         clear();
       }
+      else if(terminalRead && received<size){abort();return Transfer::ShortRead;}
       io.delayUs(10);
     }
     abort();return Transfer::Timeout;

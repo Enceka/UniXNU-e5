@@ -186,3 +186,12 @@ read-only observations do not register a diagnostic HID client.
 at195,425, then waits for snapshot102. Mode1 retains the full gesture suite.
 This avoids the partly occluded Settings target and subsequent synthetic
 gestures interfering with an application launch. Runtime qualification pending.
+
+A separate post-R295 bus change handles a lost final FIFO notification after
+an already qualified read. The new `scripts/input/tests/i2c-tail.cpp` fixture
+reproduces the old 16/18-byte timeout at status0x310420 and verifies completion
+after the final interrupt is cleared. First-interrupt qualification remains
+mandatory; terminal NACK/short read and NACK at the final-byte boundary fail
+explicitly. Both this fixture and existing protocol tests pass ASan/UBSan.
+The modeled race matches R294's terminal state but is not established as that
+physical timeout's cause. Frozen R295 does not include this transport change.
