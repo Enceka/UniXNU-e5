@@ -224,3 +224,13 @@ The current ArmCpu attach API has no mask/detach primitive: merely disabling
 GPIO13 cannot contain an unowned bank's shared interrupt, and an installed
 callback must not outlive its context/mapping. These are explicit prerequisites
 for IRQ-driven input. The existing16ms path remains the fallback.
+
+R296 qualifies the terminal FIFO fix (device5bacf9d, kernel9559f809):40,961
+valid packets, zero bad packets/recoveries,18 HID reports with no failures or
+drops and no held contacts. All100/101/102 snapshots validate,1,366 display
+frames retire, all three37/37 window checks and complete payload readback pass.
+Android A returns with no panic/APFS markers; automated transport result PASS.
+Snapshot101 shows the Photos Dock target;102 is black, so app content rendering
+remains unqualified despite R295 UIKit launch/transition proof. The later
+read-only IRQ census f4d9e13 compiles/links/prelinks but is not in R296.
+See logs/input-runtime-r296.json.
