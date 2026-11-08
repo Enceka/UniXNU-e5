@@ -102,7 +102,7 @@ class E5HidDevice final:public IOHIDDevice {
   bool driver=false,touch=false,probe=false,test=false,testDown=false,testDone=false,snapshots=false;
   bool touchTest=false,touchTestStarted=false,touchTestDone=false;
   unsigned ticks=0,reports=0,failures=0,lastDropped=0,testAt=450;
-  unsigned homeAction=0,homeActions=1;
+  unsigned homeAction=0,homeActions=1,homeActionLimit=1;
   uint32_t held=0;
   uint64_t testDeadline=0;
   uint64_t snapshotDeadline=0;
@@ -198,7 +198,7 @@ class E5HidDevice final:public IOHIDDevice {
         const char *action=self->homeAction==0?"consumer-menu":self->homeAction==2?"return":"command-h";
         note("E5HID selftest=home down=%u driver=1 failures=%u action=%s",self->testDown?1:0,self->failures,action);
         if(self->testDown)clock_interval_to_deadline(100,1000000,&self->testDeadline);
-        else if(++self->homeAction>=self->homeActions)self->testDone=true;
+        else if(++self->homeAction>=self->homeActionLimit)self->testDone=true;
         else clock_interval_to_deadline(5,1000000000,&self->testDeadline);
       }
     }
@@ -236,8 +236,10 @@ public:
     unsigned touchMode=0,testMode=0,snapshotMode=0,touchTestMode=0;
     touch=PE_parse_boot_argn("e5-touch",&touchMode,sizeof(touchMode)) && touchMode>=3;
     probe=touchMode>=1 && touchMode<=3;
-    test=PE_parse_boot_argn("e5-hid-test",&testMode,sizeof(testMode)) && (testMode==1 || testMode==4);
+    test=PE_parse_boot_argn("e5-hid-test",&testMode,sizeof(testMode)) && testMode>=1 && testMode<=4;
+    homeAction=testMode==2?1:testMode==3?2:0;
     homeActions=testMode==4?4:1;
+    homeActionLimit=homeAction+homeActions;
     snapshots=PE_parse_boot_argn("e5-hid-snapshot",&snapshotMode,sizeof(snapshotMode)) && snapshotMode==1;
     touchTest=PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode==1;
     PE_parse_boot_argn("e5-hid-test-at",&testAt,sizeof(testAt));
