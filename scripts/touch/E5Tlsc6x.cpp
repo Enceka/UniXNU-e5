@@ -212,7 +212,7 @@ extern "C" void e5_touch_stop(void) {
   stage=0;mode=0;havePrevious=false;lastCount=0;retryDeadline=0;
   identityAttempts=0;resetRequested=0;resetAttempted=false;resetPinQualified=false;
 }
-extern "C" bool e5_touch_ready(void) {return mode==3 && stage==2 && good>0;}
+extern "C" bool e5_touch_ready(void) {return mode==3 && stage==2 && good>0 && havePrevious;}
 
 extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *context) {
   if(!stage) {

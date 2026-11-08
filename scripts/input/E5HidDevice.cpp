@@ -10,6 +10,10 @@
 #include <libkern/c++/OSString.h>
 #include <libkern/c++/OSSymbol.h>
 #include <libkern/c++/OSKext.h>
+#include <libkern/c++/OSArray.h>
+#include <libkern/c++/OSNumber.h>
+#include <libkern/c++/OSSerialize.h>
+#include <libkern/c++/OSUnserialize.h>
 #include <mach/kmod.h>
 #include <pexpert/pexpert.h>
 #include <kern/clock.h>
@@ -38,6 +42,32 @@ E5Input::MatrixState matrix;
 unsigned observedStage=0,observedTicks=0,observedFlags=0,observedReport=0,observedReports=0;
 uint64_t observedDeadline=0;
 thread_call_t monitorCall=nullptr;
+IORegistryEntry *observedDevice=nullptr,*observedDigitizer=nullptr;
+bool probeEvents=false;
+void eventState(IORegistryEntry *parent,const char *role,unsigned depth) {
+  if(!parent || !depth)return;
+  OSIterator *it=parent->getChildIterator(gIOServicePlane);if(!it)return;
+  while(OSObject *object=it->getNextObject()) {
+    auto *entry=OSDynamicCast(IORegistryEntry,object);if(!entry)continue;
+    if(entry->metaCast("IOHIDEventDriver")) {
+      OSObject *keyboard=entry->copyProperty("Keyboard"),*touch=entry->copyProperty("Digitizer"),*debug=entry->copyProperty("DebugState");
+      auto *digits=OSDynamicCast(OSDictionary,touch);
+      auto *transducers=OSDynamicCast(OSArray,digits?digits->getObject("Transducers"):nullptr);
+      OSSerialize *encoded=OSSerialize::withCapacity(256);
+      const bool serialized=debug && encoded && debug->serialize(encoded);
+      OSObject *decoded=serialized?OSUnserializeXML(encoded->text(),nullptr):nullptr;
+      auto *dictionary=OSDynamicCast(OSDictionary,decoded);
+      auto *age=OSDynamicCast(OSNumber,dictionary?dictionary->getObject("LastReportTime"):nullptr);
+      note("E5HIDEV role=%s id=%llx keyboard=%u digitizer=%u transducers=%u grouped=%u serialized=%u decoded=%u seen=%u age_ns=%llu",
+           role,entry->getRegistryEntryID(),keyboard?1:0,touch?1:0,transducers?transducers->getCount():0,
+           digits && digits->getObject("collectionDispatch")==kOSBooleanTrue?1:0,
+           serialized?1:0,dictionary?1:0,age?1:0,age?age->unsigned64BitValue():0);
+      OSSafeReleaseNULL(decoded);OSSafeReleaseNULL(encoded);OSSafeReleaseNULL(debug);
+      OSSafeReleaseNULL(touch);OSSafeReleaseNULL(keyboard);
+    } else eventState(entry,role,depth-1);
+  }
+  it->release();
+}
 void monitor(thread_call_param_t,thread_call_param_t) {
   note("E5HIDOBS stage=%u ticks=%u flags=%x inflight=%u reports=%u enabled=%u polls=%u dropped=%u deadline=%llx now=%llx",
        __atomic_load_n(&observedStage,__ATOMIC_RELAXED),__atomic_load_n(&observedTicks,__ATOMIC_RELAXED),
@@ -45,6 +75,11 @@ void monitor(thread_call_param_t,thread_call_param_t) {
        __atomic_load_n(&observedReports,__ATOMIC_RELAXED),__atomic_load_n(&enabled,__ATOMIC_RELAXED),
        __atomic_load_n(&polls,__ATOMIC_RELAXED),__atomic_load_n(&dropped,__ATOMIC_RELAXED),
        __atomic_load_n(&observedDeadline,__ATOMIC_RELAXED),mach_absolute_time());
+  // Public metadata only, outside the keypad's command gate. Built-in probe
+  // targets are retained for this kernel's diagnostic lifetime.
+  if(probeEvents && __atomic_load_n(&enabled,__ATOMIC_ACQUIRE)) {
+    eventState(observedDevice,"keypad",4);eventState(observedDigitizer,"digitizer",4);
+  }
   uint64_t deadline=0;clock_interval_to_deadline(30,1000000000,&deadline);
   thread_call_enter1_delayed(monitorCall,nullptr,deadline);
 }
@@ -101,6 +136,8 @@ class E5HidDevice final:public IOHIDDevice {
   IOTimerEventSource *timer=nullptr;
   bool driver=false,touch=false,probe=false,test=false,testDown=false,testDone=false,snapshots=false;
   bool touchTest=false,touchTestStarted=false,touchTestDone=false,touchSnapshot=false;
+  bool touchOnly=false,splitTouch=false,digitizerDriver=false,hardwareActive=false;
+  E5HidDevice *digitizer=nullptr;
   unsigned ticks=0,reports=0,failures=0,lastDropped=0,testAt=450;
   unsigned homeAction=0,homeActions=1,homeActionLimit=1;
   uint32_t held=0;
@@ -109,12 +146,14 @@ class E5HidDevice final:public IOHIDDevice {
   unsigned snapshotStage=0,snapshotAttempts=0;
   unsigned touchTestStep=0;
   uint64_t touchTestDeadline=0;
+  uint64_t hardwareQuietDeadline=0;
   E5Input::TouchState touches;
   IOReturn send(const void *bytes,size_t length,const char *source) {
     __atomic_store_n(&observedStage,4,__ATOMIC_RELAXED);
     __atomic_store_n(&observedReport,static_cast<const uint8_t *>(bytes)[0],__ATOMIC_RELAXED);
     IOBufferMemoryDescriptor *buffer=IOBufferMemoryDescriptor::withBytes(bytes,length,kIODirectionNone);
-    const IOReturn result=buffer?handleReport(buffer,0,0):kIOReturnNoMemory;
+    IOHIDDevice *target=static_cast<const uint8_t *>(bytes)[0]==3 && splitTouch?digitizer:this;
+    const IOReturn result=buffer?(target?target->handleReport(buffer,0,0):kIOReturnNoDevice):kIOReturnNoMemory;
     OSSafeReleaseNULL(buffer);++reports;if(result!=kIOReturnSuccess)++failures;
     __atomic_store_n(&observedReports,reports,__ATOMIC_RELAXED);
     __atomic_store_n(&observedReport,0,__ATOMIC_RELAXED);
@@ -155,7 +194,12 @@ class E5HidDevice final:public IOHIDDevice {
   }
   static void touchReady(const E5Input::Frame &frame,void *context) {
     auto *self=static_cast<E5HidDevice *>(context);
-    if(frame.count && self->touchTest) {
+    const bool wasActive=self->hardwareActive;self->hardwareActive=frame.count!=0;
+    if(self->touchTest && !self->touchTestDone && !self->touchTestStarted) {
+      clock_interval_to_deadline(2,1000000000,&self->hardwareQuietDeadline);
+      if(frame.count && !wasActive)note("E5HID selftest=touch deferred_hardware=1 contacts=%u",frame.count);
+    }
+    if(frame.count && self->touchTest && !self->touchTestDone && self->touchTestStarted) {
       if(self->touchTestStarted)self->emitTouch(E5Input::Frame{},"selftest-cancel");
       note("E5HID selftest=touch cancelled=1 hardware_contacts=%u started=%u",frame.count,self->touchTestStarted?1:0);
       self->touchTest=false;self->touchTestDone=true;
@@ -191,6 +235,7 @@ class E5HidDevice final:public IOHIDDevice {
     // Cache the attached event driver for this built-in device. A registry
     // walk under a command gate can invert the registry/workloop lock order.
     if(!self->driver && (tickNumber%64)==0)self->driver=eventDriver(self,4);
+    if(self->digitizer && !self->digitizerDriver && (tickNumber%64)==0)self->digitizerDriver=eventDriver(self->digitizer,4);
     if(self->driver) {
       uint32_t state;
       for(unsigned i=0;i<8 && dequeueHeld(state);++i) {
@@ -213,9 +258,11 @@ class E5HidDevice final:public IOHIDDevice {
       }
     }
     __atomic_store_n(&observedStage,6,__ATOMIC_RELAXED);
-    if(self->probe)e5_touch_poll(self->touch && self->driver?touchReady:nullptr,self);
-    if(self->touch && self->driver && self->touchTest && !self->touchTestDone &&
-        e5_touch_ready() && mach_absolute_time()>=self->touchTestDeadline)self->testTouchStep();
+    const bool touchDriver=self->splitTouch?self->digitizerDriver:self->driver;
+    if(self->probe)e5_touch_poll(self->touch && touchDriver?touchReady:nullptr,self);
+    if(self->touch && touchDriver && self->touchTest && !self->touchTestDone && !self->hardwareActive &&
+        e5_touch_ready() && mach_absolute_time()>=self->touchTestDeadline &&
+        (!self->hardwareQuietDeadline || mach_absolute_time()>=self->hardwareQuietDeadline))self->testTouchStep();
     if(self->snapshots && self->snapshotStage<(self->touchSnapshot?3u:2u) && mach_absolute_time()>=self->snapshotDeadline) {
       __atomic_store_n(&observedStage,8,__ATOMIC_RELAXED);
       const bool captured=e5_input_request_capture(100+self->snapshotStage);
@@ -225,42 +272,58 @@ class E5HidDevice final:public IOHIDDevice {
         clock_interval_to_deadline(seconds,1000000000,&self->snapshotDeadline);
       } else clock_interval_to_deadline(1,1000000000,&self->snapshotDeadline);
     }
-    if((self->ticks%2000)==1)note("E5HID status driver=%u polls=%u transitions=%u reports=%u failed=%u dropped=%u held=%x",
+    if((self->ticks%2000)==1)note("E5HID status driver=%u polls=%u transitions=%u reports=%u failed=%u dropped=%u held=%x touch_driver=%u split=%u",
        self->driver?1:0,__atomic_load_n(&polls,__ATOMIC_RELAXED),__atomic_load_n(&physicalEvents,__ATOMIC_RELAXED),
-       self->reports,self->failures,__atomic_load_n(&dropped,__ATOMIC_RELAXED),self->held);
+       self->reports,self->failures,__atomic_load_n(&dropped,__ATOMIC_RELAXED),self->held,touchDriver?1:0,self->splitTouch?1:0);
     __atomic_store_n(&observedStage,10,__ATOMIC_RELAXED);source->setTimeoutMS(16);
   }
 public:
+  void setTouchOnly(){touchOnly=true;}
+  IORegistryEntry *touchService() const {return digitizer;}
+  void publishTouchService(){if(digitizer){digitizer->registerService();note("E5HID touch-publish=1");}}
   IOWorkLoop *getWorkLoop() const override {return loop;}
   OSString *newTransportString() const override {return OSString::withCString("Internal");}
-  OSString *newProductString() const override {return OSString::withCString("Rongyue E5 keypad and touchscreen");}
+  OSString *newProductString() const override {return OSString::withCString(touchOnly?"Rongyue E5 TLSC6x digitizer":"Rongyue E5 keypad and touchscreen");}
   IOReturn newReportDescriptor(IOMemoryDescriptor **out) const override {
     if(!out)return kIOReturnBadArgument;
     uint8_t descriptor[sizeof(KeyboardDescriptor)+sizeof(touchDescriptor)];
-    memcpy(descriptor,KeyboardDescriptor,sizeof(KeyboardDescriptor));size_t size=sizeof(KeyboardDescriptor);
-    if(touch){memcpy(descriptor+size,touchDescriptor,sizeof(touchDescriptor));size+=sizeof(touchDescriptor);}
+    size_t size=0;
+    if(touchOnly){memcpy(descriptor,touchDescriptor,sizeof(touchDescriptor));size=sizeof(touchDescriptor);}
+    else {
+      memcpy(descriptor,KeyboardDescriptor,sizeof(KeyboardDescriptor));size=sizeof(KeyboardDescriptor);
+      if(touch && !splitTouch){memcpy(descriptor+size,touchDescriptor,sizeof(touchDescriptor));size+=sizeof(touchDescriptor);}
+    }
     *out=IOBufferMemoryDescriptor::withBytes(descriptor,size,kIODirectionNone);
     return *out?kIOReturnSuccess:kIOReturnNoMemory;
   }
   bool start(IOService *provider) override {
     loop=IOWorkLoop::workLoop();if(!loop)return false;
-    unsigned touchMode=0,testMode=0,snapshotMode=0,touchTestMode=0;
-    touch=PE_parse_boot_argn("e5-touch",&touchMode,sizeof(touchMode)) && touchMode>=3;
-    probe=touchMode>=1 && touchMode<=3;
-    test=PE_parse_boot_argn("e5-hid-test",&testMode,sizeof(testMode)) && testMode>=1 && testMode<=4;
+    unsigned touchMode=0,testMode=0,snapshotMode=0,touchTestMode=0,splitMode=0;
+    touch=touchOnly || (PE_parse_boot_argn("e5-touch",&touchMode,sizeof(touchMode)) && touchMode>=3);
+    splitTouch=!touchOnly && touch && PE_parse_boot_argn("e5-touch-split",&splitMode,sizeof(splitMode)) && splitMode==1;
+    probe=!touchOnly && touchMode>=1 && touchMode<=3;
+    test=!touchOnly && PE_parse_boot_argn("e5-hid-test",&testMode,sizeof(testMode)) && testMode>=1 && testMode<=4;
     homeAction=testMode==2?1:testMode==3?2:0;
     homeActions=testMode==4?4:1;
     homeActionLimit=homeAction+homeActions;
-    snapshots=PE_parse_boot_argn("e5-hid-snapshot",&snapshotMode,sizeof(snapshotMode)) && snapshotMode==1;
-    touchTest=PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode==1;
+    snapshots=!touchOnly && PE_parse_boot_argn("e5-hid-snapshot",&snapshotMode,sizeof(snapshotMode)) && snapshotMode==1;
+    touchTest=!touchOnly && PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode==1;
     touchSnapshot=touchTest;
     PE_parse_boot_argn("e5-hid-test-at",&testAt,sizeof(testAt));
     if(testAt<30 || testAt>600)testAt=450;
     if(!setProperty("HIDDefaultBehavior",true) || !setProperty("Built-In",true))return false;
-    if(touch && (!setProperty("DisplayIntegrated",true) || !setProperty("DigitizerCollectionDispatch",true)))return false;
+    if(touch && !splitTouch && (!setProperty("DisplayIntegrated",true) || !setProperty("DigitizerCollectionDispatch",true)))return false;
     if(!IOHIDDevice::start(provider))return false;
+    if(touchOnly){note("E5HID touch-only=1 primary=13:4");return true;}
     timer=IOTimerEventSource::timerEventSource(this,tick);
     if(!timer || loop->addEventSource(timer)!=kIOReturnSuccess){OSSafeReleaseNULL(timer);IOHIDDevice::stop(provider);return false;}
+    if(splitTouch) {
+      digitizer=OSDynamicCast(E5HidDevice,OSMetaClass::allocClassWithName("E5HidDevice"));
+      bool initialized=false,attached=false,live=false;
+      if(digitizer){initialized=digitizer->init();if(initialized){digitizer->setTouchOnly();attached=digitizer->attach(provider);if(attached)live=digitizer->start(provider);}}
+      note("E5HID touch-start=%u init=%u attach=%u",live?1:0,initialized?1:0,attached?1:0);
+      if(!live){if(attached)digitizer->detach(provider);OSSafeReleaseNULL(digitizer);}
+    }
     clock_interval_to_deadline(testAt,1000000000,&testDeadline);
     clock_interval_to_deadline(testAt>=40?testAt-10:testAt,1000000000,&snapshotDeadline);
     clock_interval_to_deadline(testAt+50,1000000000,&touchTestDeadline);
@@ -269,14 +332,16 @@ public:
     timer->setTimeoutMS(16);return true;
   }
   void stop(IOService *provider) override {
+    if(touchOnly){IOHIDDevice::stop(provider);return;}
     note("E5HID stop entered reports=%u held=%x",reports,held);
     __atomic_store_n(&enabled,0,__ATOMIC_RELEASE);
     if(timer){timer->cancelTimeout();loop->removeEventSource(timer);OSSafeReleaseNULL(timer);}
     testDown=false;sendKeys(0,"stop");if(touch)touchReady(E5Input::Frame{},this);
     if(probe)e5_touch_stop();
+    if(digitizer){digitizer->stop(provider);digitizer->detach(provider);OSSafeReleaseNULL(digitizer);}
     IOHIDDevice::stop(provider);
   }
-  void free() override {OSSafeReleaseNULL(loop);IOHIDDevice::free();}
+  void free() override {OSSafeReleaseNULL(digitizer);OSSafeReleaseNULL(loop);IOHIDDevice::free();}
 };
 OSDefineMetaClassAndStructors(E5HidDevice,IOHIDDevice)
 extern "C" void e5_hid_static_init(void) __asm__("__GLOBAL__sub_I_E5HidDevice.cpp");
@@ -306,7 +371,9 @@ extern "C" int e5_input_start(void) {
   auto *device=OSDynamicCast(E5HidDevice,OSMetaClass::allocClassWithName("E5HidDevice"));
   bool initialized=false,attached=false,live=false;
   if(provider && device){initialized=device->init();if(initialized)attached=device->attach(provider);if(attached)live=device->start(provider);}
-  if(live){device->registerService();__atomic_store_n(&enabled,1,__ATOMIC_RELEASE);
+  if(live){device->registerService();device->publishTouchService();__atomic_store_n(&enabled,1,__ATOMIC_RELEASE);
+    unsigned requestedProbe=0;probeEvents=PE_parse_boot_argn("e5-hid-event-probe",&requestedProbe,sizeof(requestedProbe)) && requestedProbe==1;
+    if(probeEvents){observedDevice=device;observedDevice->retain();observedDigitizer=device->touchService();if(observedDigitizer)observedDigitizer->retain();}
     monitorCall=thread_call_allocate_with_options(monitor,nullptr,THREAD_CALL_PRIORITY_KERNEL,THREAD_CALL_OPTIONS_ONCE);
     if(monitorCall){uint64_t deadline=0;clock_interval_to_deadline(30,1000000000,&deadline);thread_call_enter1_delayed(monitorCall,nullptr,deadline);}}
   else if(attached)device->detach(provider);
