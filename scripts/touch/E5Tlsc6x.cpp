@@ -91,6 +91,11 @@ bool initialize() {
         note("E5TOUCH pads pa=%llx irq=%x reset=%x sda=%x scl=%x iic3_route=%x (read-only)",
              PinAddress,padsBefore[0],padsBefore[1],padsBefore[2],padsBefore[3],read(pinMap,0x20));
         if(pinMode==1 || pinMode==2) {
+          // Preload/deassert reset before connecting the pad to the GPIO
+          // output, so a stale output latch cannot create an active-low glitch.
+          write(gpio,0,read(gpio,0)|(1u<<14));
+          write(gpio,0x28,read(gpio,0x28)&~(1u<<14));
+          write(gpio,8,read(gpio,8)|(1u<<14));
           // Actual FDT gpio13/14 aliases select func4. Dedicated SDA3/SCL3
           // use func1 (qogirn6 convention); mode2 tests that source inference.
           // Change only function bits; preserve drive/pull/sleep settings.
@@ -100,6 +105,7 @@ bool initialize() {
           }
           note("E5TOUCH pads configured mode=%u changed=%x irq=%x reset=%x sda=%x scl=%x",
                pinMode,padsChanged,read(pinMap,0xa0),read(pinMap,0xa4),read(pinMap,0xa8),read(pinMap,0xac));
+          IOSleep(60);
         }
         resetPinQualified=(read(pinMap,0xa4)&0x30)==0x30;
       } else note("E5TOUCH pads map refused");
