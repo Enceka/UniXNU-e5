@@ -11,6 +11,10 @@
 #include <kern/clock.h>
 #include <stdarg.h>
 extern "C" void e5_kputc(char);
+extern "C" bool e5_touch_canvas_start(void);
+extern "C" void e5_touch_canvas_frame(const E5Input::Frame &);
+extern "C" void e5_touch_canvas_cancel(unsigned);
+extern "C" void e5_touch_canvas_stop(void);
 
 namespace {
 void note(const char *format,...) __attribute__((format(printf,1,2)));
@@ -49,9 +53,26 @@ struct Registers {
 E5Touch::I2c<Registers> bus(registers);
 unsigned mode=0,stage=0,polls=0,good=0,bad=0,recoveries=0,lastCount=0;
 unsigned identityAttempts=0,resetRequested=0;
+unsigned rawRequested=0,rawSamples[3]={};
 bool resetAttempted=false,resetPinQualified=false;
 uint64_t retryDeadline=0;
 uint8_t previous[18]={};bool havePrevious=false;
+void packetHex(const uint8_t *packet,char *hex) {
+  const char digits[]="0123456789abcdef";
+  for(unsigned i=0;i<18;++i){hex[2*i]=digits[packet[i]>>4];hex[2*i+1]=digits[packet[i]&15];}
+  hex[36]=0;
+}
+bool resetSensor(const char *reason) {
+  if(!resetPinQualified || !gpio)return false;
+  resetAttempted=true;bus.abort();
+  write(gpio,0,read(gpio,0)|(1u<<14));IOSleep(10);
+  write(gpio,0,read(gpio,0)&~(1u<<14));IOSleep(10);
+  write(gpio,0,read(gpio,0)|(1u<<14));IOSleep(60);
+  const bool released=(read(gpio,0)&(1u<<14))!=0;
+  note("E5TOUCH sensor-reset completed=%u reason=%s irq=%u reset=%u (no firmware programming)",
+       released?1:0,reason,(read(gpio,0)>>13)&1,(read(gpio,0)>>14)&1);
+  return released;
+}
 void probeInterruptBanks() {
   unsigned requested=0;
   PE_parse_boot_argn("e5-touch-irq-probe",&requested,sizeof(requested));
@@ -142,7 +163,8 @@ bool initialize() {
   }
   if(mode>=2) {
     PE_parse_boot_argn("e5-touch-reset",&resetRequested,sizeof(resetRequested));
-    if(resetRequested==1 && !resetPinQualified) {
+    if(resetRequested>2)resetRequested=0;
+    if(resetRequested && !resetPinQualified) {
       note("E5TOUCH sensor-reset refused: GPIO14 pad mode not qualified; use e5-touch-probe=1");
       resetRequested=0;
     }
@@ -153,7 +175,13 @@ bool initialize() {
     write(gpio,0x28,read(gpio,0x28)&~(1u<<14));write(gpio,8,read(gpio,8)|(1u<<14));
     if(resetWasLow)IOSleep(60);
     bus.configure();
+    // Android uses the A5 wake-only path for needKeepRamCode parts. The
+    // observed flash-backed 3536 instead resets on resume. Mode 2 tests that
+    // entry condition once; normal mode/configuration must still qualify.
+    if(resetRequested==2 && !resetSensor("startup"))return false;
+    PE_parse_boot_argn("e5-touch-raw",&rawRequested,sizeof(rawRequested));
   }
+  e5_touch_canvas_start();
   stage=1;return true;
 }
 bool directMode(bool &direct) {
@@ -225,6 +253,7 @@ void recover() {
 }
 
 extern "C" void e5_touch_stop(void) {
+  e5_touch_canvas_stop();
   if(controller && mode>=2)bus.abort();
   if(pinMap)for(unsigned i=0;i<4;++i)if(padsChanged&(1u<<i))
     write(pinMap,0xa0+4*i,(read(pinMap,0xa0+4*i)&~0x30u)|(padsBefore[i]&0x30u));
@@ -238,6 +267,7 @@ extern "C" void e5_touch_stop(void) {
   OSSafeReleaseNULL(pinMap);padsChanged=0;
   stage=0;mode=0;havePrevious=false;lastCount=0;retryDeadline=0;
   identityAttempts=0;resetRequested=0;resetAttempted=false;resetPinQualified=false;
+  rawRequested=0;for(auto &sample:rawSamples)sample=0;
 }
 extern "C" bool e5_touch_ready(void) {return mode==3 && stage==2 && good>0 && havePrevious;}
 
@@ -261,12 +291,7 @@ extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *
         // Optional single vendor-style GPIO14 pulse, only after failed reads.
         // No firmware programming. A RAM-only sensor may need a later reload;
         // default trials preserve its existing runtime firmware instead.
-        resetAttempted=true;bus.abort();
-        write(gpio,0,read(gpio,0)|(1u<<14));IOSleep(10);
-        write(gpio,0,read(gpio,0)&~(1u<<14));IOSleep(10);
-        write(gpio,0,read(gpio,0)|(1u<<14));IOSleep(60);
-        note("E5TOUCH sensor-reset completed=1 irq=%u reset=%u (optional; no firmware programming)",
-             (read(gpio,0)>>13)&1,(read(gpio,0)>>14)&1);
+        resetSensor("failed-identification");
       }
       recover();return;
     }
@@ -283,17 +308,26 @@ extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *
   // falling-edge pulse must not turn a tap/lift into a 500ms polling gap.
   const unsigned irqLevel=(read(gpio,0)>>13)&1;
   const E5Touch::Transfer result=bus.readRegister(0,packet,sizeof(packet));
+  const unsigned irqAfter=(read(gpio,0)>>13)&1;
   E5Input::Frame frame;
   const E5Input::PacketResult decoded=result==E5Touch::Transfer::Good?
       E5Input::decode(packet,sizeof(packet),frame):E5Input::PacketResult::Length;
   if(result!=E5Touch::Transfer::Good || decoded!=E5Input::PacketResult::Good) {
-    const char hex[]="0123456789abcdef";char raw[37];
-    for(unsigned i=0;i<sizeof(packet);++i){raw[2*i]=hex[packet[i]>>4];raw[2*i+1]=hex[packet[i]&15];}raw[36]=0;
-    ++bad;note("E5TOUCH error transfer=%u packet=%u bad=%u raw=%s status=%x",static_cast<unsigned>(result),static_cast<unsigned>(decoded),bad,raw,bus.lastStatus());
+    char raw[37];packetHex(packet,raw);
+    ++bad;note("E5TOUCH error transfer=%u packet=%u bad=%u raw=%s status=%x irq=%u:%u",static_cast<unsigned>(result),static_cast<unsigned>(decoded),bad,raw,bus.lastStatus(),irqLevel,irqAfter);
+    e5_touch_canvas_cancel(bad);
     if(sink)sink(E5Input::Frame{},context);recover();return;
   }
   ++good;
   if(!havePrevious || memcmp(packet,previous,sizeof(packet))) {
+    const unsigned bucket=frame.count==2 || (packet[2]&7)==2?2:frame.count?1:0;
+    const unsigned limit=bucket==2?32:bucket==1?16:8;
+    if(rawRequested==1 && rawSamples[bucket]<limit) {
+      char raw[37];packetHex(packet,raw);++rawSamples[bucket];
+      note("E5TOUCH raw good=%u polls=%u declared=%u active=%u irq=%u:%u status=%x hex=%s",
+           good,polls,packet[2]&7,frame.count,irqLevel,irqAfter,bus.lastStatus(),raw);
+    }
+    e5_touch_canvas_frame(frame);
     if(frame.count || lastCount) {
       note("E5TOUCH frame=%u count=%u c0=%u:%u,%u c1=%u:%u,%u source=hardware",good,frame.count,
            frame.contacts[0].id,frame.contacts[0].x,frame.contacts[0].y,

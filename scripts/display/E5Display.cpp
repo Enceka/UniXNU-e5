@@ -458,6 +458,7 @@ extern "C" void e5_display_vsync_fire(void) {
 // +0x1818 waiter out-object, +0x1858 pending object, +0x1860/+0x1861 flags,
 // +0x1868 lock, +0x16d0 reader-A object, +0x3c4 last power arg).
 extern "C" void e5_kputc(char);
+extern "C" bool e5_touch_canvas_selected(void);
 // r224: slot-224 (sel 79) argument captures, printed by the display census.
 unsigned long long e5_block40_args[4][7];
 unsigned e5_block40_count;

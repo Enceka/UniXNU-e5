@@ -10,6 +10,28 @@ void line(const char *text){for(const char *p=text;*p;++p)e5_kputc(*p);e5_kputc(
 thread_call_t captureCall=nullptr;
 unsigned pendingCapture=0,captureAttempts=0;
 }
+extern "C" bool e5_input_emit_frame(unsigned id,const uint16_t *copy,size_t bytes) {
+  constexpr unsigned Width=320,Height=480;
+  if(!copy || bytes!=Width*Height*sizeof(uint16_t))return false;
+  char text[128];
+  snprintf(text,sizeof(text),"E5FRAME begin id=%u width=320 height=480 format=RGB565",id);line(text);
+  const char hex[]="0123456789abcdef";uint32_t checksum=2166136261u;
+  for(unsigned y=0;y<Height;++y) {
+    snprintf(text,sizeof(text),"E5FRAMEROW id=%u y=%u ",id,y);
+    for(const char *p=text;*p;++p)e5_kputc(*p);
+    for(unsigned x=0;x<Width;) {
+      const uint16_t pixel=copy[y*Width+x];unsigned run=1;
+      while(x+run<Width && copy[y*Width+x+run]==pixel)++run;
+      for(unsigned i=0;i<run;++i){checksum=(checksum^(pixel&255))*16777619u;checksum=(checksum^(pixel>>8))*16777619u;}
+      const uint32_t pair=(run<<16)|pixel;
+      for(int shift=28;shift>=0;shift-=4)e5_kputc(hex[(pair>>shift)&15]);
+      x+=run;
+    }
+    e5_kputc('\n');
+  }
+  snprintf(text,sizeof(text),"E5FRAME end id=%u fnv=%08x",id,checksum);line(text);
+  return true;
+}
 extern "C" bool e5_input_capture(unsigned id) {
   constexpr unsigned Width=320,Height=480,Bytes=Width*Height*2;
   char stage[96];snprintf(stage,sizeof(stage),"E5HID snapshot start id=%u stage=map",id);line(stage);
@@ -28,23 +50,8 @@ extern "C" bool e5_input_capture(unsigned id) {
   map->release();
   if(!stable){IOFree(copy,Bytes);line("E5HID snapshot unstable; retry without publishing a frame");return false;}
   char text[128];snprintf(text,sizeof(text),"E5HID snapshot id=%u source=retained-scanout-memory stable_reads=2",id);line(text);
-  snprintf(text,sizeof(text),"E5FRAME begin id=%u width=320 height=480 format=RGB565",id);line(text);
-  const char hex[]="0123456789abcdef";uint32_t checksum=2166136261u;
-  for(unsigned y=0;y<Height;++y) {
-    snprintf(text,sizeof(text),"E5FRAMEROW id=%u y=%u ",id,y);
-    for(const char *p=text;*p;++p)e5_kputc(*p);
-    for(unsigned x=0;x<Width;) {
-      const uint16_t pixel=copy[y*Width+x];unsigned run=1;
-      while(x+run<Width && copy[y*Width+x+run]==pixel)++run;
-      for(unsigned i=0;i<run;++i){checksum=(checksum^(pixel&255))*16777619u;checksum=(checksum^(pixel>>8))*16777619u;}
-      const uint32_t pair=(run<<16)|pixel;
-      for(int shift=28;shift>=0;shift-=4)e5_kputc(hex[(pair>>shift)&15]);
-      x+=run;
-    }
-    e5_kputc('\n');
-  }
-  snprintf(text,sizeof(text),"E5FRAME end id=%u fnv=%08x",id,checksum);line(text);
-  IOFree(copy,Bytes);return true;
+  const bool emitted=e5_input_emit_frame(id,copy,Bytes);
+  IOFree(copy,Bytes);return emitted;
 }
 namespace {
 void captureWorker(thread_call_param_t,thread_call_param_t) {

@@ -11,15 +11,22 @@ private:
     IOTimerEventSource *retry;
     Validated validated[8];
     uint32_t offered, accepted, copied, retired, failed, fenceWaits, snapshots;
-    bool kicking, stopped, timerAdded;
+    bool kicking, stopped, timerAdded, canvas;
   };
   CpuState *cpu = nullptr;
 
   bool startCpuPresenter() {
-    if (cpu) return cpu->scanout != nullptr;
+    if (cpu) return cpu->canvas || cpu->scanout != nullptr;
     cpu = (CpuState *)IOMalloc(sizeof(CpuState));
     if (!cpu) return false;
     bzero(cpu, sizeof(*cpu));
+    cpu->canvas = e5_touch_canvas_selected();
+    if (cpu->canvas) {
+      // The diagnostic owns every scanout store. Do not map, copy, or retire
+      // compositor frames as though those pixels had been presented.
+      e5_cpu_log("E5CPU scanout-owner=touch-canvas compositor-copy=0");
+      return true;
+    }
     IODeviceMemory *memory = IODeviceMemory::withRange(0xbe000000ULL, 0x4b000ULL);
     if (memory) {
       cpu->scanout = memory->map(kIOMapAnywhere | kIOMapInhibitCache);
@@ -108,6 +115,11 @@ private:
   }
   bool validateCpuRequest(const OriginalLegacySwapRequest *request) {
     if (!cpu) return false;
+    if (cpu->canvas) {
+      if (++cpu->offered <= 4 || !(cpu->offered & (cpu->offered - 1)))
+        e5_cpu_log("E5CPU canvas-rejected=%u", cpu->offered);
+      return false;
+    }
     unsigned reason = inspectRequest(request);
     ++cpu->offered;
     if (!reason) {

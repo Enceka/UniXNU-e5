@@ -146,14 +146,18 @@ public:
     require(code(data,obj)==code(late.read_bytes(),later),'deferred staging altered owned code')
     touch=compile('E5Tlsc6x',SOURCE/'touch/E5Tlsc6x.cpp')
     capture=compile('E5InputCapture',SOURCE/'input/E5InputCapture.cpp')
+    canvas=compile('E5TouchCanvas',SOURCE/'input/E5TouchCanvas.cpp')
+    canvas_image=macho(canvas.read_bytes())
+    require(not any(s['name']=='__mod_init_func' for g in canvas_image['segments'] for s in g['sections']),
+            'canvas introduced an automatic C++ initializer')
     archive=ROOT/'build/e5-emmc/libE5Emmc.a';require(archive.is_file(),'storage archive must be built first')
-    run(['ar','rcs',archive,late,OUT/'E5HidBindings.o',touch,capture])
+    run(['ar','rcs',archive,late,OUT/'E5HidBindings.o',touch,capture,canvas])
     report=dict(original_kernelcache_sha256=hashlib.sha256(kc).hexdigest(),original_hid_text_sha256=TEXT_HASH,
                 slots=207,original_instance_bytes=208,owned_slots=owned_slots,
                 bindings={name:hex(value) for name,value in bindings.items()},
                 automatic_initializer_removed=True,owned_code_unchanged=True,
                 source_sha256={str(p.relative_to(SOURCE)):hashlib.sha256(p.read_bytes()).hexdigest()
-                               for p in [SOURCE/'input/E5HidDevice.cpp',SOURCE/'input/E5InputProtocol.h',SOURCE/'input/E5InputCapture.cpp',SOURCE/'touch/E5Tlsc6x.cpp',SOURCE/'touch/E5I2cProtocol.h',SOURCE/'touch/E5Tlsc6xConfig.h',Path(__file__)]},
+                               for p in [SOURCE/'input/E5HidDevice.cpp',SOURCE/'input/E5InputProtocol.h',SOURCE/'input/E5InputCapture.cpp',SOURCE/'input/E5TouchCanvas.cpp',SOURCE/'input/E5TouchCanvas.h',SOURCE/'touch/E5Tlsc6x.cpp',SOURCE/'touch/E5I2cProtocol.h',SOURCE/'touch/E5Tlsc6xConfig.h',Path(__file__)]},
                 runtime_qualified=False)
     (OUT/'abi-audit.json').write_text(json.dumps(report,indent=2)+'\n')
     print('e5-input: original 207-slot HID interface and deferred E5 archive verified')

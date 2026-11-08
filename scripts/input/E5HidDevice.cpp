@@ -28,6 +28,8 @@ extern "C" void e5_touch_stop(void);
 extern "C" bool e5_touch_ready(void);
 extern "C" bool e5_input_capture(unsigned);
 extern "C" bool e5_input_request_capture(unsigned);
+extern "C" bool e5_touch_canvas_selected(void);
+extern "C" void e5_touch_canvas_key(unsigned);
 
 namespace {
 void note(const char *format,...) __attribute__((format(printf,1,2)));
@@ -332,11 +334,13 @@ class E5HidDevice final:public IOHIDDevice {
       uint32_t state;
       for(unsigned i=0;i<8 && dequeueHeld(state);++i) {
         self->held=state;
+        e5_touch_canvas_key(state);
         self->sendKeys(state,"matrix");
       }
       const uint32_t lost=__atomic_load_n(&dropped,__ATOMIC_RELAXED);
       if(lost!=self->lastDropped) {
         self->lastDropped=lost;self->held=__atomic_load_n(&latest,__ATOMIC_ACQUIRE);
+        e5_touch_canvas_key(self->held);
         self->sendKeys(self->held,"overflow-reconcile");
       }
       if(self->test && !self->testDone && mach_absolute_time()>=self->testDeadline) {
@@ -402,6 +406,10 @@ public:
     touchTest=!touchOnly && PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode>=1 && touchTestMode<=2;
     touchTestKind=touchTestMode;
     touchSnapshot=touchTest;
+    if(!touchOnly && e5_touch_canvas_selected()) {
+      test=false;touchTest=false;snapshots=false;touchSnapshot=false;
+      note("E5HID canvas=1 synthetic-tests=0 timed-ui-snapshots=0");
+    }
     PE_parse_boot_argn("e5-hid-test-at",&testAt,sizeof(testAt));
     if(testAt<30 || testAt>600)testAt=450;
     if(!setProperty("HIDDefaultBehavior",true) || !setProperty("Built-In",true))return false;
