@@ -52,6 +52,32 @@ unsigned identityAttempts=0,resetRequested=0;
 bool resetAttempted=false,resetPinQualified=false;
 uint64_t retryDeadline=0;
 uint8_t previous[18]={};bool havePrevious=false;
+void probeInterruptBanks() {
+  unsigned requested=0;
+  PE_parse_boot_argn("e5-touch-irq-probe",&requested,sizeof(requested));
+  if(requested!=1)return;
+  // gpio-sprd.c: 256 lines, 16 lines per 0x80-byte bank. All banks share
+  // SPI40/INTID72. Reading bank0 alone cannot establish exclusive ownership
+  // of that parent. GPIO clock and mapping are already qualified here.
+  unsigned otherEnabled=0,otherPending=0;
+  for(unsigned bank=0;bank<16;++bank) {
+    const unsigned base=bank*0x80;
+    const uint32_t owned=bank==0?1u<<13:0;
+    const uint32_t ie=read(gpio,base+0x18)&0xffff;
+    const uint32_t ris=read(gpio,base+0x1c)&0xffff;
+    const uint32_t mis=read(gpio,base+0x20)&0xffff;
+    if(ie&~owned)otherEnabled|=1u<<bank;
+    if(mis&~owned)otherPending|=1u<<bank;
+    if(bank==0 || ie || mis)
+      note("E5TOUCH irq-probe bank=%u ie=%x ris=%x mis=%x is=%x ibe=%x iev=%x (read-only)",
+           bank,ie,ris,mis,read(gpio,base+0xc)&0xffff,
+           read(gpio,base+0x10)&0xffff,read(gpio,base+0x14)&0xffff);
+  }
+  note("E5TOUCH irq-probe banks=16 other_enabled=%x other_pending=%x parent_intid=72 attached=0",
+       otherEnabled,otherPending);
+  // IC is a write-one-to-clear action, not restorable state. Do not touch
+  // IE/IC or attach the shared parent until masking/lifetime are qualified.
+}
 bool initialize() {
   gateMap=map(GateAddress,0x3000);clockMap=map(ClockAddress,0x1000);aon=map(AonAddress,0x3000);
   if(!gateMap || !clockMap || !aon){note("E5TOUCH map refused");return false;}
@@ -77,6 +103,7 @@ bool initialize() {
   note("E5TOUCH resources pa=%llx gate=%x:%x clock=%x:%x version=%x irq=%u reset=%u",
        I2cAddress,before,after,clockBefore,read(clockMap,0xa0),version,
        (read(gpio,0)>>13)&1,(read(gpio,0)>>14)&1);
+  probeInterruptBanks();
   unsigned probePins=0,pinMode=0;
   PE_parse_boot_argn("e5-touch-probe",&probePins,sizeof(probePins));
   if(mode>=2)PE_parse_boot_argn("e5-touch-pinmux",&pinMode,sizeof(pinMode));

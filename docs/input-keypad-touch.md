@@ -213,3 +213,14 @@ Photos Dock icon, app launch and a completed home-screen→application transitio
 backboardd records one down/up and a SpringBoard destination. This verifies
 automatic touch UI action. Missing screenshot102, physical finger input and
 the single bus timeout remain separate limitations. See logs/input-ui-r295.json.
+
+After the R296 kernel freeze, opt-in `e5-touch-irq-probe=1` adds a read-only
+census of all16 GPIO banks (256 lines,0x80 stride) before any parent IRQ work.
+All share SPI40/INTID72; bank0 alone cannot establish exclusive ownership.
+The census follows verified GPIO clock/mapping setup, records IE/RIS/MIS and
+trigger configuration, and leaves IE/IC/GIC unchanged. No IRQ is attached.
+IC is write-one-to-clear and must never be restored as an ordinary register.
+The current ArmCpu attach API has no mask/detach primitive: merely disabling
+GPIO13 cannot contain an unowned bank's shared interrupt, and an installed
+callback must not outlive its context/mapping. These are explicit prerequisites
+for IRQ-driven input. The existing16ms path remains the fallback.
