@@ -112,6 +112,13 @@ int main() {
     MockBus broken;broken.fault=fault;E5Touch::I2c<MockBus> failing(broken);failing.configure();
     const auto result=failing.readRegister(0,data,18);
     assert(result==(fault==MockBus::Stall?E5Touch::Transfer::Timeout:fault==MockBus::Short?E5Touch::Transfer::ShortRead:E5Touch::Transfer::Nack));
+    if(fault==MockBus::WriteNack || fault==MockBus::ReadNack) {
+      // Abort clears the live controller flags; the failure sample must still
+      // distinguish address/write NACK from the repeated-START read NACK.
+      assert((failing.lastStatus()&6)==6);
+      assert(failing.lastWasRead()==(fault==MockBus::ReadNack));
+    }
+    assert(failing.lastElapsedUs()<10000);
     assert(!(broken.control&((1u<<20)|1)) && broken.time<=10000); // STOP allowed; no unbounded wait
   }
   MockBus invalid;E5Touch::I2c<MockBus> bounded(invalid);

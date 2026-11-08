@@ -22,6 +22,7 @@ void note(const char *format,...) {
 // syscon@20000000; the size must never be added to the parent address.
 constexpr uint64_t I2cAddress=0x22270000,GateAddress=0x20000000;
 constexpr uint64_t ClockAddress=0x20010000,AonAddress=0x64900000,GpioAddress=0x64170000;
+constexpr uint64_t PinAddress=0x642e0000;
 IOMemoryMap *controller=nullptr,*gateMap=nullptr,*clockMap=nullptr,*aon=nullptr,*gpio=nullptr;
 uint32_t gpioMaskBefore=0,gpioDirectionBefore=0,gpioInputBefore=0;
 IOMemoryMap *map(uint64_t address,size_t bytes) {
@@ -44,6 +45,8 @@ struct Registers {
 } registers;
 E5Touch::I2c<Registers> bus(registers);
 unsigned mode=0,stage=0,polls=0,good=0,bad=0,recoveries=0,lastCount=0;
+unsigned identityAttempts=0,resetRequested=0;
+bool resetAttempted=false,resetPinQualified=false;
 uint64_t retryDeadline=0;
 uint8_t previous[18]={};bool havePrevious=false;
 bool initialize() {
@@ -71,7 +74,29 @@ bool initialize() {
   note("E5TOUCH resources pa=%llx gate=%x:%x clock=%x:%x version=%x irq=%u reset=%u",
        I2cAddress,before,after,clockBefore,read(clockMap,0xa0),version,
        (read(gpio,0)>>13)&1,(read(gpio,0)>>14)&1);
+  unsigned probePins=0;
+  if(PE_parse_boot_argn("e5-touch-probe",&probePins,sizeof(probePins)) && probePins==1) {
+    // ums9621-clk.c pin-eb: AON_APB_EB1 bit11, set mirror +0x1000.
+    // Probe only: GPIO aliases' func4 must not be inferred to mean I2C.
+    write(aon,0x1004,1u<<11);IODelay(1000);
+    if(read(aon,4)&(1u<<11)) {
+      IOMemoryMap *pins=map(PinAddress,0x1000);
+      if(pins) {
+        resetPinQualified=(read(pins,0xa4)&0x30)==0x30;
+        // qogirn6lite common offset0x44 + indices23..26 *4.
+        note("E5TOUCH pads pa=%llx irq=%x reset=%x sda=%x scl=%x iic3_route=%x (read-only)",
+             PinAddress,read(pins,0xa0),read(pins,0xa4),read(pins,0xa8),read(pins,0xac),read(pins,0x20));
+        pins->release();
+      } else note("E5TOUCH pads map refused");
+    } else note("E5TOUCH pads gate refused");
+    note("E5TOUCH bus-lines status=%x control=%x",read(controller,0x14),read(controller,0));
+  }
   if(mode>=2) {
+    PE_parse_boot_argn("e5-touch-reset",&resetRequested,sizeof(resetRequested));
+    if(resetRequested==1 && !resetPinQualified) {
+      note("E5TOUCH sensor-reset refused: GPIO14 pad mode not qualified; use e5-touch-probe=1");
+      resetRequested=0;
+    }
     const bool resetWasLow=(read(gpio,0)&(1u<<14))==0;
     // Deassert the owned active-low reset without pulsing a running sensor.
     // Write the output latch first to avoid a glitch when changing direction.
@@ -155,6 +180,7 @@ extern "C" void e5_touch_stop(void) {
   OSSafeReleaseNULL(controller);OSSafeReleaseNULL(gateMap);OSSafeReleaseNULL(clockMap);
   OSSafeReleaseNULL(aon);OSSafeReleaseNULL(gpio);
   stage=0;mode=0;havePrevious=false;lastCount=0;retryDeadline=0;
+  identityAttempts=0;resetRequested=0;resetAttempted=false;resetPinQualified=false;
 }
 extern "C" bool e5_touch_ready(void) {return mode==3 && stage==2 && good>0;}
 
@@ -168,8 +194,25 @@ extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *
   if(stage==1) {
     uint8_t tag=0;
     const E5Touch::Transfer result=bus.readRegister(0xa3,&tag,1);
-    note("E5TOUCH identify a3=%x result=%u (ESD identity tag; firmware/config version unqualified)",tag,static_cast<unsigned>(result));
-    if(result!=E5Touch::Transfer::Good){recover();return;}
+    ++identityAttempts;
+    if(identityAttempts<=16 || (identityAttempts%64)==0 || result==E5Touch::Transfer::Good)
+      note("E5TOUCH identify a3=%x result=%u attempt=%u phase=%s status=%x elapsed_us=%u reset_done=%u",
+           tag,static_cast<unsigned>(result),identityAttempts,bus.lastWasRead()?"read":"write",
+           bus.lastStatus(),bus.lastElapsedUs(),resetAttempted?1:0);
+    if(result!=E5Touch::Transfer::Good) {
+      if(resetRequested==1 && !resetAttempted && identityAttempts>=4) {
+        // Optional single vendor-style GPIO14 pulse, only after failed reads.
+        // No firmware programming. A RAM-only sensor may need a later reload;
+        // default trials preserve its existing runtime firmware instead.
+        resetAttempted=true;bus.abort();
+        write(gpio,0,read(gpio,0)|(1u<<14));IOSleep(10);
+        write(gpio,0,read(gpio,0)&~(1u<<14));IOSleep(10);
+        write(gpio,0,read(gpio,0)|(1u<<14));IOSleep(60);
+        note("E5TOUCH sensor-reset completed=1 irq=%u reset=%u (optional; no firmware programming)",
+             (read(gpio,0)>>13)&1,(read(gpio,0)>>14)&1);
+      }
+      recover();return;
+    }
     // TLSC6x's ordinary wake command, also used by the Linux resume path.
     const E5Touch::Transfer awake=bus.writeRegister(0xa5,0);
     note("E5TOUCH wake result=%u",static_cast<unsigned>(awake));

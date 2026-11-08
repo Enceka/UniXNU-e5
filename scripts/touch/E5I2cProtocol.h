@@ -9,6 +9,9 @@ namespace E5Touch {
 enum class Transfer { Good, Argument, Nack, Timeout, ShortRead };
 template<class Registers> class I2c {
   Registers &io;
+  uint32_t sampledStatus=0;
+  unsigned sampledElapsed=0;
+  bool sampledRead=false;
   static constexpr uint32_t Control=0,Address=4,Count=8,Rx=12,Tx=16,Status=20;
   static constexpr uint32_t Start=1,Enable=4,Read=8,Interrupt=4,Nack=2,Empty=8;
   static constexpr uint32_t SuppressStop=1u<<20,FullEnable=1u<<10;
@@ -21,9 +24,11 @@ template<class Registers> class I2c {
     io.write32(Control,control);
     if(write)for(size_t i=0;i<size;++i)io.write8(Tx,write[i]);
     io.write32(Control,control|Start);
+    sampledRead=read!=nullptr;
     size_t received=0;
     for(unsigned elapsed=0;elapsed<10000;elapsed+=10) {
       uint32_t status=io.read32(Status);
+      sampledStatus=status;sampledElapsed=elapsed;
       // RX_ACK is qualified at an interrupt/transfer completion, as in the
       // BSP ISR. Its value before completion must not abort an in-flight byte.
       if((status&Interrupt) && (status&Nack)){abort();return Transfer::Nack;}
@@ -44,6 +49,9 @@ template<class Registers> class I2c {
   }
 public:
   constexpr explicit I2c(Registers &registers):io(registers){}
+  uint32_t lastStatus() const {return sampledStatus;}
+  unsigned lastElapsedUs() const {return sampledElapsed;}
+  bool lastWasRead() const {return sampledRead;}
   void configure() {
     // ext-26m -> 400 kHz, with 40/60 percent high/low timing.
     constexpr uint32_t divider=26000000/(4*400000)-1;
