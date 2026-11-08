@@ -27,7 +27,7 @@ so the decoder remembers the key assigned to each of four hardware slots.
 
 | Matrix position | Linux key | iOS report |
 | --- | --- | --- |
-| row 3, col 0 | KEY_MENU | Consumer Menu, usage page 0x0c / usage 0x40; physical Home effect unqualified |
+| row 3, col 0 | KEY_MENU | Command-H, keyboard H + Left GUI; R292 candidate for Home |
 | row 0, col 0 | KEY_BACK | Keyboard Escape |
 | row 1, col 0 | KEY_SELECT | Keyboard Return |
 | row 3, col 1 | KEY_PHONE | Keyboard Return/confirm |
@@ -40,6 +40,10 @@ so the decoder remembers the key assigned to each of four hardware slots.
 Keyboard usage 0x4a is a navigation Home key and is not used for iOS Home.
 GPIO127's data mask, input direction and input-enable are set after the AON
 set-mirror clock writes. PMIC volume-up/power keys are not connected yet.
+Physical Menu now uses the standard Command-H shortcut; GUI/H release follows
+the key release and other held keys are preserved. Consumer Menu remains an
+independent diagnostic pulse, so this mapping change does not relabel tests.
+The R292 candidate still needs its board trial and physical Home confirmation.
 
 `e5-hid=1` enables publication. The default profile selects it; the saved
 R285 payload needs the argument appended when preparing the new trial.
@@ -88,7 +92,8 @@ controller is reset, polling backs off 500ms, and active HID contacts are lifted
 Hardware contact IDs are 0/1 and map to stable HID IDs 1/2. Coordinates cover the observed inclusive 0..320 and
 0..480 axes and normalize to 0..32767. Vanished IDs receive explicit lift
 records with confidence retained. `DigitizerCollectionDispatch` groups the
-fingers into one frame. The first driver polls GPIO13; GPIO IRQ routing,
+fingers into one frame. The R292 adapter reads packets every16ms instead of
+waiting up to500ms when a GPIO pulse is missed; GPIO IRQ routing,
 hardware contacts, firmware/config identity and suspend/reset recovery remain
 separate qualification tasks. No sensor firmware-flash update is implemented.
 
@@ -116,3 +121,18 @@ The R287 snapshots100/101 decode with complete checksums and show the Chinese lo
 R289 completes all four diagnostic actions with 16 reports and a live independent observer. Its checksummed after-snapshot shows the desktop with Chinese Settings and dock icons; at least35 display frames retire. This qualifies the sequence effect, not individual or physical Home. Touch mode2 still NACKs, so its overall identity/configuration check fails. Android A and postboot37/37 recover. R290 tests3e6a554's IRQ-qualified ACK, cached event-driver discovery and bounded queue drain without new sensor-reset/pad writes.
 
 The corrected gate is derived with UniXNU FDT translation; a negative control rejects the old wrong base before MMIO. A separate `e5-touch-test=1` emits synthetic tap/drag/two-contact reports only after real sensor identification/packet readiness, and cancels when real contacts appear.
+
+R291 reads3536 boot0x0240, config0x0c0e0dd0/chip0x2d5c,204 bytes with a zero
+16-bit checksum and matching0x2e address. Configuration SHA256 is
+`19cc5ee07b370300680e4136c0ded6225cc21ee405716da29fc8a3a196b0a820`.
+The first pad read is IRQ/reset0x30 and SDA/SCL0; mux mode2 changes no function
+bits and the conditional reset pulse is not needed. Pin clock and GPIO reset
+initialization/settle differ from R290; their individual effects are not isolated.
+All16 synthetic touch phases complete with no report error and no active contacts.
+Actual fingers and the UI effect remain separate evidence.
+
+R292 additionally rejects bad configuration checksum/address before packet mode,
+using the actual R291 capture as a host-test fixture. Its synthetic tap targets
+the visible Settings icon/label at274,190 and requests an additional snapshot102
+after the touch window. This tests a concrete UI action instead of inferring it
+from successful report return codes.
