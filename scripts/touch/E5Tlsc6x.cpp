@@ -24,6 +24,8 @@ constexpr uint64_t I2cAddress=0x22270000,GateAddress=0x20000000;
 constexpr uint64_t ClockAddress=0x20010000,AonAddress=0x64900000,GpioAddress=0x64170000;
 constexpr uint64_t PinAddress=0x642e0000;
 IOMemoryMap *controller=nullptr,*gateMap=nullptr,*clockMap=nullptr,*aon=nullptr,*gpio=nullptr;
+IOMemoryMap *pinMap=nullptr;
+uint32_t padsBefore[4]={};unsigned padsChanged=0;
 uint32_t gpioMaskBefore=0,gpioDirectionBefore=0,gpioInputBefore=0;
 IOMemoryMap *map(uint64_t address,size_t bytes) {
   IODeviceMemory *memory=IODeviceMemory::withRange(address,bytes);
@@ -74,19 +76,32 @@ bool initialize() {
   note("E5TOUCH resources pa=%llx gate=%x:%x clock=%x:%x version=%x irq=%u reset=%u",
        I2cAddress,before,after,clockBefore,read(clockMap,0xa0),version,
        (read(gpio,0)>>13)&1,(read(gpio,0)>>14)&1);
-  unsigned probePins=0;
-  if(PE_parse_boot_argn("e5-touch-probe",&probePins,sizeof(probePins)) && probePins==1) {
+  unsigned probePins=0,pinMode=0;
+  PE_parse_boot_argn("e5-touch-probe",&probePins,sizeof(probePins));
+  if(mode>=2)PE_parse_boot_argn("e5-touch-pinmux",&pinMode,sizeof(pinMode));
+  if(probePins==1 || pinMode==1 || pinMode==2) {
     // ums9621-clk.c pin-eb: AON_APB_EB1 bit11, set mirror +0x1000.
     // Probe only: GPIO aliases' func4 must not be inferred to mean I2C.
     write(aon,0x1004,1u<<11);IODelay(1000);
     if(read(aon,4)&(1u<<11)) {
-      IOMemoryMap *pins=map(PinAddress,0x1000);
-      if(pins) {
-        resetPinQualified=(read(pins,0xa4)&0x30)==0x30;
+      pinMap=map(PinAddress,0x1000);
+      if(pinMap) {
+        for(unsigned i=0;i<4;++i)padsBefore[i]=read(pinMap,0xa0+4*i);
         // qogirn6lite common offset0x44 + indices23..26 *4.
         note("E5TOUCH pads pa=%llx irq=%x reset=%x sda=%x scl=%x iic3_route=%x (read-only)",
-             PinAddress,read(pins,0xa0),read(pins,0xa4),read(pins,0xa8),read(pins,0xac),read(pins,0x20));
-        pins->release();
+             PinAddress,padsBefore[0],padsBefore[1],padsBefore[2],padsBefore[3],read(pinMap,0x20));
+        if(pinMode==1 || pinMode==2) {
+          // Actual FDT gpio13/14 aliases select func4. Dedicated SDA3/SCL3
+          // use func1 (qogirn6 convention); mode2 tests that source inference.
+          // Change only function bits; preserve drive/pull/sleep settings.
+          for(unsigned i=0;i<(pinMode==2?4u:2u);++i) {
+            const uint32_t wanted=(padsBefore[i]&~0x30u)|(i<2?0x30u:0);
+            if(wanted!=padsBefore[i]){write(pinMap,0xa0+4*i,wanted);padsChanged|=1u<<i;}
+          }
+          note("E5TOUCH pads configured mode=%u changed=%x irq=%x reset=%x sda=%x scl=%x",
+               pinMode,padsChanged,read(pinMap,0xa0),read(pinMap,0xa4),read(pinMap,0xa8),read(pinMap,0xac));
+        }
+        resetPinQualified=(read(pinMap,0xa4)&0x30)==0x30;
       } else note("E5TOUCH pads map refused");
     } else note("E5TOUCH pads gate refused");
     note("E5TOUCH bus-lines status=%x control=%x",read(controller,0x14),read(controller,0));
@@ -172,6 +187,8 @@ void recover() {
 
 extern "C" void e5_touch_stop(void) {
   if(controller && mode>=2)bus.abort();
+  if(pinMap)for(unsigned i=0;i<4;++i)if(padsChanged&(1u<<i))
+    write(pinMap,0xa0+4*i,(read(pinMap,0xa0+4*i)&~0x30u)|(padsBefore[i]&0x30u));
   if(gpio) {
     write(gpio,4,(read(gpio,4)&~(1u<<13))|(gpioMaskBefore&(1u<<13)));
     write(gpio,8,(read(gpio,8)&~(1u<<13))|(gpioDirectionBefore&(1u<<13)));
@@ -179,6 +196,7 @@ extern "C" void e5_touch_stop(void) {
   }
   OSSafeReleaseNULL(controller);OSSafeReleaseNULL(gateMap);OSSafeReleaseNULL(clockMap);
   OSSafeReleaseNULL(aon);OSSafeReleaseNULL(gpio);
+  OSSafeReleaseNULL(pinMap);padsChanged=0;
   stage=0;mode=0;havePrevious=false;lastCount=0;retryDeadline=0;
   identityAttempts=0;resetRequested=0;resetAttempted=false;resetPinQualified=false;
 }
