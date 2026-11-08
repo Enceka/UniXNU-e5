@@ -77,6 +77,12 @@ high10ms/low10ms/high60ms pulse after four failed identity reads, only if the
 probe qualified GPIO14's func4 pad. It is refused without that qualification.
 The default preserves runtime firmware; reset of a RAM-only part may require
 a later volatile reload. No firmware programming is added.
+For isolated mux trials, `e5-touch-pinmux=1` selects the live-FDT GPIO13/14
+func4 states; `=2` also selects the dedicated SDA3/SCL3 func1 states inferred
+from the Qogirn6 convention. Only bits[5:4] change, with before/after readback;
+the previous function fields are restored on stop. No IIC matrix-route write
+is made. Both modes require touch>=2 and enable the pin clock before access.
+Sensor reset is still refused unless GPIO14 reads back as func4.
 STOP suppression is bit20 **set**; bit20 clear permits STOP. On error the
 controller is reset, polling backs off 500ms, and active HID contacts are lifted.
 Hardware contact IDs are 0/1 and map to stable HID IDs 1/2. Coordinates cover the observed inclusive 0..320 and
