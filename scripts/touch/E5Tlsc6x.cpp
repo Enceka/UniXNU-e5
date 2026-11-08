@@ -260,7 +260,9 @@ extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *
   const E5Input::PacketResult decoded=result==E5Touch::Transfer::Good?
       E5Input::decode(packet,sizeof(packet),frame):E5Input::PacketResult::Length;
   if(result!=E5Touch::Transfer::Good || decoded!=E5Input::PacketResult::Good) {
-    ++bad;note("E5TOUCH error transfer=%u packet=%u bad=%u",static_cast<unsigned>(result),static_cast<unsigned>(decoded),bad);
+    const char hex[]="0123456789abcdef";char raw[37];
+    for(unsigned i=0;i<sizeof(packet);++i){raw[2*i]=hex[packet[i]>>4];raw[2*i+1]=hex[packet[i]&15];}raw[36]=0;
+    ++bad;note("E5TOUCH error transfer=%u packet=%u bad=%u raw=%s status=%x",static_cast<unsigned>(result),static_cast<unsigned>(decoded),bad,raw,bus.lastStatus());
     if(sink)sink(E5Input::Frame{},context);recover();return;
   }
   ++good;
