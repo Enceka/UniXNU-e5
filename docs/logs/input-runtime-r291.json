@@ -1,0 +1,306 @@
+{
+  "round": 291,
+  "verdict": "PASS",
+  "implementation_revision": "1301201e106262a97f9d136802da9324f00d847a",
+  "kernel_sha256": "ad2d14ed46fb0fc3307bdb485c79284649c5e387155f307532f5331e8b5c4b3c",
+  "payload_sha256": "cf733a156aded91c0aa0b2d10f3048b00f09133d3a06edc6ffabfe2bff965c0e",
+  "source": {
+    "path": "uefi/build/sb-r291/r291/capture/kernel.log",
+    "sha256": "30011dbe12046deb9fd6a48841a6c96cfcac8c25948c1ceca6b8ac2284b439b2"
+  },
+  "hid_events": [
+    "E5HID load bundle=com.apple.iokit.IOHIDFamily ret=0",
+    "E5HID load bundle=com.apple.iokit.IOHIDEventDriver ret=0",
+    "E5HID options test=1 actions=4 snapshots=1 touch=1 touch_test=1 at=450 deadline=2f4a7d474",
+    "E5HID publish=1 init=1 attach=1 parent_bytes=208 owned_bytes=336",
+    "E5HID status driver=1 polls=12 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=1795 flags=f inflight=0 reports=0 enabled=1 polls=1806 dropped=0 deadline=2f4a7d474 now=69c62573",
+    "E5HID status driver=1 polls=2012 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=3409 flags=f inflight=0 reports=0 enabled=1 polls=3617 dropped=0 deadline=2f4a7d474 now=98472af8",
+    "E5HID status driver=1 polls=4209 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=5212 flags=f inflight=0 reports=0 enabled=1 polls=5420 dropped=0 deadline=2f4a7d474 now=c6c53adb",
+    "E5HID status driver=1 polls=6409 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=6820 flags=f inflight=0 reports=0 enabled=1 polls=7228 dropped=0 deadline=2f4a7d474 now=f54337c9",
+    "E5HID status driver=1 polls=8409 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=8430 flags=f inflight=0 reports=0 enabled=1 polls=9036 dropped=0 deadline=2f4a7d474 now=123c1564d",
+    "E5HID status driver=1 polls=10609 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=10253 flags=f inflight=0 reports=0 enabled=1 polls=10861 dropped=0 deadline=2f4a7d474 now=1523f6296",
+    "E5HID status driver=1 polls=12612 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=12073 flags=f inflight=0 reports=0 enabled=1 polls=12684 dropped=0 deadline=2f4a7d474 now=180bd4d56",
+    "E5HIDOBS stage=10 ticks=13891 flags=f inflight=0 reports=0 enabled=1 polls=14506 dropped=0 deadline=2f4a7d474 now=1af3b3828",
+    "E5HID status driver=1 polls=14616 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=15691 flags=f inflight=0 reports=0 enabled=1 polls=16306 dropped=0 deadline=2f4a7d474 now=1ddb9747b",
+    "E5HID status driver=1 polls=16616 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=17488 flags=f inflight=0 reports=0 enabled=1 polls=18108 dropped=0 deadline=2f4a7d474 now=20c37ba08",
+    "E5HID status driver=1 polls=18621 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=19289 flags=f inflight=0 reports=0 enabled=1 polls=19909 dropped=0 deadline=2f4a7d474 now=23ab604a8",
+    "E5HID status driver=1 polls=20621 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=21089 flags=f inflight=0 reports=0 enabled=1 polls=21709 dropped=0 deadline=2f4a7d474 now=269341b6a",
+    "E5HID status driver=1 polls=22621 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=22889 flags=f inflight=0 reports=0 enabled=1 polls=23509 dropped=0 deadline=2f4a7d474 now=297b20f8f",
+    "E5HID status driver=1 polls=24621 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=24695 flags=f inflight=0 reports=0 enabled=1 polls=25316 dropped=0 deadline=2f4a7d474 now=2c630100f",
+    "E5HID snapshot start id=100 stage=map",
+    "E5HID snapshot start id=100 stage=allocate",
+    "E5HID snapshot start id=100 stage=read",
+    "E5HID snapshot id=100 source=retained-scanout-memory stable_reads=2",
+    "E5HID status driver=1 polls=26624 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID report=1 source=selftest-home id=1 bytes=9 ret=0",
+    "E5HID report=2 source=selftest-home id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=1 driver=1 failures=0 action=consumer-menu",
+    "E5HIDOBS stage=10 ticks=26519 flags=f inflight=0 reports=2 enabled=1 polls=27143 dropped=0 deadline=2f4a7d474 now=2f4ae3e6c",
+    "E5HID report=3 source=selftest-home id=1 bytes=9 ret=0",
+    "E5HID report=4 source=selftest-home id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=0 driver=1 failures=0 action=consumer-menu",
+    "E5HID report=5 source=selftest-keyboard id=1 bytes=9 ret=0",
+    "E5HID report=6 source=selftest-keyboard id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=1 driver=1 failures=0 action=command-h",
+    "E5HID report=7 source=selftest-keyboard id=1 bytes=9 ret=0",
+    "E5HID report=8 source=selftest-keyboard id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=0 driver=1 failures=0 action=command-h",
+    "E5HID report=9 source=selftest-keyboard id=1 bytes=9 ret=0",
+    "E5HID report=10 source=selftest-keyboard id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=1 driver=1 failures=0 action=return",
+    "E5HID report=11 source=selftest-keyboard id=1 bytes=9 ret=0",
+    "E5HID report=12 source=selftest-keyboard id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=0 driver=1 failures=0 action=return",
+    "E5HID report=13 source=selftest-keyboard id=1 bytes=9 ret=0",
+    "E5HID report=14 source=selftest-keyboard id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=1 driver=1 failures=0 action=command-h",
+    "E5HID report=15 source=selftest-keyboard id=1 bytes=9 ret=0",
+    "E5HID report=16 source=selftest-keyboard id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=0 driver=1 failures=0 action=command-h",
+    "E5HID status driver=1 polls=28626 transitions=0 reports=16 failed=0 dropped=0 held=0",
+    "E5HID snapshot start id=101 stage=map",
+    "E5HID snapshot start id=101 stage=allocate",
+    "E5HID snapshot start id=101 stage=read",
+    "E5HID snapshot id=101 source=retained-scanout-memory stable_reads=2",
+    "E5HIDOBS stage=10 ticks=28331 flags=1f inflight=0 reports=16 enabled=1 polls=28956 dropped=0 deadline=30c9f5000 now=3234f94bd",
+    "E5HID selftest=touch phase=0 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=1 contacts=0 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=2 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=3 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=4 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=5 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=6 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=7 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=8 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=9 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=10 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=11 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=12 contacts=1 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=13 contacts=0 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=14 contacts=2 failed=0 (synthetic)",
+    "E5HID selftest=touch phase=15 contacts=0 failed=0 (synthetic)",
+    "E5HID selftest=touch complete=1 active=0 failed=0 (synthetic)",
+    "E5HID status driver=1 polls=30626 transitions=0 reports=32 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=30136 flags=1f inflight=0 reports=32 enabled=1 polls=30761 dropped=0 deadline=30c9f5000 now=351cdd322",
+    "E5HIDOBS stage=10 ticks=31942 flags=1f inflight=0 reports=32 enabled=1 polls=32570 dropped=0 deadline=30c9f5000 now=3804c0daf",
+    "E5HID status driver=1 polls=32629 transitions=0 reports=32 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=33744 flags=1f inflight=0 reports=32 enabled=1 polls=34372 dropped=0 deadline=30c9f5000 now=3aeca0bfa",
+    "E5HID status driver=1 polls=34629 transitions=0 reports=32 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=35545 flags=1f inflight=0 reports=32 enabled=1 polls=36173 dropped=0 deadline=30c9f5000 now=3dd484fe0",
+    "E5HID status driver=1 polls=36629 transitions=0 reports=32 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=37349 flags=1f inflight=0 reports=32 enabled=1 polls=37977 dropped=0 deadline=30c9f5000 now=40bc643b2",
+    "E5HID status driver=1 polls=38632 transitions=0 reports=32 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=39148 flags=1f inflight=0 reports=32 enabled=1 polls=39780 dropped=0 deadline=30c9f5000 now=43a449327",
+    "E5HID status driver=1 polls=40633 transitions=0 reports=32 failed=0 dropped=0 held=0",
+    "E5HIDOBS stage=10 ticks=40950 flags=1f inflight=0 reports=32 enabled=1 polls=41583 dropped=0 deadline=30c9f5000 now=468c2a204",
+    "E5HID status driver=1 polls=42634 transitions=0 reports=32 failed=0 dropped=0 held=0"
+  ],
+  "final_hid_state": {
+    "driver": 1,
+    "reports": 32,
+    "failed": 0,
+    "dropped": 0,
+    "held": 0
+  },
+  "automatic_home_press_release_passed": true,
+  "home_test_actions": [
+    {
+      "down": 1,
+      "failures": 0,
+      "action": "consumer-menu"
+    },
+    {
+      "down": 0,
+      "failures": 0,
+      "action": "consumer-menu"
+    },
+    {
+      "down": 1,
+      "failures": 0,
+      "action": "command-h"
+    },
+    {
+      "down": 0,
+      "failures": 0,
+      "action": "command-h"
+    },
+    {
+      "down": 1,
+      "failures": 0,
+      "action": "return"
+    },
+    {
+      "down": 0,
+      "failures": 0,
+      "action": "return"
+    },
+    {
+      "down": 1,
+      "failures": 0,
+      "action": "command-h"
+    },
+    {
+      "down": 0,
+      "failures": 0,
+      "action": "command-h"
+    }
+  ],
+  "home_test_sequence_passed": true,
+  "final_observer_state": {
+    "stage": 10,
+    "ticks": 40950,
+    "flags": 31,
+    "inflight": 0,
+    "reports": 32
+  },
+  "observer_progress_verified": true,
+  "physical_key_actuation_verified": false,
+  "physical_touch_verified": false,
+  "touch_mode": 3,
+  "touch_events": [
+    "E5TOUCH resources pa=22270000 gate=89:2089 clock=0:0 version=900 irq=1 reset=1",
+    "E5TOUCH pads pa=642e0000 irq=30 reset=30 sda=0 scl=0 iic3_route=76d23c10 (read-only)",
+    "E5TOUCH pads configured mode=2 changed=0 irq=30 reset=30 sda=0 scl=0",
+    "E5TOUCH bus-lines status=310008 control=82106",
+    "E5TOUCH identify a3=36 result=0 attempt=1 phase=read status=310204 elapsed_us=20 reset_done=0",
+    "E5TOUCH wake result=0",
+    "E5TOUCH firmware entry=35368008 boot_version=240 config_version=c0e0dd0 chip_code=2d5c config_bytes=204",
+    "E5TOUCH config offset=0 len=64 hex=d00d0e0c023402330b03031f75a10d0a0a0f0000081400000000210c040b030a02090111191200001a131b141c1500001d161e171f182010080f070e0000060d",
+    "E5TOUCH config offset=64 len=64 hex=052200000000088a72013d004001e0015000f00090010002dc0521105050505064400884061e262626265c2d91083232232375bd1a1e1137031986af9a648102",
+    "E5TOUCH config offset=128 len=64 hex=e66020212511326a78372246b428c8675f0584a23007600a1a0635087206e4085906b208080af734f73400000000d5020e300808281032038c14141f1c1f0e20",
+    "E5TOUCH config offset=192 len=12 hex=1f1f22212221151c1c1e9c5a",
+    "E5TOUCH identity valid=1 normal_mode=1",
+    "E5TOUCH status polls=1 good=1 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=2049 good=65 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=4097 good=129 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=6145 good=193 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=8193 good=257 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=10241 good=321 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=12289 good=385 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=14337 good=449 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=16385 good=513 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=18433 good=577 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=20481 good=641 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=22529 good=705 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=24577 good=769 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=26625 good=833 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=28673 good=897 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=30721 good=961 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=32769 good=1025 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=34817 good=1089 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=36865 good=1153 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=38913 good=1217 bad=0 recoveries=0 mode=3 (GPIO polling)",
+    "E5TOUCH status polls=40961 good=1281 bad=0 recoveries=0 mode=3 (GPIO polling)"
+  ],
+  "touch_resources_observed": true,
+  "firmware_identity_verified": true,
+  "touch_transport_samples": {
+    "polls": 40961,
+    "good": 1281,
+    "bad": 0,
+    "recoveries": 0
+  },
+  "automatic_touch_test_completed": true,
+  "automatic_touch_test_cancelled_for_hardware": false,
+  "hardware_contacts_observed": false,
+  "configuration_valid": true,
+  "configuration_checksum16": 0,
+  "configuration_sha256": "19cc5ee07b370300680e4136c0ded6225cc21ee405716da29fc8a3a196b0a820",
+  "markers": {
+    "panic(cpu": 0,
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "E5CPU copy-failed": 0
+  },
+  "completed_frames": 16,
+  "display_summary": [
+    "E5IMSUM vc=1:48368:48368 d=1:0:e00002bc b=16:16:0 e=16:16:0 over=0"
+  ],
+  "captured_frames": [
+    {
+      "id": 1,
+      "width": 320,
+      "height": 480,
+      "fnv": "b6005dc5"
+    },
+    {
+      "id": 100,
+      "width": 320,
+      "height": 480,
+      "fnv": "0fc9ffd6"
+    },
+    {
+      "id": 101,
+      "width": 320,
+      "height": 480,
+      "fnv": "531de4aa"
+    }
+  ],
+  "rejected_captures": [],
+  "snapshot_pair_verified": true,
+  "required_snapshot_ids": [
+    100,
+    101
+  ],
+  "required_snapshots_verified": true,
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "android_recovered": true,
+  "scope": "Automated original-HID reports and bounded sensor transport checks; physical actuation and UI meaning are separate evidence.",
+  "ui_observation": {
+    "before": "Chinese lock screen",
+    "after": "Chinese desktop with Settings/Dock and white/clipped widget artifacts",
+    "observer": "root inspected verified snapshots100/101",
+    "snapshot_paths": [
+      "uefi/build/sb-r291/frames/frame-01-100.png",
+      "uefi/build/sb-r291/frames/frame-02-101.png"
+    ],
+    "touch_ui_effect_verified": false,
+    "reason": "Shots bracket keyboard sequence; generic touch suite ran later without a targeted after-shot"
+  },
+  "initial_pin_words": {
+    "irq": "0x30",
+    "reset": "0x30",
+    "sda": "0",
+    "scl": "0",
+    "iic3_route": "0x76d23c10",
+    "function_fields_changed": false
+  },
+  "conditional_sensor_reset_executed": false,
+  "causal_limit": "Pin clock/GPIO latch+direction/60ms settle differ from R290; individual effects not isolated."
+}
