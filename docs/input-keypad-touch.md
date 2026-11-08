@@ -195,3 +195,14 @@ mandatory; terminal NACK/short read and NACK at the final-byte boundary fail
 explicitly. Both this fixture and existing protocol tests pass ASan/UBSan.
 The modeled race matches R294's terminal state but is not established as that
 physical timeout's cause. Frozen R295 does not include this transport change.
+
+R295 public client evidence identifies backboardd (pid57) as the digitizer
+subscriber: open=1, enqueue0→2, dropped0, last event type11, and queue head=tail
+0x1e0 after the isolated Photos down/up. DisplayIntegrated, Built-In and
+HIDServiceSupport are true. This establishes event queue delivery/consumption,
+not UI response. Capture stops around621s before snapshot102, and the original
+runner has no final result. On resume, Android A is independently observed and
+postboot37/37 passes; retained logs contain at least24 frames and no panic markers.
+Another 16/18-byte timeout has status0x310420. Overall R295 is FAIL/incomplete;
+see logs/input-runtime-r295.json. R296 keeps the same HID and UI test configuration
+and adds only the qualified terminal FIFO fix, with complete capture required.
