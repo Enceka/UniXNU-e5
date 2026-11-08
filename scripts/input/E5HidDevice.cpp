@@ -6,6 +6,7 @@
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <IOKit/IOWorkLoop.h>
 #include <IOKit/IOTimerEventSource.h>
+#include <IOKit/IOCatalogue.h>
 #include <libkern/c++/OSIterator.h>
 #include <libkern/c++/OSString.h>
 #include <libkern/c++/OSSymbol.h>
@@ -44,6 +45,25 @@ uint64_t observedDeadline=0;
 thread_call_t monitorCall=nullptr;
 IORegistryEntry *observedDevice=nullptr,*observedDigitizer=nullptr;
 bool probeEvents=false;
+bool setString(OSDictionary *dictionary,const char *key,const char *value) {
+  OSString *string=OSString::withCString(value);
+  const bool ok=string && dictionary->setObject(key,string);OSSafeReleaseNULL(string);return ok;
+}
+bool installTouchMatch() {
+  OSDictionary *match=OSDictionary::withCapacity(8),*usage=OSDictionary::withCapacity(2);
+  OSArray *pairs=OSArray::withCapacity(1),*drivers=OSArray::withCapacity(1);
+  OSNumber *page=OSNumber::withNumber(13,32),*kind=OSNumber::withNumber(4,32),*score=OSNumber::withNumber(60000,32);
+  bool ok=match && usage && pairs && drivers && page && kind && score && gIOCatalogue;
+  if(ok)ok=setString(match,"IOClass","IOHIDEventDriver") && setString(match,"IOProviderClass","IOHIDInterface") &&
+      setString(match,"CFBundleIdentifier","com.apple.iokit.IOHIDFamily") &&
+      setString(match,"IOPersonalityName","E5 TLSC6x native digitizer") && setString(match,"HIDDefaultBehavior","") &&
+      match->setObject("IOProbeScore",score) && usage->setObject("DeviceUsagePage",page) && usage->setObject("DeviceUsage",kind) &&
+      pairs->setObject(usage) && match->setObject("DeviceUsagePairs",pairs) && drivers->setObject(match);
+  if(ok)ok=gIOCatalogue->addDrivers(drivers,true);
+  note("E5HID native-touch-match=%u primary=13:4 score=60000",ok?1:0);
+  OSSafeReleaseNULL(score);OSSafeReleaseNULL(kind);OSSafeReleaseNULL(page);OSSafeReleaseNULL(drivers);
+  OSSafeReleaseNULL(pairs);OSSafeReleaseNULL(usage);OSSafeReleaseNULL(match);return ok;
+}
 void eventState(IORegistryEntry *parent,const char *role,unsigned depth) {
   if(!parent || !depth)return;
   OSIterator *it=parent->getChildIterator(gIOServicePlane);if(!it)return;
@@ -58,10 +78,10 @@ void eventState(IORegistryEntry *parent,const char *role,unsigned depth) {
       OSObject *decoded=serialized?OSUnserializeXML(encoded->text(),nullptr):nullptr;
       auto *dictionary=OSDynamicCast(OSDictionary,decoded);
       auto *age=OSDynamicCast(OSNumber,dictionary?dictionary->getObject("LastReportTime"):nullptr);
-      note("E5HIDEV role=%s id=%llx keyboard=%u digitizer=%u transducers=%u grouped=%u serialized=%u decoded=%u seen=%u age_ns=%llu",
+      note("E5HIDEV role=%s id=%llx keyboard=%u digitizer=%u transducers=%u grouped=%u serialized=%u decoded=%u seen=%u age_ns=%llu class=%s",
            role,entry->getRegistryEntryID(),keyboard?1:0,touch?1:0,transducers?transducers->getCount():0,
            digits && digits->getObject("collectionDispatch")==kOSBooleanTrue?1:0,
-           serialized?1:0,dictionary?1:0,age?1:0,age?age->unsigned64BitValue():0);
+           serialized?1:0,dictionary?1:0,age?1:0,age?age->unsigned64BitValue():0,entry->getMetaClass()->getClassName());
       OSSafeReleaseNULL(decoded);OSSafeReleaseNULL(encoded);OSSafeReleaseNULL(debug);
       OSSafeReleaseNULL(touch);OSSafeReleaseNULL(keyboard);
     } else eventState(entry,role,depth-1);
@@ -113,7 +133,10 @@ bool eventDriver(IORegistryEntry *parent,unsigned depth) {
   bool found=false;
   while(OSObject *object=it->getNextObject()) {
     IORegistryEntry *entry=OSDynamicCast(IORegistryEntry,object);
-    if(entry && (entry->metaCast("IOHIDEventDriver") || eventDriver(entry,depth-1))){found=true;break;}
+    if(entry && entry->metaCast("IOHIDEventDriver")) {
+      OSObject *ready=entry->copyProperty("DebugState");found=ready!=nullptr;OSSafeReleaseNULL(ready);
+    } else if(entry)found=eventDriver(entry,depth-1);
+    if(found)break;
   }
   it->release();return found;
 }
@@ -365,6 +388,8 @@ extern "C" int e5_input_start(void) {
   if(registration!=kOSReturnSuccess){note("E5HID registration ret=%x",static_cast<unsigned>(registration));return 0;}
   const OSMetaClass *owned=meta("E5HidDevice");
   if(!owned || owned->getSuperClass()!=parent || owned->getClassSize()!=sizeof(E5HidDevice))return 0;
+  unsigned nativeTouch=0;
+  if(PE_parse_boot_argn("e5-touch-native",&nativeTouch,sizeof(nativeTouch)) && nativeTouch==1 && !installTouchMatch())return 0;
   OSDictionary *matching=IOService::serviceMatching("IOPlatformExpertDevice");
   IOService *provider=matching?IOService::copyMatchingService(matching):nullptr;
   OSSafeReleaseNULL(matching);
