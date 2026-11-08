@@ -69,6 +69,14 @@ before access. Working Android pinmux/reset/firmware are preserved.
 | `e5-touch=3` | Read/decode 18-byte packets and submit two-contact digitizer reports |
 
 Transfers use a repeated START, FIFO servicing, NACK checks and a 10ms bound.
+Failure telemetry retains the pre-abort status, write/read phase and elapsed
+time. `e5-touch-probe=1` enables pin-eb (AON_APB_EB1 bit11) before reading
+the FDT-derived pinctrl at0x642e0000, pads0xa0/0xa4/0xa8/0xac and IIC route0x20.
+Pad mux is not changed. `e5-touch-reset=1` optionally applies one vendor GPIO14
+high10ms/low10ms/high60ms pulse after four failed identity reads, only if the
+probe qualified GPIO14's func4 pad. It is refused without that qualification.
+The default preserves runtime firmware; reset of a RAM-only part may require
+a later volatile reload. No firmware programming is added.
 STOP suppression is bit20 **set**; bit20 clear permits STOP. On error the
 controller is reset, polling backs off 500ms, and active HID contacts are lifted.
 Hardware contact IDs are 0/1 and map to stable HID IDs 1/2. Coordinates cover the observed inclusive 0..320 and
