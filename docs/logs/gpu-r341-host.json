@@ -1,0 +1,20 @@
+{
+  "nx_repro_before": {
+    "returncode": 1,
+    "stdout": "raw=00400000be000743 decoded=00400000be000000 expected=00000000be000000\n",
+    "header_sha256": "a14e9284af4384cea4293fa8b91696677d8612589dc5b004de9a9737cb7ade61"
+  },
+  "nx_repro_after": {
+    "returncode": 0,
+    "stdout": "raw=00400000be000743 decoded=00000000be000000 expected=00000000be000000\n",
+    "header_sha256": "fb8ce222f582ed07570e1bdcebfc50bfcbf691fca64f3921cea1fc589014911a"
+  },
+  "mmu_sanitizers": "ASan/UBSan all checks passed including new NX/high-PA/private-count cases",
+  "shader_sha256": "86797ec22b8c86f06d5589adcda8b4aa1db0cb976cb7470ad4bfa13f5347e143",
+  "mmu_sanitizer_result": {
+    "returncode": 0,
+    "stdout": "test_mmu: all checks passed\n",
+    "test_sha256": "cb5de20e945d8fb7281ba7b4c73a4468b360422a0b58502f5666e107b3c46a61"
+  },
+  "build_source_hashes_match": true
+}
