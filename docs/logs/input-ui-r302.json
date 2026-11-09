@@ -1,0 +1,113 @@
+{
+  "round": 302,
+  "verdict": "PASS_TOUCH_UI",
+  "gic_verdict": "PASS",
+  "home_verdict": "FAIL",
+  "kernel_sha256": "5008191bcce3fcbb17804855a78965522b7431e42daea684dfe9e48d0981f80d",
+  "payload_sha256": "1c52dca3510082252e63f29f705fa33f352e1eeeb89b100e6bb46a2db472014e",
+  "source": {
+    "path": "uefi/build/sb-r302-ui/r302/capture/kernel.log",
+    "sha256": "03b972a8984ab6456f039021fcb1172552d1a6605f7a6886d4fdd706417064a3"
+  },
+  "last_periodic": {
+    "checks": 34817,
+    "callbacks": 1018,
+    "consumed": 1018,
+    "reads": 971,
+    "coalesced": 47,
+    "pending": 0,
+    "work_runs": 971,
+    "work_reads": 962,
+    "timer_reads": 9,
+    "notifications": 1018,
+    "entries": 1018,
+    "spurious": 0,
+    "foreign": 0,
+    "ie": 8192,
+    "gic": 1018,
+    "generation": 2,
+    "good": 971,
+    "bad": 0,
+    "recoveries": 0,
+    "line": 32449
+  },
+  "gic_checks": {
+    "single_sensor_epoch": true,
+    "shared_ownership_checked": true,
+    "parent_attached": true,
+    "parent_enabled": true,
+    "actual_callbacks": true,
+    "actual_deferred_reads": true,
+    "read_accounting": true,
+    "idle_read_suppression": true,
+    "sampled_irq_to_read_timing": true,
+    "lifecycle_cycle": true,
+    "error_free": true,
+    "callbacks_after_reuse": true
+  },
+  "hardware_frame_count": 662,
+  "moving_single_contact_releases": 25,
+  "stationary_single_contact_releases": 35,
+  "final_active": 0,
+  "sensor_errors": [],
+  "operator": {
+    "source": "user",
+    "recorded_at": "2026-11-08T18:10:45.640550+08:00",
+    "text": "触屏有反应了，但看门狗到时间了，下一轮改成900秒吧",
+    "springboard_touch_responds": true,
+    "home_key_works": false,
+    "next_watchdog_seconds_authorized": 900,
+    "scope": "Original iPadOS lockscreen/wallpaper UI, confirmed by operator and captured visible state changes; desktop/Home/app operation not yet qualified."
+  },
+  "final_hid_state": {
+    "driver": 1,
+    "reports": 700,
+    "failed": 0,
+    "dropped": 0,
+    "held": 0
+  },
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 939.775001958
+  },
+  "android": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "16b2337a-9025-4af9-9d52-39c697ef2b27",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "data_after_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "e7aa5e16650c3c2e5b4d85eec5647dc1466aab7257a04178d866682563a22fc2",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r302-ui-after/data-after.img",
+    "elapsed_seconds": 354.579772292,
+    "command": "dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none"
+  },
+  "scope": "Physical original lockscreen touch responds and opens wallpaper selector. Actual GIC/reuse/transport pass. Native Home/desktop/app operation is not yet qualified; physicalCommand-H is ineffective. Next900s/nativeConsumerMenu is user-authorized."
+}

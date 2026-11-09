@@ -1,0 +1,273 @@
+{
+  "revision": "170f6df5eb980b1d8dc40b36c3ad6dfee54e7008",
+  "kernel_sha256": "68c47267f294b9fc0a46ccf2903a4943514c0b21ef5aa328de9702f12b901ab1",
+  "checks": [
+    {
+      "name": "canvas",
+      "command": "clang++ -std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined scripts/input/tests/canvas.cpp; canvas",
+      "result": "PASS: bounds, inclusive edge coordinates, stable identities, lifts, cancellation, queue overflow, independent key state"
+    },
+    {
+      "name": "protocol",
+      "command": "clang++ -std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined scripts/input/tests/protocol.cpp; protocol",
+      "result": "PASS: key/chord/lift and I2C protocol regression"
+    },
+    {
+      "name": "i2c-tail",
+      "command": "clang++ -std=c++17 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined scripts/input/tests/i2c-tail.cpp; i2c-tail",
+      "result": "PASS: lost terminal interrupt, first readiness, NACK, short read and STOP"
+    },
+    {
+      "name": "frame-decoder",
+      "command": "python3 -m unittest discover -s tools/tests -p test_frame_read.py (e5-xnu repository)",
+      "result": "PASS: 4 tests"
+    },
+    {
+      "name": "record",
+      "command": "python3 scripts/porting-record.py check --device .work/e5-input-current",
+      "result": "PASS: 15 structured areas"
+    },
+    {
+      "name": "kernel",
+      "command": [
+        "/opt/homebrew/bin/python3.15",
+        "/Volumes/Projects/e5-xnu/uefi/build/e5tw-validation/UniXNU-066c8d8315f83749d28bcae2faf3595718646be5/unixnu",
+        "build",
+        "kernel",
+        "-D",
+        "/Volumes/Projects/e5-xnu/.work/e5-input-current",
+        "--out",
+        "/private/tmp/e5-local-build-r275",
+        "--kernelcache",
+        "/Volumes/Projects/e5-xnu/.work/e5-device-current/build/e5-kernelcache",
+        "-j",
+        "8"
+      ],
+      "result": "PASS: complete native compile/link/prelink; source SHA matches; original 207-slot HID and 358-slot display checks pass"
+    }
+  ],
+  "build_environment": {
+    "initial_failure": "Inherited SDKROOT pointed to macOS27.2 while compiling ARM64/iOS17 component archives.",
+    "correction": "Removed SDKROOT and CPATH only from the build child environment; retained warnings-as-errors and pinned Apple compiler."
+  },
+  "linked_audit": {
+    "kernel_sha256": "68c47267f294b9fc0a46ccf2903a4943514c0b21ef5aa328de9702f12b901ab1",
+    "kernel_bytes": 52305920,
+    "original_display_slots": {
+      "155": "0xfffffff0057972b0",
+      "354": "0xfffffff0057970cc"
+    },
+    "owned_slots": {
+      "155": {
+        "address": "0xfffffff0079ac100",
+        "names": [
+          "__ZN9E5Display13setPowerStateEmP9IOService",
+          "",
+          "__ZN9E5Display13setPowerStateEmP9IOService",
+          ""
+        ]
+      },
+      "290": {
+        "address": "0xfffffff0079acbc4",
+        "names": [
+          "__ZN9E5Display13kickSwapQueueEv",
+          "",
+          "__ZN9E5Display13kickSwapQueueEv",
+          ""
+        ]
+      },
+      "295": {
+        "address": "0xfffffff005795b88",
+        "names": [
+          "__ZN25IOMobileFramebufferLegacy19completeCurrentSwapEv"
+        ]
+      },
+      "296": {
+        "address": "0xfffffff0079acc20",
+        "names": [
+          "__ZN9E5Display12validateSwapEPK25OriginalLegacySwapRequest",
+          "",
+          "__ZN9E5Display12validateSwapEPK25OriginalLegacySwapRequest",
+          ""
+        ]
+      },
+      "354": {
+        "address": "0xfffffff0079acd3c",
+        "names": [
+          "__ZN9E5Display15setDisplayStateEP26OriginalLegacyDisplayStateb",
+          "",
+          "__ZN9E5Display15setDisplayStateEP26OriginalLegacyDisplayStateb",
+          ""
+        ]
+      }
+    },
+    "canvas_symbols": {
+      "_e5_touch_canvas_selected": "0xfffffff0079bbdac",
+      "_e5_touch_canvas_start": "0xfffffff0079bbe40",
+      "_e5_touch_canvas_frame": "0xfffffff0079bcce0",
+      "_e5_touch_canvas_cancel": "0xfffffff0079bce40",
+      "_e5_touch_canvas_stop": "0xfffffff0079bcec8",
+      "_e5_input_emit_frame": "0xfffffff0079bb6d8"
+    },
+    "source_hashes_match": true,
+    "sources": [
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/input/E5HidDevice.cpp",
+        "sha256": "85eb40cce4e4533e5963081fc4bc8a16ac1449c5fd8f347b61b4b9263170483c"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/input/E5InputProtocol.h",
+        "sha256": "e96eb142f444f230cf59ea7840b1ee8ae1263e7bc15120d6074d3b54a063f8ae"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/input/E5InputCapture.cpp",
+        "sha256": "b6e1ab25872afa6b29dcdf4b89d8de5c221676dbaf78d99715da60032ff9445d"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/input/E5TouchCanvas.cpp",
+        "sha256": "8157812120c1b4f7caa1e830bda2ddc480787f53a02cb61024b3324dcd107055"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/input/E5TouchCanvas.h",
+        "sha256": "99d613824b0da7e2c0290d9511ab57296bfb23e3370ed89f350007e5037443c2"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/touch/E5Tlsc6x.cpp",
+        "sha256": "87a22cbc4e26f7f19a0c4d2fad346e31c404d2af19976a0ac7fb2a736b02e5f1"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/touch/E5I2cProtocol.h",
+        "sha256": "6ed1c864427a0461308401ab3395bc5a1aa2c9b3766b2de8891128673df8e746"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/touch/E5Tlsc6xConfig.h",
+        "sha256": "40a4c97debab2060cd648223ba236fc5b63d9d5d52d63cccdaa35949fa365661"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/e5_input_build.py",
+        "sha256": "ee943c9ea0fda28802744830d69f5c7d1aae6018a77c38635a3407ee4e33ecd1"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/display/E5Display.cpp",
+        "sha256": "d85fbd602f19dcfae90dcc89c089f4c658e12e2f7f60758707814fe9bda9b31a"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/display/E5DisplayProbe.cpp",
+        "sha256": "6827d648e3c1cb176f9088b5354fa96aaf0190b83e345096c469b10d97e1d373"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/display/E5CAProbe.cpp",
+        "sha256": "e886329dc7469b648936c009aabf313738d74add8f456897a7ee0daafa5a1628"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/display/E5KeyStore.cpp",
+        "sha256": "84102d013a010d2f5c8237526580e5788f2adfe529c673b194c5b62137af8a23"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/display/E5FramebufferCopy.h",
+        "sha256": "efae750d3a4ef1219a1bf1ce0536fb98b8d974b99819052212641bfe70504d27"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/display/E5CpuPresenter.inc",
+        "sha256": "f76c79b8287dbe57bf1a90a1938880feded6f18c41b375cbb714edff95e539b1"
+      },
+      {
+        "path": "/private/tmp/e5-local-build-r275/e5/ipados-17.7.11-21H461/e5/tree/drivers/AppleKeyStoreState/NativeKeyStoreEvents.cpp",
+        "sha256": "273b030afee897e48c30bc917c4df8a9c4d94a189d073ef80c0e0a15caef82ee"
+      },
+      {
+        "path": "/Volumes/Projects/e5-xnu/.work/e5-input-current/scripts/e5_display_build.py",
+        "sha256": "68a85cd685ae7ffb0824288da01c4f0234b69016e50a3af83db8c182b9bf8bd6"
+      }
+    ],
+    "canvas_has_no_automatic_initializer": true,
+    "scope": "Host build/link audit; physical canvas acceptance remains pending."
+  },
+  "input_abi": {
+    "original_kernelcache_sha256": "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7",
+    "original_hid_text_sha256": "7e4c5104814f2e773d5be13d092dec53ee44ba5a61a81264b229780406e86b72",
+    "slots": 207,
+    "original_instance_bytes": 208,
+    "owned_slots": [
+      0,
+      1,
+      7,
+      14,
+      86,
+      87,
+      111,
+      171,
+      173,
+      180
+    ],
+    "bindings": {
+      "__ZN11IOHIDDevice9opaque200Ev": "0xfffffff004add378",
+      "__ZN11IOHIDDevice9opaque172Ev": "0xfffffff004adcfe4",
+      "__ZN11IOHIDDevice9opaque174Ev": "0xfffffff004adcff4",
+      "__ZN11IOHIDDevice9opaque205Ev": "0xfffffff004adf42c",
+      "__ZN11IOHIDDevice9opaque202Ev": "0xfffffff004adea2c",
+      "__ZN11IOHIDDevice9opaque168Ev": "0xfffffff004adc3a0",
+      "__ZN11IOHIDDevice4initEP12OSDictionary": "0xfffffff004ad9590",
+      "__ZN11IOHIDDevice9opaque195Ev": "0xfffffff004ade1c4",
+      "__ZN11IOHIDDevice9opaque179Ev": "0xfffffff004add06c",
+      "__ZN11IOHIDDevice9opaque198Ev": "0xfffffff004ade6d0",
+      "__ZN11IOHIDDevice9opaque196Ev": "0xfffffff004ade1cc",
+      "__ZN11IOHIDDevice9opaque203Ev": "0xfffffff004adeb38",
+      "__ZN11IOHIDDeviceD2Ev": "0xfffffff004ad9518",
+      "__ZN11IOHIDDevice10handleOpenEP9IOServicejPv": "0xfffffff004adc3ac",
+      "__ZN11IOHIDDevice9opaque176Ev": "0xfffffff004add004",
+      "__ZN11IOHIDDevice10gMetaClassE": "0xfffffff006ae6fa0",
+      "__ZN11IOHIDDeviceC2EPK11OSMetaClass": "0xfffffff004ad94f8",
+      "__ZN11IOHIDDevice7messageEjP9IOServicePv": "0xfffffff004adccb4",
+      "__ZN11IOHIDDevice12handleReportEP18IOMemoryDescriptorjj": "0xfffffff004add0c4",
+      "__ZN11IOHIDDevice9opaque187Ev": "0xfffffff004addd74",
+      "__ZN11IOHIDDevice9opaque191Ev": "0xfffffff004addf68",
+      "__ZN11IOHIDDevice9opaque169Ev": "0xfffffff004adc3a8",
+      "__ZN11IOHIDDevice9opaque194Ev": "0xfffffff004ade1a4",
+      "__ZN11IOHIDDevice9opaque188Ev": "0xfffffff004addea8",
+      "__ZN11IOHIDDevice9opaque193Ev": "0xfffffff004ade184",
+      "__ZN11IOHIDDevice9opaque184Ev": "0xfffffff004addc54",
+      "__ZN11IOHIDDevice9opaque185Ev": "0xfffffff004addc44",
+      "__ZN11IOHIDDevice9opaque192Ev": "0xfffffff004ade02c",
+      "__ZN11IOHIDDevice9opaque183Ev": "0xfffffff004add294",
+      "__ZN11IOHIDDevice12updateReportEP19IOReportChannelListjPvS2_": "0xfffffff004adaeb0",
+      "__ZN11IOHIDDevice15configureReportEP19IOReportChannelListjPvS2_": "0xfffffff004adaea4",
+      "__ZN11IOHIDDevice8DispatchE5IORPC": "0xfffffff004b0b55c",
+      "__ZN11IOHIDDevice9opaque189Ev": "0xfffffff004addf34",
+      "__ZTV11IOHIDDevice": "0xfffffff005d045b0",
+      "__ZN11IOHIDDevice9opaque190Ev": "0xfffffff004addf50",
+      "__ZN11IOHIDDevice11setPropertyEPK8OSSymbolP8OSObject": "0xfffffff004adced0",
+      "__ZN11IOHIDDevice9opaque182Ev": "0xfffffff004add160",
+      "__ZN11IOHIDDevice9opaque170Ev": "0xfffffff004adb680",
+      "__ZN11IOHIDDevice13willTerminateEP9IOServicej": "0xfffffff004adb0e4",
+      "__ZN11IOHIDDevice9opaque175Ev": "0xfffffff004adcffc",
+      "__ZN11IOHIDDevice9opaque177Ev": "0xfffffff004add00c",
+      "__ZN11IOHIDDevice9opaque201Ev": "0xfffffff004ade890",
+      "__ZN11IOHIDDevice9opaque204Ev": "0xfffffff004adeca8",
+      "__ZN11IOHIDDevice9opaque199Ev": "0xfffffff004ade75c",
+      "__ZN11IOHIDDevice11handleCloseEP9IOServicej": "0xfffffff004adc824",
+      "__ZN11IOHIDDevice9opaque206Ev": "0xfffffff004adf434",
+      "__ZN11IOHIDDevice18matchPropertyTableEP12OSDictionaryPi": "0xfffffff004adb4cc",
+      "__ZN11IOHIDDevice9opaque178Ev": "0xfffffff004add014",
+      "__ZN11IOHIDDevice9opaque197Ev": "0xfffffff004ade1d4",
+      "__ZNK11IOHIDDevice12handleIsOpenEPK9IOService": "0xfffffff004adc93c",
+      "__ZN11IOHIDDevice13newUserClientEP4taskPvjP12OSDictionaryPP12IOUserClient": "0xfffffff004adc978",
+      "__ZN11IOHIDDevice9opaque186Ev": "0xfffffff004addc68"
+    },
+    "automatic_initializer_removed": true,
+    "owned_code_unchanged": true,
+    "source_sha256": {
+      "input/E5HidDevice.cpp": "85eb40cce4e4533e5963081fc4bc8a16ac1449c5fd8f347b61b4b9263170483c",
+      "input/E5InputProtocol.h": "e96eb142f444f230cf59ea7840b1ee8ae1263e7bc15120d6074d3b54a063f8ae",
+      "input/E5InputCapture.cpp": "b6e1ab25872afa6b29dcdf4b89d8de5c221676dbaf78d99715da60032ff9445d",
+      "input/E5TouchCanvas.cpp": "8157812120c1b4f7caa1e830bda2ddc480787f53a02cb61024b3324dcd107055",
+      "input/E5TouchCanvas.h": "99d613824b0da7e2c0290d9511ab57296bfb23e3370ed89f350007e5037443c2",
+      "touch/E5Tlsc6x.cpp": "87a22cbc4e26f7f19a0c4d2fad346e31c404d2af19976a0ac7fb2a736b02e5f1",
+      "touch/E5I2cProtocol.h": "6ed1c864427a0461308401ab3395bc5a1aa2c9b3766b2de8891128673df8e746",
+      "touch/E5Tlsc6xConfig.h": "40a4c97debab2060cd648223ba236fc5b63d9d5d52d63cccdaa35949fa365661",
+      "e5_input_build.py": "ee943c9ea0fda28802744830d69f5c7d1aae6018a77c38635a3407ee4e33ecd1"
+    },
+    "runtime_qualified": false
+  },
+  "scope": "Host verification only; the R297 canvas/reset hardware cycle is running."
+}
