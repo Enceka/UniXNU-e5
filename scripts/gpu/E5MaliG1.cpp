@@ -37,10 +37,22 @@
 #include <pexpert/pexpert.h>
 
 #include "E5MaliG1.hpp"
+#include "E5MaliG1Ext.h"
+static_assert(sizeof(E5MaliCacheRange) == 24, "cache ABI");
+static_assert(sizeof(E5MaliGpuProperties) == 104, "properties ABI");
+static_assert(sizeof(E5MaliSubmitMany) == 288, "submit-many ABI");
 
 // Offline-compiled Valhall v9 shader assets for self-test §4.2 (user-space
 // subagent deliverable; provenance header inside the file).
 #include "E5MaliG1Shaders.inc"
+#include "E5GpuUserProbeImage.inc"
+
+extern "C" int e5_gpu_user_probe_image(const uint8_t **bytes, uint64_t *size) {
+    if (!bytes || !size) return 0;
+    *bytes = e5GpuUserProbeImage;
+    *size = sizeof(e5GpuUserProbeImage);
+    return 1;
+}
 
 using namespace E5MaliG1Regs;
 
@@ -227,6 +239,11 @@ static void readBootArgs() {
 // ===========================================================================
 bool E5MaliG1::start(IOService *provider) {
     if (!IOService::start(provider)) return false;
+    pinStorage_ = (uint32_t *)IOMalloc(kAtomPool * E5_MALI_MAX_SUBMIT_BOS * sizeof(uint32_t));
+    if (!pinStorage_) return false;
+    bzero(pinStorage_, kAtomPool * E5_MALI_MAX_SUBMIT_BOS * sizeof(uint32_t));
+    for (uint32_t i = 0; i < kAtomPool; ++i)
+        atomPool_[i].pinnedBo = pinStorage_ + i * E5_MALI_MAX_SUBMIT_BOS;
     readBootArgs();
     state_ = IOLockAlloc();
     hw_ = IOSimpleLockAlloc();
@@ -348,7 +365,13 @@ void E5MaliG1::stop(IOService *provider) {
     IOService::stop(provider);
 }
 
-void E5MaliG1::free() { IOService::free(); }
+void E5MaliG1::free() {
+    if (pinStorage_) {
+        IOFree(pinStorage_, kAtomPool * E5_MALI_MAX_SUBMIT_BOS * sizeof(uint32_t));
+        pinStorage_ = nullptr;
+    }
+    IOService::free();
+}
 
 IOMemoryMap *E5MaliG1::map(uint64_t pa, uint32_t len) {
     // E5Mali.cpp mapWindow discipline: refuse short maps outright.
@@ -1530,9 +1553,17 @@ public:
     IOReturn unmapBo(const E5MaliUnmapBo *in, uint32_t *status);
     IOReturn importFixed(const E5MaliImportFixed *in, E5MaliMapBoOut *out);
     IOReturn submit(const E5MaliSubmit *in, E5MaliSubmitOut *out);
+    IOReturn submitHandles(uint64_t jc, uint32_t slot, const uint64_t *udata,
+                           const uint32_t *handles, uint32_t count, E5MaliSubmitOut *out);
     IOReturn waitAtom(const E5MaliWaitAtom *in, E5MaliWaitAtomOut *out, bool wait);
     static void cacheCleanRange(void *p, uint32_t bytes);
     static void cacheInvalidateRange(void *p, uint32_t bytes);
+    bool dmaActive() const {
+        for (uint32_t i = 0; i < kMaxClientAtoms; ++i)
+            if (atoms_[i] && (atoms_[i]->state == kAtomQueued || atoms_[i]->state == kAtomOnHw))
+                return true;
+        return false;
+    }
     bool handlePinned(uint32_t handle) const {
         for (uint32_t i = 0; i < kMaxClientAtoms; ++i)
             if (atoms_[i] && atoms_[i]->state != kAtomFree)
@@ -1602,7 +1633,7 @@ IOReturn E5MaliG1UserClient::destroyBoLocked(uint32_t handle) {
     if (handle == 0 || handle > kMaxBoHandles) return kIOReturnBadArgument;
     Bo &bo = bos_[handle - 1];
     if (!bo.md && !bo.imported) return kIOReturnBadArgument;
-    if (handlePinned(handle)) return kIOReturnBusy;
+    if (handlePinned(handle) || dmaActive()) return kIOReturnBusy;
     E5MaliG1 *d = driver_;
     for (uint32_t m = 0; m < bo.mapCount; ++m) {
         const uint64_t va = bo.maps[m].va, len = bo.maps[m].len;
@@ -1717,7 +1748,7 @@ IOReturn E5MaliG1UserClient::unmapBo(const E5MaliUnmapBo *in, uint32_t *status) 
     for (uint32_t m = 0; m < bo.mapCount; ++m) {
         if (bo.maps[m].va != in->va || bo.maps[m].len != in->length) continue;
         // Refuse while an atom may still DMA through this mapping.
-        if (handlePinned(in->handle)) { *status = kIOReturnBusy; return kIOReturnBusy; }
+        if (handlePinned(in->handle) || dmaActive()) { *status = kIOReturnBusy; return kIOReturnBusy; }
         if (!ctx_->table.unmap(in->va, in->length)) {
             *status = kIOReturnIOError;
             return kIOReturnIOError;
@@ -1827,9 +1858,17 @@ static void e5CtxCleanTables(E5MaliG1Context *ctx) {
 }
 
 IOReturn E5MaliG1UserClient::submit(const E5MaliSubmit *in, E5MaliSubmitOut *out) {
+    uint32_t count = 0;
+    while (count < 8 && in->boHandles[count]) ++count;
+    return submitHandles(in->jc, in->slot, in->udata, in->boHandles, count, out);
+}
+
+IOReturn E5MaliG1UserClient::submitHandles(uint64_t jc, uint32_t slot, const uint64_t *udata,
+                                         const uint32_t *handles, uint32_t count,
+                                         E5MaliSubmitOut *out) {
     bzero(out, sizeof(*out));
     E5MaliG1 *d = driver_;
-    if (!d->slotUsable(in->slot)) {
+    if (count > E5_MALI_MAX_SUBMIT_BOS || slot >= kMaxSlots || !d->slotUsable(slot)) {
         out->status = kIOReturnBadArgument;
         return kIOReturnBadArgument;
     }
@@ -1840,9 +1879,9 @@ IOReturn E5MaliG1UserClient::submit(const E5MaliSubmit *in, E5MaliSubmitOut *out
     if (d->resetPending()) { out->status = kIOReturnNotReady; return kIOReturnNotReady; }
     if (ctx_->asFaulted) { out->status = kIOReturnNotPermitted; return kIOReturnNotPermitted; }
     // jc must land inside a mapped, executable GPU VA of this context.
-    const E5MaliG1Mmu::PageTable::Lookup lu = ctx_->table.lookupEntry(in->jc);
+    const E5MaliG1Mmu::PageTable::Lookup lu = ctx_->table.lookupEntry(jc);
     if (!lu.mapped) {
-        note("E5MALI1 submit jc=%llx unmapped — refused", (unsigned long long)in->jc);
+        note("E5MALI1 submit jc=%llx unmapped — refused", (unsigned long long)jc);
         out->status = kIOReturnBadArgument;
         return kIOReturnBadArgument;
     }
@@ -1851,11 +1890,11 @@ IOReturn E5MaliG1UserClient::submit(const E5MaliSubmit *in, E5MaliSubmitOut *out
         return kIOReturnNotPermitted;
     }
     // Pin every BO handle first; all-or-nothing.
-    uint32_t pins[8] = {};
+    uint32_t pins[E5_MALI_MAX_SUBMIT_BOS] = {};
     uint32_t pinCount = 0;
-    for (uint32_t i = 0; i < 8 && in->boHandles[i]; ++i) {
-        const uint32_t h = in->boHandles[i];
-        if (h > kMaxBoHandles || (!bos_[h - 1].md && !bos_[h - 1].imported)) {
+    for (uint32_t i = 0; i < count; ++i) {
+        const uint32_t h = handles[i];
+        if (!h || h > kMaxBoHandles || (!bos_[h - 1].md && !bos_[h - 1].imported)) {
             out->status = kIOReturnBadArgument;
             return kIOReturnBadArgument;
         }
@@ -1864,6 +1903,14 @@ IOReturn E5MaliG1UserClient::submit(const E5MaliSubmit *in, E5MaliSubmitOut *out
         if (dup) continue;
         pins[pinCount++] = h;
     }
+    bool chainPinned = false;
+    for (uint32_t i = 0; i < pinCount; ++i) {
+        const Bo &bo = bos_[pins[i] - 1];
+        for (uint32_t m = 0; m < bo.mapCount; ++m)
+            if (jc >= bo.maps[m].va && jc - bo.maps[m].va < bo.maps[m].len)
+                chainPinned = true;
+    }
+    if (!chainPinned) { out->status = kIOReturnBadArgument; return kIOReturnBadArgument; }
     // Atom from the shared pool.
     E5MaliG1Atom *a = nullptr;
     for (uint32_t i = 0; i < E5MaliG1::kAtomPool; ++i)
@@ -1871,12 +1918,12 @@ IOReturn E5MaliG1UserClient::submit(const E5MaliSubmit *in, E5MaliSubmitOut *out
     if (!a) { out->status = kIOReturnNoSpace; return kIOReturnNoSpace; }
     static uint64_t nextId = 1;
     a->id = nextId++;
-    a->jc = in->jc;
-    a->slot = in->slot;
+    a->jc = jc;
+    a->slot = (uint8_t)slot;
     a->state = kAtomQueued;
     a->hwStatus = 0;
-    a->udata[0] = in->udata[0];
-    a->udata[1] = in->udata[1];
+    a->udata[0] = udata[0];
+    a->udata[1] = udata[1];
     a->owner = this;
     a->ctx = ctx_;
     a->pinnedCount = pinCount;
@@ -1886,8 +1933,7 @@ IOReturn E5MaliG1UserClient::submit(const E5MaliSubmit *in, E5MaliSubmitOut *out
     for (uint32_t i = 0; i < kMaxClientAtoms; ++i)
         if (!atoms_[i]) { atoms_[i] = a; placed = true; break; }
     if (!placed) { a->state = kAtomFree; out->status = kIOReturnNoSpace; return kIOReturnNoSpace; }
-    e5_mali_g1_submitted = e5_mali_g1_submitted + 1;
-    E5MaliG1::SlotState &s = d->slots_[in->slot];
+    E5MaliG1::SlotState &s = d->slots_[slot];
     if (s.queued >= E5MaliG1::kSlotQueue) {
         a->state = kAtomFree;
         a->owner = nullptr;
@@ -1897,7 +1943,8 @@ IOReturn E5MaliG1UserClient::submit(const E5MaliSubmit *in, E5MaliSubmitOut *out
         return kIOReturnNoSpace;
     }
     s.wait[s.queued++] = a;
-    d->slotKick(in->slot);
+    e5_mali_g1_submitted = e5_mali_g1_submitted + 1;
+    d->slotKick(slot);
     out->atomId = a->id;
     out->status = kIOReturnSuccess;
     return kIOReturnSuccess;
@@ -2063,6 +2110,77 @@ IOReturn E5MaliG1UserClient::externalMethod(uint32_t selector,
         args->structureOutputSize = sizeof(out);
         return r;
     }
+    case kSelSubmitMany: {
+        if (args->structureInputSize != sizeof(E5MaliSubmitMany) ||
+            args->structureOutputSize < sizeof(E5MaliSubmitOut)) return kIOReturnBadArgument;
+        const E5MaliSubmitMany *in = (const E5MaliSubmitMany *)args->structureInput;
+        E5MaliSubmitOut out = {};
+        IOLockLock(d->stateLock());
+        const IOReturn r = submitHandles(in->jc, in->slot, in->udata,
+                                         in->handles, in->handleCount, &out);
+        IOLockUnlock(d->stateLock());
+        memcpy(args->structureOutput, &out, sizeof(out));
+        args->structureOutputSize = sizeof(out);
+        return r;
+    }
+    case kSelGpuProperties: {
+        if (args->structureInputSize || args->structureOutputSize < sizeof(E5MaliGpuProperties))
+            return kIOReturnBadArgument;
+        // Read-only GPU feature registers, from the pinned vendor
+        // gpu/mali_kbase_gpu_regmap.h. Return raw values, not guessed caps.
+        E5MaliGpuProperties out = {};
+        IOLockLock(d->stateLock());
+        out.gpuId = d->gpuId();
+        out.l2Features = d->read32(0x004);
+        out.tilerFeatures = d->read32(0x00c);
+        out.memFeatures = d->read32(0x010);
+        out.mmuFeatures = d->mmuFeatures();
+        out.threadMaxThreads = d->read32(0x0a0);
+        out.threadMaxWorkgroup = d->read32(0x0a4);
+        out.threadMaxBarrier = d->read32(0x0a8);
+        out.threadFeatures = d->read32(0x0ac);
+        out.threadTlsAlloc = d->read32(0x310);
+        for (uint32_t i = 0; i < 4; ++i) out.textureFeatures[i] = d->read32(0x0b0 + 4 * i);
+        out.shaderPresent = d->shaderPresent();
+        out.l2Present = d->l2Present();
+        out.tilerPresent = d->tilerPresent();
+        out.vaBase = ctx_->va.base();
+        out.vaBytes = ctx_->va.size();
+        out.maxBoHandles = kMaxBoHandles;
+        out.maxSubmitBos = E5_MALI_MAX_SUBMIT_BOS;
+        IOLockUnlock(d->stateLock());
+        memcpy(args->structureOutput, &out, sizeof(out));
+        args->structureOutputSize = sizeof(out);
+        return kIOReturnSuccess;
+    }
+    case kSelCacheRange: {
+        if (args->structureInputSize != sizeof(E5MaliCacheRange)) return kIOReturnBadArgument;
+        const E5MaliCacheRange *in = (const E5MaliCacheRange *)args->structureInput;
+        if (!in->handle || in->handle > kMaxBoHandles || in->operation > E5_MALI_CACHE_INVALIDATE)
+            return kIOReturnBadArgument;
+        IOLockLock(d->stateLock());
+        Bo &bo = bos_[in->handle - 1];
+        IOReturn r = kIOReturnBadArgument;
+        if (bo.md && !bo.imported && in->offset < bo.size) {
+            const uint64_t bytes = in->length ? in->length : bo.size - in->offset;
+            if (!(in->offset & 63u) && bytes && !(bytes & 63u) && bytes <= bo.size - in->offset) {
+                r = kIOReturnBusy;
+                if (!handlePinned(in->handle)) {
+                    uint8_t *cpu = (uint8_t *)bo.md->getBytesNoCopy();
+                    r = kIOReturnNoMemory;
+                    if (cpu) {
+                        if (in->operation == E5_MALI_CACHE_CLEAN)
+                            cacheCleanRange(cpu + in->offset, (uint32_t)bytes);
+                        else
+                            cacheInvalidateRange(cpu + in->offset, (uint32_t)bytes);
+                        r = kIOReturnSuccess;
+                    }
+                }
+            }
+        }
+        IOLockUnlock(d->stateLock());
+        return r;
+    }
     case kSelStats: {
         if (args->structureOutputSize < sizeof(E5MaliStats)) return kIOReturnNoSpace;
         E5MaliStats st = {};
@@ -2093,10 +2211,9 @@ IOReturn E5MaliG1UserClient::externalMethod(uint32_t selector,
                            !bos_[h - 1].imported;
         void *bytes = valid ? bos_[h - 1].md->getBytesNoCopy() : nullptr;
         const uint32_t bytesLen = valid ? (uint32_t)bos_[h - 1].size : 0;
-        IOLockUnlock(d->stateLock());
-        if (!valid) return kIOReturnBadArgument;
         if (bytes) cacheCleanRange(bytes, bytesLen);
-        return kIOReturnSuccess;
+        IOLockUnlock(d->stateLock());
+        return valid && bytes ? kIOReturnSuccess : kIOReturnBadArgument;
     }
     case kSelSelfTestMmu: {
         if (args->structureOutputSize < sizeof(E5MaliSelfTestMmuOut)) return kIOReturnNoSpace;

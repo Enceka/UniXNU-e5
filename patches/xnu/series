@@ -24,3 +24,6 @@ e5-display-mode-crash.patch
 e5-display-mode-keep.patch
 e5-display-submit-trace.patch
 e5-usb-console.patch
+e5-gpu-user-probe.patch
+e5-gpu-user-probe-v11.patch
+e5-gpu-user-init.patch

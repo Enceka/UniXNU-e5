@@ -1,0 +1,39 @@
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -8167,9 +8167,24 @@
+ 	}
+ 	vfs_context_t ctx = vfs_context_current();
+ 	vnode_t vp = NULLVP;
+-	int error = vnode_lookup("/private/var/e5mali_harness", VNODE_LOOKUP_NOFOLLOW, &vp, ctx);
+-	if (!error) { vnode_put(vp); vp = NULLVP; }
+-	if (error) { printf("E5GPUUSER FAIL probe missing errno=%d\n", error); return; }
++	extern int e5_gpu_user_probe_image(const uint8_t **, uint64_t *);
++	const uint8_t *image = NULL;
++	uint64_t image_size = 0;
++	if (!e5_gpu_user_probe_image(&image, &image_size) || !image || image_size < 4096 || image_size > 1048576) {
++		printf("E5GPUUSER FAIL invalid embedded image\n"); return;
++	}
++	int error = vnode_open("/private/var/e5gpu-probe", O_CREAT | O_TRUNC | FWRITE | O_NOFOLLOW, 0755, 0, &vp, ctx);
++	if (!error) {
++		int resid = 0;
++		error = vn_rdwr(UIO_WRITE, vp, (caddr_t)image, (int)image_size, 0, UIO_SYSSPACE,
++		    IO_NOAUTH | IO_UNIT, vfs_context_ucred(ctx), &resid, p);
++		if (!error && resid) error = EIO;
++		if (!error) error = VNOP_FSYNC(vp, MNT_WAIT, ctx);
++		int closed = vnode_close(vp, FWRITE, ctx); vp = NULLVP;
++		if (!error) error = closed;
++	}
++	if (error) { printf("E5GPUUSER FAIL image install errno=%d\n", error); return; }
++	printf("E5GPUUSER IMAGE PASS bytes=%llu\n", image_size);
+ 	static const char source[] = "/private/var/e5gpu-daemons";
+ 	static const char point[] = "/System/Library/LaunchDaemons";
+ 	static const char path[] = "/private/var/e5gpu-daemons/com.e5.gpu-probe.plist";
+@@ -8186,7 +8201,7 @@
+ 	"\t<string>Background</string>\n"
+ 	"\t<key>ProgramArguments</key>\n"
+ 	"\t<array>\n"
+-	"\t\t<string>/private/var/e5mali_harness</string>\n"
++	"\t\t<string>/private/var/e5gpu-probe</string>\n"
+ 	"\t\t<string>all</string>\n"
+ 	"\t</array>\n"
+ 	"\t<key>RunAtLoad</key>\n"

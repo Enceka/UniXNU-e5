@@ -1,0 +1,57 @@
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -8151,16 +8151,18 @@
+ int e5_diag_stage = -999; /* -999 unreached, 1 file found, 2 exec ok, 3 absent, 1000+errno exec fail */
+ extern void commpage_update_dyld_flags(uint64_t);
+ 
+-/* E5 opt-in launchd probe. Only writes its own plist on the qualified
+- * eMMC Data volume, then mounts a read-only union over the daemon directory.
+- * The original system jobs remain visible. No init replacement or injected
+- * environment is needed; launchd starts the signed probe as a normal job. */
++/* E5 opt-in userspace probe, installed only on qualified eMMC Data.
++ * Mode 1 exposes a launchd plist; iOS 17 may instead use its signed job cache.
++ * Mode 2 executes the bounded probe before launchd, preserving PID 1 through
++ * the probe's unconditional execve handoff after its tests. */
+ extern volatile int native_bindfs_boot_mount;
++static int e5_gpu_probe_init_ready;
+ static void
+ e5_gpu_probe_prepare(proc_t p, user_addr_t scratch)
+ {
+ 	unsigned enabled = 0;
+-	if (!PE_parse_boot_argn("e5-gpu-user-probe", &enabled, sizeof(enabled)) || enabled != 1) return;
++	if (!PE_parse_boot_argn("e5-gpu-user-probe", &enabled, sizeof(enabled)) ||
++	    (enabled != 1 && enabled != 2)) return;
+ 	if (e5_data_mount_state != 100) {
+ 		printf("E5GPUUSER FAIL Data not qualified state=%d\n", e5_data_mount_state);
+ 		return;
+@@ -8185,6 +8187,13 @@
+ 	}
+ 	if (error) { printf("E5GPUUSER FAIL image install errno=%d\n", error); return; }
+ 	printf("E5GPUUSER IMAGE PASS bytes=%llu\n", image_size);
++	if (enabled == 2) {
++		/* iOS 17 loads system jobs from a signed precomputed cache.
++		 * This bounded mode runs the signed probe before launchd; its
++		 * main always execs launchd in place, even after a failed test. */
++		e5_gpu_probe_init_ready = 1;
++		return;
++	}
+ 	static const char source[] = "/private/var/e5gpu-daemons";
+ 	static const char point[] = "/System/Library/LaunchDaemons";
+ 	static const char path[] = "/private/var/e5gpu-daemons/com.e5.gpu-probe.plist";
+@@ -8509,6 +8518,16 @@
+ 	}
+ #endif
+ 
++#if DEBUG || DEVELOPMENT
++	if (e5_gpu_probe_init_ready) {
++		printf("E5GPUUSER INIT loading signed probe before launchd\n");
++		error = load_init_program_at_path(p, (user_addr_t)scratch_addr,
++		    "/private/var/e5gpu-probe", init_envp);
++		if (!error) return;
++		printf("E5GPUUSER INIT FAIL errno=%d; continuing launchd\n", error);
++	}
++#endif
++
+ /*
+  * E5 userspace diagnostics wrapper: if the writable Data volume provides
+  * /private/var/e5diag, exec it as init first; it forks a telemetry orphan

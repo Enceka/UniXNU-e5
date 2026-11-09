@@ -446,6 +446,8 @@ public:
     probe = compile_source('E5DisplayProbe')
     ca_probe = compile_source('E5CAProbe')
     mali = compile_source_at('E5Mali', SOURCE.parent / 'gpu' / 'E5Mali.cpp')
+    from e5_gpu_user_build import build as build_gpu_user_probe
+    user_probe = build_gpu_user_probe(ROOT, OUT)
     # R311: E5MaliG1 kernel driver (platform lifecycle, shared IRQ, MMU/BO,
     # JM submit/wait/fault/reset, UserClient ABI 1.0). Compiled and archived
     # unconditionally; zero runtime effect without the e5-mali-g1 boot arg.
@@ -471,7 +473,12 @@ public:
                                   SOURCE / 'E5KeyStore.cpp', SOURCE / 'E5FramebufferCopy.h', SOURCE / 'E5CpuPresenter.inc', component, Path(__file__),
                                   SOURCE.parent / 'gpu' / 'E5Mali.cpp', SOURCE.parent / 'gpu' / 'E5MaliG1.cpp',
                                   SOURCE.parent / 'gpu' / 'E5MaliG1.hpp', SOURCE.parent / 'gpu' / 'E5MaliG1Mmu.hpp',
-                                  SOURCE.parent / 'gpu' / 'E5MaliG1Shaders.inc']},
+                                  SOURCE.parent / 'gpu' / 'E5MaliG1Shaders.inc',
+                                  SOURCE.parent / 'gpu' / 'E5MaliG1Abi.h',
+                                  SOURCE.parent / 'gpu' / 'E5MaliG1Ext.h',
+                                  SOURCE.parent / 'gpu' / 'user' / 'E5GpuUserProbe.c',
+                                  SOURCE.parent / 'e5_gpu_user_build.py']},
+                  user_probe=user_probe,
                   late_object_sha256=digest(late.read_bytes()), archive_sha256=digest(archive.read_bytes()),
                   automatic_initializer_removed=True, owned_instructions_unchanged=True,
                   runtime_registration_verified=False, runtime_construction_verified=False,
