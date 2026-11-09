@@ -40,3 +40,23 @@ static inline bool e5_blank_rgb565(volatile void *destination,
   }
   return true;
 }
+
+struct E5PixelSummary {
+  uint32_t pixels=0, rgb=0, alpha=0, opaque=0, rgbWithZeroAlpha=0;
+  uint32_t hash=2166136261u;
+};
+static inline bool e5_summarize_bgra(const void *source,uint64_t bytes,
+    uint64_t stride,uint32_t width,uint32_t height,E5PixelSummary &summary) {
+  if(!e5_framebuffer_layout((uintptr_t)source,bytes,stride,width,height,4))return false;
+  E5PixelSummary result{};
+  for(uint32_t y=0;y<height;++y) {
+    const uint8_t *row=(const uint8_t *)source+y*stride;
+    for(uint32_t x=0;x<width;++x) {
+      const uint8_t *p=row+(uint64_t)x*4;const bool colored=(p[0]|p[1]|p[2])!=0;
+      ++result.pixels;result.rgb+=colored;result.alpha+=p[3]!=0;
+      result.opaque+=p[3]==255;result.rgbWithZeroAlpha+=colored && !p[3];
+      for(unsigned c=0;c<4;++c)result.hash=(result.hash^p[c])*16777619u;
+    }
+  }
+  summary=result;return true;
+}

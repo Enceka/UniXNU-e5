@@ -11,16 +11,24 @@ private:
     IOTimerEventSource *retry;
     Validated validated[8];
     uint32_t offered, accepted, copied, retired, failed, fenceWaits, snapshots;
-    bool kicking, stopped, timerAdded, canvas;
+    bool kicking, stopped, timerAdded, canvas, pixels, gpuScanout;
+    uint32_t lastReject, lastFormat, lastSourceRgb, lastDestinationRgb;
+    bool lastBlank;
   };
   CpuState *cpu = nullptr;
 
   bool startCpuPresenter() {
-    if (cpu) return cpu->canvas || cpu->scanout != nullptr;
+    if (cpu) return cpu->canvas || cpu->gpuScanout || cpu->scanout != nullptr;
     cpu = (CpuState *)IOMalloc(sizeof(CpuState));
     if (!cpu) return false;
     bzero(cpu, sizeof(*cpu));
+    unsigned trace=0;PE_parse_boot_argn("e5-ui-pixels",&trace,sizeof(trace));cpu->pixels=trace==1;
     cpu->canvas = e5_touch_canvas_selected();
+    cpu->gpuScanout = e5_mali_g1_scanout_selected();
+    if (cpu->gpuScanout) {
+      e5_cpu_log("E5CPU scanout-owner=gpu-selftest compositor-copy=0");
+      return true;
+    }
     if (cpu->canvas) {
       // The diagnostic owns every scanout store. Do not map, copy, or retire
       // compositor frames as though those pixels had been presented.
@@ -44,6 +52,8 @@ private:
   }
   void stopCpuPresenter() {
     if (!cpu) return;
+    if (cpu->gpuScanout)
+      __atomic_store_n(&e5GpuScanoutOwned, 0U, __ATOMIC_RELEASE);
     auto action = [](OSObject *owner, void *, void *, void *, void *) -> IOReturn {
       auto display = static_cast<E5Display *>(owner);
       if (display->cpu) {
@@ -115,9 +125,9 @@ private:
   }
   bool validateCpuRequest(const OriginalLegacySwapRequest *request) {
     if (!cpu) return false;
-    if (cpu->canvas) {
+    if (cpu->canvas || cpu->gpuScanout) {
       if (++cpu->offered <= 4 || !(cpu->offered & (cpu->offered - 1)))
-        e5_cpu_log("E5CPU canvas-rejected=%u", cpu->offered);
+        e5_cpu_log("E5CPU %s-rejected=%u", cpu->gpuScanout ? "gpu" : "canvas", cpu->offered);
       return false;
     }
     unsigned reason = inspectRequest(request);
@@ -136,13 +146,15 @@ private:
       if (entry.request == request) entry = {};
     if (!reason) ++cpu->accepted;
     OSObject *surface = request ? requestSurface(request, 0) : nullptr;
-    if (cpu->offered <= 16 || !(cpu->offered & (cpu->offered - 1)))
+    const uint32_t format=surface && surface->metaCast("IOSurface")?e5_surface_format(surface):0;
+    const bool changedReject=cpu->pixels && reason && (reason!=cpu->lastReject || format!=cpu->lastFormat);
+    if (cpu->offered <= 16 || !(cpu->offered & (cpu->offered - 1)) || changedReject)
       e5_cpu_log("E5CPU offer=%u accept=%u reason=%u req=%p surface=%p fmt=%x planes=%u masks=%x:%x",
           cpu->offered, cpu->accepted, reason, request, surface,
           surface && surface->metaCast("IOSurface") ? e5_surface_format(surface) : 0,
           surface && surface->metaCast("IOSurface") ? e5_surface_planes(surface) : 0,
           request ? requestWord(request, 792) : 0, request ? requestWord(request, 796) : 0);
-    if (reason && cpu->offered <= 16 && request) {
+    if (reason && (cpu->offered <= 16 || changedReject) && request) {
       e5_cpu_log("E5CPUREQ bg=%x opts=%x:%x:%x dims=%u:%u rect=%u:%u:%u:%u dst=%u:%u:%u:%u",
           requestWord(request, 800), requestWord(request, 804), requestWord(request, 808), requestWord(request, 812),
           requestWord(request, 816), requestWord(request, 820), requestWord(request, 17), requestWord(request, 21),
@@ -156,6 +168,7 @@ private:
             (unsigned long long)(memory && memory->metaCast("IOMemoryDescriptor") ? memory->getLength() : 0));
       }
     }
+    cpu->lastReject=reason;cpu->lastFormat=format;
     return reason == 0;
   }
   // Two bounded captures of the actual destination, while the presenter's
@@ -191,7 +204,7 @@ private:
     ++cpu->snapshots;
   }
   void copyCpuRequests() {
-    if (!cpu || cpu->stopped || cpu->kicking) return;
+    if (!cpu || cpu->stopped || cpu->kicking || cpu->gpuScanout) return;
     cpu->kicking = true;
     while (const OriginalLegacySwapRequest *request = pendingSwapRequest()) {
       if (!knownRequest(request)) break;
@@ -213,7 +226,8 @@ private:
           break;
         }
       }
-      bool copied = false;
+      bool copied = false;E5PixelSummary pixels{};bool sampled=false;
+      const bool sample=cpu->pixels;
       OSObject *surface = requestSurface(request, 0);
       // Original post-validation layer bookkeeping ORs consumed bits into
       // request+796. Those mutable words no longer describe the submitted
@@ -231,9 +245,11 @@ private:
         else {
           IOMemoryDescriptor *memory = e5_surface_descriptor(surface);
           IOMemoryMap *source = memory->map(kIOMapAnywhere | kIOMapReadOnly);
-          if (source && source->getLength() >= e5_surface_allocation(surface))
+          if (source && source->getLength() >= e5_surface_allocation(surface)) {
+            if(sample)sampled=e5_summarize_bgra((const void *)source->getVirtualAddress(),source->getLength(),e5_surface_stride(surface),320,480,pixels);
             copied = e5_copy_bgra_rgb565(destination, cpu->scanout->getLength(), 640,
                 (const void *)source->getVirtualAddress(), source->getLength(), e5_surface_stride(surface), 320, 480);
+          }
           if (source) source->release();
         }
       }
@@ -245,7 +261,18 @@ private:
       // Finish every device-memory store before the family releases the
       // request's source ownership. No hardware vblank is claimed here.
       __asm__ volatile("dsb sy" ::: "memory");
+      if(sample) {
+        uint32_t rgb=0,hash=2166136261u;
+        auto out=(const volatile uint16_t *)cpu->scanout->getVirtualAddress();
+        for(unsigned i=0;i<320*480;++i){const uint16_t p=out[i];rgb+=p!=0;hash=(hash^(p&255))*16777619u;hash=(hash^(p>>8))*16777619u;}
+        if(cpu->copied<8 || (cpu->copied%64)==0 || (surface==nullptr)!=cpu->lastBlank ||
+            (pixels.rgb<=64)!=(cpu->lastSourceRgb<=64) || (rgb<=64)!=(cpu->lastDestinationRgb<=64))
+          e5_cpu_log("E5PIX next=%u ts=%llu blank=%u valid=%u source_rgb=%u alpha=%u opaque=%u rgb_alpha0=%u source_fnv=%x destination_rgb=%u destination_fnv=%x",
+            cpu->copied+1,(unsigned long long)mach_absolute_time(),surface==nullptr,sampled?1u:0u,pixels.rgb,pixels.alpha,pixels.opaque,pixels.rgbWithZeroAlpha,pixels.hash,rgb,hash);
+        cpu->lastSourceRgb=pixels.rgb;cpu->lastDestinationRgb=rgb;cpu->lastBlank=surface==nullptr;
+      }
       ++cpu->copied;
+      __atomic_add_fetch(&e5CpuPresentedFrames,1U,__ATOMIC_RELEASE);
       if (surface && (!cpu->snapshots || (cpu->snapshots == 1 && cpu->copied >= 64)))
         captureCpuFrame();
       if (!activateOnlyPendingSwap(request)) {

@@ -4,6 +4,11 @@
 #include "E5InputProtocol.h"
 #include "E5I2cProtocol.h"
 #include "E5Tlsc6xConfig.h"
+#include "E5GpioEvents.h"
+#include "E5GpioIrq.h"
+#include "ArmCpuSpi.h"
+#include <IOKit/IOInterruptEventSource.h>
+#include <machine/machine_routines.h>
 #include <IOKit/IOLib.h>
 #include <IOKit/IOMemoryDescriptor.h>
 #include <IOKit/IODeviceMemory.h>
@@ -19,7 +24,7 @@ extern "C" void e5_touch_canvas_stop(void);
 namespace {
 void note(const char *format,...) __attribute__((format(printf,1,2)));
 void note(const char *format,...) {
-  char text[256];va_list ap;va_start(ap,format);vsnprintf(text,sizeof(text),format,ap);va_end(ap);
+  char text[512];va_list ap;va_start(ap,format);vsnprintf(text,sizeof(text),format,ap);va_end(ap);
   for(const char *p=text;*p;++p)e5_kputc(*p);e5_kputc('\n');
 }
 // Board addresses include the parent bus translation, not the FDT unit offset.
@@ -51,9 +56,63 @@ struct Registers {
   void delayUs(unsigned microseconds){IODelay(microseconds);}
 } registers;
 E5Touch::I2c<Registers> bus(registers);
+struct GpioRegisters {
+  uint32_t read32(unsigned offset){return read(gpio,offset);}
+  void write32(unsigned offset,uint32_t value){write(gpio,offset,value);}
+} gpioRegisters;
+E5Touch::GpioEvents<GpioRegisters> gpioEvents(gpioRegisters);
 unsigned mode=0,stage=0,polls=0,good=0,bad=0,recoveries=0,lastCount=0;
 unsigned identityAttempts=0,resetRequested=0;
-unsigned rawRequested=0,rawSamples[3]={};
+unsigned rawRequested=0,rawSamples[3]={},eventPollRequested=0,eventIntervalMs=16;
+unsigned irqRequested=0,irqCycleRequested=0,irqGeneration=0;
+bool irqAttached=false,irqCycleDone=false,irqInWork=false;
+uint64_t irqCycleDeadline=0,irqCycleQuietTicks=0,gicPastCount=0;
+IOInterruptEventSource *irqSource=nullptr;
+E5TouchIrqState irqState;
+struct IrqRegisters {
+  uint32_t read32(unsigned offset){return read(gpio,offset);}
+  void write32(unsigned offset,uint32_t value){write(gpio,offset,value);}
+  void maskParent(){armcpu_spi_mask_irq(72,&irqState);}
+} irqRegisters;
+void touchInterrupt(void *) {
+  if(e5TouchCaptureIrq(irqRegisters,irqState,mach_absolute_time()) && irqSource)
+    irqSource->interruptOccurred(nullptr,nullptr,0);
+}
+bool sharedSourcesClear() {
+  unsigned foreign=0;
+  for(unsigned bank=0;bank<16;++bank) {
+    const unsigned base=bank*0x80;const uint32_t owned=bank==0?1u<<13:0;
+    if((read(gpio,base+0x18)|read(gpio,base+0x20))&0xffff&~owned)foreign|=1u<<bank;
+  }
+  note("E5TOUCH irq-ownership banks=16 foreign=%x",foreign);return !foreign;
+}
+bool attachTouchIrq() {
+  if(!irqSource || !sharedSourcesClear())return false;
+  uint32_t state=0;uint64_t router=0;
+  const IOReturn attached=armcpu_spi_attach_masked(72,false,touchInterrupt,&irqState,&state,&router);
+  if(attached!=kIOReturnSuccess){note("E5TOUCH irq-attach refused=%x",unsigned(attached));return false;}
+  irqAttached=true;++irqGeneration;
+  const uint32_t control=armcpu_spi_control();const bool groupsVisible=(control&(1u<<6))!=0;
+  note("E5TOUCH irq-attached parent=72 masked=1 state=%x router=%llx generation=%u groups_visible=%u control=%x",
+       state,router,irqGeneration,groupsVisible?1u:0u,control);
+  if((state&0xff06)!=0xa000 || (groupsVisible && !(state&1)))return false;
+  write(gpio,0x24,1u<<13);write(gpio,0x18,read(gpio,0x18)|(1u<<13));
+  const IOReturn enabled=armcpu_spi_set_enabled(72,true,&irqState);
+  const bool valid=enabled==kIOReturnSuccess && (read(gpio,0x18)&(1u<<13)) &&
+      !__atomic_load_n(&irqState.foreignBanks,__ATOMIC_ACQUIRE);
+  note("E5TOUCH irq-enabled valid=%u result=%x pin=13 edge=falling parent=level-high generation=%u",
+       valid?1:0,unsigned(enabled),irqGeneration);return valid;
+}
+bool detachTouchIrq() {
+  if(!irqAttached)return true;
+  write(gpio,0x18,read(gpio,0x18)&~(1u<<13));
+  const IOReturn masked=armcpu_spi_set_enabled(72,false,&irqState);
+  const IOReturn detached=armcpu_spi_detach(72,&irqState);
+  note("E5TOUCH irq-detached result=%x masked=%x drained=%u generation=%u",
+       unsigned(detached),unsigned(masked),detached==kIOReturnSuccess?1:0,irqGeneration);
+  if(detached!=kIOReturnSuccess)return false;
+  gicPastCount+=armcpu_spi_count(72);irqAttached=false;return true;
+}
 bool resetAttempted=false,resetPinQualified=false;
 uint64_t retryDeadline=0;
 uint8_t previous[18]={};bool havePrevious=false;
@@ -180,6 +239,16 @@ bool initialize() {
     // entry condition once; normal mode/configuration must still qualify.
     if(resetRequested==2 && !resetSensor("startup"))return false;
     PE_parse_boot_argn("e5-touch-raw",&rawRequested,sizeof(rawRequested));
+    if(mode==3)PE_parse_boot_argn("e5-touch-gpio-events",&eventPollRequested,sizeof(eventPollRequested));
+    if(mode==3)PE_parse_boot_argn("e5-touch-irq",&irqRequested,sizeof(irqRequested));
+    if(irqRequested==1) {
+      eventPollRequested=1;
+      PE_parse_boot_argn("e5-touch-irq-cycle",&irqCycleRequested,sizeof(irqCycleRequested));
+    }
+    if(eventPollRequested==1) {
+      PE_parse_boot_argn("e5-touch-event-ms",&eventIntervalMs,sizeof(eventIntervalMs));
+      if(eventIntervalMs<1 || eventIntervalMs>16)eventIntervalMs=16;
+    }
   }
   e5_touch_canvas_start();
   stage=1;return true;
@@ -250,10 +319,33 @@ void recover() {
   havePrevious=false;lastCount=0;
   clock_interval_to_deadline(500,1000000,&retryDeadline);
 }
+void eventStatus(unsigned irqLevel) {
+  if(irqRequested==1) {
+    if((irqState.checks%2048)!=1)return;
+    const unsigned callbacks=__atomic_load_n(&irqState.callbacks,__ATOMIC_ACQUIRE);
+    note("E5TOUCH irq-status checks=%u callbacks=%u consumed=%u reads=%u coalesced=%u pending=%u work_runs=%u work_reads=%u timer_reads=%u notifications=%u entries=%u spurious=%u foreign=%x ie=%x gic=%llu generation=%u good=%u bad=%u recoveries=%u",
+         irqState.checks,callbacks,irqState.consumed,irqState.reads,irqState.coalesced,callbacks-irqState.consumed,
+         irqState.workRuns,irqState.workReads,irqState.timerReads,irqState.notifications,__atomic_load_n(&irqState.entries,__ATOMIC_RELAXED),
+         __atomic_load_n(&irqState.spurious,__ATOMIC_RELAXED),__atomic_load_n(&irqState.foreignBanks,__ATOMIC_ACQUIRE),
+         read(gpio,0x18)&0xffff,gicPastCount+armcpu_spi_count(72),irqGeneration,good,bad,recoveries);
+    return;
+  }
+  if((gpioEvents.polls%2048)!=1)return;
+  note("E5TOUCH status polls=%u good=%u bad=%u recoveries=%u mode=%u irq=%u (GPIO event polling)",polls,good,bad,recoveries,mode,irqLevel);
+  note("E5TOUCH events polls=%u reads=%u edges=%u low_no_edge=%u skipped=%u ie=%x ris=%x",
+       gpioEvents.polls,gpioEvents.reads,gpioEvents.edges,gpioEvents.lowWithoutEdge,gpioEvents.skipped,
+       read(gpio,0x18)&0xffff,read(gpio,0x1c)&0xffff);
+}
 }
 
-extern "C" void e5_touch_stop(void) {
+extern "C" void e5_touch_set_irq_source(IOInterruptEventSource *source) {irqSource=source;}
+extern "C" void e5_touch_irq_work(bool begin,unsigned count) {
+  irqInWork=begin;if(begin){++irqState.workRuns;irqState.notifications+=count;}
+}
+extern "C" bool e5_touch_stop(void) {
+  if(gpio && !detachTouchIrq())return false; // Retain mappings/context on timeout.
   e5_touch_canvas_stop();
+  if(gpio)gpioEvents.stop();
   if(controller && mode>=2)bus.abort();
   if(pinMap)for(unsigned i=0;i<4;++i)if(padsChanged&(1u<<i))
     write(pinMap,0xa0+4*i,(read(pinMap,0xa0+4*i)&~0x30u)|(padsBefore[i]&0x30u));
@@ -268,8 +360,13 @@ extern "C" void e5_touch_stop(void) {
   stage=0;mode=0;havePrevious=false;lastCount=0;retryDeadline=0;
   identityAttempts=0;resetRequested=0;resetAttempted=false;resetPinQualified=false;
   rawRequested=0;for(auto &sample:rawSamples)sample=0;
+  eventPollRequested=0;eventIntervalMs=16;irqRequested=0;irqSource=nullptr;
+  return true;
 }
 extern "C" bool e5_touch_ready(void) {return mode==3 && stage==2 && good>0 && havePrevious;}
+extern "C" unsigned e5_touch_poll_interval_ms(void) {
+  return irqRequested!=1 && eventPollRequested==1 && stage==2 && gpioEvents.active()?eventIntervalMs:16;
+}
 
 extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *context) {
   if(!stage) {
@@ -300,23 +397,71 @@ extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *
     note("E5TOUCH wake result=%u",static_cast<unsigned>(awake));
     if(awake!=E5Touch::Transfer::Good){recover();return;}
     if(!identifyFirmware()){recover();return;}
+    // Start a fresh packet-event epoch only after identity/direct-mode work
+    // has restored normal mode. Those setup reads are not touch packet reads.
+    if(eventPollRequested==1) {
+      if(!gpioEvents.start()){note("E5TOUCH gpio-events refused=1");stage=99;return;}
+      if(irqRequested==1) {
+        if(!attachTouchIrq()){detachTouchIrq();note("E5TOUCH irq-start refused=1");stage=99;return;}
+        clock_interval_to_deadline(300,1000000000,&irqCycleDeadline);
+        uint64_t future=0;clock_interval_to_deadline(2,1000000000,&future);irqCycleQuietTicks=future-mach_absolute_time();
+        note("E5TOUCH irq-configured pin=13 parent=72 deferred=IOInterruptEventSource i2c_in_irq=0 cycle=%u",irqCycleRequested);
+      } else {
+        note("E5TOUCH gpio-events configured=1 pin=13 edge=falling masked=1 parent_attached=0 strict=1 clock=mach_absolute_time");
+        note("E5TOUCH gpio-cadence interval_ms=%u scope=hid-workloop period_includes_work=1",eventIntervalMs);
+      }
+    }
     stage=2;
   }
   if(mode==2)return;
-  uint8_t packet[18]={};++polls;
-  // Until GPIO IRQ routing is implemented, read every 16ms tick. A short
-  // falling-edge pulse must not turn a tap/lift into a 500ms polling gap.
   const unsigned irqLevel=(read(gpio,0)>>13)&1;
+  uint64_t observed=eventPollRequested==1?mach_absolute_time():0;unsigned irqBatch=0;
+  if(irqRequested==1) {
+    ++irqState.checks;
+    const unsigned foreign=__atomic_load_n(&irqState.foreignBanks,__ATOMIC_ACQUIRE);
+    if(foreign) {note("E5TOUCH irq-conflict foreign=%x",foreign);stage=99;e5_touch_canvas_cancel(1);if(sink)sink(E5Input::Frame{},context);return;}
+    if(irqCycleRequested==1 && !irqCycleDone && havePrevious && !lastCount && !irqState.pending() &&
+        mach_absolute_time()>=irqCycleDeadline &&
+        mach_absolute_time()-__atomic_load_n(&irqState.latestTick,__ATOMIC_ACQUIRE)>=irqCycleQuietTicks) {
+      irqCycleDone=true;
+      const bool detached=detachTouchIrq();const bool attached=detached && attachTouchIrq();
+      note("E5TOUCH irq-cycle completed=%u detached=%u generation=%u",attached?1:0,detached?1:0,irqGeneration);
+      if(!attached){stage=99;return;}
+    }
+    if(!irqState.take(irqBatch,observed)){eventStatus(irqLevel);return;}
+    if(irqInWork)++irqState.workReads;else ++irqState.timerReads;
+  } else if(eventPollRequested==1) {
+    if(!gpioEvents.acquire()){eventStatus(irqLevel);return;}
+  }
+  uint8_t packet[18]={};++polls;
+  // Default retains the qualified 16ms polling baseline. The opt-in event
+  // path consumes only the masked falling-edge latch, with no idle fallback.
+  // Do not emit serial diagnostics between acknowledging RIS and the read.
+  const uint64_t started=eventPollRequested==1?mach_absolute_time():0;
   const E5Touch::Transfer result=bus.readRegister(0,packet,sizeof(packet));
+  const uint64_t ended=eventPollRequested==1?mach_absolute_time():0;
   const unsigned irqAfter=(read(gpio,0)>>13)&1;
+  const unsigned pendingAfter=eventPollRequested==1?((read(gpio,0x1c)>>13)&1):0;
   E5Input::Frame frame;
   const E5Input::PacketResult decoded=result==E5Touch::Transfer::Good?
       E5Input::decode(packet,sizeof(packet),frame):E5Input::PacketResult::Length;
+  if(irqRequested==1 && (irqState.reads<=64 || (irqState.reads%256)==0 ||
+      result!=E5Touch::Transfer::Good || decoded!=E5Input::PacketResult::Good))
+    note("E5TOUCH irq-read seq=%u consumed=%u batch=%u irq_tick=%llu start=%llu end=%llu work_context=%u irq=%u:%u pending=%u transfer=%u packet=%u",
+         irqState.reads,irqState.consumed,irqBatch,observed,started,ended,ml_at_interrupt_context()?1u:0u,
+         irqLevel,irqAfter,irqState.pending(),static_cast<unsigned>(result),static_cast<unsigned>(decoded));
+  if(irqRequested!=1 && eventPollRequested==1 && (gpioEvents.reads<=64 || (gpioEvents.reads%256)==0 ||
+      result!=E5Touch::Transfer::Good || decoded!=E5Input::PacketResult::Good))
+    note("E5TOUCH event-read seq=%u poll=%u observed=%llu start=%llu end=%llu irq=%u:%u pending_after=%u transfer=%u packet=%u",
+         gpioEvents.reads,gpioEvents.polls,observed,started,ended,irqLevel,irqAfter,pendingAfter,
+         static_cast<unsigned>(result),static_cast<unsigned>(decoded));
   if(result!=E5Touch::Transfer::Good || decoded!=E5Input::PacketResult::Good) {
     char raw[37];packetHex(packet,raw);
     ++bad;note("E5TOUCH error transfer=%u packet=%u bad=%u raw=%s status=%x irq=%u:%u",static_cast<unsigned>(result),static_cast<unsigned>(decoded),bad,raw,bus.lastStatus(),irqLevel,irqAfter);
     e5_touch_canvas_cancel(bad);
-    if(sink)sink(E5Input::Frame{},context);recover();return;
+    if(sink)sink(E5Input::Frame{},context);recover();
+    if(eventPollRequested==1)eventStatus(irqAfter);
+    return;
   }
   ++good;
   if(!havePrevious || memcmp(packet,previous,sizeof(packet))) {
@@ -336,5 +481,6 @@ extern "C" void e5_touch_poll(void (*sink)(const E5Input::Frame &,void *),void *
     }
     memcpy(previous,packet,sizeof(packet));havePrevious=true;lastCount=frame.count;
   }
-  if((polls%2048)==1)note("E5TOUCH status polls=%u good=%u bad=%u recoveries=%u mode=%u irq=%u (16ms polling)",polls,good,bad,recoveries,mode,irqLevel);
+  if(eventPollRequested==1)eventStatus(irqAfter);
+  else if((polls%2048)==1)note("E5TOUCH status polls=%u good=%u bad=%u recoveries=%u mode=%u irq=%u (16ms polling)",polls,good,bad,recoveries,mode,irqLevel);
 }

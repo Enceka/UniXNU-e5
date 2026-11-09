@@ -19,15 +19,20 @@
 #include <pexpert/pexpert.h>
 #include <kern/clock.h>
 #include <kern/thread_call.h>
+#include <IOKit/IOInterruptEventSource.h>
 #include <stdarg.h>
 
 extern "C" void e5_kputc(char);
 extern "C" kmod_info_t g_kernel_kmod_info;
 extern "C" void e5_touch_poll(void (*)(const E5Input::Frame &,void *),void *);
-extern "C" void e5_touch_stop(void);
+extern "C" bool e5_touch_stop(void);
+extern "C" void e5_touch_set_irq_source(IOInterruptEventSource *);
+extern "C" void e5_touch_irq_work(bool,unsigned);
 extern "C" bool e5_touch_ready(void);
+extern "C" unsigned e5_touch_poll_interval_ms(void);
 extern "C" bool e5_input_capture(unsigned);
 extern "C" bool e5_input_request_capture(unsigned);
+extern "C" unsigned e5_input_presented_frames(void);
 extern "C" bool e5_touch_canvas_selected(void);
 extern "C" void e5_touch_canvas_key(unsigned);
 
@@ -211,17 +216,23 @@ class E5HidDevice final:public IOHIDDevice {
   OSDeclareDefaultStructors(E5HidDevice)
   IOWorkLoop *loop=nullptr;
   IOTimerEventSource *timer=nullptr;
+  IOInterruptEventSource *touchIrq=nullptr;
+  bool stopRetained=false;
   bool driver=false,touch=false,probe=false,test=false,testDown=false,testDone=false,snapshots=false;
   bool touchTest=false,touchTestStarted=false,touchTestDone=false,touchSnapshot=false;
   bool touchOnly=false,splitTouch=false,digitizerDriver=false,hardwareActive=false;
   E5HidDevice *digitizer=nullptr;
-  unsigned ticks=0,reports=0,failures=0,lastDropped=0,testAt=450;
+  unsigned ticks=0,reports=0,failures=0,lastDropped=0,testAt=450,keySamples=0;
+  bool doubleHome=false;
+  unsigned homeClicks=0;
   unsigned homeAction=0,homeActions=1,homeActionLimit=1;
   uint32_t held=0;
   uint64_t testDeadline=0;
   uint64_t snapshotDeadline=0;
+  uint64_t uiCaptureDeadline=0;
+  unsigned uiCapturePeriod=0,uiCaptureId=300;
   unsigned snapshotStage=0,snapshotAttempts=0;
-  unsigned touchTestStep=0,touchTestKind=0;
+  unsigned touchTestStep=0,touchTestKind=0,touchTestRepeats=0;
   uint64_t touchTestDeadline=0;
   uint64_t hardwareQuietDeadline=0;
   E5Input::TouchState touches;
@@ -250,10 +261,12 @@ class E5HidDevice final:public IOHIDDevice {
     E5Input::KeyboardReport keyboard;E5Input::ConsumerReport consumer;
     E5Input::reports(state,keyboard,consumer);
     if(testDown && homeAction==0)consumer.buttons|=1;
-    if(reports<64)
+    if(reports<64 || (!strcmp(source,"matrix") && keySamples<256)) {
+      ++keySamples;
       note("E5HID keys source=%s held=%x modifiers=%x usages=%02x,%02x,%02x,%02x,%02x,%02x consumer=%x",
            source,state,unsigned(keyboard.modifiers),unsigned(keyboard.keys[0]),unsigned(keyboard.keys[1]),
            unsigned(keyboard.keys[2]),unsigned(keyboard.keys[3]),unsigned(keyboard.keys[4]),unsigned(keyboard.keys[5]),unsigned(consumer.buttons));
+    }
     send(&keyboard,sizeof(keyboard),source);send(&consumer,sizeof(consumer),source);
   }
   void sendHomeAction(bool down) {
@@ -294,11 +307,24 @@ class E5HidDevice final:public IOHIDDevice {
     // Mode 2 taps the fully visible Photos Dock icon and then leaves the UI
     // alone for the after-capture. The Settings icon is partly occluded in
     // R294, and the full gesture suite can disrupt an app-launch transition.
-    if(touchTestKind==2) {
-      if(step==0){frame.count=1;frame.contacts[0]={0,195,425,true};}
+    if(touchTestKind==2 || touchTestKind==3) {
+      const bool settings=touchTestKind==3;
+      if(step==0){frame.count=1;frame.contacts[0]={0,static_cast<uint16_t>(settings?122:195),static_cast<uint16_t>(settings?318:425),true};}
       emitTouch(frame,"selftest-touch");touchTestStarted=true;
-      note("E5HID selftest=touch phase=%u contacts=%u failed=%u target=photos-dock (synthetic)",step,frame.count,failures);
-      if(step==1){touchTestDone=true;note("E5HID selftest=touch complete=1 active=%u failed=%u (synthetic)",touches.previous.count,failures);}
+      note("E5HID selftest=touch phase=%u contacts=%u failed=%u target=%s (synthetic)",step,frame.count,failures,settings?"settings-se2":"photos-dock");
+      if(step==1) {
+        // R311: retry the identical tap once, 35s later. R310's first tap on
+        // a freshly-unlocked desktop produced only scroll states; the repeat
+        // lands on the settled layout. Real hardware activity still cancels
+        // the whole test, and the repeat is the same isolated down/up pair.
+        if(settings && touchTestRepeats<1) {
+          ++touchTestRepeats;touchTestStep=0;
+          clock_interval_to_deadline(35,1000000000,&touchTestDeadline);
+          note("E5HID selftest=touch repeat=%u scheduled=35s (synthetic)",touchTestRepeats);
+          return;
+        }
+        touchTestDone=true;note("E5HID selftest=touch complete=1 active=%u failed=%u repeats=%u (synthetic)",touches.previous.count,failures,touchTestRepeats);
+      }
       else clock_interval_to_deadline(100,1000000,&touchTestDeadline);
       return;
     }
@@ -317,6 +343,24 @@ class E5HidDevice final:public IOHIDDevice {
       const unsigned milliseconds=(step==1 || step==13)?500:(step>=2 && step<=12)?50:100;
       clock_interval_to_deadline(milliseconds,1000000,&touchTestDeadline);
     }
+  }
+  static void irqWork(OSObject *owner,IOInterruptEventSource *,int count) {
+    auto *self=OSDynamicCast(E5HidDevice,owner);if(!self || count<=0)return;
+    e5_touch_irq_work(true,static_cast<unsigned>(count));
+    const bool touchDriver=self->splitTouch?self->digitizerDriver:self->driver;
+    if(self->probe)e5_touch_poll(self->touch && touchDriver?touchReady:nullptr,self);
+    e5_touch_irq_work(false,0);
+  }
+  static IOReturn shutdownOnGate(OSObject *owner,void *,void *,void *,void *) {
+    auto *self=OSDynamicCast(E5HidDevice,owner);if(!self)return kIOReturnBadArgument;
+    self->testDown=false;self->sendKeys(0,"stop");
+    if(self->touch)touchReady(E5Input::Frame{},self);
+    if(self->probe && !e5_touch_stop())return kIOReturnTimeout;
+    if(self->touchIrq) {
+      self->touchIrq->disable();self->loop->removeEventSource(self->touchIrq);
+      OSSafeReleaseNULL(self->touchIrq);
+    }
+    return kIOReturnSuccess;
   }
   static void tick(OSObject *owner,IOTimerEventSource *source) {
     auto *self=OSDynamicCast(E5HidDevice,owner);if(!self)return;
@@ -343,21 +387,35 @@ class E5HidDevice final:public IOHIDDevice {
         e5_touch_canvas_key(self->held);
         self->sendKeys(self->held,"overflow-reconcile");
       }
-      if(self->test && !self->testDone && mach_absolute_time()>=self->testDeadline) {
+      // The isolated Settings test starts only after the original compositor
+      // has submitted actual frames; warm boot times vary across Data states.
+      if(self->test && !self->testDone && mach_absolute_time()>=self->testDeadline &&
+          (self->touchTestKind!=3 || e5_input_presented_frames()>=2)) {
         self->testDown=!self->testDown;
         self->sendHomeAction(self->testDown);
         const char *action=self->homeAction==0?"consumer-menu":self->homeAction==2?"return":"command-h";
         note("E5HID selftest=home down=%u driver=1 failures=%u action=%s",self->testDown?1:0,self->failures,action);
         if(self->testDown)clock_interval_to_deadline(100,1000000,&self->testDeadline);
+        else if(self->doubleHome) {
+          if(++self->homeClicks>=2)self->testDone=true;
+          else clock_interval_to_deadline(150,1000000,&self->testDeadline);
+        }
         else if(++self->homeAction>=self->homeActionLimit)self->testDone=true;
         else clock_interval_to_deadline(5,1000000000,&self->testDeadline);
+        if(self->testDone && self->touchTestKind==3)
+          // R311: 40s (was 10s). R310 proved Home unlocks, but the tap at
+          // +10s hit the still-settling desktop and only produced scroll
+          // states; R308's user-verified Settings tap happened on a desktop
+          // that had been up for minutes. Give SpringBoard time to finish
+          // icon layout before the synthetic tap.
+          clock_interval_to_deadline(40,1000000000,&self->touchTestDeadline);
       }
     }
     __atomic_store_n(&observedStage,6,__ATOMIC_RELAXED);
     const bool touchDriver=self->splitTouch?self->digitizerDriver:self->driver;
     if(self->probe)e5_touch_poll(self->touch && touchDriver?touchReady:nullptr,self);
     if(self->touch && touchDriver && self->touchTest && !self->touchTestDone && !self->hardwareActive &&
-        e5_touch_ready() && mach_absolute_time()>=self->touchTestDeadline &&
+        (self->touchTestKind==3?self->testDone:e5_touch_ready()) && mach_absolute_time()>=self->touchTestDeadline &&
         (!self->hardwareQuietDeadline || mach_absolute_time()>=self->hardwareQuietDeadline))self->testTouchStep();
     if(self->snapshots && self->snapshotStage<(self->touchSnapshot?3u:2u) && mach_absolute_time()>=self->snapshotDeadline) {
       __atomic_store_n(&observedStage,8,__ATOMIC_RELAXED);
@@ -368,10 +426,15 @@ class E5HidDevice final:public IOHIDDevice {
         clock_interval_to_deadline(seconds,1000000000,&self->snapshotDeadline);
       } else clock_interval_to_deadline(1,1000000000,&self->snapshotDeadline);
     }
+    if(self->uiCapturePeriod && mach_absolute_time()>=self->uiCaptureDeadline) {
+      const bool queued=e5_input_request_capture(self->uiCaptureId);
+      if(queued)++self->uiCaptureId;
+      clock_interval_to_deadline(queued?self->uiCapturePeriod:1,1000000000,&self->uiCaptureDeadline);
+    }
     if((self->ticks%2000)==1)note("E5HID status driver=%u polls=%u transitions=%u reports=%u failed=%u dropped=%u held=%x touch_driver=%u split=%u",
        self->driver?1:0,__atomic_load_n(&polls,__ATOMIC_RELAXED),__atomic_load_n(&physicalEvents,__ATOMIC_RELAXED),
        self->reports,self->failures,__atomic_load_n(&dropped,__ATOMIC_RELAXED),self->held,touchDriver?1:0,self->splitTouch?1:0);
-    __atomic_store_n(&observedStage,10,__ATOMIC_RELAXED);source->setTimeoutMS(16);
+    __atomic_store_n(&observedStage,10,__ATOMIC_RELAXED);source->setTimeoutMS(e5_touch_poll_interval_ms());
   }
 public:
   void setTouchOnly(){touchOnly=true;}
@@ -398,16 +461,20 @@ public:
     touch=touchOnly || (PE_parse_boot_argn("e5-touch",&touchMode,sizeof(touchMode)) && touchMode>=3);
     splitTouch=!touchOnly && touch && PE_parse_boot_argn("e5-touch-split",&splitMode,sizeof(splitMode)) && splitMode==1;
     probe=!touchOnly && touchMode>=1 && touchMode<=3;
-    test=!touchOnly && PE_parse_boot_argn("e5-hid-test",&testMode,sizeof(testMode)) && testMode>=1 && testMode<=4;
+    test=!touchOnly && PE_parse_boot_argn("e5-hid-test",&testMode,sizeof(testMode)) && testMode>=1 && testMode<=5;
+    doubleHome=testMode==5;
     homeAction=testMode==2?1:testMode==3?2:0;
-    homeActions=testMode==4?4:1;
+    homeActions=testMode==4?4:doubleHome?2:1;
     homeActionLimit=homeAction+homeActions;
     snapshots=!touchOnly && PE_parse_boot_argn("e5-hid-snapshot",&snapshotMode,sizeof(snapshotMode)) && snapshotMode==1;
-    touchTest=!touchOnly && PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode>=1 && touchTestMode<=2;
+    touchTest=!touchOnly && PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode>=1 && touchTestMode<=3;
     touchTestKind=touchTestMode;
     touchSnapshot=touchTest;
+    if(!touchOnly)PE_parse_boot_argn("e5-hid-ui-capture",&uiCapturePeriod,sizeof(uiCapturePeriod));
+    if(uiCapturePeriod<10 || uiCapturePeriod>60)uiCapturePeriod=0;
     if(!touchOnly && e5_touch_canvas_selected()) {
       test=false;touchTest=false;snapshots=false;touchSnapshot=false;
+      uiCapturePeriod=0;
       note("E5HID canvas=1 synthetic-tests=0 timed-ui-snapshots=0");
     }
     PE_parse_boot_argn("e5-hid-test-at",&testAt,sizeof(testAt));
@@ -425,9 +492,24 @@ public:
       note("E5HID touch-start=%u init=%u attach=%u",live?1:0,initialized?1:0,attached?1:0);
       if(!live){if(attached)digitizer->detach(provider);OSSafeReleaseNULL(digitizer);}
     }
+    unsigned irqMode=0;
+    if(probe && touchMode==3 && PE_parse_boot_argn("e5-touch-irq",&irqMode,sizeof(irqMode)) && irqMode==1) {
+      touchIrq=IOInterruptEventSource::interruptEventSource(this,irqWork,nullptr,0);
+      if(!touchIrq || loop->addEventSource(touchIrq)!=kIOReturnSuccess) {
+        OSSafeReleaseNULL(touchIrq);loop->removeEventSource(timer);OSSafeReleaseNULL(timer);
+        if(digitizer){digitizer->stop(provider);digitizer->detach(provider);OSSafeReleaseNULL(digitizer);}
+        IOHIDDevice::stop(provider);return false;
+      }
+      touchIrq->enable();e5_touch_set_irq_source(touchIrq);
+      note("E5HID touch-irq-event-source=1 provider=none workloop=owned");
+    }
     clock_interval_to_deadline(testAt,1000000000,&testDeadline);
     clock_interval_to_deadline(testAt>=40?testAt-10:testAt,1000000000,&snapshotDeadline);
     clock_interval_to_deadline(testAt+50,1000000000,&touchTestDeadline);
+    if(uiCapturePeriod) {
+      clock_interval_to_deadline(120,1000000000,&uiCaptureDeadline);
+      note("E5HID ui-captures period_s=%u start_s=120 first_id=300 source=retained-scanout-memory",uiCapturePeriod);
+    }
     note("E5HID options test=%u actions=%u snapshots=%u touch=%u touch_test=%u at=%u deadline=%llx",
          test?1:0,homeActions,snapshots?1:0,touch?1:0,touchTest?1:0,testAt,testDeadline);
     timer->setTimeoutMS(16);return true;
@@ -437,12 +519,14 @@ public:
     note("E5HID stop entered reports=%u held=%x",reports,held);
     __atomic_store_n(&enabled,0,__ATOMIC_RELEASE);
     if(timer){timer->cancelTimeout();loop->removeEventSource(timer);OSSafeReleaseNULL(timer);}
-    testDown=false;sendKeys(0,"stop");if(touch)touchReady(E5Input::Frame{},this);
-    if(probe)e5_touch_stop();
+    if(loop->runAction(shutdownOnGate,this)!=kIOReturnSuccess) {
+      if(!stopRetained){retain();stopRetained=true;}
+      note("E5HID stop retained=1 reason=irq-context-not-drained");return;
+    }
     if(digitizer){digitizer->stop(provider);digitizer->detach(provider);OSSafeReleaseNULL(digitizer);}
     IOHIDDevice::stop(provider);
   }
-  void free() override {OSSafeReleaseNULL(digitizer);OSSafeReleaseNULL(loop);IOHIDDevice::free();}
+  void free() override {OSSafeReleaseNULL(touchIrq);OSSafeReleaseNULL(digitizer);OSSafeReleaseNULL(loop);IOHIDDevice::free();}
 };
 OSDefineMetaClassAndStructors(E5HidDevice,IOHIDDevice)
 extern "C" void e5_hid_static_init(void) __asm__("__GLOBAL__sub_I_E5HidDevice.cpp");

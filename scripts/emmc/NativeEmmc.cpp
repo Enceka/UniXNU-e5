@@ -1847,6 +1847,7 @@ static E5DataDeviceEmmc *prepareDataDeviceEmmc(NativeEmmc *host) {
   elog("NativeEmmc: data media window %llu sectors, container %llu blocks %s\n",
        (unsigned long long)E5Data::sectors, (unsigned long long)containerBlocks,
        containerBlocks * 8 == E5Data::sectors ? "match" : "MISMATCH");
+  if (containerBlocks != E5Data::sectors / 8) return nullptr;
   E5DataDeviceEmmc *device = new E5DataDeviceEmmc;
   if (!device || !device->init(nullptr)) {
     if (device) device->release();

@@ -18,6 +18,15 @@
 #include <mach/mach_time.h>
 
 extern "C" unsigned e5_quiet;
+static unsigned e5CpuPresentedFrames;
+static unsigned e5GpuScanoutOwned;
+extern "C" bool e5_mali_g1_scanout_selected(void);
+extern "C" bool e5_display_gpu_scanout_owned(void) {
+  return __atomic_load_n(&e5GpuScanoutOwned, __ATOMIC_ACQUIRE) != 0;
+}
+extern "C" unsigned e5_input_presented_frames(void) {
+  return __atomic_load_n(&e5CpuPresentedFrames,__ATOMIC_ACQUIRE);
+}
 extern "C" IOMemoryDescriptor *e5_surface_descriptor(OSObject *);
 extern "C" uint64_t e5_surface_width(OSObject *), e5_surface_height(OSObject *);
 extern "C" uint64_t e5_surface_stride(OSObject *), e5_surface_allocation(OSObject *);
@@ -716,6 +725,8 @@ public:
     if (width != 320 || height != 480) return false;
     if (!startCpuPresenter()) return false;
     bootValidated = true;
+    if (cpu && cpu->gpuScanout)
+      __atomic_store_n(&e5GpuScanoutOwned, 1U, __ATOMIC_RELEASE);
     __atomic_fetch_or(&e5_display_lifecycle, 0x008U, __ATOMIC_RELAXED);
     return true;
   }

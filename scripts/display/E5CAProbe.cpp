@@ -112,10 +112,12 @@ struct ProcSnap {
   char imageText[16][48];
   Word slide, dyldStatus, lockBefore, lockAfter, lockReadBefore, lockReadAfter;
   Word stamp, seedGroup, seedIsa, seedBefore, seedAfter, seedReadBefore, seedReadAfter;
-  ThreadSnap thread[12];
+  Word objcBefore, objcAfter, objcReadBefore, objcReadAfter;
+  bool threadsTruncated;
+  ThreadSnap thread[64];
 };
-static const unsigned kMaxProcs = 10;
-static const unsigned kMaxThreads = 12;
+static const unsigned kMaxProcs = 12;
+static const unsigned kMaxThreads = 64;
 static const unsigned kFrames = 24;
 struct ProcSnaps { unsigned count; ProcSnap proc[kMaxProcs]; };
 // r219: rolling sample of each proc's first-thread pc across worker runs —
@@ -539,7 +541,8 @@ static void recordPcHistory(const ProcSnaps &snaps) {
     const ProcSnap &p = snaps.proc[i];
     const bool springboard = !strcmp(p.name, "SpringBoard");
     const bool lsd = !strcmp(p.name, "lsd");
-    if (!springboard && !lsd) continue;
+    const bool app=!strcmp(p.name,"Preferences") || !strcmp(p.name,"MobileSlideShow");
+    if (!springboard && !lsd && !app) continue;
     // The SB main thread plus lsd's first four threads — the lsd scan
     // workers are TH_RUN and only their pc/cpu trajectory distinguishes
     // forward progress from a spin or a scheduling stall.
@@ -566,9 +569,12 @@ static void recordPcHistory(const ProcSnaps &snaps) {
   pcHistory = buffer;
 }
 static void snapshotThreads(ProcSnaps &out) {
-  static const char *const wanted[] = {"SpringBoard", "liveactivitiesd", "chronod", "backboardd", "lsd",
+  static const char *const wanted[] = {"Preferences", "MobileSlideShow", "SpringBoard", "liveactivitiesd", "chronod", "backboardd", "lsd",
                                       "launchd", "logd", "runningboardd", "watchdogd"};
   bzero(&out, sizeof(out));
+  unsigned requestedThreads=12;
+  PE_parse_boot_argn("e5-ui-threads",&requestedThreads,sizeof(requestedThreads));
+  if(requestedThreads<12 || requestedThreads>kMaxThreads)requestedThreads=12;
   for (int pid = 1; pid < 512 && out.count < kMaxProcs; ++pid) {
     proc_t process = proc_find(pid);
     if (!process) continue;
@@ -594,7 +600,9 @@ static void snapshotThreads(ProcSnaps &out) {
     Reader r = {map, nullptr};
     const bool springboard = !strcmp(name, "SpringBoard");
     const bool lsd = !strcmp(name, "lsd");
-    const bool deep = springboard || lsd;
+    const bool deep = springboard || lsd || !strcmp(name,"Preferences") || !strcmp(name,"MobileSlideShow");
+    const bool sampleStacks=deep || !strcmp(name,"backboardd") ||
+        !strcmp(name,"liveactivitiesd") || !strcmp(name,"chronod");
     if (deep) {
       task_dyld_info_data_t dyld = {};
       mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;
@@ -666,6 +674,10 @@ static void snapshotThreads(ProcSnaps &out) {
           p.seedReadBefore = r.probeBytes(p.seedGroup + 0x30, &p.seedBefore, 8);
       }
     }
+    // The pinned cache UUID was checked above. runtimeLock is an original
+    // os_unfair_lock at unslid 0x1f4841580, not a LaunchServices lock.
+    if(deep && !p.dyldStatus)
+      p.objcReadBefore=r.probeBytes(0x1f4841580ULL+p.slide,&p.objcBefore,4);
     // Offsets checked in the pinned build's thread.o DWARF and pcb.o code:
     // task.threads=0x80, thread.task_threads=0x428 (container queue),
     // machine=0xf8, upcb=machine+0x18, cthread_self=machine+0x50,
@@ -674,7 +686,7 @@ static void snapshotThreads(ProcSnaps &out) {
     Word head = (Word)task + 0x80, th = 0;
     unsigned count = 0;
     if (kernelRead(head, &th, 8)) {
-      while (th != head && th && count != kMaxThreads) {
+      while (th != head && th && count != (deep?requestedThreads:12)) {
         ThreadSnap &t = p.thread[count++];
         Word next = 0;
         if (!kernelRead(th + 0x428, &next, 8)) { t.status = 5; break; }
@@ -712,9 +724,10 @@ static void snapshotThreads(ProcSnaps &out) {
     }
     task_unlock(task);
     p.threads = count;
+    p.threadsTruncated=th && th!=head;
     // r275: new boot-graph targets use only no-fault kernel snapshots.
     // Do not fault their userspace stacks in merely to observe a slow boot.
-    if (slot >= 5) {
+    if (!sampleStacks) {
       task_deallocate(task);
       continue;
     }
@@ -787,6 +800,7 @@ static void snapshotThreads(ProcSnaps &out) {
       }
     }
     if (deep && !p.dyldStatus) {
+      p.objcReadAfter=r.probeBytes(0x1f4841580ULL+p.slide,&p.objcAfter,4);
       p.lockReadAfter = r.probeBytes(0x1f4884878ULL + p.slide, &p.lockAfter, 8);
       if (lsd && p.seedReadBefore)
         p.seedReadAfter = r.probeBytes(p.seedGroup + 0x30, &p.seedAfter, 8);
@@ -958,9 +972,12 @@ extern "C" void e5_ca_probe_dump(void) {
   for (unsigned i = 0; i != threadLocal.count && i != kMaxProcs; ++i) {
     const ProcSnap &p = threadLocal.proc[i];
     log("E5THP i=%u pid=%u name=%s n=%u uid=%u ts=%llx", i,p.pid,p.name[0] ? p.name : "-",p.threads,p.uid,p.stamp);
+    log("E5THCAP pid=%u n=%u truncated=%u",p.pid,p.threads,p.threadsTruncated?1u:0u);
     const bool springboard = !strcmp(p.name, "SpringBoard");
     const bool lsd = !strcmp(p.name, "lsd");
-    const bool deep = springboard || lsd;
+    const bool deep = springboard || lsd || !strcmp(p.name,"Preferences") || !strcmp(p.name,"MobileSlideShow");
+    if(deep)log("E5OBJC pid=%u sl=%llx rd=%llu:%llu lock=%llx:%llx",p.pid,p.slide,
+        p.objcReadBefore,p.objcReadAfter,p.objcBefore,p.objcAfter);
     if (lsd)
       log("E5LSD pid=%u uid=%u sl=%llx kr=%llx gp=%llx isa=%llx rd=%llu:%llu raw=%llx:%llx lk=%llx:%llx",
           p.pid,p.uid,p.slide,p.dyldStatus,p.seedGroup,p.seedIsa,p.seedReadBefore,p.seedReadAfter,p.seedBefore,p.seedAfter,p.lockBefore,p.lockAfter);

@@ -67,14 +67,14 @@ int main() {
   assert(application==2 && depth==0 && bits[1]==64 && bits[2]==8);
   unsigned wired=0;for(const auto &key:Keys)wired+=key.linuxCode!=0;assert(wired==20);
   KeyboardReport k;ConsumerReport c;
-  reports(1u<<21,k,c);assert(c.buttons==0 && k.modifiers==8 && k.keys[0]==0x0b); // physical Menu -> Command-H
-  reports(0,k,c);assert(c.buttons==0 && k.modifiers==0 && k.keys[0]==0); // release GUI and H
-  reports((1u<<21)|(1u<<6),k,c);assert(k.modifiers==8 && k.keys[0]==0x52 && k.keys[1]==0x0b);
+  reports(1u<<21,k,c);assert(c.buttons==1 && k.modifiers==0 && k.keys[0]==0); // native iOS Home page0xC/usage0x40
+  reports(0,k,c);assert(c.buttons==0 && k.modifiers==0 && k.keys[0]==0);
+  reports((1u<<21)|(1u<<6),k,c);assert(c.buttons==1 && k.modifiers==0 && k.keys[0]==0x52 && k.keys[1]==0);
   reports(1u<<6,k,c);assert(k.modifiers==0 && k.keys[0]==0x52 && k.keys[1]==0);
   reports((1u<<4)|(1u<<3)|VolumeDown,k,c);assert(k.modifiers==2 && k.keys[0]==0x26 && k.keys[1]==0x20 && c.buttons==8);
   reports((1u<<5)|(1u<<6)|(1u<<7)|(1u<<8),k,c);
   assert(k.keys[0]==0x4f && k.keys[1]==0x52 && k.keys[2]==0x28 && k.keys[3]==0x50);
-  reports((1u<<28)-1,k,c);assert(k.keys[0]==1 && k.modifiers==10 && c.buttons==0);
+  reports((1u<<28)-1,k,c);assert(k.keys[0]==1 && k.modifiers==2 && c.buttons==1);
   MatrixState matrix;std::vector<uint32_t> events;
   auto emit=[&](uint32_t held){events.push_back(held);};
   matrix.update(0x11,0x77777730,false,emit);

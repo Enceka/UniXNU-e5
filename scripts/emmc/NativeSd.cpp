@@ -1407,20 +1407,28 @@ static bool publishData(E5DataDevice *device, NativeSd *host) {
   return true;
 }
 
-// Select the Data volume by its actual UUID, never by enumeration order.
+// The RAM seed and its grown eMMC copy share a volume UUID. Require the
+// eMMC Data provider as well: UUID-only matching selected the 32 MiB seed
+// even while the real 4 GiB window was published (R341).
 extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
   __atomic_store_n(&dataLookup, "match-alloc", __ATOMIC_RELAXED);
   OSDictionary *match = IOService::serviceMatching("IOMedia");
   OSDictionary *properties = OSDictionary::withCapacity(1);
+  OSDictionary *parent = IOService::serviceMatching("E5DataDeviceEmmc");
   OSString *uuid = OSString::withCString(E5Data::uuid);
-  if (!match || !properties || !uuid) {
+  if (!match || !properties || !parent || !uuid) {
     if (match) match->release();
     if (properties) properties->release();
+    if (parent) parent->release();
     if (uuid) uuid->release();
     return 0;
   }
-  bool ready = properties->setObject("UUID", uuid) && match->setObject(gIOPropertyMatchKey, properties);
-  properties->release(); uuid->release();
+  // IOService::matchPassive searches IOParentMatch anywhere up to the root,
+  // across the intervening APFS volume/container and block-storage services.
+  bool ready = properties->setObject("UUID", uuid) &&
+      match->setObject(gIOPropertyMatchKey, properties) &&
+      match->setObject("IOParentMatch", parent);
+  properties->release(); parent->release(); uuid->release();
   if (!ready) { __atomic_store_n(&dataLookup, "match-build", __ATOMIC_RELAXED); match->release(); return 0; }
   __atomic_store_n(&dataLookup, "waiting", __ATOMIC_RELAXED);
   IOService *volume = IOService::waitForMatchingService(match, 30ULL * 1000000000ULL);
@@ -1429,12 +1437,26 @@ extern "C" int e5_data_device(char *path, size_t size, int *major, int *minor) {
   OSString *name = OSDynamicCast(OSString, volume->getProperty("BSD Name"));
   OSNumber *maj = OSDynamicCast(OSNumber, volume->getProperty("BSD Major"));
   OSNumber *min = OSDynamicCast(OSNumber, volume->getProperty("BSD Minor"));
-  bool ok = name && maj && min && size > strlen(name->getCStringNoCopy()) + 5 &&
+  IOService *owner = volume;
+  for (unsigned depth = 0; owner && !owner->metaCast("E5DataDeviceEmmc") && depth < 24; ++depth)
+    owner = owner->getProvider();
+  IOBlockStorageDevice *device = owner && owner->metaCast("E5DataDeviceEmmc")
+      ? static_cast<IOBlockStorageDevice *>(owner) : nullptr;
+  UInt64 blockSize = 0, maxBlock = 0;
+  const bool geometry = device &&
+      device->reportBlockSize(&blockSize) == kIOReturnSuccess && blockSize == 512 &&
+      device->reportMaxValidBlock(&maxBlock) == kIOReturnSuccess && maxBlock == E5Data::sectors - 1;
+  bool ok = geometry && name && maj && min && size > strlen(name->getCStringNoCopy()) + 5 &&
       maj->unsigned64BitValue() <= 255 && min->unsigned64BitValue() <= 0xffffff;
   if (ok) {
     snprintf(path, size, "/dev/%s", name->getCStringNoCopy());
     *major = (int)maj->unsigned32BitValue(); *minor = (int)min->unsigned32BitValue();
-    sdlog("NativeSd: Data volume %s device %s\n", E5Data::uuid, path);
+    sdlog("E5DATA SELECT PASS uuid=%s device=%s backend=E5DataDeviceEmmc sectors=%llu bytes=%llu\n",
+          E5Data::uuid, path, (unsigned long long)(maxBlock + 1),
+          (unsigned long long)((maxBlock + 1) * blockSize));
+  } else {
+    sdlog("E5DATA SELECT FAIL geometry=%u block=%llu max=%llu\n", geometry,
+          (unsigned long long)blockSize, (unsigned long long)maxBlock);
   }
   __atomic_store_n(&dataLookup, ok ? "ready" : "bsd-missing", __ATOMIC_RELAXED);
   volume->release();
@@ -1549,5 +1571,11 @@ extern "C" int e5_display_start(void) {
   // G0: power the Mali up and read its identity once, after the display
   // service is up so probe MMIO never interleaves with early boot.
   if (PE_parse_boot_argn("e5-mali-on", nullptr, 0)) e5_mali_probe();
+  // R311: E5Mali G1 driver (lifecycle/MMU/BO/JM/UserClient). Inert without
+  // the e5-mali-g1 boot argument: no MMIO, no GIC, no service registration.
+  if (PE_parse_boot_argn("e5-mali-g1", nullptr, 0)) {
+    extern int e5_mali_g1_start(void *providerService);
+    e5_mali_g1_start(nub);
+  }
   return 0;
 }
