@@ -1,0 +1,28 @@
+{
+  "round": 378,
+  "status": "prepared; pending explicit duration authorization",
+  "kernel": {
+    "returncode": 0,
+    "elapsed_seconds": 25.467100124999998,
+    "kernel_sha256": "940b80b7a99743fb09d4ad3fc438e20a1ba371fc04c8c5b62bcaa094dde0f723"
+  },
+  "icd": {
+    "source": ".work/e5-gpu-active/mesa-ios/src/panfrost/vulkan/libvulkan_panfrost.dylib",
+    "target": ".work/e5-gpu-active/ra-vector/libvulkan_panfrost.dylib",
+    "libraries": [
+      "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+      "/usr/lib/libSystem.B.dylib",
+      "/usr/lib/libc++.1.dylib"
+    ],
+    "source_sha256": "e1ff99176ed2f86e58a4639f54eaa5bbbd41de94f5a989d9bdbba25144650268",
+    "sha256": "c677ea16120dd987a381c33d795fa6b398afd4adb75b99f1c3edd923605cca13",
+    "bindings": 7835,
+    "weak_symbols_to_self": 7640,
+    "ordinal_opcodes_changed": 1,
+    "strong_unresolved": [],
+    "signature_verified": true
+  },
+  "differential_tests": "PASS nodes=257 variant=0 old=0.000893 new=0.000599 speedup=1.49 constraints/affinity/live exact\nPASS nodes=257 variant=1 old=0.000669 new=0.000555 speedup=1.21 constraints/affinity/live exact\nPASS nodes=257 variant=2 old=0.000607 new=0.000532 speedup=1.14 constraints/affinity/live exact\nPASS nodes=257 variant=3 old=0.000562 new=0.000551 speedup=1.02 constraints/affinity/live exact\nPASS nodes=4096 variant=0 old=0.014384 new=0.001675 speedup=8.59 constraints/affinity/live exact\nPASS nodes=4096 variant=1 old=0.011865 new=0.001048 speedup=11.32 constraints/affinity/live exact\nPASS nodes=4096 variant=2 old=0.010826 new=0.001138 speedup=9.51 constraints/affinity/live exact\nPASS nodes=4096 variant=3 old=0.010321 new=0.001029 speedup=10.03 constraints/affinity/live exact\nPASS nodes=24000 variant=0 old=0.278814 new=0.010280 speedup=27.12 constraints/affinity/live exact\nPASS nodes=24000 variant=1 old=0.274341 new=0.009622 speedup=28.51 constraints/affinity/live exact\nPASS nodes=24000 variant=2 old=0.275243 new=0.009796 speedup=28.10 constraints/affinity/live exact\nPASS nodes=24000 variant=3 old=0.273635 new=0.009347 speedup=29.28 constraints/affinity/live exact\nPASS liveness nodes=259 blocks=32 cfg=0 old=0.000018 new=0.000004 speedup=4.50 all fixed-point component masks exact\nPASS liveness nodes=24576 blocks=256 cfg=1 old=0.004667 new=0.001258 speedup=3.71 all fixed-point component masks exact\nPASS liveness nodes=24576 blocks=256 cfg=2 old=0.005077 new=0.001724 speedup=2.94 all fixed-point component masks exact\n",
+  "host_resources": "        1.20 real         1.18 user         0.01 sys\n            69353472  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n                4385  page reclaims\n                  18  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                   0  voluntary context switches\n                 404  involuntary context switches\n         30379743444  instructions retired\n          5265889251  cycles elapsed\n            51282352  peak memory footprint\n",
+  "scope": "Sparse register interference plus disjoint liveness-array merges; navigation diagnostics. No translation semantics or shader budget changes."
+}

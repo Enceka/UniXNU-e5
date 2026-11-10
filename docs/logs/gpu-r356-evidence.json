@@ -1,0 +1,96 @@
+{
+  "round": 356,
+  "scope": "Exact generic varying stride candidate; no original UI qualification",
+  "kernel_sha256": "9a68eab64731b56a226ba9f608e3f0f0e84d8f649d3fa53a0235717365e1eb6d",
+  "inputs": {
+    "files": {
+      "probe.metallib": "6efbb6dcba1813623989d9e32c04f69c16f2664a1fd1c1d6728f2c51d66a3726",
+      "e5metal-probe": "0a3273f5fccf6886c5b3f30b6d6567c215dd6a98dd8d12c510d57b93ebcb026d",
+      "lib/libvulkan_panfrost.link-audit.json": "376613af1f0d1507dae748a08ac62391d861aa2539e5a692500e4f4f91e04d7b",
+      "lib/libvulkan_panfrost.dylib": "b9338c0e2ccd7d8ee78800f7f4ee7b3dddcc995e980990a0b11b5496cada7ecc",
+      "NativeE5Metal.bundle/NativeE5Metal": "ba26747603bc001e98e93f1f645bae65855b57ecbd6e81f60254d4ba9dd02903",
+      "NativeE5Metal.bundle/Info.plist": "744030aad04dc531396bbff6c6724024e69c72e64af89b97af6ea7e2327ed0e5",
+      "NativeE5Metal.bundle/_CodeSignature/CodeResources": "7d269767886b69539bf17beee4e59a956bf1a9adfb23cc891fbd7e96512262aa"
+    },
+    "binaries": [
+      {
+        "name": "e5metal-probe",
+        "relative_path": "e5metal-probe",
+        "sha256": "0a3273f5fccf6886c5b3f30b6d6567c215dd6a98dd8d12c510d57b93ebcb026d",
+        "cdhash": "7aa6cbffd88cc3a6e208c2a4537746de467282f2",
+        "bytes": 72864
+      },
+      {
+        "name": "libvulkan_panfrost.dylib",
+        "relative_path": "lib/libvulkan_panfrost.dylib",
+        "sha256": "b9338c0e2ccd7d8ee78800f7f4ee7b3dddcc995e980990a0b11b5496cada7ecc",
+        "cdhash": "a0acbcd7a7a8afd7be563a0569cdea5a5d41f301",
+        "bytes": 16784288
+      },
+      {
+        "name": "NativeE5Metal",
+        "relative_path": "NativeE5Metal.bundle/NativeE5Metal",
+        "sha256": "ba26747603bc001e98e93f1f645bae65855b57ecbd6e81f60254d4ba9dd02903",
+        "cdhash": "5b7d837e178284f75a3017d4ca479f8f8bbebcf4",
+        "bytes": 19354736
+      }
+    ],
+    "host_reference": {
+      "returncode": 0,
+      "elapsed_seconds": 0.6808612079999999,
+      "output": "E5MTL ENTRY pid=37134 reference=1\nE5MTL DEVICE Apple M5\nE5MTL VARY constant PASS mismatch=0 expected=37 actual=37,37,0,255 primitives=16 draws=2 fnv=3736682f769e0325\nE5MTL VARY vertex-id PASS mismatch=0 expected=15 actual=15,15,0,255 primitives=16 draws=2 fnv=931db5e2a3eba325\nE5MTL FETCH uint PASS mismatch=0 expected=232 actual=232,15,0,255 primitives=16 draws=2 fnv=27913629c1642325\nE5MTL FETCH unorm PASS mismatch=0 expected=120 actual=120,0,0,255 primitives=16 draws=2 fnv=88562405feafa325\nE5MTL VERDICT PASS\n"
+    }
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 940.025972208
+  },
+  "closeout": {
+    "round": 356,
+    "stage": "complete-data-verified",
+    "directory": "/Users/enceka/e5-work/sb-r356-varying-stride",
+    "at": "2026-11-10T04:09:53.871309+08:00"
+  },
+  "data_after": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "09ea4534b4fff30eae2de59995f701681871c3dd3383d91c62dcde63a5b71c0e",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r356-framebuffer-fetch-after/data-after.img",
+    "elapsed_seconds": 352.20184875000007,
+    "command": "dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none"
+  },
+  "observations": [
+    "E5MTL ENTRY pid=1 reference=0",
+    "E5MTL DEVICE Mali-G57 MC2",
+    "E5PANVK VARY pid=1 secondary=1 slots=3 packet=20 attr=4 spd=11815300 offset=768 preload=800000000000000 fau=5 flat=1",
+    "E5PANVK ROA pid=1 read=0 write=1 fpk=0 samples=1",
+    "E5PANVK VARY pid=1 secondary=1 slots=3 packet=20 attr=4 spd=11815300 offset=768 preload=800000000000000 fau=5 flat=1",
+    "E5PANVK ROA pid=1 read=0 write=1 fpk=0 samples=1",
+    "E5MTL VARY constant FAIL mismatch=4096 expected=37 actual=0,0,0,255 primitives=16 draws=2 fnv=6927fac75e74a325",
+    "E5PANVK VARY pid=1 secondary=1 slots=3 packet=20 attr=4 spd=11815480 offset=768 preload=1800000000000000 fau=5 flat=1",
+    "E5PANVK ROA pid=1 read=0 write=1 fpk=0 samples=1",
+    "E5PANVK VARY pid=1 secondary=1 slots=3 packet=20 attr=4 spd=11815480 offset=768 preload=1800000000000000 fau=5 flat=1",
+    "E5PANVK ROA pid=1 read=0 write=1 fpk=0 samples=1",
+    "E5MTL VARY vertex-id FAIL mismatch=4096 expected=15 actual=0,0,0,255 primitives=16 draws=2 fnv=cc349db36e965625",
+    "E5PANVK VARY pid=1 secondary=1 slots=3 packet=20 attr=4 spd=11815580 offset=768 preload=1800000000000000 fau=5 flat=1",
+    "E5PANVK ROA pid=1 read=1 write=1 fpk=0 samples=1",
+    "E5PANVK VARY pid=1 secondary=1 slots=3 packet=20 attr=4 spd=11815580 offset=768 preload=1800000000000000 fau=5 flat=1",
+    "E5PANVK ROA pid=1 read=1 write=1 fpk=0 samples=1",
+    "E5MTL FETCH uint FAIL mismatch=4096 expected=232 actual=240,0,0,255 primitives=16 draws=2 fnv=bcf6c7e1eb145425",
+    "E5PANVK VARY pid=1 secondary=1 slots=3 packet=20 attr=4 spd=118156c0 offset=768 preload=1800000000000000 fau=5 flat=1",
+    "E5PANVK ROA pid=1 read=1 write=1 fpk=0 samples=1",
+    "E5PANVK VARY pid=1 secondary=1 slots=3 packet=20 attr=4 spd=118156c0 offset=768 preload=1800000000000000 fau=5 flat=1",
+    "E5PANVK ROA pid=1 read=1 write=1 fpk=0 samples=1",
+    "E5MTL FETCH unorm FAIL mismatch=4096 expected=120 actual=165,165,165,165 primitives=16 draws=2 fnv=211e6ee4f7211485",
+    "E5MTL STATUS c4/0 d4 p4 x7 R4 D8 F0 M4 C0 B4 native-metal: device object ready 3239 ms after the open began | native-metal: no device answer: the device has no answer for supportsConditionalLoadStore",
+    "E5PANVK CLOSE sub=16 comp=16 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0 pid=1",
+    "E5PANVK CLOSE sub=16 comp=16 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0 pid=1",
+    "E5MTL CLOSE PASS",
+    "E5MTL CACHE-RELEASE PASS held_pages=0",
+    "E5MTL VERDICT FAIL",
+    "E5MTL HANDOFF launchd status=1"
+  ],
+  "verdict": "FAIL",
+  "physical_observation": "deferred"
+}

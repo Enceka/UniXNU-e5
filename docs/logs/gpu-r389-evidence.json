@@ -1,0 +1,16 @@
+{
+  "round": 389,
+  "device": "Rongyue E5 / UMS9621",
+  "os_profile": "ipados-17.7.11-21H461",
+  "result": "FAIL, deterministic reproduction of r388 (reproducibility control).",
+  "why_it_ran": "launch-round.py --drop-extra only strips keys from the inherited payload-command --extra-arg list; r388's payload builder had already written e5-frameinfo=0 into the baseline boot_b EFI/UniXNU/unixnu.toml args, and the r389 baseline was the device's post-r388 boot_b, so the value was inherited. Documented in uefi/build/sb-r389-frameinfo-default/launch-correction.json and kept as a control.",
+  "evidence": {
+    "same_failure_signature_as_r388": "main render client fi=0 all round; source_rgb never exceeded ~8k px; FRAMEROW ids 300-317 only; zero synthetic transitions; fps 19 presents mean 0.53 (r388: 22 presents mean 0.56).",
+    "shader_variance_note": "Same binaries as r388 yet compile costs differ per run (max 4.9s vs r388's 15.5s; r390 saw 19.4s) - multi-second compiles are a distribution, not fixed costs; per-run order varies."
+  },
+  "round_closeout": {
+    "runner_result": "rc0 1539.5s",
+    "postboot": "PASS 37/37",
+    "data_after_backup_sha256": "69ef6dae7f2473f68275c86a3483893b65f32f374c553ba3953c0140b0c0d77c"
+  }
+}

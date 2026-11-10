@@ -1,0 +1,73 @@
+{
+  "round": 390,
+  "device": "Rongyue E5 / UMS9621",
+  "os_profile": "ipados-17.7.11-21H461",
+  "result": "PASS functional: FrameInfo advertisement restored (e5-frameinfo=1). Desktop composited, full Settings navigation sequence completed with zero failures, Home returned to a real desktop, and Settings was re-opened after Home (first time past the r385-r387 failure boundary). FPS remains low and is now attributed with per-call measurements.",
+  "single_variable": "Boot args identical to r388/r389 except e5-frameinfo=1 vs inherited 0; kernel.macho, ICD and Data bytes unchanged across r388-r390.",
+  "visuals": {
+    "desktop": {
+      "reference": "docs/logs/ui-r390/desktop.png",
+      "sha256": "5324086656c9ab126368a7186fbd6454c01e8be39811471debced78aff555185"
+    },
+    "settings-opening-transition": {
+      "reference": "docs/logs/ui-r390/settings-opening-transition.png",
+      "sha256": "8dd9089c3af4f926255251fd9f683ac364b6948df6fcda311a7ff0c49ef109e7"
+    },
+    "settings-root": {
+      "reference": "docs/logs/ui-r390/settings-root.png",
+      "sha256": "3eb788de74093cd325ee8bd7d54b523a31dc684e9d2c5e106986abef9a38d2f8"
+    },
+    "settings-root-stable": {
+      "reference": "docs/logs/ui-r390/settings-root-stable.png",
+      "sha256": "b15c0bf5ba45ac9779a5ad68afcb7d826342c83facb863dafafc7cfd38bccd65"
+    },
+    "scroll": {
+      "reference": "docs/logs/ui-r390/scroll.png",
+      "sha256": "4ff01f044fd600f78338d0f89ec9609d0d99d51f1ab7086c2eef3a4d64b4c9a9"
+    },
+    "home-desktop": {
+      "reference": "docs/logs/ui-r390/home-desktop.png",
+      "sha256": "511f9d9552fc28622d690f5bd28e07bb059a6303bca24271bab11cb0ed7572e0"
+    },
+    "settings-reopen": {
+      "reference": "docs/logs/ui-r390/settings-reopen.png",
+      "sha256": "1291e8002df1bd12f321052e9a0de272d9ff7977a9b8163551caf0b7125234f7"
+    }
+  },
+  "visual_verification": "Each frame independently inspected as PNG: 600 desktop; 602 still desktop while Settings opening (transition lag, not a misrender); 604/606 fully rendered Settings root (设置 title, 登录 iPhone, 飞行模式 toggle, Wi-Fi 关闭, 通知, 声音, 专注模式 rows with chevrons); 618 Settings list near top (scroll phase executed with 17 releases and content pixel changes, but the sampled frame is not visibly offset - scroll visual proof weaker than r385); 620 real desktop after Home; 622 fully rendered re-opened Settings root.",
+  "inputs": [
+    "E5HID settings-sequence phase=0 action=open-settings release=1 held_ms=115 failures=0 frames=7 pixels=79135 ink=79135 (synthetic)",
+    "E5HID settings-sequence phase=2 action=open-row release=3 held_ms=115 failures=0 frames=9 pixels=84510 ink=84510 (synthetic)",
+    "E5HID settings-sequence phase=4 action=back release=5 held_ms=116 failures=0 frames=11 pixels=152783 ink=89934 (synthetic)",
+    "E5HID settings-sequence phase=6 action=scroll release=17 held_ms=1809 failures=0 frames=12 pixels=152780 ink=89914 (synthetic)",
+    "E5HID settings-sequence phase=18 action=home-down release=19 held_ms=115 failures=0 frames=19 pixels=153249 ink=105661 (synthetic)",
+    "E5HID settings-sequence phase=20 action=open-settings release=21 held_ms=116 failures=0 frames=21 pixels=79267 ink=79267 (synthetic)",
+    "E5HID settings-sequence complete=1 active=0 home_down=0 failures=0"
+  ],
+  "fps": {
+    "source": "uefi/build/sb-r390-frameinfo-restore/r390/capture/kernel.log",
+    "reported_intervals": {
+      "seconds": 77.0,
+      "presented": 35,
+      "mean_fps": 0.46
+    },
+    "intervals_with_input": {
+      "seconds": 11.0,
+      "presented": 2,
+      "mean_fps": 0.17
+    },
+    "scope": "Presenter-frame updates in reported windows only; not hardware vblank; user-perceived latency remains."
+  },
+  "bottleneck_measurements_first_instrumented_working_ui_session": {
+    "shader_compiles_backboardd": "17 sampled calls; call37 = 19.4s single shader (r388 saw 15.5s/15.1s/9.9s at boot). Multi-second compiles are real and recur inside the working session; pipeline cache is weak_ref mem_cache only (disk cache disabled in this Meson build), so eviction with pipeline destruction forces recompiles.",
+    "queue_submits_backboardd": "22 sampled SubmitWaitMany calls during boot+UI: 43 batches=1555ms, 86 batches=2259ms, 82=1316ms, 76=931ms/614ms, 93=857ms, 24=891ms, 9=723ms, 13=962ms/143ms; per-atom kernel overhead ~4-6ms with individual GPU jobs ~100us (see r388 gpu-perf). The synchronous submit+wait serializes the CPU presenter against full GPU completion of large batch sets.",
+    "per_atom": "r388 E5GPUPERF samples: submit_sync median ~2ms, hw median ~0.1-30ms, retire_sync ~2ms."
+  },
+  "round_closeout": {
+    "runner_result": "rc0 1549.5s",
+    "postboot": "PASS 37/37",
+    "data_after_backup_sha256": "479f280ef7dc5918e0e3cefff03ec5e9798d8f2ee2188bcb76cb080026626299",
+    "data_before_reused_from": "r389 after-backup 69ef6dae7f2473f68275c86a3483893b65f32f374c553ba3953c0140b0c0d77c (live sha match, zero Data writes)"
+  },
+  "scope": "Presenter destination memory PNGs plus kernel-side counters; physical panel output still needs independent observation. Automation input is synthetic (kernel HID)."
+}

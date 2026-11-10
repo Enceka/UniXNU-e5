@@ -1,0 +1,345 @@
+{
+  "round": 376,
+  "result": "NOT QUALIFIED: input was delivered but the scanout remained on the lock screen.",
+  "home_and_touch_events": [
+    "E5HID selftest=home down=1 driver=1 failures=0 action=consumer-menu",
+    "E5HID selftest=home down=0 driver=1 failures=0 action=consumer-menu",
+    "E5HID selftest=touch phase=0 contacts=1 failed=0 target=settings-se2 (synthetic)",
+    "E5HID selftest=touch phase=1 contacts=0 failed=0 target=settings-se2 (synthetic)",
+    "E5HID selftest=touch repeat=1 scheduled=35s (synthetic)",
+    "E5HID selftest=touch phase=0 contacts=1 failed=0 target=settings-se2 (synthetic)",
+    "E5HID selftest=touch phase=1 contacts=0 failed=0 target=settings-se2 (synthetic)",
+    "E5HID selftest=touch complete=1 active=0 failed=0 repeats=1 (synthetic)"
+  ],
+  "copies": [
+    "E5CPU copied=1 retired=1 failed=0 blank=0",
+    "E5CPU copied=2 retired=2 failed=0 blank=0"
+  ],
+  "ui_completions": [
+    "E5METAL pid=57 UI completed=1 local_failed=0 draws=31 dispatches=0 blits=5",
+    "E5METAL pid=57 UI completed=2 local_failed=0 draws=68 dispatches=0 blits=5"
+  ],
+  "blocking_stacks": [
+    {
+      "thread": 4,
+      "symbols": [
+        {
+          "image": "/usr/lib/system/libsystem_kernel.dylib",
+          "symbol": "___psynch_cvwait",
+          "symbol_va": "0x1cb78619c",
+          "offset": "0x8",
+          "va": "0x1cb7861a4"
+        },
+        {
+          "image": "/usr/lib/system/libsystem_pthread.dylib",
+          "symbol": "__pthread_cond_wait$VARIANT$armv81",
+          "symbol_va": "0x1dd629b7c",
+          "offset": "0x4ec",
+          "va": "0x1dd62a068"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<std::sys::sync::condvar::pthread::Condvar>::wait_timeout",
+          "offset": "0xb8",
+          "unslid": "0xca7d84"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<metal2vulkan_runtime::pipeline::budget::Budget>::take",
+          "offset": "0x4d8",
+          "unslid": "0x969b74"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "metal2vulkan_runtime::pipeline::budget::program_turn",
+          "offset": "0xb4",
+          "unslid": "0x9640e0"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<metal2vulkan_runtime::pipeline::objects::VariantObjects>::graphics_pipeline",
+          "offset": "0x750",
+          "unslid": "0xa18770"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<<metal2vulkan_runtime::pipeline::render::RenderVariant>::make_at_creation::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}",
+          "offset": "0x254",
+          "unslid": "0xaa5b68"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<metal2vulkan_runtime::pipeline::render::GraphicsState>::make_at_creation",
+          "offset": "0x2458",
+          "unslid": "0xaa315c"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "std::thread::scoped::scope::<<metal2vulkan_runtime::pipeline::render::GraphicsState>::create_reflecting::{closure#3}, core::result::Result<(metal2vulkan_runtime::pipeline::render::GraphicsState, core::option::Option<metal2vulkan_runtime::pipeline::render::Reflected>), metal2vulkan_runtime::error::Error>>",
+          "offset": "0x30e0",
+          "unslid": "0xa9dae8"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<metal2vulkan_runtime::pipeline::render::GraphicsState>::create_reflecting",
+          "offset": "0x1478",
+          "unslid": "0x9853e0"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "_nmb_render_pipeline_new_with_options",
+          "offset": "0xdc",
+          "unslid": "0x891b0"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "-[NBDeviceMethods newRenderPipelineStateWithDescriptor:options:reflection:error:]",
+          "offset": "0xe4",
+          "unslid": "0x2a2cc"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL12MetalContext21create_pipeline_stateERKNS1_8Pipeline4SpecEPjPNSt3__16atomicIbEE",
+          "symbol_va": "0x18956c000",
+          "offset": "0x214",
+          "va": "0x18956c214"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL12MetalContext4drawE16MTLPrimitiveTypejjPKvmmjjPKtPKNS0_9ClipPlaneEPKNS0_15MetalBufferPool11MetalBufferE",
+          "symbol_va": "0x18942bb44",
+          "offset": "0x29a4",
+          "va": "0x18942e4e8"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL12MetalContext13draw_elementsENS0_13PrimitiveModeEjPKtPKNS0_6VertexEjjPKNS0_9ClipPlaneE",
+          "symbol_va": "0x18943e6fc",
+          "offset": "0x7c",
+          "va": "0x18943e778"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL7Context12ClippedArray9next_rectERNS_6BoundsE",
+          "symbol_va": "0x18943e280",
+          "offset": "0x244",
+          "va": "0x18943e4c4"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL18emit_one_part_rectERNS0_7ContextERKNS0_9RectStateEPKfS7_j",
+          "symbol_va": "0x18943dfa0",
+          "offset": "0xe4",
+          "va": "0x18943e084"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL13fill_rect_texERNS0_7ContextERKNS0_9RectStateEPKf",
+          "symbol_va": "0x18943cea4",
+          "offset": "0x114",
+          "va": "0x18943cfb8"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZNK2CA3OGL16ContentsGeometry15fill_and_unbindERNS0_7ContextEPNS0_5ImageE",
+          "symbol_va": "0x18943c6f8",
+          "offset": "0x340",
+          "va": "0x18943ca38"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL26render_contents_backgroundERNS0_8RendererEPKNS0_5LayerE",
+          "symbol_va": "0x18944a430",
+          "offset": "0x1250",
+          "va": "0x18944b680"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL9LayerNode5applyEfPPNS0_7SurfaceEPf",
+          "symbol_va": "0x1894364a4",
+          "offset": "0x54",
+          "va": "0x1894364f8"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL11ImagingNode6renderEPNS1_13RenderClosureEj",
+          "symbol_va": "0x189436098",
+          "offset": "0x2b0",
+          "va": "0x189436348"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL13render_layersERNS0_8RendererEPNS0_5LayerE",
+          "symbol_va": "0x189435b10",
+          "offset": "0x18c",
+          "va": "0x189435c9c"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL9LayerNode5applyEfPPNS0_7SurfaceEPf",
+          "symbol_va": "0x1894364a4",
+          "offset": "0xa4",
+          "va": "0x189436548"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL11ImagingNode6renderEPNS1_13RenderClosureEj",
+          "symbol_va": "0x189436098",
+          "offset": "0x2b0",
+          "va": "0x189436348"
+        },
+        {
+          "image": "/System/Library/Frameworks/QuartzCore.framework/QuartzCore",
+          "symbol": "__ZN2CA3OGL13render_layersERNS0_8RendererEPNS0_5LayerE",
+          "symbol_va": "0x189435b10",
+          "offset": "0x18c",
+          "va": "0x189435c9c"
+        }
+      ]
+    },
+    {
+      "thread": 12,
+      "symbols": [
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_bi_allocate_registers",
+          "offset": "0x554",
+          "unslid": "0x3e047c"
+        },
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_bi_allocate_registers",
+          "offset": "0x420",
+          "unslid": "0x3e0348"
+        },
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_bi_register_allocate",
+          "offset": "0x1004",
+          "unslid": "0x3ded6c"
+        },
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_bi_compile_variant",
+          "offset": "0x7c0",
+          "unslid": "0x3e6c18"
+        },
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_bifrost_compile_shader_nir",
+          "offset": "0x6f0",
+          "unslid": "0x40c338"
+        },
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_panvk_compile_nir",
+          "offset": "0x534",
+          "unslid": "0x7c140"
+        },
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_panvk_compile_shader",
+          "offset": "0x8e8",
+          "unslid": "0x783c8"
+        },
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_panvk_compile_shaders",
+          "offset": "0x124",
+          "unslid": "0x77058"
+        },
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_vk_compile_shaders",
+          "offset": "0x38",
+          "unslid": "0x12f4d0"
+        },
+        {
+          "image": "libvulkan_panfrost.dylib",
+          "symbol": "_vk_common_CreateComputePipelines",
+          "offset": "0x45c",
+          "unslid": "0x1275cc"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "metal2vulkan_runtime::device::compiles::create_compute_pipelines",
+          "offset": "0x9c",
+          "unslid": "0xbcda54"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<metal2vulkan_runtime::device::Device>::owned_kernel",
+          "offset": "0x2efc",
+          "unslid": "0x9eba6c"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<metal2vulkan_runtime::render::RenderCommandEncoder>::capture_steps",
+          "offset": "0xe0",
+          "unslid": "0xc1cb5c"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<metal2vulkan_runtime::render::RenderCommandEncoder>::end_pass",
+          "offset": "0x4e80",
+          "unslid": "0xc10310"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "<metal2vulkan_runtime::render::RenderCommandEncoder>::end_encoding",
+          "offset": "0x30",
+          "unslid": "0xc66c9c"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "_nmb_encoder_end",
+          "offset": "0x64",
+          "unslid": "0x7d844"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "void EncodeBatch::add<-[NBEncoder endEncoding]::$_0>(-[NBEncoder endEncoding]::$_0&&)::'lambda'(void*)::__invoke(void*)",
+          "offset": "0x24",
+          "unslid": "0x3e280"
+        },
+        {
+          "image": "NativeE5Metal",
+          "symbol": "encodeThread()::$_0::operator()() const::'lambda'(void*)::__invoke(void*)",
+          "offset": "0x290",
+          "unslid": "0x37dc8"
+        },
+        {
+          "image": "/usr/lib/system/libsystem_pthread.dylib",
+          "symbol": "__pthread_start",
+          "symbol_va": "0x1dd6237c4",
+          "offset": "0x68",
+          "va": "0x1dd62382c"
+        },
+        {
+          "image": "/usr/lib/system/libsystem_pthread.dylib",
+          "symbol": "_thread_start",
+          "symbol_va": "0x1dd61fcd0",
+          "offset": "0x8",
+          "va": "0x1dd61fcd8"
+        }
+      ]
+    }
+  ],
+  "recovery": "complete-data-verified",
+  "windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "e96171ad70f4b218745fca532913b77f6436e2a1373066551f37570f3b2d4d53",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r376-settings-after/data-after.img",
+    "elapsed_seconds": 69.65465337499995,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  },
+  "next_change": "Construct Bifrost register interference from nonzero live nodes, preserving all constraints; fix unaligned imported-memory cache ranges."
+}

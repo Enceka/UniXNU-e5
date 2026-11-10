@@ -1,0 +1,99 @@
+{
+  "round": 348,
+  "scope": "Native E5 PanVK compute and offscreen graphics through IOKit; Metal and original UI remain unqualified",
+  "kernel_sha256": "f26bce60613170ceb1c727d44d6d895137c7d945f49613a0613c00ebccc6f10d",
+  "binaries": [
+    {
+      "name": "e5vk-probe",
+      "sha256": "0e799aed35d74e9c0fd8b0426f84d355be56e7d2eec74c4337556a63676dc75c",
+      "cdhash": "0ba6fa8c26a44b8a4872f118688cb86a96d1a1f4",
+      "bytes": 67632
+    },
+    {
+      "name": "libvulkan_panfrost.dylib",
+      "sha256": "d9752acf3ec33ba98ec999738c119e220d43d0994a80db78dda1ced9c0bcef69",
+      "cdhash": "bfd366468545e31ecc632ae5f9b9a15fecd7b61c",
+      "bytes": 16784128
+    }
+  ],
+  "frozen_mesa_sources": {
+    "meson.build": "ed9db959a26cbe948b013e1d233f04be2616e780db582b35182de4a511d07d50",
+    "meson.options": "287b751a455e1a00d1a03abf39a1d3bdd348afed8173a472f33daeb7c80c662d",
+    "src/panfrost/lib/kmod/kbase_kmod.h": "50060a71a6e11c2e6953a9aa8e7de84b1937ac6b8363d88f7b0147cf82fa2e2b",
+    "src/panfrost/lib/kmod/meson.build": "bfb04d707854a2f504d12872ab672be19d3988abfb902c12a577f139d12bc8fa",
+    "src/panfrost/lib/kmod/pan_kmod.c": "ed26a9163bea8746adbd67e8ca2359677dce7aea388180b007ccc1c69ba61bad",
+    "src/panfrost/lib/kmod/pan_kmod.h": "38d71f9ef5275d6bc26444652f03729e536216d73feda6ed569c305fa6951296",
+    "src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c": "0b81263d9775e1c2a65cc92b5b122bb4c67f41aea091d56df0ee79a1e097eb2a",
+    "src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c": "8e643188c307217baef9ea39c51477b7c5a0e67d0516797252c996c0dd5d3b89",
+    "src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c": "21aef38f0d0b0add5a8fca20dca70aba293f5d933187fc605d3a2ed0bb527c8e",
+    "src/panfrost/vulkan/panvk_device.h": "b44532ae524f29e7c8857406a11a5bb70f67e26098f2a42bfb98d1b8ad861ab7",
+    "src/panfrost/vulkan/panvk_instance.c": "b3c67c0516ee7583e7eb7b69dc0e9db7c3843837b07762917156d5e096f23d3d",
+    "src/panfrost/vulkan/panvk_physical_device.c": "c4e0a0976bf6aa1ebe7723cb295bb5e05d481db531ca30d142cef8f00491a0f1",
+    "src/panfrost/vulkan/panvk_physical_device.h": "fe7fd6ae30e05f273f6ab888498d741fd5887f89bc9280abaa31789f7d98db9e",
+    "src/panfrost/vulkan/panvk_vX_device.c": "577f59ee41408d756c25bfc2627d3dff27b6d7f44f2b1651ef6902bfc95ac016",
+    "src/panfrost/vulkan/panvk_vX_physical_device.c": "44b48db72c854dcf80695f92f1c3b1e1333ed3a6ac9b7cd1b6bfc4d6b8ecab44",
+    "src/vulkan/runtime/vk_android.c": "e707cefcb8722a0a079abffa57a865c8c155ea03a2cdeddacfd7ce991c4da055",
+    "src/vulkan/runtime/vk_device.c": "e4fd379abae526869caf84908c9102b6e0e89aa4a531f027d8f5c951c79c3624",
+    "src/vulkan/runtime/vk_fence.c": "4d7165f9396d6be926c96a014227d561a36843264a776edb25c5d975fa439219",
+    "src/vulkan/runtime/vk_image.c": "babcf0253dda942336a02572b99bbdd484c6e88bfeda2476c3b5f8b112b9eb24",
+    "src/vulkan/runtime/vk_image.h": "529ac48a2dcb0c37054bcdc32e2e7b995249202f429dd695c8c4b777d668e95e",
+    "src/vulkan/runtime/vk_queue.c": "77d790420ae02c44974bd7bb5c88caa950452565bbaa380b61bdc49c0bb45e13",
+    "src/vulkan/runtime/vk_semaphore.c": "385224e81054c0ea042865ff5e385fcf12ef95bb342ad6189e7f99c712b8d293",
+    "src/vulkan/wsi/wsi_common.c": "853e3f36cd6c089c63122cf9adf26e4ff9f0f588d6f57e32744856ee2e31bd6e",
+    "src/panfrost/lib/kmod/e5_kmod.c": "59b47d5a7691028a3663c88193023db27795fd618f64fbd6cf6f46ece038045b"
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 1240.32295475
+  },
+  "protected_windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  },
+  "android": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "caa49124-7dc5-4b40-b33e-fc5ee4cac4dc",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "data_after_sha256": "2d976207567ffdcab7ab26e24e013d155fa7d884bd556816e72bdb0ee3ab2209",
+  "data_after_bytes": 4294967296,
+  "log_sha256": "34ca99c49cfa22971e40b23514822c5b89d6724f593d5d215a214ab7bdb66dd7",
+  "observed": [
+    "E5UL|E5VK ENTRY pid=1",
+    "E5UL|E5VK DLOPEN /private/var/mobile/e5gpu-stage/lib/libvulkan_panfrost.dylib",
+    "E5REG3 0 0 0 0E5DPU t=1310 ctl=0 duty=19 crc=11b0af80 v=0 wdt=a af=20 gl=0 n3=0 0 0 0 0 0 0E5UL|E5VK ICD base=0x101d98000 entry=0x101da6374",
+    "E5UL|E5PANVK OPEN sub=0 comp=0 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0",
+    "E5UL|E5VK DEVICE Mali-G57 MC2 vendor=13b5 device=90910010 api=403162",
+    "E5UL|E5VK CACHE atom=64",
+    "E5UL|E5PANVK OPEN sub=0 comp=0 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0",
+    "E5UL|E5VK SETUP PASS",
+    "E5UL|E5VK COMPUTE PASS mismatch=0 first=17 last=1046546 fnv=310a459ce171d7db",
+    "E5UL|E5VK TRIANGLE PASS mismatch=0 inside=28800 yellow=28800 fnv=417503084e2ac225",
+    "E5UL|E5VK IDLE rc=0",
+    "E5UL|E5PANVK CLOSE sub=4 comp=4 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0",
+    "E5UL|E5PANVK CLOSE sub=4 comp=4 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0",
+    "E5UL|E5VK VERDICT PASS",
+    "E5UL|E5VK HANDOFF launchd status=0"
+  ],
+  "compute": {
+    "values": 1024,
+    "mismatches": 0,
+    "fnv": "310a459ce171d7db"
+  },
+  "graphics": {
+    "width": 320,
+    "height": 480,
+    "format": "RGBA8Unorm",
+    "inside": 28800,
+    "mismatches": 0,
+    "fnv": "417503084e2ac225"
+  },
+  "submitted": 4,
+  "completed": 4,
+  "errors": 0,
+  "final_client_resources": 0,
+  "physical_observation": false
+}

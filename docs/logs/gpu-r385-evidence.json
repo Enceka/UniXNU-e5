@@ -1,0 +1,61 @@
+{
+  "round": 385,
+  "device": "Rongyue E5 / UMS9621",
+  "os_profile": "ipados-17.7.11-21H461",
+  "result": "Settings root, Notifications, Back and scroll captured; physical input cancelled automation before Home/reopen. Full interaction NOT qualified.",
+  "visuals": {
+    "desktop": {
+      "reference": "docs/logs/ui-r385/desktop.png",
+      "sha256": "5324086656c9ab126368a7186fbd6454c01e8be39811471debced78aff555185"
+    },
+    "settings-root": {
+      "reference": "docs/logs/ui-r385/settings-root.png",
+      "sha256": "3eb788de74093cd325ee8bd7d54b523a31dc684e9d2c5e106986abef9a38d2f8"
+    },
+    "notifications": {
+      "reference": "docs/logs/ui-r385/notifications.png",
+      "sha256": "814cf00c7dee189b5cbda73a23256847a722c98202f4ee433a7bd991cc46cd9f"
+    },
+    "back-to-settings": {
+      "reference": "docs/logs/ui-r385/back-to-settings.png",
+      "sha256": "a676d7ffdd1a2e87de9e20c129aa5c00ba20d356bf7b8972c12b7339c83954d3"
+    },
+    "scroll": {
+      "reference": "docs/logs/ui-r385/scroll.png",
+      "sha256": "4ff01f044fd600f78338d0f89ec9609d0d99d51f1ab7086c2eef3a4d64b4c9a9"
+    }
+  },
+  "kernel": {
+    "returncode": 0,
+    "elapsed_seconds": 25.229213167,
+    "kernel_sha256": "147551d771a395cf706018cc3146acf01bb13352c87de81ea92b85ece6a9e12e"
+  },
+  "inputs": [
+    "E5HID settings-sequence phase=0 action=open-settings release=1 held_ms=100 failures=0 frames=6 pixels=79135 ink=79135 (synthetic)",
+    "E5HID settings-sequence phase=2 action=open-row release=3 held_ms=114 failures=0 frames=15 pixels=152783 ink=89934 (synthetic)",
+    "E5HID settings-sequence phase=4 action=back release=5 held_ms=115 failures=0 frames=19 pixels=153316 ink=96763 (synthetic)",
+    "E5HID settings-sequence phase=6 action=scroll release=17 held_ms=1807 failures=0 frames=23 pixels=152781 ink=89925 (synthetic)",
+    "E5HID settings-sequence cancelled=1 hardware=touch"
+  ],
+  "recovery": {
+    "round": 385,
+    "stage": "complete-data-verified",
+    "directory": "/Volumes/Projects/e5-xnu/uefi/build/sb-r385-settings-navigation",
+    "at": "2026-11-10T22:30:41.861126+08:00"
+  },
+  "windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "c87328bea83aa9c706cd4033dff575e7bc9f8d3fd0d3e4ad9aab6d0204e71daa",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r385-settings-navigation-after/data-after.img",
+    "elapsed_seconds": 72.86480837500001,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  }
+}

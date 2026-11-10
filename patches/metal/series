@@ -1,0 +1,3 @@
+native-e5-frontend.patch
+e5-encoder-error-context.patch
+e5-compile-concurrency-bridge.patch

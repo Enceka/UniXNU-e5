@@ -1,0 +1,105 @@
+{
+  "round": 379,
+  "result": "SDR BGRA native GPU presentation and desktop visible; Settings NOT qualified because diagnostic used old icon coordinates.",
+  "format": "BGRA / 0x42475241 / non-planar",
+  "frame_evidence": {
+    "desktop": "/Volumes/Projects/e5-xnu/.work/e5-gpu-active/r379-frames/frame-76-371.png",
+    "observed_settings_icon": [
+      200,
+      186
+    ],
+    "old_test_coordinate": [
+      122,
+      318
+    ]
+  },
+  "copies": [
+    "E5CPU copied=1 retired=1 failed=0 blank=0",
+    "E5CPU copied=2 retired=2 failed=0 blank=0",
+    "E5CPU copied=3 retired=3 failed=0 blank=0",
+    "E5CPU copied=4 retired=4 failed=0 blank=0",
+    "E5CPU copied=5 retired=5 failed=0 blank=0",
+    "E5CPU copied=6 retired=6 failed=0 blank=0",
+    "E5CPU copied=7 retired=7 failed=0 blank=0",
+    "E5CPU copied=8 retired=8 failed=0 blank=0",
+    "E5CPU copied=9 retired=9 failed=0 blank=0",
+    "E5CPU copied=10 retired=10 failed=0 blank=0",
+    "E5CPU copied=11 retired=11 failed=0 blank=0",
+    "E5CPU copied=12 retired=12 failed=0 blank=0",
+    "E5CPU copied=13 retired=13 failed=0 blank=0",
+    "E5CPU copied=14 retired=14 failed=0 blank=0",
+    "E5CPU copied=15 retired=15 failed=0 blank=0",
+    "E5CPU copied=16 retired=16 failed=0 blank=0"
+  ],
+  "ui_completions": [
+    "E5METAL pid=57 UI completed=1 local_failed=0 draws=31 dispatches=0 blits=2",
+    "E5METAL pid=57 UI completed=2 local_failed=0 draws=61 dispatches=0 blits=2",
+    "E5METAL pid=57 UI completed=3 local_failed=0 draws=84 dispatches=0 blits=2",
+    "E5METAL pid=57 UI completed=4 local_failed=0 draws=93 dispatches=0 blits=2",
+    "E5METAL pid=57 UI completed=5 local_failed=0 draws=112 dispatches=0 blits=2",
+    "E5METAL pid=57 UI completed=6 local_failed=0 draws=127 dispatches=0 blits=2",
+    "E5METAL pid=57 UI completed=8 local_failed=0 draws=170 dispatches=0 blits=2",
+    "E5METAL pid=57 UI completed=16 local_failed=0 draws=420 dispatches=0 blits=2"
+  ],
+  "input_sequence": [
+    "E5HID selftest=home down=1 driver=1 failures=0 action=consumer-menu",
+    "E5HID selftest=home down=0 driver=1 failures=0 action=consumer-menu",
+    "E5HID settings-sequence phase=0 action=open-settings x=122 y=318 contacts=1 failures=0 frames=4 (synthetic)",
+    "E5HID settings-sequence phase=1 action=release x=0 y=0 contacts=0 failures=0 frames=4 (synthetic)",
+    "E5HID settings-sequence phase=2 action=open-row x=120 y=200 contacts=1 failures=0 frames=5 (synthetic)",
+    "E5HID settings-sequence phase=3 action=release x=0 y=0 contacts=0 failures=0 frames=5 (synthetic)",
+    "E5HID settings-sequence phase=4 action=back x=18 y=43 contacts=1 failures=0 frames=6 (synthetic)",
+    "E5HID settings-sequence phase=5 action=release x=0 y=0 contacts=0 failures=0 frames=6 (synthetic)",
+    "E5HID settings-sequence phase=6 action=scroll x=160 y=390 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=7 action=scroll x=160 y=370 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=8 action=scroll x=160 y=350 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=9 action=scroll x=160 y=330 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=10 action=scroll x=160 y=310 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=11 action=scroll x=160 y=290 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=12 action=scroll x=160 y=270 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=13 action=scroll x=160 y=250 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=14 action=scroll x=160 y=230 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=15 action=scroll x=160 y=210 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=16 action=scroll x=160 y=190 contacts=1 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=17 action=release x=0 y=0 contacts=0 failures=0 frames=7 (synthetic)",
+    "E5HID settings-sequence phase=18 action=home-down x=0 y=0 contacts=0 failures=0 frames=9 (synthetic)",
+    "E5HID settings-sequence phase=19 action=home-up x=0 y=0 contacts=0 failures=0 frames=9 (synthetic)",
+    "E5HID settings-sequence phase=20 action=open-settings x=122 y=318 contacts=1 failures=0 frames=14 (synthetic)",
+    "E5HID settings-sequence phase=21 action=release x=0 y=0 contacts=0 failures=0 frames=14 (synthetic)",
+    "E5HID settings-sequence complete=1 active=0 home_down=0 failures=0"
+  ],
+  "policy": {
+    "source_sha256": "b80f931e0e5b2e8cd28ce75bcb7d7b4e520950c6f916fa6630bee8b7dcd0fc2d",
+    "output_sha256": "184af586a33785fb68a4621185644ba362d953cb7ba22a59ceb40e0a4039e839",
+    "readonly_remount_verified": true,
+    "source_unchanged": true,
+    "files": {
+      "mobile/Library/Preferences/com.apple.backboardd.plist": "f81e651adb100a260bc2cf93ab8e815b963d8b901891ffaaffaa6dad5b583c04"
+    },
+    "copy_method": "same-volume-apfs-clone",
+    "policy": {
+      "application": "com.apple.backboardd",
+      "CAEnableDeepFramebuffer": false,
+      "previous_value": null,
+      "reason": "E5 RGB565 SDR panel; retain native GPU rendering"
+    },
+    "preserved_skip_setup": true,
+    "setup_sha256": "82a2b7cc08a1ca01c42ec04cde5b896f93a023a61472b52cf65aae9daa299cd9"
+  },
+  "recovery": "complete-data-verified",
+  "windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "62b822ee871e5cfec1a694fef9ca9b5ad63b21e61089010e00c790480132729b",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r379-sdr-ui-after/data-after.img",
+    "elapsed_seconds": 71.95139858399989,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  }
+}

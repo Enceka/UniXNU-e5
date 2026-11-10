@@ -1,0 +1,55 @@
+{
+  "round": 347,
+  "scope": "PanVK dylib load and device enumeration; no GPU submission or Metal/UI acceptance",
+  "kernel_sha256": "f26bce60613170ceb1c727d44d6d895137c7d945f49613a0613c00ebccc6f10d",
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 1240.766987959
+  },
+  "protected_windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  },
+  "android": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "4a1a135d-c5c3-4fec-a114-401cc05d778b",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "data_after_sha256": "15477d98491e018569bc25c7eb6ce51fae9a4ffc87f31c4be18409d69c1cac90",
+  "data_after_bytes": 4294967296,
+  "log_sha256": "590b2acab2fcbc0899da03b45575ca597ee41f2a282091234a634617318cf7ae",
+  "observed": [
+    "E5UL|E5VK ENTRY pid=1",
+    "E5UL|E5VK DLOPEN /private/var/mobile/e5gpu-stage/lib/libvulkan_panfrost.dylib",
+    "E5GPUMAP CHECK err=0 prot=1 max=7/3 flags=40002 off=0 len=1002000",
+    "E5GPUMAP RESULT err=0 prot=1 max=3 len=1002000",
+    "E5GPUMAP CHECK err=1 prot=5 max=7/7 flags=40012 off=0 len=e00000",
+    "E5GPUMAP GRANT staged probe mapping; original err=1",
+    "E5GPUMAP RESULT err=0 prot=5 max=7 len=e00000",
+    "E5GPUMAP CHECK err=0 prot=3 max=7/3 flags=40012 off=e00000 len=98000",
+    "E5GPUMAP RESULT err=0 prot=3 max=3 len=98000",
+    "E5GPUMAP CHECK err=0 prot=3 max=7/3 flags=40012 off=e98000 len=c000",
+    "E5GPUMAP RESULT err=0 prot=3 max=3 len=c000",
+    "E5GPUMAP CHECK err=0 prot=1 max=7/3 flags=40012 off=ea4000 len=160000",
+    "E5GPUMAP RESULT err=0 prot=1 max=3 len=160000",
+    "E5UL|E5PANVK OPEN sub=0 comp=0 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0",
+    "E5EXC pid 1 (e5vk-probe) exc 2 code 1 sub 3577413673 lr 103072ee8 fp 16f139c40 x16 19baf9720 x17 4d fr 103012adc 10301018c 10313ada0 10313ac9c 100cc8e38 100dfb228",
+    "E5UL|E5VK FATAL sig=0000000000000004 pc=000000010319d538 lr=0000000103072ee8"
+  ],
+  "diagnosis": {
+    "signal": 4,
+    "instruction": "0xd53b0029: mrs x9, CTR_EL0",
+    "function": "util_cache_granularity",
+    "pc": "0x10319d538",
+    "pc_image_offset": "0x19b538",
+    "lr": "0x103072ee8",
+    "lr_image_offset": "0x70ee8",
+    "image_base_inferred": "0x103002000",
+    "caller": "panvk_v9_get_physical_device_properties",
+    "gpu_submissions": 0
+  },
+  "correction": "R348 supplies the 64-byte E5 CacheRange ABI granularity to both Vulkan nonCoherentAtomSize and deferred kernel sync coalescing; runtime verification pending."
+}

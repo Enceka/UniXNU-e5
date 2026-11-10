@@ -1,0 +1,330 @@
+diff --git a/ArmCpu.cpp b/ArmCpu.cpp
+index a1f7bc6..da96d95 100644
+--- a/ArmCpu.cpp
++++ b/ArmCpu.cpp
+@@ -6,6 +6,9 @@
+ #include <libkern/c++/OSSymbol.h>
+ #include <machine/machine_routines.h>
+ #include <pexpert/pexpert.h>
++#include <IOKit/IOLib.h>
++#include "ArmCpuSpi.h"
++#include "SpiGate.h"
+ 
+ // Exact private entry from Darwin 23 arm/rtclock.h. Its full data header is
+ // not exported to IOKit; the IRQ path calls the real kernel implementation.
+@@ -163,12 +166,39 @@ static bool gRemoteGic = false; // sheng-smp-gic=1: the boot CPU prepares a new
+ // then enabled. The handler runs in the primary interrupt context, before the EOI, and must clear a level source.
+ // An SPI without a handler is counted and disabled instead of being acknowledged forever.
+ #define ARMCPU_SPI_SLOTS 16
+-struct ArmCpuSpi {uint32_t id; void (*handler) (void *); void *context; volatile uint64_t count;};
++struct ArmCpuSpi {
++  uint32_t id = 0;
++  void (*handler)(void *) = nullptr;
++  void *context = nullptr;
++  uint64_t count = 0;
++  ArmCpuSpiGate gate;
++  enum Ownership { Vacant, Live, Closing } ownership = Vacant;
++};
+ static ArmCpuSpi gSpi[ARMCPU_SPI_SLOTS];
+ static volatile uint32_t gSpiUsed = 0;
++static uint32_t gSpiWriter = 0;
++class SpiWriterGuard {
++  boolean_t interrupts;
++public:
++  SpiWriterGuard() : interrupts(ml_set_interrupts_enabled(false)) {
++    while (__atomic_exchange_n(&gSpiWriter, 1u, __ATOMIC_ACQUIRE)) {
++      __asm__ volatile("yield");
++    }
++  }
++  ~SpiWriterGuard() {
++    __atomic_store_n(&gSpiWriter, 0u, __ATOMIC_RELEASE);
++    ml_set_interrupts_enabled(interrupts);
++  }
++};
++static ArmCpuSpi *findSpi(uint32_t intid) {
++  const uint32_t used = __atomic_load_n(&gSpiUsed, __ATOMIC_ACQUIRE);
++  for (uint32_t slot = 0; slot < used; ++slot) if (gSpi[slot].id == intid) return &gSpi[slot];
++  return nullptr;
++}
+ static uint64_t gBootAffinity = 0;
+ extern "C" {
+ volatile uint64_t armcpu_spi_unhandled = 0;
++volatile uint64_t armcpu_spi_retired = 0;
+ volatile uint32_t armcpu_spi_unhandled_id = 0;
+ }
+ 
+@@ -334,7 +364,11 @@ void ArmCpu::enableGic (void)
+   if (!secondary) { gBootAffinity = affinity & 0xff00ffffffULL; }
+   if (!secondary || !gRemoteGic) {
+     write32 (redist + 0x10000, 0x100, kSgiPpiEnable);
+-    write32 (dist, 0, read32 (dist, 0) | 0x12U);
++    // With security enabled the non-secure view uses both Group1 enable
++    // aliases, as in Linux irq-gic-v3.c. Keep the single-state view's Group0
++    // enable unchanged. IGROUPR is not a readable ownership probe in NS/DS=0.
++    const uint32_t control=read32(dist,0);
++    write32 (dist, 0, control | ((control & (1u<<6)) ? 0x12U : 0x13U));
+   }
+   value = 1;
+   __asm__ volatile ("msr icc_igrpen1_el1, %0; dsb sy; isb" :: "r" (value) : "memory");
+@@ -590,10 +624,15 @@ void ArmCpu::interrupt (void)
+       for (uint32_t slot = 0; intid >= 32 && slot < used && spi == nullptr; slot++) {
+         if (gSpi[slot].id == intid) { spi = &gSpi[slot]; }
+       }
+-      if (spi != nullptr) {
++      if (spi != nullptr && spi->gate.enter()) {
+         armcpu_irq_phase = 7;
+-        spi->count = spi->count + 1;
++        __atomic_fetch_add(&spi->count, 1ULL, __ATOMIC_RELAXED);
+         spi->handler (spi->context);
++        spi->gate.leave();
++      } else if (spi != nullptr) {
++        // The retiring owner masks this line. Do not mask here after losing
++        // an entry race: a later reattachment may already have enabled it.
++        armcpu_spi_retired = armcpu_spi_retired + 1;
+       } else if (intid >= 32 && gDist != 0) {
+         armcpu_spi_unhandled = armcpu_spi_unhandled + 1;
+         armcpu_spi_unhandled_id = intid;
+@@ -781,17 +820,23 @@ const OSSymbol *ArmCpu::getCPUName (void)
+ }
+ 
+ // Readback after configuration: bit 0 group 1, bit 1 enabled, bit 2 edge, bits 8..15 priority; IROUTER separately.
+-extern "C" IOReturn armcpu_spi_attach (uint32_t intid, bool edge, void (*handler) (void *), void *context,
+-                                       uint32_t *readback, uint64_t *router)
++static IOReturn attachSpi(uint32_t intid, bool edge, void (*handler)(void *), void *context,
++                          uint32_t *readback, uint64_t *router, bool enable)
+ {
+   if (gDist == 0 || armcpu_gic_ready == 0 || handler == nullptr) { return kIOReturnNotReady; }
++  if (ml_at_interrupt_context()) return kIOReturnNotPermitted;
+   const unsigned interrupts = ((read32 (gDist, 4) & 31) + 1) * 32;
+   if (intid < 32 || intid >= 1020 || intid >= interrupts) { return kIOReturnBadArgument; }
++  SpiWriterGuard guard;
+   const uint32_t used = __atomic_load_n (&gSpiUsed, __ATOMIC_ACQUIRE);
++  ArmCpuSpi *entry = nullptr;
+   for (uint32_t slot = 0; slot < used; slot++) {
+-    if (gSpi[slot].id == intid) { return kIOReturnExclusiveAccess; }
++    if (gSpi[slot].id == intid) {
++      entry = &gSpi[slot];
++      if (entry->ownership != ArmCpuSpi::Vacant) return kIOReturnExclusiveAccess;
++    }
+   }
+-  if (used >= ARMCPU_SPI_SLOTS) { return kIOReturnNoResources; }
++  if (!entry && used >= ARMCPU_SPI_SLOTS) { return kIOReturnNoResources; }
+   const uint32_t word = (intid / 32) * 4, bit = 1U << (intid % 32);
+   write32 (gDist, 0x180 + word, bit); // ICENABLER while it is reconfigured
+   if (!waitClear (gDist, 0, 1U << 31)) { return kIOReturnTimeout; }
+@@ -800,10 +845,14 @@ extern "C" IOReturn armcpu_spi_attach (uint32_t intid, bool edge, void (*handler
+   const unsigned cfg = 0xc00 + (intid / 16) * 4, shift = (intid % 16) * 2 + 1;
+   write32 (gDist, cfg, (read32 (gDist, cfg) & ~(1U << shift)) | ((edge ? 1U : 0U) << shift));
+   *reinterpret_cast<volatile uint64_t *> (gDist + 0x6000 + 8 * intid) = gBootAffinity;
+-  gSpi[used] = {intid, handler, context, 0};
+-  __atomic_store_n (&gSpiUsed, used + 1, __ATOMIC_RELEASE);
++  if (!entry) { entry = &gSpi[used]; entry->id = intid; }
++  entry->handler = handler; entry->context = context;
++  __atomic_store_n(&entry->count, 0ULL, __ATOMIC_RELAXED);
++  entry->ownership = ArmCpuSpi::Live;
++  if (!entry->gate.open()) { entry->ownership = ArmCpuSpi::Closing; return kIOReturnBusy; }
++  if (entry == &gSpi[used]) __atomic_store_n (&gSpiUsed, used + 1, __ATOMIC_RELEASE);
+   __asm__ volatile ("dsb sy" ::: "memory");
+-  write32 (gDist, 0x100 + word, bit); // ISENABLER
++  if (enable) write32 (gDist, 0x100 + word, bit); // legacy attach enables; masked attach does not
+   if (readback != nullptr) {
+     *readback = ((read32 (gDist, 0x80 + word) & bit) ? 1U : 0U) | ((read32 (gDist, 0x100 + word) & bit) ? 2U : 0U) |
+                 (((read32 (gDist, cfg) >> shift) & 1U) << 2) |
+@@ -813,11 +862,69 @@ extern "C" IOReturn armcpu_spi_attach (uint32_t intid, bool edge, void (*handler
+   return kIOReturnSuccess;
+ }
+ 
++extern "C" IOReturn armcpu_spi_attach(uint32_t id, bool edge, void (*handler)(void *), void *context,
++                                      uint32_t *readback, uint64_t *router) {
++  return attachSpi(id, edge, handler, context, readback, router, true);
++}
++extern "C" IOReturn armcpu_spi_attach_masked(uint32_t id, bool edge, void (*handler)(void *), void *context,
++                                             uint32_t *readback, uint64_t *router) {
++  return attachSpi(id, edge, handler, context, readback, router, false);
++}
++extern "C" IOReturn armcpu_spi_set_enabled(uint32_t id, bool enable, void *context) {
++  if (!gDist || !armcpu_gic_ready) return kIOReturnNotReady;
++  if (ml_at_interrupt_context()) return kIOReturnNotPermitted;
++  SpiWriterGuard guard;
++  ArmCpuSpi *entry = findSpi(id);
++  if (!entry || entry->ownership == ArmCpuSpi::Vacant) return kIOReturnNotOpen;
++  if (entry->context != context) return kIOReturnExclusiveAccess;
++  if (enable && entry->ownership != ArmCpuSpi::Live) return kIOReturnNotPermitted;
++  const uint32_t word = (id / 32) * 4, bit = 1u << (id % 32);
++  write32(gDist, (enable ? 0x100 : 0x180) + word, bit);
++  if (!waitClear(gDist, 0, 1u << 31)) return kIOReturnTimeout;
++  return bool(read32(gDist, 0x100 + word) & bit) == enable ? kIOReturnSuccess : kIOReturnIOError;
++}
++extern "C" void armcpu_spi_mask_irq(uint32_t id, void *context) {
++  // This caller already holds the slot's callback borrow. No writer lock,
++  // waits, allocation or changes to callback storage in interrupt context.
++  ArmCpuSpi *entry = findSpi(id);
++  if (gDist && entry && entry->context == context)
++    write32(gDist, 0x180 + (id / 32) * 4, 1u << (id % 32));
++}
++extern "C" IOReturn armcpu_spi_detach(uint32_t id, void *context) {
++  if (!gDist || !armcpu_gic_ready) return kIOReturnNotReady;
++  if (ml_at_interrupt_context()) return kIOReturnNotPermitted;
++  ArmCpuSpi *entry;
++  {
++    SpiWriterGuard guard;
++    entry = findSpi(id);
++    if (!entry || entry->ownership == ArmCpuSpi::Vacant) return kIOReturnNotOpen;
++    if (entry->context != context) return kIOReturnExclusiveAccess;
++    entry->ownership = ArmCpuSpi::Closing;
++    const uint32_t word = (id / 32) * 4, bit = 1u << (id % 32);
++    write32(gDist, 0x180 + word, bit);
++    entry->gate.close();
++    if (!waitClear(gDist, 0, 1u << 31) || (read32(gDist, 0x100 + word) & bit)) return kIOReturnTimeout;
++  }
++  // Interrupts are restored while waiting. A timeout preserves the context
++  // and Closing ownership; callers must retain it and can retry detach.
++  for (unsigned waited = 0; entry->gate.active(); waited += 10) {
++    if (waited >= 100000) return kIOReturnTimeout;
++    IODelay(10);
++  }
++  SpiWriterGuard guard;
++  if (entry->context != context || entry->ownership != ArmCpuSpi::Closing) return kIOReturnExclusiveAccess;
++  entry->handler = nullptr; entry->context = nullptr; entry->ownership = ArmCpuSpi::Vacant;
++  return kIOReturnSuccess;
++}
++
+ extern "C" uint64_t armcpu_spi_count (uint32_t intid)
+ {
+   const uint32_t used = __atomic_load_n (&gSpiUsed, __ATOMIC_ACQUIRE);
+   for (uint32_t slot = 0; slot < used; slot++) {
+-    if (gSpi[slot].id == intid) { return gSpi[slot].count; }
++    if (gSpi[slot].id == intid) { return __atomic_load_n(&gSpi[slot].count, __ATOMIC_RELAXED); }
+   }
+   return 0;
+ }
++extern "C" uint32_t armcpu_spi_control(void) {
++  return gDist && armcpu_gic_ready ? read32(gDist,0) : 0;
++}
+diff --git a/ArmCpuSpi.h b/ArmCpuSpi.h
+new file mode 100644
+index 0000000..b457dc9
+--- /dev/null
++++ b/ArmCpuSpi.h
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: BSD-2-Clause-Patent
++#pragma once
++#include <stdint.h>
++#include <IOKit/IOReturn.h>
++
++extern "C" {
++IOReturn armcpu_spi_attach(uint32_t, bool, void (*)(void *), void *, uint32_t *, uint64_t *);
++IOReturn armcpu_spi_attach_masked(uint32_t, bool, void (*)(void *), void *, uint32_t *, uint64_t *);
++IOReturn armcpu_spi_set_enabled(uint32_t, bool, void *);
++// Only an executing owner callback may call this IRQ-safe containment path.
++void armcpu_spi_mask_irq(uint32_t, void *);
++// Thread context only. Success guarantees no callback can use context again.
++// Timeout keeps ownership/context alive and forbids unmask or reattachment.
++IOReturn armcpu_spi_detach(uint32_t, void *);
++uint64_t armcpu_spi_count(uint32_t);
++uint32_t armcpu_spi_control(void);
++}
+diff --git a/README.md b/README.md
+index 68e713b..f56c275 100644
+--- a/README.md
++++ b/README.md
+@@ -5,3 +5,22 @@ ARM generic interrupt controller and timer.
+ starts the CPU, GIC and timer on sheng and on the QEMU virt machine.
+ 
+ Build and interface details: [documentation](https://unixnu.com/reference/components). Component sources and dependencies: [catalog](https://unixnu.com/reference/components).
++
++Shared peripheral SPI callbacks run in primary interrupt context before EOIR.
++The original `armcpu_spi_attach` configures and enables an SPI. The additional
++`armcpu_spi_attach_masked` publishes the same handler while leaving the parent
++masked; its owner later calls `armcpu_spi_set_enabled`. Calls are serialized
++and accept an owner context, preventing another owner from changing the line.
++
++`armcpu_spi_detach` masks the parent and closes an atomic callback-entry gate.
++Success guarantees all existing callbacks have returned and no new callback
++can use the context. A timeout leaves ownership closed and context retained;
++callers must keep resources alive and may retry. Detached slots retain their
++immutable INTID and can be reused for that INTID. These management calls are
++thread-context operations. An executing owner callback can contain an unknown
++level source with the bounded `armcpu_spi_mask_irq` operation.
++
++Callback/context fields change only behind a closed, drained gate. Host
++ASan/UBSan tests in `tests/spi-gate.cpp` exercise concurrent entry, closure,
++heap-context retirement and reuse. Build with `build-arm-driver.py ArmCpu`
++in the resolved kernel tree. Device qualification remains separate.
+diff --git a/SpiGate.h b/SpiGate.h
+new file mode 100644
+index 0000000..594a15d
+--- /dev/null
++++ b/SpiGate.h
+@@ -0,0 +1,27 @@
++// SPDX-License-Identifier: BSD-2-Clause-Patent
++#pragma once
++#include <stdint.h>
++
++// One atomic word closes entry and counts borrowers. After close(), a CAS
++// either joined the count beforehand or fails against the closed bit.
++// Callback/context storage may change only while closed and quiescent.
++struct ArmCpuSpiGate {
++  static constexpr uint32_t Closed = 1u << 31;
++  uint32_t state = Closed;
++  bool enter() {
++    uint32_t value = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
++    while (!(value & Closed) && value != Closed - 1) {
++      if (__atomic_compare_exchange_n(&state, &value, value + 1, false,
++                                      __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) return true;
++    }
++    return false;
++  }
++  void leave() { __atomic_fetch_sub(&state, 1u, __ATOMIC_RELEASE); }
++  void close() { __atomic_fetch_or(&state, Closed, __ATOMIC_ACQ_REL); }
++  uint32_t active() const { return __atomic_load_n(&state, __ATOMIC_ACQUIRE) & ~Closed; }
++  bool open() {
++    uint32_t expected = Closed;
++    return __atomic_compare_exchange_n(&state, &expected, 0u, false,
++                                       __ATOMIC_RELEASE, __ATOMIC_RELAXED);
++  }
++};
+diff --git a/tests/spi-gate.cpp b/tests/spi-gate.cpp
+new file mode 100644
+index 0000000..c8b4cf5
+--- /dev/null
++++ b/tests/spi-gate.cpp
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: BSD-2-Clause-Patent
++#include "../SpiGate.h"
++#include <atomic>
++#include <cassert>
++#include <thread>
++#include <vector>
++#include <iostream>
++
++int main() {
++  ArmCpuSpiGate gate;
++  assert(!gate.enter() && gate.active() == 0 && gate.open());
++  assert(gate.enter()); gate.close();
++  assert(gate.active() == 1 && !gate.enter() && !gate.open());
++  gate.leave(); assert(gate.active() == 0 && gate.open()); gate.close();
++  // Exercise retirement of actual heap context while concurrent dispatchers
++  // repeatedly borrow it. The closed gate must exclude all post-retirement reads.
++  for (unsigned epoch = 0; epoch < 150; ++epoch) {
++    int *context = new int(37);
++    std::atomic<bool> stop{false}; std::atomic<unsigned> reads{0};
++    assert(gate.open());
++    std::vector<std::thread> threads;
++    for (unsigned i = 0; i < 4; ++i) threads.emplace_back([&] {
++      while (!stop.load(std::memory_order_acquire)) {
++        if (gate.enter()) {
++          assert(*context == 37); ++reads; gate.leave();
++        }
++      }
++    });
++    while (reads.load() < 200) std::this_thread::yield();
++    gate.close();
++    while (gate.active()) std::this_thread::yield();
++    delete context;
++    for (unsigned i = 0; i < 1000; ++i) assert(!gate.enter());
++    stop.store(true, std::memory_order_release);
++    for (auto &thread : threads) thread.join();
++  }
++  std::cout << "PASS: gate closure rejects new borrowers, drains old callbacks and permits safe context retirement/reuse\n";
++}

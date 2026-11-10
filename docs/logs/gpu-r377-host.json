@@ -1,0 +1,35 @@
+{
+  "implementation": "sparse live-node interference construction",
+  "comparison": "exact constraints, affinity, liveness across MOV/BLEND/dual destination/partial masks; 257/4096/24000 nodes; 4 variants",
+  "results": "PASS nodes=257 variant=0 old=0.000918 new=0.000646 speedup=1.42 constraints/affinity/live exact\nPASS nodes=257 variant=1 old=0.000671 new=0.000591 speedup=1.14 constraints/affinity/live exact\nPASS nodes=257 variant=2 old=0.000640 new=0.000589 speedup=1.09 constraints/affinity/live exact\nPASS nodes=257 variant=3 old=0.000671 new=0.000500 speedup=1.34 constraints/affinity/live exact\nPASS nodes=4096 variant=0 old=0.016038 new=0.001507 speedup=10.64 constraints/affinity/live exact\nPASS nodes=4096 variant=1 old=0.011573 new=0.001291 speedup=8.96 constraints/affinity/live exact\nPASS nodes=4096 variant=2 old=0.011433 new=0.001135 speedup=10.07 constraints/affinity/live exact\nPASS nodes=4096 variant=3 old=0.010282 new=0.001043 speedup=9.86 constraints/affinity/live exact\nPASS nodes=24000 variant=0 old=0.280054 new=0.010263 speedup=27.29 constraints/affinity/live exact\nPASS nodes=24000 variant=1 old=0.277732 new=0.009434 speedup=29.44 constraints/affinity/live exact\nPASS nodes=24000 variant=2 old=0.274213 new=0.009360 speedup=29.30 constraints/affinity/live exact\nPASS nodes=24000 variant=3 old=0.273648 new=0.009331 speedup=29.33 constraints/affinity/live exact\n",
+  "resources": "        1.19 real         1.17 user         0.01 sys\n            34111488  maximum resident set size\n                   0  average shared memory size\n                   0  average unshared data size\n                   0  average unshared stack size\n                2234  page reclaims\n                  18  page faults\n                   0  swaps\n                   0  block input operations\n                   0  block output operations\n                   0  messages sent\n                   0  messages received\n                   0  signals received\n                   4  voluntary context switches\n                 757  involuntary context switches\n         30072922311  instructions retired\n          5211586446  cycles elapsed\n            33358232  peak memory footprint\n",
+  "kernel_cache_range_regression": "old FAIL for offset1 length64; fixed PASS for clean/invalidate/clean+invalidate and cross-page ranges",
+  "kernel_build": {
+    "returncode": 0,
+    "elapsed_seconds": 26.498364667,
+    "kernel_sha256": "3a6f554d83460bb67e9d145d22169c6620dcedbb95dd6659b65037787dcbe671"
+  },
+  "panvk_link_audit": {
+    "source": ".work/e5-gpu-active/mesa-ios/src/panfrost/vulkan/libvulkan_panfrost.dylib",
+    "target": ".work/e5-gpu-active/ra-live/libvulkan_panfrost.dylib",
+    "libraries": [
+      "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+      "/usr/lib/libSystem.B.dylib",
+      "/usr/lib/libc++.1.dylib"
+    ],
+    "source_sha256": "1f4e09c1e987d08b2a52c56335765767a44636bd9151f834a61081f21337b294",
+    "sha256": "38284531102b40ac31da8a743cfa238d961ecb35b150c459826d2136d4abcaee",
+    "bindings": 7835,
+    "weak_symbols_to_self": 7640,
+    "ordinal_opcodes_changed": 1,
+    "strong_unresolved": [],
+    "signature_verified": true
+  },
+  "hardware_qualification": "R377 recovered with two lock-screen presentations; desktop/Settings not qualified. New sample points to scalar live-array merging.",
+  "r376_hot_pc": {
+    "pc_in_icd": "0x3e047c",
+    "instructions": "cmp x28,x23; b.eq; ldrb w26,[x27,x23]",
+    "source": "bi_mark_interference dense for(i=0;i<node_count;++i) live[i] scan",
+    "confirmed_by": "Disassembly of the R376-qualified ICD at the sampled runtime PC"
+  }
+}

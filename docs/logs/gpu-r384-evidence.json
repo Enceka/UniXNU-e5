@@ -1,0 +1,264 @@
+{
+  "round": 384,
+  "result": "Settings main list visibly renders. Full navigation not yet qualified: priorrow280waswrong; scroll selectedNotifications and Home/reopen overlappedtransition.",
+  "visuals": {
+    "settings_root": "/Volumes/Projects/e5-xnu/.work/e5-gpu-active/r384-frames/frame-09-604.png",
+    "notifications_transition": "/Volumes/Projects/e5-xnu/.work/e5-gpu-active/r384-frames/frame-14-620.png",
+    "observed_notifications_row": [
+      120,
+      389
+    ]
+  },
+  "fps": {
+    "source": "uefi/build/sb-r384-fused-pixels/r384/capture/kernel.log",
+    "reported_intervals": {
+      "samples": 30,
+      "seconds": 30.807,
+      "presented": 23,
+      "mean_fps": 0.7465835686694582,
+      "input_reports": 43
+    },
+    "intervals_with_input": {
+      "samples": 11,
+      "seconds": 11.729,
+      "presented": 2,
+      "mean_fps": 0.1705175206752494,
+      "input_reports": 43
+    },
+    "rejected_records": 0,
+    "samples": [
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 49.959
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 1,
+        "fps": 0.995,
+        "input_reports": 4,
+        "last_present_ms": 50.36
+      },
+      {
+        "interval_ms": 1002,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 4,
+        "last_present_ms": 50.36
+      },
+      {
+        "interval_ms": 1006,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 4,
+        "last_present_ms": 50.36
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 4,
+        "last_present_ms": 50.36
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 1,
+        "fps": 0.994,
+        "input_reports": 0,
+        "last_present_ms": 50.496
+      },
+      {
+        "interval_ms": 1001,
+        "presented": 1,
+        "fps": 0.998,
+        "input_reports": 0,
+        "last_present_ms": 50.266
+      },
+      {
+        "interval_ms": 1001,
+        "presented": 2,
+        "fps": 1.997,
+        "input_reports": 0,
+        "last_present_ms": 50.177
+      },
+      {
+        "interval_ms": 1010,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 2,
+        "last_present_ms": 50.177
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 1,
+        "fps": 0.994,
+        "input_reports": 0,
+        "last_present_ms": 50.258
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 1,
+        "fps": 0.995,
+        "input_reports": 0,
+        "last_present_ms": 50.269
+      },
+      {
+        "interval_ms": 1011,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 2,
+        "last_present_ms": 50.269
+      },
+      {
+        "interval_ms": 1012,
+        "presented": 1,
+        "fps": 0.987,
+        "input_reports": 0,
+        "last_present_ms": 49.971
+      },
+      {
+        "interval_ms": 1001,
+        "presented": 1,
+        "fps": 0.998,
+        "input_reports": 0,
+        "last_present_ms": 50.12
+      },
+      {
+        "interval_ms": 1002,
+        "presented": 1,
+        "fps": 0.997,
+        "input_reports": 0,
+        "last_present_ms": 49.406
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 2,
+        "last_present_ms": 49.406
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 1,
+        "fps": 0.995,
+        "input_reports": 0,
+        "last_present_ms": 50.163
+      },
+      {
+        "interval_ms": 1503,
+        "presented": 1,
+        "fps": 0.665,
+        "input_reports": 12,
+        "last_present_ms": 49.182
+      },
+      {
+        "interval_ms": 1002,
+        "presented": 1,
+        "fps": 0.997,
+        "input_reports": 0,
+        "last_present_ms": 50.684
+      },
+      {
+        "interval_ms": 1002,
+        "presented": 1,
+        "fps": 0.997,
+        "input_reports": 0,
+        "last_present_ms": 49.904
+      },
+      {
+        "interval_ms": 1082,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 4,
+        "last_present_ms": 49.904
+      },
+      {
+        "interval_ms": 1002,
+        "presented": 1,
+        "fps": 0.997,
+        "input_reports": 0,
+        "last_present_ms": 50.073
+      },
+      {
+        "interval_ms": 1096,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 2,
+        "last_present_ms": 50.073
+      },
+      {
+        "interval_ms": 1013,
+        "presented": 2,
+        "fps": 1.973,
+        "input_reports": 0,
+        "last_present_ms": 49.823
+      },
+      {
+        "interval_ms": 1008,
+        "presented": 1,
+        "fps": 0.992,
+        "input_reports": 0,
+        "last_present_ms": 50.853
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 48.944
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 1,
+        "fps": 0.995,
+        "input_reports": 0,
+        "last_present_ms": 50.278
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 50.076
+      },
+      {
+        "interval_ms": 1006,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 3,
+        "last_present_ms": 50.076
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 50.185
+      }
+    ],
+    "scope": "Presented-frame updates; reported intervals only. Input may be physical or synthetic. Not hardware vblank."
+  },
+  "present_work": "About50ms/frame afterfusedsource read versusabout180ms before;notGPUtime.",
+  "input": [
+    "E5HID settings-sequence phase=0 action=open-settings release=1 held_ms=114 failures=0 frames=6 pixels=79135 ink=79135 (synthetic)",
+    "E5HID settings-sequence phase=2 action=open-row release=3 held_ms=100 failures=0 frames=8 pixels=82544 ink=82544 (synthetic)",
+    "E5HID settings-sequence phase=4 action=back release=5 held_ms=115 failures=0 frames=11 pixels=152788 ink=89960 (synthetic)",
+    "E5HID settings-sequence phase=6 action=scroll release=17 held_ms=692 failures=0 frames=13 pixels=152788 ink=89960 (synthetic)",
+    "E5HID settings-sequence phase=18 action=home-down release=19 held_ms=115 failures=0 frames=15 pixels=152783 ink=90269 (synthetic)",
+    "E5HID settings-sequence phase=20 action=open-settings release=21 held_ms=115 failures=0 frames=16 pixels=153506 ink=115796 (synthetic)",
+    "E5HID settings-sequence complete=1 active=0 home_down=0 failures=0"
+  ],
+  "recovery": "complete-data-verified",
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "f118475d9e74ac3a64c2877d6becad6947a74dac67a7fe5ab4f319ee22c9fa77",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r384-fused-pixels-after/data-after.img",
+    "elapsed_seconds": 71.58623883399991,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "round": 375,
+  "scope": "Linear b3a8 IOSurface presentation to E5 RGB565",
+  "kernel": {
+    "returncode": 0,
+    "elapsed_seconds": 24.555463917,
+    "kernel_sha256": "09addb9f1c404f4e7caad8f22a60f1821b1b663a31981f872b3afa10720e381f"
+  },
+  "host_validation": {
+    "pixel_and_bounds_tests": "PASS (ASan + UBSan)",
+    "diff_check": "PASS"
+  },
+  "offers": [
+    {
+      "offered": 1,
+      "accepted": 1,
+      "reason": 0,
+      "format": "62336138",
+      "planes": 2
+    },
+    {
+      "offered": 2,
+      "accepted": 2,
+      "reason": 0,
+      "format": "62336138",
+      "planes": 2
+    }
+  ],
+  "planes": [
+    "E5CPUPLANE p=0 wh=320:480 offsets=0:0 stride=1280",
+    "E5CPUPLANE p=1 wh=320:480 offsets=614400:614400 stride=320",
+    "E5CPUPLANE p=0 wh=320:480 offsets=0:0 stride=1280",
+    "E5CPUPLANE p=1 wh=320:480 offsets=614400:614400 stride=320"
+  ],
+  "copies": [
+    {
+      "copied": 1,
+      "retired": 1,
+      "failed": 0
+    },
+    {
+      "copied": 2,
+      "retired": 2,
+      "failed": 0
+    }
+  ],
+  "original_backboardd_completions": [
+    "E5METAL pid=57 UI completed=1 local_failed=0 draws=31 dispatches=0 blits=5",
+    "E5METAL pid=57 UI completed=2 local_failed=0 draws=55 dispatches=0 blits=5"
+  ],
+  "pixel_evidence": [
+    "E5PIX next=1 ts=15190533865 blank=0 valid=1 source_rgb=6540 alpha=153600 opaque=153600 rgb_alpha0=0 source_fnv=d45350a7 destination_rgb=0 destination_fnv=b6005dc5",
+    "E5PIX next=2 ts=16951980173 blank=0 valid=1 source_rgb=7989 alpha=153600 opaque=153600 rgb_alpha0=0 source_fnv=b1ceb835 destination_rgb=7953 destination_fnv=23d7ef95"
+  ],
+  "frame_checksums": [
+    {
+      "id": 300,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 301,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 302,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 303,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 304,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 305,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 306,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 307,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 1,
+      "fnv": "b6005dc5"
+    },
+    {
+      "id": 308,
+      "fnv": "b6005dc5"
+    },
+    {
+      "id": 309,
+      "fnv": "23d7ef95"
+    },
+    {
+      "id": 310,
+      "fnv": "23d7ef95"
+    },
+    {
+      "id": 311,
+      "fnv": "23d7ef95"
+    },
+    {
+      "id": 312,
+      "fnv": "23d7ef95"
+    }
+  ],
+  "visible_frame": "/Volumes/Projects/e5-xnu/uefi/build/sb-r375-b3a8/frames/frame-10-309.png",
+  "visual_observation": "Checksum-valid frame shows the original Chinese date/time lock screen and iPhone/battery status bar.",
+  "limitations": [
+    "Physical panel observation deferred",
+    "Desktop and interactive behavior not qualified by this trial"
+  ],
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 1235.417754
+  },
+  "window_verdicts": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  },
+  "android_after": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "1a3aa13a-2bc0-4409-93cd-630c05e310e7",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "data_after_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "780eb79de874fb83b9b161e92d86eb0efed77ae916b6461da58a1181656aecc2",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r375-b3a8-after/data-after.img",
+    "elapsed_seconds": 70.38057162500013,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  },
+  "source_sha256": {
+    "scripts/display/E5FramebufferCopy.h": "815d28e586a2a61b0058a7e80de40ec1f901398fc1da8b70d865de0c42f07551",
+    "scripts/display/E5CpuPresenter.inc": "a47c3c39d07cb7499edbb136c32c58f404f7ab510cc89bdbbca86b0bcd40c4e7",
+    "scripts/display/E5Display.cpp": "d79d18b92910fe8301f1bf930d72cdf3da9c95f4844554e4d35b555fc15a8ad1",
+    "scripts/e5_display_build.py": "e2ccd9314460aafeb1097c1583a38634fd6719fb72e770a57401e72455f6ab43",
+    "scripts/display/tests/rgb565.cpp": "8d612ef8af0460de118d5a4d21f68bbe91dd96a02963268b2b8feb3da84f220f"
+  }
+}

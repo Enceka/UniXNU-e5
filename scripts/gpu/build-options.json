@@ -1,0 +1,51 @@
+{
+  "mesa_ios": {
+    "buildtype": "release",
+    "b_ndebug": "true",
+    "platforms": [],
+    "expat": "disabled",
+    "gallium-drivers": [],
+    "vulkan-drivers": [
+      "panfrost"
+    ],
+    "panfrost-kmds": [
+      "e5"
+    ],
+    "shader-cache": "disabled",
+    "vulkan-layers": [],
+    "gles1": "disabled",
+    "gles2": "disabled",
+    "opengl": false,
+    "gbm": "disabled",
+    "glx": "disabled",
+    "egl": "disabled",
+    "llvm": "disabled",
+    "valgrind": "disabled",
+    "libunwind": "disabled",
+    "lmsensors": "disabled",
+    "build-tests": false,
+    "tools": [],
+    "zstd": "disabled",
+    "video-codecs": [],
+    "xmlconfig": "disabled",
+    "mesa-clc": "system",
+    "precomp-compiler": "system",
+    "spirv-tools": "disabled"
+  },
+  "frontend_flags": [
+    "-O2",
+    "-g0",
+    "-std=c++17",
+    "-fobjc-arc",
+    "-DNATIVE_E5_KERNEL_CACHE_SYNC=1",
+    "-DNATIVE_E5_UI_TRACE=1",
+    "-Wl,-dead_strip",
+    "-Wl,-no_fixup_chains"
+  ],
+  "bridge_release": {
+    "panic": "unwind",
+    "debug": 1,
+    "lto": "fat",
+    "codegen-units": 1
+  }
+}

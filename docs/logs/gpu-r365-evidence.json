@@ -1,0 +1,93 @@
+{
+  "round": 365,
+  "kernel_sha256": "c09cc01da2e65c904df271312618d3b7476b50bd16e18fd2e5b46ad51bc0263d",
+  "readonly_gpu_reads": {
+    "rounds": 2,
+    "mismatch": 0,
+    "explicit_flush": false,
+    "final_resources": 0,
+    "submitted": 2,
+    "completed": 2,
+    "faults": 0
+  },
+  "write_permission_fault_observed": {
+    "code": "0xcb PERM_FAULT_3",
+    "access": "write",
+    "address": "0x10000000",
+    "expected_target": "0x10000000"
+  },
+  "negative_test_verdict": "FAIL: atom not retired and bytes cannot be validated before completion because reset-completion IRQ is consumed by primary handler",
+  "overall": "FAIL",
+  "original_ui_qualified": false,
+  "recovery": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "51ea64ef-de49-4033-9842-2bfc2085bfe0",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "samples": [
+    "E5UL|E5MTL READONLY ROUND 0 PASS mismatch=0 identity=1 explicit_flush=0",
+    "E5UL|E5MTL READONLY ROUND 1 PASS mismatch=0 identity=1 explicit_flush=0",
+    "E5UL|E5MTL READONLY COMPUTE PASS release=1",
+    "E5UL|E5PANVK CLOSE sub=2 comp=2 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0 pid=1",
+    "E5UL|E5PANVK CLOSE sub=2 comp=2 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0 pid=1",
+    "E5UL|E5MTL READONLY POLICY PASS default_reject=2 explicit_import=1 executable_reject=1",
+    "E5MALI1 mmu fault as=0 code=cb(PERM_FAULT_3) access=write source=7c00 addr=10000000 raw=7c0003cb",
+    "E5MALI1 reset #1 (deferred) total=1/32 irqSrc job=2 mmu=1 gpu=0",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5MALI1 soft reset no completion (rawstat=00000000 gpu_status=00000100) \u2014 hard reset",
+    "E5UL|E5MTL READONLY NEGATIVE FAIL cleanup_bo=8192 mapped=8192 active=1 expected_mmu_faults=1",
+    "E5UL|E5MTL VERDICT FAIL",
+    "E5UL|E5MTL HANDOFF launchd status=1"
+  ],
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 937.339817625
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "ef8a95e895b49509058620fdd05323811c533bb6404fd2674ff1413a93472557",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r365-readonly-import-after/data-after.img",
+    "elapsed_seconds": 66.05318720900004,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  },
+  "windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  }
+}

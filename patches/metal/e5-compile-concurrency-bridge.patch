@@ -1,0 +1,13 @@
+--- a/metal-plugin/bridge/NativeMetalBridge.rs
++++ b/metal-plugin/bridge/NativeMetalBridge.rs
+@@ -364,3 +364,10 @@
+         Err(_) => run.fail(0x65fe, "panic"),
+     }
+ }
++
++// The E5 integration's bounded compile-concurrency measurement. This changes
++// only how many driver pipeline creations may run together, not shader budgets.
++#[unsafe(no_mangle)]
++pub extern "C" fn native_e5_metal_limit_pipeline_makers() -> bool {
++    metal2vulkan_runtime::set_making_budget_for_measurement(1, 1).is_ok()
++}
