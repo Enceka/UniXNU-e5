@@ -32,7 +32,11 @@ extern "C" bool e5_touch_ready(void);
 extern "C" unsigned e5_touch_poll_interval_ms(void);
 extern "C" bool e5_input_capture(unsigned);
 extern "C" bool e5_input_request_capture(unsigned);
+extern "C" bool e5_input_capture_busy(void);
 extern "C" unsigned e5_input_presented_frames(void);
+extern "C" unsigned e5_input_presented_rgb_pixels(void);
+extern "C" unsigned e5_input_presented_ink_pixels(void);
+extern "C" uint64_t e5_input_last_present_ns(void);
 extern "C" bool e5_touch_canvas_selected(void);
 extern "C" void e5_touch_canvas_key(unsigned);
 
@@ -223,7 +227,7 @@ class E5HidDevice final:public IOHIDDevice {
   bool touchOnly=false,splitTouch=false,digitizerDriver=false,hardwareActive=false;
   E5HidDevice *digitizer=nullptr;
   unsigned ticks=0,reports=0,failures=0,lastDropped=0,testAt=450,keySamples=0;
-  bool doubleHome=false;
+  bool doubleHome=false,repeatHome=false;
   unsigned homeClicks=0;
   unsigned homeAction=0,homeActions=1,homeActionLimit=1;
   uint32_t held=0;
@@ -233,6 +237,16 @@ class E5HidDevice final:public IOHIDDevice {
   unsigned uiCapturePeriod=0,uiCaptureId=300;
   unsigned snapshotStage=0,snapshotAttempts=0;
   unsigned touchTestStep=0,touchTestKind=0,touchTestRepeats=0;
+  unsigned settingsRowY=0,touchTestFrameMark=0,touchTestWaits=0;
+  unsigned settingsIconX=122,settingsIconY=318;
+  unsigned settingsMinRgb=0,settingsWaitSeconds=60;
+  unsigned settingsMinInk=0,settingsGesturePhase=0;
+  uint64_t settingsGestureAt=0;
+  const char *settingsGestureAction="none";
+  unsigned settingsCapturedGate=~0u;
+  bool fpsEnabled=false;
+  unsigned fpsFrames=0,fpsReports=0;
+  uint64_t fpsStamp=0,fpsDeadline=0,fpsActivityDeadline=0;
   uint64_t touchTestDeadline=0;
   uint64_t hardwareQuietDeadline=0;
   E5Input::TouchState touches;
@@ -288,21 +302,88 @@ class E5HidDevice final:public IOHIDDevice {
     if(send(&report,sizeof(report),source)==kIOReturnSuccess)return true;
     touches.retainPossible(before,frame);return false;
   }
+  void cancelSettingsTest(const char *source) {
+    if(!touchTest || touchTestKind!=4 || touchTestDone)return;
+    if(touchTestStarted && touches.previous.count)emitTouch(E5Input::Frame{},"selftest-cancel");
+    if(testDown){testDown=false;sendKeys(held,"selftest-cancel-home");}
+    test=false;testDone=true;touchTest=false;touchTestDone=true;
+    note("E5HID settings-sequence cancelled=1 hardware=%s",source);
+  }
   static void touchReady(const E5Input::Frame &frame,void *context) {
     auto *self=static_cast<E5HidDevice *>(context);
     const bool wasActive=self->hardwareActive;self->hardwareActive=frame.count!=0;
+    if(frame.count)self->cancelSettingsTest("touch");
     if(self->touchTest && !self->touchTestDone && !self->touchTestStarted) {
       clock_interval_to_deadline(2,1000000000,&self->hardwareQuietDeadline);
       if(frame.count && !wasActive)note("E5HID selftest=touch deferred_hardware=1 contacts=%u",frame.count);
     }
     if(frame.count && self->touchTest && !self->touchTestDone && self->touchTestStarted) {
       if(self->touchTestStarted)self->emitTouch(E5Input::Frame{},"selftest-cancel");
+      if(self->touchTestKind==4 && self->testDown) {
+        self->testDown=false;self->sendKeys(self->held,"selftest-cancel-home");
+      }
       note("E5HID selftest=touch cancelled=1 hardware_contacts=%u started=%u",frame.count,self->touchTestStarted?1:0);
       self->touchTest=false;self->touchTestDone=true;
     }
     self->emitTouch(frame,"tlsc6x");
   }
   void testTouchStep() {
+    if(touchTestKind==4) {
+      // Read-only Settings navigation: open, a caller-selected row, Back,
+      // scroll, Home, reopen. Never tap a setting's switch. A fresh display
+      // frame is required between groups; physical contact cancels the test.
+      const unsigned step=touchTestStep;
+      const bool gate=step==0 || step==2 || step==4 || step==6 || step==18 || step==20 || step==22;
+      if(gate && e5_input_capture_busy()) {
+        clock_interval_to_deadline(50,1000000,&touchTestDeadline);return;
+      }
+      const unsigned rgb=e5_input_presented_rgb_pixels();
+      const unsigned ink=e5_input_presented_ink_pixels();
+      const bool contentGate=((step==0 || step==2 || step==20 || step==22) && rgb<settingsMinRgb) ||
+          ((step==2 || step==22) && ink<settingsMinInk);
+      if(gate && (e5_input_presented_frames()<=touchTestFrameMark || contentGate)) {
+        if(++touchTestWaits>=settingsWaitSeconds) {
+          touchTestDone=true;
+          note("E5HID settings-sequence stopped=1 phase=%u reason=frame-or-content-not-ready pixels=%u required=%u ink=%u required_ink=%u",step,rgb,settingsMinRgb,ink,settingsMinInk);
+        } else clock_interval_to_deadline(1,1000000000,&touchTestDeadline);
+        return;
+      }
+      touchTestWaits=0;
+      if(step==22) {
+        touchTestDone=true;e5_input_request_capture(622);
+        note("E5HID settings-sequence complete=1 active=%u home_down=%u failures=%u",touches.previous.count,testDown?1:0,failures);
+        return;
+      }
+      if(gate && settingsCapturedGate!=step) {
+        if(e5_input_request_capture(600+step))settingsCapturedGate=step;
+        clock_interval_to_deadline(50,1000000,&touchTestDeadline);return;
+      }
+      if(gate)touchTestFrameMark=e5_input_presented_frames();
+      E5Input::Frame frame{};unsigned delay=100;
+      const char *action="release";
+      if(step==0 || step==20) {frame.count=1;frame.contacts[0]={0,static_cast<uint16_t>(settingsIconX),static_cast<uint16_t>(settingsIconY),true};action="open-settings";}
+      else if(step==2) {frame.count=1;frame.contacts[0]={0,120,static_cast<uint16_t>(settingsRowY),true};action="open-row";}
+      else if(step==4) {frame.count=1;frame.contacts[0]={0,18,43,true};action="back";}
+      else if(step>=6 && step<=16) {frame.count=1;frame.contacts[0]={0,160,static_cast<uint16_t>(390-(step-6)*20),true};delay=150;action="scroll";}
+      else if(step==18 || step==19) {testDown=step==18;action=testDown?"home-down":"home-up";}
+      // First launch includes icon generation; leave enough time for the
+      // actual page to settle before interpreting the following touch.
+      if(step==1 || step==21)delay=90000;
+      if(step==3 || step==5 || step==17 || step==19)delay=60000;
+      // No full-frame capture or diagnostic output while a synthetic finger
+      // is held. Schedule first, emit input, then log only after its release.
+      clock_interval_to_deadline(delay,1000000,&touchTestDeadline);
+      if(gate) {settingsGestureAt=mach_absolute_time();settingsGesturePhase=step;settingsGestureAction=action;}
+      if(step==18 || step==19)sendKeys(held,"selftest-settings-home");
+      else emitTouch(frame,"selftest-settings");
+      touchTestStarted=true;++touchTestStep;
+      if(!frame.count && !testDown) {
+        uint64_t elapsedNs=0;absolutetime_to_nanoseconds(mach_absolute_time()-settingsGestureAt,&elapsedNs);
+        note("E5HID settings-sequence phase=%u action=%s release=%u held_ms=%llu failures=%u frames=%u pixels=%u ink=%u (synthetic)",
+            settingsGesturePhase,settingsGestureAction,step,(unsigned long long)(elapsedNs/1000000),failures,e5_input_presented_frames(),rgb,ink);
+      }
+      return;
+    }
     E5Input::Frame frame{};const unsigned step=touchTestStep++;
     // Mode 2 taps the fully visible Photos Dock icon and then leaves the UI
     // alone for the after-capture. The Settings icon is partly occluded in
@@ -378,6 +459,7 @@ class E5HidDevice final:public IOHIDDevice {
       uint32_t state;
       for(unsigned i=0;i<8 && dequeueHeld(state);++i) {
         self->held=state;
+        if(state)self->cancelSettingsTest("key");
         e5_touch_canvas_key(state);
         self->sendKeys(state,"matrix");
       }
@@ -390,7 +472,8 @@ class E5HidDevice final:public IOHIDDevice {
       // The isolated Settings test starts only after the original compositor
       // has submitted actual frames; warm boot times vary across Data states.
       if(self->test && !self->testDone && mach_absolute_time()>=self->testDeadline &&
-          (self->touchTestKind!=3 || e5_input_presented_frames()>=2)) {
+          (self->testDown || !e5_input_capture_busy()) &&
+          (self->touchTestKind<3 || e5_input_presented_frames()>=2)) {
         self->testDown=!self->testDown;
         self->sendHomeAction(self->testDown);
         const char *action=self->homeAction==0?"consumer-menu":self->homeAction==2?"return":"command-h";
@@ -400,24 +483,32 @@ class E5HidDevice final:public IOHIDDevice {
           if(++self->homeClicks>=2)self->testDone=true;
           else clock_interval_to_deadline(150,1000000,&self->testDeadline);
         }
+        else if(self->repeatHome) {
+          if(++self->homeClicks>=2)self->testDone=true;
+          else clock_interval_to_deadline(5,1000000000,&self->testDeadline);
+        }
         else if(++self->homeAction>=self->homeActionLimit)self->testDone=true;
         else clock_interval_to_deadline(5,1000000000,&self->testDeadline);
-        if(self->testDone && self->touchTestKind==3)
+        if(self->testDone && self->touchTestKind>=3) {
           // R311: 40s (was 10s). R310 proved Home unlocks, but the tap at
           // +10s hit the still-settling desktop and only produced scroll
           // states; R308's user-verified Settings tap happened on a desktop
           // that had been up for minutes. Give SpringBoard time to finish
           // icon layout before the synthetic tap.
           clock_interval_to_deadline(40,1000000000,&self->touchTestDeadline);
+          self->touchTestFrameMark=e5_input_presented_frames();
+          if(self->touchTestKind==4)self->homeAction=0;
+        }
       }
     }
     __atomic_store_n(&observedStage,6,__ATOMIC_RELAXED);
     const bool touchDriver=self->splitTouch?self->digitizerDriver:self->driver;
     if(self->probe)e5_touch_poll(self->touch && touchDriver?touchReady:nullptr,self);
     if(self->touch && touchDriver && self->touchTest && !self->touchTestDone && !self->hardwareActive &&
-        (self->touchTestKind==3?self->testDone:e5_touch_ready()) && mach_absolute_time()>=self->touchTestDeadline &&
+        (self->touchTestKind>=3?self->testDone:e5_touch_ready()) && mach_absolute_time()>=self->touchTestDeadline &&
         (!self->hardwareQuietDeadline || mach_absolute_time()>=self->hardwareQuietDeadline))self->testTouchStep();
-    if(self->snapshots && self->snapshotStage<(self->touchSnapshot?3u:2u) && mach_absolute_time()>=self->snapshotDeadline) {
+    const bool inputHeld=self->testDown || self->touches.previous.count || self->held;
+    if(!inputHeld && self->snapshots && self->snapshotStage<(self->touchSnapshot?3u:2u) && mach_absolute_time()>=self->snapshotDeadline) {
       __atomic_store_n(&observedStage,8,__ATOMIC_RELAXED);
       const bool captured=e5_input_request_capture(100+self->snapshotStage);
       if(captured || ++self->snapshotAttempts>=5) {
@@ -426,12 +517,26 @@ class E5HidDevice final:public IOHIDDevice {
         clock_interval_to_deadline(seconds,1000000000,&self->snapshotDeadline);
       } else clock_interval_to_deadline(1,1000000000,&self->snapshotDeadline);
     }
-    if(self->uiCapturePeriod && mach_absolute_time()>=self->uiCaptureDeadline) {
+    if(!inputHeld && self->uiCapturePeriod && mach_absolute_time()>=self->uiCaptureDeadline) {
       const bool queued=e5_input_request_capture(self->uiCaptureId);
       if(queued)++self->uiCaptureId;
       clock_interval_to_deadline(queued?self->uiCapturePeriod:1,1000000000,&self->uiCaptureDeadline);
     }
-    if((self->ticks%2000)==1)note("E5HID status driver=%u polls=%u transitions=%u reports=%u failed=%u dropped=%u held=%x touch_driver=%u split=%u",
+    if(!inputHeld && self->fpsEnabled && mach_absolute_time()>=self->fpsDeadline) {
+      const uint64_t now=mach_absolute_time();uint64_t ns=0;
+      absolutetime_to_nanoseconds(now-self->fpsStamp,&ns);
+      const unsigned frames=e5_input_presented_frames(),delta=frames-self->fpsFrames;
+      const unsigned inputs=self->reports-self->fpsReports;
+      if(inputs)clock_interval_to_deadline(5,1000000000,&self->fpsActivityDeadline);
+      const bool activity=now<self->fpsActivityDeadline;
+      self->fpsStamp=now;self->fpsFrames=frames;self->fpsReports=self->reports;
+      clock_interval_to_deadline(1,1000000000,&self->fpsDeadline);
+      if(ns && (delta || inputs || activity))
+        note("E5FPS interval_ms=%llu presented=%u fps_milli=%llu input_reports=%u last_present_us=%llu activity=%u",
+            (unsigned long long)(ns/1000000),delta,(unsigned long long)((uint64_t)delta*1000000000000ULL/ns),inputs,
+            (unsigned long long)(e5_input_last_present_ns()/1000),activity?1:0);
+    }
+    if(!inputHeld && (self->ticks%2000)==1)note("E5HID status driver=%u polls=%u transitions=%u reports=%u failed=%u dropped=%u held=%x touch_driver=%u split=%u",
        self->driver?1:0,__atomic_load_n(&polls,__ATOMIC_RELAXED),__atomic_load_n(&physicalEvents,__ATOMIC_RELAXED),
        self->reports,self->failures,__atomic_load_n(&dropped,__ATOMIC_RELAXED),self->held,touchDriver?1:0,self->splitTouch?1:0);
     __atomic_store_n(&observedStage,10,__ATOMIC_RELAXED);source->setTimeoutMS(e5_touch_poll_interval_ms());
@@ -461,14 +566,32 @@ public:
     touch=touchOnly || (PE_parse_boot_argn("e5-touch",&touchMode,sizeof(touchMode)) && touchMode>=3);
     splitTouch=!touchOnly && touch && PE_parse_boot_argn("e5-touch-split",&splitMode,sizeof(splitMode)) && splitMode==1;
     probe=!touchOnly && touchMode>=1 && touchMode<=3;
-    test=!touchOnly && PE_parse_boot_argn("e5-hid-test",&testMode,sizeof(testMode)) && testMode>=1 && testMode<=5;
+    test=!touchOnly && PE_parse_boot_argn("e5-hid-test",&testMode,sizeof(testMode)) && testMode>=1 && testMode<=6;
     doubleHome=testMode==5;
+    repeatHome=testMode==6;
     homeAction=testMode==2?1:testMode==3?2:0;
-    homeActions=testMode==4?4:doubleHome?2:1;
+    homeActions=testMode==4?4:(doubleHome || repeatHome)?2:1;
     homeActionLimit=homeAction+homeActions;
     snapshots=!touchOnly && PE_parse_boot_argn("e5-hid-snapshot",&snapshotMode,sizeof(snapshotMode)) && snapshotMode==1;
-    touchTest=!touchOnly && PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode>=1 && touchTestMode<=3;
-    touchTestKind=touchTestMode;
+    touchTest=!touchOnly && PE_parse_boot_argn("e5-touch-test",&touchTestMode,sizeof(touchTestMode)) && touchTestMode>=1 && touchTestMode<=4;
+    touchTestKind=touchTest?touchTestMode:0;
+    unsigned fps=0;
+    if(!touchOnly)PE_parse_boot_argn("e5-ui-fps",&fps,sizeof(fps));
+    fpsEnabled=fps==1;fpsStamp=mach_absolute_time();
+    fpsFrames=e5_input_presented_frames();fpsReports=reports;
+    clock_interval_to_deadline(1,1000000000,&fpsDeadline);
+    if(touchTestKind==4) {
+      PE_parse_boot_argn("e5-settings-row",&settingsRowY,sizeof(settingsRowY));
+      PE_parse_boot_argn("e5-settings-icon-x",&settingsIconX,sizeof(settingsIconX));
+      PE_parse_boot_argn("e5-settings-icon-y",&settingsIconY,sizeof(settingsIconY));
+      PE_parse_boot_argn("e5-ui-ready-pixels",&settingsMinRgb,sizeof(settingsMinRgb));
+      PE_parse_boot_argn("e5-ui-ready-ink",&settingsMinInk,sizeof(settingsMinInk));
+      PE_parse_boot_argn("e5-ui-ready-wait",&settingsWaitSeconds,sizeof(settingsWaitSeconds));
+      if(settingsRowY<80 || settingsRowY>450 || settingsIconX>=320 || settingsIconY>=480 ||
+          settingsMinRgb>320*480 || settingsMinInk>320*480 || !settingsWaitSeconds || settingsWaitSeconds>300) {
+        touchTest=false;touchTestKind=0;
+      }
+    }
     touchSnapshot=touchTest;
     if(!touchOnly)PE_parse_boot_argn("e5-hid-ui-capture",&uiCapturePeriod,sizeof(uiCapturePeriod));
     if(uiCapturePeriod<10 || uiCapturePeriod>60)uiCapturePeriod=0;

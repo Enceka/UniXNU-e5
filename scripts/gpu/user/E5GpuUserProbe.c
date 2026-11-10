@@ -12,7 +12,7 @@
 
 _Static_assert(sizeof(E5MaliInfo) == 72, "info ABI");
 _Static_assert(sizeof(E5MaliSubmit) == 72, "submit ABI");
-_Static_assert(sizeof(E5MaliSubmitMany) == 288, "submit-many ABI");
+_Static_assert(sizeof(E5MaliSubmitMany) == 1056, "submit-many ABI1.6");
 _Static_assert(sizeof(E5MaliGpuProperties) == 104, "properties ABI");
 static io_connect_t connection;
 
@@ -122,9 +122,10 @@ static int run_probe(void) {
     ok = !rc && info.abiMajor == 1 && info.abiMinor >= 1 && info.gpuIdRaw == 0x90910010 && info.shaderPresent == 5;
     note("VERSION %s abi=%u.%u gpu=%08x shader=%llx", ok ? "PASS" : "FAIL", info.abiMajor, info.abiMinor, info.gpuIdRaw, (unsigned long long)info.shaderPresent);
     if (!ok) goto done;
+    const size_t submit_bytes = info.abiMinor >= 6 ? sizeof(E5MaliSubmitMany) : E5_MALI_LEGACY_SUBMIT_MANY_BYTES;
     E5MaliGpuProperties properties = {0};
     rc = call(kSelGpuProperties, NULL, 0, &properties, sizeof(properties));
-    ok = !rc && properties.gpuId == info.gpuIdRaw && properties.mmuFeatures == info.mmuFeatures && properties.maxSubmitBos == 64;
+    ok = !rc && properties.gpuId == info.gpuIdRaw && properties.mmuFeatures == info.mmuFeatures && properties.maxSubmitBos >= 64;
     note("PROPS %s l2=%x tiler=%x mem=%x threads=%u wg=%u barrier=%u features=%x tls=%u", ok ? "PASS" : "FAIL", properties.l2Features, properties.tilerFeatures, properties.memFeatures, properties.threadMaxThreads, properties.threadMaxWorkgroup, properties.threadMaxBarrier, properties.threadFeatures, properties.threadTlsAlloc);
     note("TEXTURE features=%x:%x:%x:%x", properties.textureFeatures[0], properties.textureFeatures[1], properties.textureFeatures[2], properties.textureFeatures[3]);
     if (!ok || !make_buffer(&desc, 4096, 1) || !make_buffer(&fb, 320u * 480u * 2u, 0)) { ok = 0; goto done; }
@@ -136,9 +137,9 @@ static int run_probe(void) {
     ok = rc == kIOReturnBadArgument;
     note("CACHE-BOUNDS %s rc=%x", ok ? "PASS" : "FAIL", rc);
     if (!ok) goto done;
-    E5MaliSubmitMany too_many = { .jc = desc.gpu, .slot = 0, .handleCount = 65 };
+    E5MaliSubmitMany too_many = { .jc = desc.gpu, .slot = 0, .handleCount = E5_MALI_MAX_SUBMIT_BOS + 1 };
     E5MaliSubmitOut rejected = {0};
-    rc = call(kSelSubmitMany, &too_many, sizeof(too_many), &rejected, sizeof(rejected));
+    rc = call(kSelSubmitMany, &too_many, submit_bytes, &rejected, sizeof(rejected));
     ok = rc == kIOReturnBadArgument && !rejected.atomId;
     note("SUBMIT-BOUNDS %s rc=%x", ok ? "PASS" : "FAIL", rc);
     if (!ok) goto done;
@@ -149,7 +150,7 @@ static int run_probe(void) {
         E5MaliSubmitMany submit = { .jc = desc.gpu, .slot = 0, .handleCount = 64, .handles = { desc.handle, fb.handle } };
         for (unsigned i = 0; i < 62; ++i) submit.handles[i + 2] = extra[i].handle;
         E5MaliSubmitOut submitted = {0};
-        rc = call(kSelSubmitMany, &submit, sizeof(submit), &submitted, sizeof(submitted));
+        rc = call(kSelSubmitMany, &submit, submit_bytes, &submitted, sizeof(submitted));
         if (rc || submitted.status || !submitted.atomId) { note("SUBMIT FAIL rc=%x status=%x", rc, submitted.status); ok = 0; break; }
         E5MaliDestroyBo pinned = { .handle = extra[61].handle };
         rc = call(kSelDestroyBo, &pinned, sizeof(pinned), NULL, 0);

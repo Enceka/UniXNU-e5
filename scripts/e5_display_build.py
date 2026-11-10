@@ -19,7 +19,7 @@ import sys
 
 FAMILY_HASH = '2e044ee68c1650397e1435234ca6459206262e4c7ed709cb7131c6f664f9bd9b'
 PURE = [211, 213, 245, 246, 306, 307, 337, 338, 345]
-OWNED = sorted([0, 1, 7, 14, 84, 86, 87, 91, 141, 155, 176, 180, 183, 184, 188, 199, 200, 201, 203, 206, 207, 208, 210, 224, 229, 232, 255, 256, 258, 288, 290, 296, 344, 354] + PURE)
+OWNED = sorted([0, 1, 7, 14, 84, 86, 87, 91, 141, 155, 176, 180, 183, 184, 188, 199, 200, 201, 203, 206, 207, 208, 210, 224, 229, 232, 255, 256, 258, 288, 290, 296, 336, 344, 354] + PURE)
 ROOT = Path(sys.argv[1] if len(sys.argv) > 1 else '.').resolve()
 SOURCE = Path(__file__).resolve().parent / 'display'
 OUT = ROOT / 'build/e5-display'
@@ -117,6 +117,9 @@ def main():
     vptr = 0xfffffff005f38570
     table = struct.unpack('<358Q', read(vptr - slide, 358 * 8))
     require(all(table) and read(vptr - slide + 358 * 8, 24) == bytes(24), 'original vtable extent changed')
+    require(table[336] == 0xfffffff0067a023c and
+            read(table[336], 24) == bytes.fromhex('ff4300d1e00700f92800805200010012ff430091c0035fd6'),
+            'original shared FrameInfo transport bool changed')
     names = exports(kc, original)
     pure = [i for i, va in enumerate(table) if '___cxa_pure_virtual' in names.get(va, [])]
     require(pure == PURE, 'original pure virtual slots changed')
@@ -175,6 +178,18 @@ def main():
         expected = (0xf9400000 if wide else 0xb9400000) | ((field // (8 if wide else 4)) << 10)
         require(read(address - slide, 8) == struct.pack('<2I', expected, 0xd65f03c0),
                 'original IOSurface getter changed: ' + name)
+        surface_bindings['_e5_surface_' + name] = address
+
+    # Original IOSurface indexed getters: validate their complete code, including
+    # plane-table bounds checks, before using them from the b3a8 presenter.
+    for name, address, size, expected in [
+        ('plane_offset', 0xfffffff004b9ec3c, 0xd4, '75fb3151c20086386fa84387edea18e88a72461f4befe8272633ae74fec05b73'),
+        ('plane_data_offset', 0xfffffff004b9ed10, 0xd4, '285f244ebd6abc8186def019e931721d9d1a44a7e6440008e5e15198c778c7a8'),
+        ('plane_width', 0xfffffff004b9eeb8, 0xcc, '6453a60ac451634018d469f980c3fc3212a78dab0622e0e038c13960c0baed05'),
+        ('plane_height', 0xfffffff004b9ef84, 0xd4, 'a788918b63709f6b3d5f44df42e35f2fac990adf93756f315aba0439ca65985e'),
+        ('plane_stride', 0xfffffff004b9f1fc, 0xd4, '74a5c52bec00503d918f045bfc62e4825a66a03a4c2c6b4480a481cbbc6fa873')]:
+        require(digest(read(address - slide, size)) == expected,
+                'original IOSurface plane getter changed: ' + name)
         surface_bindings['_e5_surface_' + name] = address
 
     header = '''// SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -312,6 +327,8 @@ public:
             header += '  virtual void completeCurrentSwap();\n'
         elif i == 296:
             header += '  virtual bool validateSwap(const OriginalLegacySwapRequest *);\n'
+        elif i == 336:
+            header += '  virtual bool opaque336();\n'
         elif i == 337:
             header += '  virtual IOReturn collectCompletionReports(uint32_t, void *, uint32_t *, uint32_t) = 0;\n'
         elif i == 344:

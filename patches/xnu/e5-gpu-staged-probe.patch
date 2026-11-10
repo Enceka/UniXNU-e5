@@ -1,0 +1,64 @@
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -8156,19 +8156,37 @@
+  * Mode 2 executes the bounded probe before launchd, preserving PID 1 through
+  * the probe's unconditional execve handoff after its tests. */
+ extern volatile int native_bindfs_boot_mount;
+-static int e5_gpu_probe_init_ready;
++static const char *e5_gpu_probe_init_path;
+ static void
+ e5_gpu_probe_prepare(proc_t p, user_addr_t scratch)
+ {
+ 	unsigned enabled = 0;
+ 	if (!PE_parse_boot_argn("e5-gpu-user-probe", &enabled, sizeof(enabled)) ||
+-	    (enabled != 1 && enabled != 2)) return;
++	    (enabled != 1 && enabled != 2 && enabled != 3)) return;
+ 	if (e5_data_mount_state != 100) {
+ 		printf("E5GPUUSER FAIL Data not qualified state=%d\n", e5_data_mount_state);
+ 		return;
+ 	}
+ 	vfs_context_t ctx = vfs_context_current();
+ 	vnode_t vp = NULLVP;
++	if (enabled == 3) {
++		/* The signed Vulkan/Metal libraries live on Data, outside boot_b.
++		 * Loading the probe still goes through the ordinary exec path. */
++		static const char staged[] = "/private/var/mobile/e5gpu-stage/e5vk-probe";
++		int error = vnode_lookup(staged, VNODE_LOOKUP_NOFOLLOW, &vp, ctx);
++		if (!error) {
++			if (vnode_vtype(vp) != VREG) error = EINVAL;
++			struct vnode_attr va;
++			VATTR_INIT(&va); VATTR_WANTED(&va, va_data_size);
++			if (!error) error = vnode_getattr(vp, &va, ctx);
++			if (!error && (va.va_data_size < 4096 || va.va_data_size > 1048576)) error = EINVAL;
++			vnode_put(vp); vp = NULLVP;
++		}
++		if (error) { printf("E5GPUUSER STAGED FAIL errno=%d\n", error); return; }
++		e5_gpu_probe_init_path = staged;
++		printf("E5GPUUSER STAGED PASS path=%s\n", staged);
++		return;
++	}
+ 	extern int e5_gpu_user_probe_image(const uint8_t **, uint64_t *);
+ 	const uint8_t *image = NULL;
+ 	uint64_t image_size = 0;
+@@ -8191,7 +8209,7 @@
+ 		/* iOS 17 loads system jobs from a signed precomputed cache.
+ 		 * This bounded mode runs the signed probe before launchd; its
+ 		 * main always execs launchd in place, even after a failed test. */
+-		e5_gpu_probe_init_ready = 1;
++		e5_gpu_probe_init_path = "/private/var/e5gpu-probe";
+ 		return;
+ 	}
+ 	static const char source[] = "/private/var/e5gpu-daemons";
+@@ -8519,10 +8537,10 @@
+ #endif
+ 
+ #if DEBUG || DEVELOPMENT
+-	if (e5_gpu_probe_init_ready) {
++	if (e5_gpu_probe_init_path) {
+ 		printf("E5GPUUSER INIT loading signed probe before launchd\n");
+ 		error = load_init_program_at_path(p, (user_addr_t)scratch_addr,
+-		    "/private/var/e5gpu-probe", init_envp);
++		    e5_gpu_probe_init_path, init_envp);
+ 		if (!error) return;
+ 		printf("E5GPUUSER INIT FAIL errno=%d; continuing launchd\n", error);
+ 	}

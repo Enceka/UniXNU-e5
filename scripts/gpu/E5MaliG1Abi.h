@@ -4,7 +4,7 @@
 
 enum {
     kE5MaliAbiMajor = 1,
-    kE5MaliAbiMinor = 1,
+    kE5MaliAbiMinor = 7,
 };
 
 enum E5MaliSelector {
@@ -23,7 +23,9 @@ enum E5MaliSelector {
     kSelCacheRange   = 12,
     kSelGpuProperties = 13,
     kSelSubmitMany   = 14,
-    kSelCount        = 15,
+    kSelImportUser   = 15,
+    kSelSubmitWaitMany = 16, // SubmitMany in; SubmitWaitOut out; bounded genuine wait
+    kSelCount        = 17,
 };
 
 enum E5MaliAtomState {
@@ -51,7 +53,7 @@ struct E5MaliCreateBo {              // in
     uint32_t flags;                  // bit0 noExec
 };
 struct E5MaliCreateBoOut {           // out
-    uint32_t handle;                 // 1..64
+    uint32_t handle;                 // 1..maxBoHandles (GpuProperties).
     uint32_t status;                 // IOReturn
     uint64_t size;
 };
@@ -116,7 +118,7 @@ struct E5MaliStats {                 // kSelStats out
     //               Reset (the engine reset it triggered).
     uint64_t submitted, completed, faults, timedOut, cancelled;
     uint64_t resets, mmuFaults, lastMmuFaultCode, lastMmuFaultAddr;
-    uint64_t pad0;
+    uint64_t userCachePages; // ABI1.3: globally held imported RAM pages
     uint32_t activeAtoms, mappedBytes, liveBoBytes;
     uint32_t pad1;
 };

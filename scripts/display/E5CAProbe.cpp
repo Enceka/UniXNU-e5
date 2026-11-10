@@ -541,7 +541,7 @@ static void recordPcHistory(const ProcSnaps &snaps) {
     const ProcSnap &p = snaps.proc[i];
     const bool springboard = !strcmp(p.name, "SpringBoard");
     const bool lsd = !strcmp(p.name, "lsd");
-    const bool app=!strcmp(p.name,"Preferences") || !strcmp(p.name,"MobileSlideShow");
+    const bool app=!strcmp(p.name,"Preferences") || !strcmp(p.name,"MobileSlideShow") || !strncmp(p.name,"iconservicesagen",16);
     if (!springboard && !lsd && !app) continue;
     // The SB main thread plus lsd's first four threads — the lsd scan
     // workers are TH_RUN and only their pc/cpu trajectory distinguishes
@@ -569,23 +569,24 @@ static void recordPcHistory(const ProcSnaps &snaps) {
   pcHistory = buffer;
 }
 static void snapshotThreads(ProcSnaps &out) {
-  static const char *const wanted[] = {"Preferences", "MobileSlideShow", "SpringBoard", "liveactivitiesd", "chronod", "backboardd", "lsd",
+  static const char *const wanted[] = {"Preferences", "MobileSlideShow", "iconservicesagent", "iconservicesagen", "SpringBoard", "liveactivitiesd", "chronod", "backboardd", "lsd",
                                       "launchd", "logd", "runningboardd", "watchdogd"};
   bzero(&out, sizeof(out));
   unsigned requestedThreads=12;
   PE_parse_boot_argn("e5-ui-threads",&requestedThreads,sizeof(requestedThreads));
+  if(!requestedThreads)return;
   if(requestedThreads<12 || requestedThreads>kMaxThreads)requestedThreads=12;
   for (int pid = 1; pid < 512 && out.count < kMaxProcs; ++pid) {
     proc_t process = proc_find(pid);
     if (!process) continue;
     char name[32] = {};
     proc_name(pid, name, sizeof(name));
-    unsigned slot = kMaxProcs;
+    bool wantedProcess = false;
     for (unsigned i = 0; i != sizeof(wanted) / sizeof(wanted[0]); ++i)
-      if (!strcmp(name, wanted[i])) { slot = i; break; }
+      if (!strcmp(name, wanted[i])) { wantedProcess = true; break; }
     unsigned uid = proc_getuid(process);
     task_t task = TASK_NULL;
-    if (slot != kMaxProcs && !proc_exiting(process)) {
+    if (wantedProcess && !proc_exiting(process)) {
       task = proc_task(process);
       if (task) task_reference(task);
     }
@@ -600,7 +601,7 @@ static void snapshotThreads(ProcSnaps &out) {
     Reader r = {map, nullptr};
     const bool springboard = !strcmp(name, "SpringBoard");
     const bool lsd = !strcmp(name, "lsd");
-    const bool deep = springboard || lsd || !strcmp(name,"Preferences") || !strcmp(name,"MobileSlideShow");
+    const bool deep = springboard || lsd || !strcmp(name,"Preferences") || !strcmp(name,"MobileSlideShow") || !strcmp(name,"backboardd") || !strncmp(name,"iconservicesagen",16);
     const bool sampleStacks=deep || !strcmp(name,"backboardd") ||
         !strcmp(name,"liveactivitiesd") || !strcmp(name,"chronod");
     if (deep) {
@@ -637,6 +638,10 @@ static void snapshotThreads(ProcSnaps &out) {
             Word entry = arrayPtr + 3 * e * 8;  // dyld_image_info: 3 pointers
             Word loadAddress = 0, pathPtr = 0, pathAlt = 0;
             if (!r.probeBytes(entry, &loadAddress, 8)) break;
+            // GPU workers execute privately loaded images, often after the
+            // first sixteen cache entries. Keep only non-cache mappings for
+            // backboardd so its plug-in and ICD bases are always captured.
+            if (!strcmp(name,"backboardd") && loadAddress >= 0x180000000ULL) continue;
             // r232 delivered a=… p=0 t=- for every entry: the +0x10 slot read
             // zero on this dyld. r233 reads +8 first (user-filed correction),
             // keeps +0x10 as a fallback, and trusts whichever decodes to
@@ -657,6 +662,17 @@ static void snapshotThreads(ProcSnaps &out) {
             for (unsigned c = 0; c != sizeof(p.imageText[0]); ++c)
               p.imageText[p.images][c] = 0;
             if (pathPtr) r.probeBytes(pathPtr, p.imageText[p.images], sizeof(p.imageText[0]) - 1);
+            if (pathPtr && !strcmp(name,"backboardd")) {
+              char full[192] = {};
+              if (r.probeBytes(pathPtr, full, sizeof(full) - 1)) {
+                const char *baseName = full;
+                for (const char *at = full; *at; ++at) if (*at == '/') baseName = at + 1;
+                unsigned c = 0;
+                for (; c + 1 < sizeof(p.imageText[0]) && baseName[c]; ++c)
+                  p.imageText[p.images][c] = baseName[c];
+                p.imageText[p.images][c] = 0;
+              }
+            }
             ++p.images;
           }
         }
@@ -975,7 +991,7 @@ extern "C" void e5_ca_probe_dump(void) {
     log("E5THCAP pid=%u n=%u truncated=%u",p.pid,p.threads,p.threadsTruncated?1u:0u);
     const bool springboard = !strcmp(p.name, "SpringBoard");
     const bool lsd = !strcmp(p.name, "lsd");
-    const bool deep = springboard || lsd || !strcmp(p.name,"Preferences") || !strcmp(p.name,"MobileSlideShow");
+    const bool deep = springboard || lsd || !strcmp(p.name,"Preferences") || !strcmp(p.name,"MobileSlideShow") || !strcmp(p.name,"backboardd") || !strncmp(p.name,"iconservicesagen",16);
     if(deep)log("E5OBJC pid=%u sl=%llx rd=%llu:%llu lock=%llx:%llx",p.pid,p.slide,
         p.objcReadBefore,p.objcReadAfter,p.objcBefore,p.objcAfter);
     if (lsd)

@@ -65,9 +65,14 @@ void captureWorker(thread_call_param_t,thread_call_param_t) {
 }
 }
 extern "C" bool e5_input_request_capture(unsigned id) {
+  // The throttled LOW pool can starve under the original system's startup
+  // load. The HID caller instead excludes captures while input is held.
   if(!captureCall)captureCall=thread_call_allocate_with_options(captureWorker,nullptr,THREAD_CALL_PRIORITY_KERNEL,THREAD_CALL_OPTIONS_ONCE);
   if(!captureCall)return false;
   unsigned empty=0;
   if(!__atomic_compare_exchange_n(&pendingCapture,&empty,id,false,__ATOMIC_ACQ_REL,__ATOMIC_ACQUIRE))return false;
   captureAttempts=0;thread_call_enter(captureCall);return true;
+}
+extern "C" bool e5_input_capture_busy(void) {
+  return __atomic_load_n(&pendingCapture,__ATOMIC_ACQUIRE)!=0;
 }

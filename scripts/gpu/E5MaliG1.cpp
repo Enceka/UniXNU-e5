@@ -34,13 +34,21 @@
 #include <IOKit/IOLocks.h>
 #include <IOKit/IOUserClient.h>
 #include <mach/mach_types.h>
+#include <kern/task.h>
+#include <vm/pmap.h>
+// vm/pmap.h hides these from the IOKit compile mode; signatures are native XNU.
+extern "C" unsigned int pmap_cache_attributes(ppnum_t);
+extern "C" void pmap_set_cache_attributes(ppnum_t, unsigned int);
+extern "C" boolean_t pmap_valid_page(ppnum_t);
+extern "C" vm_offset_t ml_static_ptovirt(vm_offset_t);
 #include <pexpert/pexpert.h>
 
 #include "E5MaliG1.hpp"
 #include "E5MaliG1Ext.h"
 static_assert(sizeof(E5MaliCacheRange) == 24, "cache ABI");
 static_assert(sizeof(E5MaliGpuProperties) == 104, "properties ABI");
-static_assert(sizeof(E5MaliSubmitMany) == 288, "submit-many ABI");
+static_assert(sizeof(E5MaliSubmitMany) == 1056, "submit-many ABI1.6");
+static_assert(sizeof(E5MaliImportUser) == 24, "import-user ABI");
 
 // Offline-compiled Valhall v9 shader assets for self-test §4.2 (user-space
 // subagent deliverable; provenance header inside the file).
@@ -55,6 +63,7 @@ extern "C" int e5_gpu_user_probe_image(const uint8_t **bytes, uint64_t *size) {
 }
 
 using namespace E5MaliG1Regs;
+static void e5_publish_metal(IOService *gpu);
 
 // ---------------------------------------------------------------------------
 // External kernel interfaces (same archive / conventions as the E5Tlsc6x
@@ -137,7 +146,7 @@ const char *exceptionName(uint32_t code) {
     return "UNLISTED";
 }
 
-constexpr uint32_t kMaxBoHandles = 64;      // handles 1..64
+constexpr uint32_t kMaxBoHandles = E5_MALI_MAX_BO_HANDLES;
 constexpr uint32_t kMaxBoMappings = 4;      // remaps per BO
 constexpr uint32_t kMaxClientAtoms = 64;
 constexpr uint64_t kVaWindowDefault = 512ull << 20;
@@ -206,6 +215,19 @@ uint32_t E5MaliG1::bootImport_ = 0;     // e5-mali-g1-import=1 (ImportFixed)
 uint32_t E5MaliG1::bootVaMb_ = 0;       // e5-mali-g1-va-mb=N
 uint32_t E5MaliG1::bootSlotMask_ = 7;   // e5-mali-g1-slots=N
 uint32_t E5MaliG1::bootSelftest_ = 0;   // e5-mali-g1-selftest=N (bit0 §2, bit1 §3)
+static uint32_t gTraceJobs = 0;
+static uint32_t gTracePerf = 0;
+// Optional timing lives outside the IOService's size-constrained atom pool.
+// All accesses use the same state lock as the corresponding atom transition.
+struct E5AtomPerf {
+    uint64_t id, cleanTicks, submittedAt, completedAt, importedBytes;
+};
+static E5AtomPerf gAtomPerf[E5MaliG1::kAtomPool];
+static uint64_t e5PerfUs(uint64_t ticks) {
+    uint64_t ns = 0;
+    absolutetime_to_nanoseconds(ticks, &ns);
+    return ns / 1000;
+}
 
 // Diagnostic counters (serial echo).
 extern "C" {
@@ -229,9 +251,176 @@ static void readBootArgs() {
     PE_parse_boot_argn("e5-mali-g1-va-mb", &E5MaliG1::bootVaMb_, sizeof(uint32_t));
     PE_parse_boot_argn("e5-mali-g1-slots", &E5MaliG1::bootSlotMask_, sizeof(uint32_t));
     PE_parse_boot_argn("e5-mali-g1-selftest", &E5MaliG1::bootSelftest_, sizeof(uint32_t));
+    PE_parse_boot_argn("e5-gpu-job-trace", &gTraceJobs, sizeof(gTraceJobs));
+    PE_parse_boot_argn("e5-gpu-perf", &gTracePerf, sizeof(gTracePerf));
     PE_parse_boot_argn("e5-mali-g1-selftest-slot", &gSelftestSlot, sizeof(gSelftestSlot));
     if (gSelftestSlot > 2) gSelftestSlot = 2;
     PE_parse_boot_argn("e5-mali-g1-clear-variant", &gClearVariant, sizeof(gClearVariant));
+}
+
+// Track imported physical pages without retyping their CPU mappings. Shared
+// bitmap pages also contain CPU atomic reference counts; changing the whole
+// page to non-cacheable breaks that protocol on E5. DMA visibility is handled
+// by cache maintenance at submission and retirement instead.
+namespace E5UserCache {
+// Pinned xnu-10063.141.1 arm/memory_types.h values; the IOKit header mode
+// hides their VM_MEM_* definitions. Do not enable broader private layouts.
+constexpr unsigned cacheWriteBack = 0x2, cacheInnerWriteBack = 0x12;
+constexpr unsigned cacheWriteThrough = 0xb, cacheWriteCombine = 0x6;
+// This pinned E5 kernel has HAS_UCNORMAL_MEM=0: VM_WIMG_RT is device
+// uncached (CACHE_ATTRINDX_DISABLE), as used by original IOSurface buffers.
+constexpr unsigned cacheRealtime = 0x17;
+constexpr uint64_t base = 0x80000000ull;
+constexpr uint64_t top = 0x100000000ull;
+constexpr size_t count = (top - base) / 4096;
+struct Page { uint32_t references, previous; };
+static Page *pages;
+static IOLock *lock;
+static uint64_t active;
+static bool start() {
+    if (!lock) lock = IOLockAlloc();
+    return lock != nullptr;
+}
+static bool index(IOMemoryDescriptor *md, uint64_t offset, size_t *slot, ppnum_t *page,
+                  IOByteCount *segmentBytes = nullptr) {
+    IOByteCount bytes = 0;
+    // Our GPU page tables require CPU physical addresses, never an I/O
+    // mapper's address for a pre-existing shared memory object.
+    uint64_t physical = md->getPhysicalSegment(offset, &bytes, kIOMemoryMapperNone);
+    if (bytes < 4096 || (physical & 4095) || physical < base || physical > top - 4096) return false;
+    *slot = (size_t)((physical - base) >> 12); *page = (ppnum_t)(physical >> 12);
+    if (segmentBytes) *segmentBytes = bytes;
+    return true;
+}
+static void releaseLocked(IOMemoryDescriptor *md, uint32_t number) {
+    uint32_t restored = 0, mismatch = 0;
+    for (uint32_t n = 0; n < number; ++n) {
+        size_t slot = 0; ppnum_t page = 0;
+        if (!index(md, (uint64_t)n * 4096, &slot, &page) || !pages[slot].references) { ++mismatch; continue; }
+        if (--pages[slot].references == 0) {
+            // Imports never change the caller's CPU memory type.
+            mismatch += pmap_cache_attributes(page) != pages[slot].previous;
+            pages[slot].previous = 0;
+            --active; ++restored;
+        }
+    }
+    note("E5WC RELEASE pages=%u released=%u mismatch=%u live=%llu preserve=1", number, restored, mismatch, (unsigned long long)active);
+}
+static bool acquire(IOMemoryDescriptor *md, uint64_t length, uint32_t *number) {
+    *number = 0;
+    IOLockLock(lock);
+    if (!pages) {
+        pages = (Page *)IOMalloc(count * sizeof(Page));
+        if (pages) bzero(pages, count * sizeof(Page));
+    }
+    bool ok = pages != nullptr;
+    const char *reason = "tracker";
+    uint64_t offset = 0;
+    uint32_t realtimePages = 0;
+    for (; ok && offset < length; offset += 4096) {
+        size_t slot = 0; ppnum_t page = 0;
+        reason = "segment";
+        ok = index(md, offset, &slot, &page);
+        if (!ok) break;
+        reason = "refcount";
+        ok = pages[slot].references != UINT32_MAX;
+        if (!ok) break;
+        if (pages[slot].references &&
+            pmap_cache_attributes(page) != pages[slot].previous) {
+            reason = "cpu-policy-changed"; ok = false; break;
+        }
+        if (!pages[slot].references) {
+            unsigned mode = pmap_cache_attributes(page);
+            reason = "cache-mode";
+            if (mode != cacheWriteBack && mode != cacheInnerWriteBack &&
+                mode != cacheWriteThrough && mode != cacheWriteCombine &&
+                mode != cacheRealtime) { ok = false; break; }
+            // Do not extend this to unmanaged I/O or unknown cache modes.
+            if (!pmap_valid_page(page)) {
+                reason = "unmanaged"; ok = false; break;
+            }
+            pages[slot].previous = mode; ++active;
+        }
+        ++pages[slot].references;
+        if (pages[slot].previous == cacheRealtime) ++realtimePages;
+        ++*number;
+    }
+    if (!ok && *number) { releaseLocked(md, *number); *number = 0; }
+    if (ok) {
+        note("E5WC ACQUIRE PASS pages=%u live=%llu rt=%u preserve=1", *number, (unsigned long long)active, realtimePages);
+    } else {
+        static uint64_t failures;
+        const uint64_t n = ++failures;
+        if (n <= 4 || !(n & (n - 1))) {
+            IOByteCount rawLength = 0, physicalLength = 0;
+            const uint64_t raw = md->getPhysicalSegment(offset, &rawLength);
+            const uint64_t physical = md->getPhysicalSegment(offset, &physicalLength, kIOMemoryMapperNone);
+            const bool ram = !(physical & 4095) && physical >= base && physical <= top - 4096;
+            const ppnum_t page = (ppnum_t)(physical >> 12);
+            note("E5WC ACQUIRE FAIL n=%llu reason=%s off=%llx len=%llx pa=%llx raw=%llx seg=%llx mode=%x managed=%u pages=%u live=%llu",
+                 (unsigned long long)n, reason, (unsigned long long)offset,
+                 (unsigned long long)length, (unsigned long long)physical,
+                 (unsigned long long)raw, (unsigned long long)physicalLength,
+                 ram ? pmap_cache_attributes(page) : 0xffffu,
+                 ram ? (unsigned)pmap_valid_page(page) : 0u, *number,
+                 (unsigned long long)active);
+        }
+    }
+    IOLockUnlock(lock);
+    return ok;
+}
+static uint64_t activePages() {
+    IOLockLock(lock); uint64_t result = active; IOLockUnlock(lock); return result;
+}
+// CPU memory types stay unchanged. Operation 0 validates, 1 cleans before
+// DMA, 2 explicitly invalidates, and 3 cleans/invalidates on retirement.
+// The retirement clean preserves CPU-owned metadata lines modified while
+// the GPU accessed other cache lines of the same imported bitmap pages.
+static bool syncUserRange(IOMemoryDescriptor *md, uint64_t offset, uint64_t length, unsigned operation) {
+    uint64_t physical = 0, segmentLeft = 0;
+    while (length) {
+        const uint64_t pageOffset = offset & ~4095ull;
+        const uint64_t within = offset & 4095;
+        const uint64_t bytes = length < 4096 - within ? length : 4096 - within;
+        if (!segmentLeft) {
+            size_t slot = 0; ppnum_t first = 0; IOByteCount span = 0;
+            if (!index(md, pageOffset, &slot, &first, &span)) return false;
+            physical = (uint64_t)first << 12;
+            // Reuse only whole pages of the descriptor's physical segment.
+            // A fragmented or partial segment is queried again at its edge.
+            segmentLeft = span & ~4095ull;
+        }
+        if (physical < base || physical > top - 4096) return false;
+        const ppnum_t page = (ppnum_t)(physical >> 12);
+        if (!pmap_valid_page(page)) return false;
+        const unsigned mode = pmap_cache_attributes(page);
+        const bool cached = mode == cacheWriteBack || mode == cacheInnerWriteBack || mode == cacheWriteThrough;
+        if (!cached && mode != cacheWriteCombine && mode != cacheRealtime) return false;
+        if (operation && cached) {
+            // The native direct map avoids altering the user's RO mapping.
+            const uintptr_t start = (uintptr_t)ml_static_ptovirt((vm_offset_t)((uint64_t)page << 12)) + within;
+            // DC operates on whole lines. An unaligned range can touch one
+            // more line than ceil(bytes / 64); include both boundary lines.
+            for (uintptr_t at = start & ~uintptr_t(63); at < start + bytes; at += 64) {
+                if (operation == 1) __asm__ volatile("dc cvac, %0" :: "r"(at) : "memory");
+                else if (operation == 2) __asm__ volatile("dc ivac, %0" :: "r"(at) : "memory");
+                else __asm__ volatile("dc civac, %0" :: "r"(at) : "memory");
+            }
+        }
+        offset += bytes; length -= bytes;
+        physical += 4096; segmentLeft -= 4096;
+    }
+    if (operation) __asm__ volatile("dsb sy" ::: "memory");
+    return true;
+}
+static void release(IOMemoryDescriptor *md, uint32_t number) {
+    if (!number) return;
+    IOLockLock(lock); releaseLocked(md, number); IOLockUnlock(lock);
+}
+static void finish() {
+    if (pages) { IOFree(pages, count * sizeof(Page)); pages = nullptr; }
+    if (lock) { IOLockFree(lock); lock = nullptr; }
+}
 }
 
 // ===========================================================================
@@ -247,7 +436,7 @@ bool E5MaliG1::start(IOService *provider) {
     readBootArgs();
     state_ = IOLockAlloc();
     hw_ = IOSimpleLockAlloc();
-    if (!state_ || !hw_) { fail(); return false; }
+    if (!state_ || !hw_ || !E5UserCache::start()) { fail(); return false; }
     e5_mali_g1_stage = 1;
     if (!mapAll()) { fail(); return false; }
     e5_mali_g1_stage = 2;
@@ -292,6 +481,7 @@ bool E5MaliG1::start(IOService *provider) {
          gpuId_, (unsigned long long)shaderPresent_, asPresent_, jsPresent_,
          mmuFeatures_, numSlots_);
     registerService();
+    e5_publish_metal(this);
     scheduleSelftest();
     return true;
 }
@@ -366,6 +556,7 @@ void E5MaliG1::stop(IOService *provider) {
 }
 
 void E5MaliG1::free() {
+    E5UserCache::finish();
     if (pinStorage_) {
         IOFree(pinStorage_, kAtomPool * E5_MALI_MAX_SUBMIT_BOS * sizeof(uint32_t));
         pinStorage_ = nullptr;
@@ -559,7 +750,7 @@ bool E5MaliG1::gpuInit() {
     }
     if (!done) { note("E5MALI1 GPU soft/hard reset timed out"); return false; }
     write32(GPU_INT_CLEAR, ~0u);
-    write32(GPU_INT_MASK, GPU_IRQ_FAULT | GPU_IRQ_MULTIPLE_FAULT | GPU_IRQ_RESET_COMPLETED);
+    write32(GPU_INT_MASK, GPU_IRQ_FAULT | GPU_IRQ_MULTIPLE_FAULT);
 
     // Identity + capability snapshot with the corrected offsets (the R198
     // CAP line mislabelled 0x08/0x0c/0x10/0x14 and read MMU_INT as "as").
@@ -848,6 +1039,7 @@ E5MaliG1Atom *E5MaliG1::slotDequeue(uint32_t slot) {
 }
 
 void E5MaliG1::completeAtom(E5MaliG1Atom *a, uint8_t state, uint32_t hwStatus) {
+    if (gTracePerf == 1) gAtomPerf[a - atomPool_].completedAt = mach_absolute_time();
     // Single terminal-transition point: drop any slot-ring reference first
     // so a retired pool entry can never be touched again by the engine
     // (pool entries are reused the moment they read kAtomFree).
@@ -968,12 +1160,14 @@ bool E5MaliG1::slotKick(uint32_t slot) {
         write32(base + JS_AFFINITY_NEXT_LO, (uint32_t)shaderPresent_);
         write32(base + JS_AFFINITY_NEXT_HI, (uint32_t)(shaderPresent_ >> 32));
         write32(base + JS_CONFIG_NEXT, cfg);
+        if (gTracePerf == 1) gAtomPerf[a - atomPool_].submittedAt = mach_absolute_time();
         write32(base + JS_COMMAND_NEXT, JS_COMMAND_START);
         if (!s.ring[0]) s.ring[0] = a;
         else s.ring[1] = a;
         a->state = kAtomOnHw;
         a->submittedTickMs = tickMs_;
-        note("E5MALI1 submit atom %llu js%u as=%d headN=%llx affN=%llx cfgN=%08x cmdN=1 (tail: RO, never written)",
+        if (gTraceJobs == 1 || bootSelftest_ || a->id <= 8 || !(a->id & (a->id - 1)))
+          note("E5MALI1 submit atom %llu js%u as=%d headN=%llx affN=%llx cfgN=%08x cmdN=1 (tail: RO, never written)",
              (unsigned long long)a->id, slot, a->ctx->as,
              (unsigned long long)a->jc, (unsigned long long)shaderPresent_, cfg);
     }
@@ -1210,8 +1404,10 @@ void E5MaliG1::resetEngine(const char *why) {
     // GPU reset, escalated for the wedged-slot case (R318: rawstat stayed 0
     // through soft AND hard reset): SOFT_RESET -> HARD_RESET -> settle,
     // clear, HARD_RESET again with a longer bound. RESET_COMPLETED is
-    // polled in INT_RAWSTAT, which latches regardless of INT_MASK.
-    write32(GPU_INT_MASK, GPU_IRQ_RESET_COMPLETED);
+    // polled in INT_RAWSTAT, which latches regardless of INT_MASK. Keep
+    // GPU interrupts masked: irqPrimary clears masked status before the
+    // workloop runs, so enabling RESET_COMPLETED lets it steal our signal.
+    write32(GPU_INT_MASK, 0);
     write32(GPU_INT_CLEAR, GPU_IRQ_RESET_COMPLETED);
     write32(GPU_CMD, GPU_CMD_SOFT_RESET);
     bool done = false;
@@ -1435,6 +1631,7 @@ public:
         if (!uc) return nullptr;
         if (!uc->init()) { uc->release(); return nullptr; }
         uc->task_ = task;
+        if (task) task_reference(task);
         uc->driver_ = driver;
         if (!uc->attach(driver)) { uc->release(); return nullptr; }
         if (!uc->start(driver)) {
@@ -1447,6 +1644,10 @@ public:
     bool start(IOService *provider) override {
         if (!IOUserClient::start(provider)) return false;
         if (!driver_ || !e5_mali_g1_ready) return false;
+        // IOKit objects are limited to 16 KiB. Keep the larger handle table
+        // separately allocated, with the same client/DMA lifetime.
+        bos_ = new Bo[kMaxBoHandles];
+        if (!bos_) return false;
         E5MaliG1Context *ctx = new E5MaliG1Context;
         if (!ctx) return false;
         ctx->client = this;
@@ -1480,16 +1681,22 @@ public:
         return kIOReturnSuccess;
     }
     void free() override {
+        if (ctx_ && ctx_->as >= 0) quiesceAndRelease();
         if (ctx_) { ctx_->teardown(); delete ctx_; ctx_ = nullptr; }
+        if (bos_) { delete[] bos_; bos_ = nullptr; }
+        if (task_) { task_deallocate(task_); task_ = nullptr; }
         IOUserClient::free();
     }
-    IOReturn clientMemoryForType(UInt32 type, IOOptionBits *, IOMemoryDescriptor **memory) override {
-        // type = BO handle; userspace mmaps the underlying buffer.
-        if (type == 0 || type > kMaxBoHandles || !bos_[type - 1].md)
+    IOReturn clientMemoryForType(UInt32 type, IOOptionBits *options, IOMemoryDescriptor **memory) override {
+        if (!memory || type == 0 || type > kMaxBoHandles || !driver_ || !bos_)
             return kIOReturnBadArgument;
-        bos_[type - 1].md->retain();
-        *memory = bos_[type - 1].md;
-        return kIOReturnSuccess;
+        IOLockLock(driver_->stateLock());
+        IOMemoryDescriptor *descriptor = bos_[type - 1].descriptor();
+        if (options && bos_[type - 1].userReadOnly) *options |= kIOMapReadOnly;
+        if (descriptor) descriptor->retain();
+        IOLockUnlock(driver_->stateLock());
+        *memory = descriptor;
+        return descriptor ? kIOReturnSuccess : kIOReturnBadArgument;
     }
     IOReturn externalMethod(uint32_t selector, IOExternalMethodArguments *args,
                             IOExternalMethodDispatch *dispatch = 0,
@@ -1540,14 +1747,24 @@ public:
 
     struct Bo {
         IOBufferMemoryDescriptor *md = nullptr;
+        IOMemoryDescriptor *userMd = nullptr;
+        IOMemoryMap *userMap = nullptr;
+        uint32_t userCachePages = 0;
+        IOMemoryDescriptor *descriptor() const { return md ? md : userMd; }
+        void *bytes() const {
+            return md ? md->getBytesNoCopy() :
+                   userMap ? (void *)(uintptr_t)userMap->getVirtualAddress() : nullptr;
+        }
         uint64_t size = 0;
         bool imported = false;
+        bool userReadOnly = false;
         uint64_t importPa = 0;
         struct Mapping { uint64_t va = 0, len = 0; } maps[kMaxBoMappings];
         uint32_t mapCount = 0;
     };
 
     IOReturn createBo(const E5MaliCreateBo *in, E5MaliCreateBoOut *out);
+    IOReturn importUser(const E5MaliImportUser *in, E5MaliCreateBoOut *out);
     IOReturn destroyBoLocked(uint32_t handle);
     IOReturn mapBo(const E5MaliMapBo *in, E5MaliMapBoOut *out);
     IOReturn unmapBo(const E5MaliUnmapBo *in, uint32_t *status);
@@ -1587,7 +1804,7 @@ public:
     task_t task_ = nullptr;
     E5MaliG1 *driver_ = nullptr;
     E5MaliG1Context *ctx_ = nullptr;
-    Bo bos_[kMaxBoHandles];
+    Bo *bos_ = nullptr;
     E5MaliG1Atom *atoms_[kMaxClientAtoms] = {};
     uint64_t liveBoBytes_ = 0;
 };
@@ -1611,7 +1828,7 @@ IOReturn E5MaliG1UserClient::createBo(const E5MaliCreateBo *in, E5MaliCreateBoOu
         return kIOReturnNoMemory;
     }
     for (uint32_t h = 0; h < kMaxBoHandles; ++h) {
-        if (bos_[h].md || bos_[h].imported) continue;
+        if (bos_[h].descriptor() || bos_[h].imported) continue;
         bos_[h].md = md;
         bos_[h].size = size;
         bos_[h].mapCount = 0;
@@ -1619,6 +1836,9 @@ IOReturn E5MaliG1UserClient::createBo(const E5MaliCreateBo *in, E5MaliCreateBoOu
         out->handle = h + 1;
         out->size = size;
         out->status = kIOReturnSuccess;
+        if (h == 64 || h == 127 || h == 255)
+            note("E5MALI BO TABLE handle=%u bytes=%llu capacity=%u", h + 1,
+                 (unsigned long long)size, kMaxBoHandles);
         return kIOReturnSuccess;
     }
     md->complete();
@@ -1627,12 +1847,66 @@ IOReturn E5MaliG1UserClient::createBo(const E5MaliCreateBo *in, E5MaliCreateBoOu
     return kIOReturnNoSpace;
 }
 
+IOReturn E5MaliG1UserClient::importUser(const E5MaliImportUser *in, E5MaliCreateBoOut *out) {
+    bzero(out, sizeof(*out));
+    out->status = kIOReturnBadArgument;
+    if (!task_ || task_ == kernel_task || !in->address || !in->length ||
+        in->length > (256ull << 20) || (in->address & 4095) || (in->length & 4095) ||
+        in->address >= (1ull << 48) || in->length > (1ull << 48) - in->address ||
+        (in->flags & ~E5_MALI_IMPORT_READ_ONLY) || in->reserved) return out->status;
+    const bool readOnly = (in->flags & E5_MALI_IMPORT_READ_ONLY) != 0;
+    const IODirection direction = readOnly ? kIODirectionOut : kIODirectionInOut;
+    // Wire before publishing the handle; VM operations run outside the GPU lock.
+    IOMemoryDescriptor *md = IOMemoryDescriptor::withAddressRange(
+        in->address, in->length, ((IOOptionBits)direction | (IOOptionBits)kIOMemoryMapperNone), task_);
+    if (!md) { out->status = kIOReturnNoMemory; return out->status; }
+    IOReturn result = md->prepare(direction);
+    if (result != kIOReturnSuccess) { md->release(); out->status = result; return result; }
+    IOMemoryMap *map = md->createMappingInTask(kernel_task, 0,
+        kIOMapAnywhere | (readOnly ? kIOMapReadOnly : 0));
+    if (!map || !map->getVirtualAddress()) {
+        if (map) map->release();
+        md->complete(); md->release(); out->status = kIOReturnNoMemory; return out->status;
+    }
+    uint32_t cachePages = 0;
+    if (!(readOnly ? E5UserCache::syncUserRange(md, 0, in->length, 0) :
+                    E5UserCache::acquire(md, in->length, &cachePages))) {
+        map->release(); md->complete(); md->release();
+        out->status = kIOReturnNoResources; return out->status;
+    }
+    IOLockLock(driver_->stateLock());
+    result = kIOReturnNotReady;
+    if (ctx_ && ctx_->as >= 0 && !ctx_->asFaulted) {
+        result = kIOReturnNoSpace;
+        for (uint32_t i = 0; i < kMaxBoHandles; ++i) {
+            Bo &bo = bos_[i];
+            if (bo.descriptor() || bo.imported) continue;
+            bo.userMd = md; bo.userMap = map; bo.userCachePages = cachePages;
+            bo.userReadOnly = readOnly;
+            bo.size = in->length; bo.mapCount = 0;
+            liveBoBytes_ += bo.size;
+            out->handle = i + 1; out->size = bo.size; result = kIOReturnSuccess; break;
+        }
+    }
+    IOLockUnlock(driver_->stateLock());
+    if (result == kIOReturnSuccess && readOnly) {
+        static uint32_t reports;
+        if (__atomic_add_fetch(&reports, 1u, __ATOMIC_RELAXED) <= 8)
+            note("E5MALI RO IMPORT handle=%u bytes=%llu", out->handle, (unsigned long long)in->length);
+    }
+    if (result != kIOReturnSuccess) {
+        E5UserCache::release(md, cachePages);
+        map->release(); md->complete(); md->release();
+    }
+    out->status = result; return result;
+}
+
 // DMA-safe release: refuses while an atom pins the handle; otherwise unmaps
 // every mapping, flushes the AS range, then drops the buffer.
 IOReturn E5MaliG1UserClient::destroyBoLocked(uint32_t handle) {
     if (handle == 0 || handle > kMaxBoHandles) return kIOReturnBadArgument;
     Bo &bo = bos_[handle - 1];
-    if (!bo.md && !bo.imported) return kIOReturnBadArgument;
+    if (!bo.descriptor() && !bo.imported) return kIOReturnBadArgument;
     if (handlePinned(handle) || dmaActive()) return kIOReturnBusy;
     E5MaliG1 *d = driver_;
     for (uint32_t m = 0; m < bo.mapCount; ++m) {
@@ -1649,7 +1923,13 @@ IOReturn E5MaliG1UserClient::destroyBoLocked(uint32_t handle) {
         bo.md->release();
         bo.md = nullptr;
     }
+    if (bo.userMd) { E5UserCache::release(bo.userMd, bo.userCachePages); bo.userCachePages = 0; }
+    if (bo.userMap) { bo.userMap->release(); bo.userMap = nullptr; }
+    if (bo.userMd) {
+        bo.userMd->complete(); bo.userMd->release(); bo.userMd = nullptr;
+    }
     bo.imported = false;
+    bo.userReadOnly = false;
     bo.importPa = 0;
     liveBoBytes_ -= bo.size;
     bo.size = 0;
@@ -1660,11 +1940,15 @@ IOReturn E5MaliG1UserClient::mapBo(const E5MaliMapBo *in, E5MaliMapBoOut *out) {
     bzero(out, sizeof(*out));
     E5MaliG1 *d = driver_;
     if (in->handle == 0 || in->handle > kMaxBoHandles ||
-        (!bos_[in->handle - 1].md && !bos_[in->handle - 1].imported)) {
+        (!bos_[in->handle - 1].descriptor() && !bos_[in->handle - 1].imported)) {
         out->status = kIOReturnBadArgument;
         return kIOReturnBadArgument;
     }
     Bo &bo = bos_[in->handle - 1];
+    if (bo.userMd && !(in->flags & 2)) {
+        out->status = kIOReturnNotPermitted;
+        return kIOReturnNotPermitted;
+    }
     if (bo.mapCount >= kMaxBoMappings) { out->status = kIOReturnNoSpace; return kIOReturnNoSpace; }
     uint64_t length = in->length ? in->length : bo.size - in->offset;
     if (in->offset > bo.size || length == 0 || length % E5MaliG1Mmu::kPageSize ||
@@ -1693,6 +1977,7 @@ IOReturn E5MaliG1UserClient::mapBo(const E5MaliMapBo *in, E5MaliMapBoOut *out) {
     if (!va) { out->status = kIOReturnNoSpace; return kIOReturnNoSpace; }
     E5MaliG1Mmu::MapFlags flags;
     flags.noExec = (in->flags & 2) != 0;
+    if (bo.userReadOnly) flags.write = false;
     uint64_t mapped = 0;
     if (bo.imported) {
         // Fixed physical window: straight 4 KiB ATEs.
@@ -1703,7 +1988,7 @@ IOReturn E5MaliG1UserClient::mapBo(const E5MaliMapBo *in, E5MaliMapBoOut *out) {
     } else {
         // Walk the buffer's physical segments page by page.
         IOByteCount segLen = 0;
-        uint64_t seg = bo.md->getPhysicalSegment(in->offset, &segLen);
+        uint64_t seg = bo.descriptor()->getPhysicalSegment(in->offset, &segLen, kIOMemoryMapperNone);
         while (mapped < length && seg) {
             if (!ctx_->table.map(va + mapped, seg & ~(E5MaliG1Mmu::kPageSize - 1),
                                  E5MaliG1Mmu::kPageSize, flags)) goto fail;
@@ -1712,7 +1997,7 @@ IOReturn E5MaliG1UserClient::mapBo(const E5MaliMapBo *in, E5MaliMapBoOut *out) {
                 segLen -= E5MaliG1Mmu::kPageSize;
                 seg += E5MaliG1Mmu::kPageSize;
             } else {
-                seg = bo.md->getPhysicalSegment(in->offset + mapped, &segLen);
+                seg = bo.descriptor()->getPhysicalSegment(in->offset + mapped, &segLen, kIOMemoryMapperNone);
             }
         }
         if (mapped < length) goto fail;
@@ -1740,7 +2025,7 @@ fail:
 IOReturn E5MaliG1UserClient::unmapBo(const E5MaliUnmapBo *in, uint32_t *status) {
     E5MaliG1 *d = driver_;
     if (in->handle == 0 || in->handle > kMaxBoHandles ||
-        (!bos_[in->handle - 1].md && !bos_[in->handle - 1].imported)) {
+        (!bos_[in->handle - 1].descriptor() && !bos_[in->handle - 1].imported)) {
         *status = kIOReturnBadArgument;
         return kIOReturnBadArgument;
     }
@@ -1784,7 +2069,7 @@ IOReturn E5MaliG1UserClient::importFixed(const E5MaliImportFixed *in, E5MaliMapB
     IOLockLock(d->stateLock());
     uint32_t h = 0;
     for (uint32_t i = 0; i < kMaxBoHandles; ++i)
-        if (!bos_[i].md && !bos_[i].imported) { h = i + 1; break; }
+        if (!bos_[i].descriptor() && !bos_[i].imported) { h = i + 1; break; }
     if (!h) { IOLockUnlock(d->stateLock()); return kIOReturnNoSpace; }
     Bo &bo = bos_[h - 1];
     const uint64_t va = ctx_->va.alloc(in->length);
@@ -1894,7 +2179,8 @@ IOReturn E5MaliG1UserClient::submitHandles(uint64_t jc, uint32_t slot, const uin
     uint32_t pinCount = 0;
     for (uint32_t i = 0; i < count; ++i) {
         const uint32_t h = handles[i];
-        if (!h || h > kMaxBoHandles || (!bos_[h - 1].md && !bos_[h - 1].imported)) {
+        if (!h || h > kMaxBoHandles || (!bos_[h - 1].descriptor() && !bos_[h - 1].imported)) {
+            note("E5MALI1 SUBMIT REJECT invalid handle=%u count=%u", h, count);
             out->status = kIOReturnBadArgument;
             return kIOReturnBadArgument;
         }
@@ -1911,6 +2197,16 @@ IOReturn E5MaliG1UserClient::submitHandles(uint64_t jc, uint32_t slot, const uin
                 chainPinned = true;
     }
     if (!chainPinned) { out->status = kIOReturnBadArgument; return kIOReturnBadArgument; }
+    const uint64_t cleanBegin = gTracePerf == 1 ? mach_absolute_time() : 0;
+    uint64_t importedBytes = 0;
+    for (uint32_t i = 0; i < pinCount; ++i) {
+        const Bo &bo = bos_[pins[i] - 1];
+        if (bo.userMd) importedBytes += bo.size;
+        if (bo.userMd && !E5UserCache::syncUserRange(bo.userMd, 0, bo.size, 1)) {
+            out->status = kIOReturnNotPermitted;
+            return out->status;
+        }
+    }
     // Atom from the shared pool.
     E5MaliG1Atom *a = nullptr;
     for (uint32_t i = 0; i < E5MaliG1::kAtomPool; ++i)
@@ -1918,6 +2214,10 @@ IOReturn E5MaliG1UserClient::submitHandles(uint64_t jc, uint32_t slot, const uin
     if (!a) { out->status = kIOReturnNoSpace; return kIOReturnNoSpace; }
     static uint64_t nextId = 1;
     a->id = nextId++;
+    if (gTracePerf == 1) {
+        auto &perf = gAtomPerf[a - d->atomPool()];
+        perf = {a->id, mach_absolute_time() - cleanBegin, 0, 0, importedBytes};
+    }
     a->jc = jc;
     a->slot = (uint8_t)slot;
     a->state = kAtomQueued;
@@ -1978,6 +2278,28 @@ IOReturn E5MaliG1UserClient::waitAtom(const E5MaliWaitAtom *in, E5MaliWaitAtomOu
             const uint8_t state = a->state;
             const uint32_t hw = a->hwStatus;
             const uint64_t seq = d->completionSeq();
+            // Publish GPU-written cache lines before the completion reaches
+            // userspace and before dropping the BO pins. Preserve concurrently
+            // modified CPU-only metadata lines in shared bitmap allocations.
+            IOReturn synced = kIOReturnSuccess;
+            const uint64_t retireBegin = gTracePerf == 1 ? mach_absolute_time() : 0;
+            for (uint32_t n = 0; n < a->pinnedCount; ++n) {
+                const Bo &bo = bos_[a->pinnedBo[n] - 1];
+                if (bo.userMd && !bo.userReadOnly &&
+                    !E5UserCache::syncUserRange(bo.userMd, 0, bo.size, 3))
+                    synced = kIOReturnNotPermitted;
+            }
+            if (gTracePerf == 1 && (a->id <= 8 || !(a->id & 63))) {
+                const auto &perf = gAtomPerf[a - d->atomPool()];
+                const uint64_t now = mach_absolute_time();
+                if (perf.id == a->id && perf.submittedAt && perf.completedAt >= perf.submittedAt)
+                    note("E5GPUPERF atom=%llu client=%p slot=%u bos=%u imported_bytes=%llu submit_sync_us=%llu hw_us=%llu observe_us=%llu retire_sync_us=%llu polls=%u state=%u",
+                         (unsigned long long)a->id, this, a->slot, a->pinnedCount,
+                         (unsigned long long)perf.importedBytes, (unsigned long long)e5PerfUs(perf.cleanTicks),
+                         (unsigned long long)e5PerfUs(perf.completedAt - perf.submittedAt),
+                         (unsigned long long)e5PerfUs(retireBegin - perf.submittedAt),
+                         (unsigned long long)e5PerfUs(now - retireBegin), spins, state);
+            }
             // Terminal: retire the pool slot and the client registry entry
             // (the id becomes non-queryable afterwards; see userclient-abi.md).
             a->pinnedCount = 0;
@@ -1988,8 +2310,8 @@ IOReturn E5MaliG1UserClient::waitAtom(const E5MaliWaitAtom *in, E5MaliWaitAtomOu
             out->state = state;
             out->hwStatus = hw;
             out->completionSeq = seq;
-            out->status = kIOReturnSuccess;
-            return kIOReturnSuccess;
+            out->status = synced;
+            return synced;
         }
         if (!wait || in->timeoutMs == 0 || spins >= in->timeoutMs) {
             const uint8_t state = a->state;
@@ -2079,6 +2401,15 @@ IOReturn E5MaliG1UserClient::externalMethod(uint32_t selector,
         if (r != kIOReturnSuccess && status == 0) status = (uint32_t)r;
         return r;
     }
+    case kSelImportUser: {
+        if (args->structureInputSize != sizeof(E5MaliImportUser) ||
+            args->structureOutputSize < sizeof(E5MaliCreateBoOut)) return kIOReturnBadArgument;
+        E5MaliCreateBoOut out = {};
+        const IOReturn r = importUser((const E5MaliImportUser *)args->structureInput, &out);
+        memcpy(args->structureOutput, &out, sizeof(out));
+        args->structureOutputSize = sizeof(out);
+        return r;
+    }
     case kSelImportFixed: {
         if (args->structureInputSize != sizeof(E5MaliImportFixed) ||
             args->structureOutputSize < sizeof(E5MaliMapBoOut)) return kIOReturnBadArgument;
@@ -2111,17 +2442,55 @@ IOReturn E5MaliG1UserClient::externalMethod(uint32_t selector,
         return r;
     }
     case kSelSubmitMany: {
-        if (args->structureInputSize != sizeof(E5MaliSubmitMany) ||
+        if (!e5_mali_submit_many_size_supported(args->structureInputSize) ||
             args->structureOutputSize < sizeof(E5MaliSubmitOut)) return kIOReturnBadArgument;
         const E5MaliSubmitMany *in = (const E5MaliSubmitMany *)args->structureInput;
+        if (!e5_mali_submit_many_count_valid(args->structureInputSize, in->handleCount))
+            return kIOReturnBadArgument;
         E5MaliSubmitOut out = {};
         IOLockLock(d->stateLock());
+        if (in->handleCount > 64) {
+            static uint32_t reports;
+            if (++reports <= 8)
+                note("E5MALI SUBMIT MANY handles=%u packet=%u", in->handleCount,
+                     (unsigned)args->structureInputSize);
+        }
         const IOReturn r = submitHandles(in->jc, in->slot, in->udata,
                                          in->handles, in->handleCount, &out);
         IOLockUnlock(d->stateLock());
         memcpy(args->structureOutput, &out, sizeof(out));
         args->structureOutputSize = sizeof(out);
         return r;
+    }
+    case kSelSubmitWaitMany: {
+        if (!e5_mali_submit_many_size_supported(args->structureInputSize) ||
+            args->structureOutputSize < sizeof(E5MaliSubmitWaitOut)) return kIOReturnBadArgument;
+        const auto *in = (const E5MaliSubmitMany *)args->structureInput;
+        if (!e5_mali_submit_many_count_valid(args->structureInputSize, in->handleCount))
+            return kIOReturnBadArgument;
+        E5MaliSubmitOut submitted = {};
+        IOLockLock(d->stateLock());
+        IOReturn result = submitHandles(in->jc, in->slot, in->udata,
+                                       in->handles, in->handleCount, &submitted);
+        IOLockUnlock(d->stateLock());
+        E5MaliSubmitWaitOut out = {};
+        out.atomId = submitted.atomId;
+        out.status = result;
+        if (result == kIOReturnSuccess) {
+            E5MaliWaitAtom request = {submitted.atomId, 500, 0};
+            E5MaliWaitAtomOut completion = {};
+            // The IRQ/workloop can complete the atom while this call waits.
+            // The existing waiter owns cache publication, pin lifetime and
+            // terminal retirement; timeout leaves active pins intact.
+            result = waitAtom(&request, &completion, true);
+            out.state = completion.state;
+            out.hwStatus = completion.hwStatus;
+            out.completionSeq = completion.completionSeq;
+            out.status = result;
+        }
+        memcpy(args->structureOutput, &out, sizeof(out));
+        args->structureOutputSize = sizeof(out);
+        return result;
     }
     case kSelGpuProperties: {
         if (args->structureInputSize || args->structureOutputSize < sizeof(E5MaliGpuProperties))
@@ -2161,19 +2530,25 @@ IOReturn E5MaliG1UserClient::externalMethod(uint32_t selector,
         IOLockLock(d->stateLock());
         Bo &bo = bos_[in->handle - 1];
         IOReturn r = kIOReturnBadArgument;
-        if (bo.md && !bo.imported && in->offset < bo.size) {
+        if (bo.descriptor() && !bo.imported && in->offset < bo.size) {
             const uint64_t bytes = in->length ? in->length : bo.size - in->offset;
             if (!(in->offset & 63u) && bytes && !(bytes & 63u) && bytes <= bo.size - in->offset) {
                 r = kIOReturnBusy;
                 if (!handlePinned(in->handle)) {
-                    uint8_t *cpu = (uint8_t *)bo.md->getBytesNoCopy();
-                    r = kIOReturnNoMemory;
-                    if (cpu) {
-                        if (in->operation == E5_MALI_CACHE_CLEAN)
-                            cacheCleanRange(cpu + in->offset, (uint32_t)bytes);
-                        else
-                            cacheInvalidateRange(cpu + in->offset, (uint32_t)bytes);
-                        r = kIOReturnSuccess;
+                    if (bo.userMd) {
+                        r = E5UserCache::syncUserRange(bo.userMd, in->offset, bytes,
+                            in->operation == E5_MALI_CACHE_CLEAN ? 1 : 2)
+                            ? kIOReturnSuccess : kIOReturnNotPermitted;
+                    } else {
+                        uint8_t *cpu = (uint8_t *)bo.bytes();
+                        r = kIOReturnNoMemory;
+                        if (cpu) {
+                            if (in->operation == E5_MALI_CACHE_CLEAN)
+                                cacheCleanRange(cpu + in->offset, (uint32_t)bytes);
+                            else
+                                cacheInvalidateRange(cpu + in->offset, (uint32_t)bytes);
+                            r = kIOReturnSuccess;
+                        }
                     }
                 }
             }
@@ -2196,6 +2571,7 @@ IOReturn E5MaliG1UserClient::externalMethod(uint32_t selector,
         for (uint32_t i = 0; i < kMaxClientAtoms; ++i)
             if (atoms_[i] && (atoms_[i]->state == kAtomOnHw || atoms_[i]->state == kAtomQueued))
                 ++st.activeAtoms;
+        st.userCachePages = E5UserCache::activePages();
         st.mappedBytes = (uint32_t)ctx_->mappedBytes;
         st.liveBoBytes = (uint32_t)liveBoBytes_;
         IOLockUnlock(d->stateLock());
@@ -2207,13 +2583,19 @@ IOReturn E5MaliG1UserClient::externalMethod(uint32_t selector,
         if (args->structureInputSize != sizeof(E5MaliCleanBo)) return kIOReturnBadArgument;
         const uint32_t h = ((const E5MaliCleanBo *)args->structureInput)->handle;
         IOLockLock(d->stateLock());
-        const bool valid = h != 0 && h <= kMaxBoHandles && bos_[h - 1].md &&
+        const bool valid = h != 0 && h <= kMaxBoHandles && bos_[h - 1].descriptor() &&
                            !bos_[h - 1].imported;
-        void *bytes = valid ? bos_[h - 1].md->getBytesNoCopy() : nullptr;
+        void *bytes = valid ? bos_[h - 1].bytes() : nullptr;
         const uint32_t bytesLen = valid ? (uint32_t)bos_[h - 1].size : 0;
-        if (bytes) cacheCleanRange(bytes, bytesLen);
+        const bool busy = valid && handlePinned(h);
+        bool synced = false;
+        if (bytes && !busy) {
+            if (bos_[h - 1].userMd)
+                synced = E5UserCache::syncUserRange(bos_[h - 1].userMd, 0, bytesLen, 1);
+            else { cacheCleanRange(bytes, bytesLen); synced = true; }
+        }
         IOLockUnlock(d->stateLock());
-        return valid && bytes ? kIOReturnSuccess : kIOReturnBadArgument;
+        return busy ? kIOReturnBusy : synced ? kIOReturnSuccess : kIOReturnBadArgument;
     }
     case kSelSelfTestMmu: {
         if (args->structureOutputSize < sizeof(E5MaliSelfTestMmuOut)) return kIOReturnNoSpace;
@@ -4071,3 +4453,6 @@ extern "C" int e5_mali_g1_start(void *providerService) {
     }
     return kIOReturnSuccess;
 }
+
+#include "E5MetalDiscovery.inc"
+static void e5_publish_metal(IOService *gpu) { E5MetalDiscovery::publish(gpu); }

@@ -19,6 +19,9 @@
 
 extern "C" unsigned e5_quiet;
 static unsigned e5CpuPresentedFrames;
+static unsigned e5CpuPresentedRgb;
+static unsigned e5CpuPresentedInk;
+static uint64_t e5CpuLastPresentNs;
 static unsigned e5GpuScanoutOwned;
 extern "C" bool e5_mali_g1_scanout_selected(void);
 extern "C" bool e5_display_gpu_scanout_owned(void) {
@@ -27,10 +30,26 @@ extern "C" bool e5_display_gpu_scanout_owned(void) {
 extern "C" unsigned e5_input_presented_frames(void) {
   return __atomic_load_n(&e5CpuPresentedFrames,__ATOMIC_ACQUIRE);
 }
+extern "C" unsigned e5_input_presented_rgb_pixels(void) {
+  // Diagnostic content count, updated only with e5-ui-pixels enabled.
+  return __atomic_load_n(&e5CpuPresentedRgb,__ATOMIC_ACQUIRE);
+}
+extern "C" unsigned e5_input_presented_ink_pixels(void) {
+  // Diagnostic contrast: pixels different from the top-left background.
+  return __atomic_load_n(&e5CpuPresentedInk,__ATOMIC_ACQUIRE);
+}
+extern "C" uint64_t e5_input_last_present_ns(void) {
+  return __atomic_load_n(&e5CpuLastPresentNs,__ATOMIC_ACQUIRE);
+}
 extern "C" IOMemoryDescriptor *e5_surface_descriptor(OSObject *);
 extern "C" uint64_t e5_surface_width(OSObject *), e5_surface_height(OSObject *);
 extern "C" uint64_t e5_surface_stride(OSObject *), e5_surface_allocation(OSObject *);
 extern "C" uint32_t e5_surface_format(OSObject *), e5_surface_planes(OSObject *);
+extern "C" uint64_t e5_surface_plane_offset(OSObject *, unsigned);
+extern "C" uint64_t e5_surface_plane_data_offset(OSObject *, unsigned);
+extern "C" uint64_t e5_surface_plane_stride(OSObject *, unsigned);
+extern "C" uint64_t e5_surface_plane_width(OSObject *, unsigned);
+extern "C" uint64_t e5_surface_plane_height(OSObject *, unsigned);
 
 extern "C" IOReturn e5_display_backend_soft(unsigned slot, uint32_t selector,
                                             void *b, void *c, void *d);
@@ -252,7 +271,6 @@ static void *const e5FakeFamilyVt[264] = {
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
     (void *)&e5FakeFamilyThunk, (void *)&e5FakeFamilyThunk,
 };
-static void *sAsyncNode = nullptr; // r153: kind-3 node captured at registration
 // Registration arguments can live on the caller's stack. Retain only bounded
 // diagnostic copies; r201 faulted while the DPU timer reread that dead stack.
 static unsigned long long sAsyncRegSnapshot[4] = {};
@@ -260,90 +278,44 @@ static unsigned long long sAsyncNodeSnapshot[6] = {};
 static unsigned sAsyncDiagnosticValid = 0;
 extern "C" void e5_display_family_broadcast(void *svcRaw, unsigned kind,
                                             unsigned long long payload0);
+// Use native live lists only. Their link/unlink and this action share the
+// original command gate, so a removed registration is never dereferenced.
+static void e5_cpu_log(const char *format, ...);
 static IOReturn e5_display_async_action(OSObject *owner, void *, void *, void *, void *) {
-  static bool sNodeDumped = false;
   uint8_t *base = (uint8_t *)owner;
-  if (!sNodeDumped) {
-    sNodeDumped = true;
-    e5_state_log("E5ACT base=%p node3=%p ak=%02x", owner,
-                 __atomic_load_n(&sAsyncNode, __ATOMIC_RELAXED)
-                     ? *(void **)&sAsyncNode : nullptr,
-                 e5_display_async_kinds);
-  }
   const unsigned long long now = mach_absolute_time();
+  unsigned livePorts = 0;
   for (unsigned kind = 3; kind <= 5; kind += 2) {
-    // r153: +0x1588 list head was NEVER populated (r152 proved: ak set, no
-    // node, no E5NODE dump). Deliver through the node captured in opaque208.
-    uint8_t *node = (kind == 3) ? (uint8_t *)sAsyncNode
-                                : *(uint8_t **)(base + 0x1588 + kind * 16);
+    uint8_t *node = *(uint8_t **)(base + 0x1588 + kind * 16);
     for (unsigned visited = 0; node && visited < 64; ++visited) {
-      unsigned long long *ref = (unsigned long long *)(node + 0x18);
-      // r159: r158 proved node+0x18 is EMPTY while node+0x8 holds a kernel
-      // pointer (the OSAsyncReference64 array the family registered). Try
-      // BOTH candidates; sendAsyncResult64WithOptions validates and simply
-      // returns an error for a wrong array (tracked in ar=).
-
-      if (!*ref && !sNodeDumped) {
-        sNodeDumped = true;
-        // r152: node exists (ak bits prove it) but +0x18 ref is zero —
-        // dump the node head once to find where the wake ref lives.
-        e5_state_log("E5NODE k=%u node=%p w0=%llx w1=%llx w2=%llx w3=%llx w4=%llx w5=%llx",
-                     kind, node,
-                     ((unsigned long long *)node)[0],
-                     ((unsigned long long *)node)[1],
-                     ((unsigned long long *)node)[2],
-                     ((unsigned long long *)node)[3],
-                     ((unsigned long long *)node)[4],
-                     ((unsigned long long *)node)[5]);
-      }
-      if (!*ref && kind == 3) {
-        // r168: v28/r126 delivered 630/630 through the NODE ITSELF as the
-        // OSAsyncReference64 (the sel-72 wrapper hands slot 208 a pointer at
-        // ctx+8 that IS the reference array; node[0]==0 is fine — the kernel
-        // delivery re-derives the port). Replicate exactly that call.
-        unsigned long long v28payload[2] = {mach_absolute_time(), 0};
-        int r = _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
-            (unsigned long long *)node, 0, v28payload, 2, 1);
-        __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
-        __atomic_store_n(&e5_display_async_last, (unsigned)r, __ATOMIC_RELAXED);
-        if (r == 0) __atomic_add_fetch(&e5_display_async_send_ok, 1U, __ATOMIC_RELAXED);
-        break; // one delivery per fire; r159 taught wrong-array = zone panic,
-               // but v28's array is the registered pointer itself (r126-proven)
-      }
-      if (*ref) {
-        __atomic_fetch_or(&e5_display_async_ports, 1u << kind, __ATOMIC_RELAXED);
-        if (kind == 3) {
-          // r160: the family's own broadcaster (raw 0xfffffff0067778c0)
-          // resolves the registered ref internally; r136 proved it safe from
-          // this thread_call context (asend counted 630/630 ok in that era).
-          e5_display_family_broadcast(base, 3, 0);
-          __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
-          node = nullptr; // manual send below is dead for kind 3
-          break;
-        }
-        // FrameInfoNotifyFunc accepts {property-mask, frame-id}; an empty mask
-        // reports no changed properties. VsyncNotifyFunc requires SIX words:
-        // three u64 values split low/high, as in the original broadcaster
-        // at raw 0x6796720. The v28 two-word timestamp could overrun that
-        // callback's input and must never be used for kind 5.
-        unsigned long long payload[6] = {0, 0, 0, 0, 0, 0};
-        unsigned count = 2;
+      auto ref = (unsigned long long *)(node + 0x18);
+      // Pinned XNU IOUserClient.cpp strips its two reserved flag bits.
+      // A null port returns Success without sending any message; node+0
+      // is the list's next link and must never be used as an async reference.
+      if ((*ref & ~3ULL) != 0) {
+        livePorts |= 1u << kind;
+        unsigned long long payload[6] = {};
+        unsigned count = 2; // FrameInfo: empty property mask and status.
         if (kind == 5) {
-          payload[0] = (uint32_t)now;
-          payload[1] = now >> 32;
-          payload[2] = (uint32_t)now;
-          payload[3] = now >> 32;
-          count = 6;
+          payload[0] = (uint32_t)now; payload[1] = now >> 32;
+          payload[2] = (uint32_t)now; payload[3] = now >> 32;
+          count = 6; // Vsync: three split 64-bit words, native callback ABI.
         }
-        int r = _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
+        const int status = _ZN12IOUserClient28sendAsyncResult64WithOptionsEPyiS0_jj(
             ref, 0, payload, count, 1);
-        __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
-        __atomic_store_n(&e5_display_async_last, (unsigned)r, __ATOMIC_RELAXED);
-        if (r == 0) __atomic_add_fetch(&e5_display_async_send_ok, 1U, __ATOMIC_RELAXED);
+        const unsigned sends = __atomic_add_fetch(&e5_display_async_sends, 1U, __ATOMIC_RELAXED);
+        __atomic_store_n(&e5_display_async_last, (unsigned)status, __ATOMIC_RELAXED);
+        if (!status) __atomic_add_fetch(&e5_display_async_send_ok, 1U, __ATOMIC_RELAXED);
+        if (sends <= 4 || !(sends & (sends - 1)))
+          e5_cpu_log("E5ASYNC kind=%u args=%u sends=%u live=%x status=%x", kind, count, sends, livePorts, status);
       }
       node = *(uint8_t **)node;
     }
   }
+  // Recompute on each protected traversal, including after unregistration.
+  // The delivery timer can now leave slow discovery mode when a real port
+  // is registered, rather than counting no-op Success returns as delivery.
+  __atomic_store_n(&e5_display_async_ports, livePorts, __ATOMIC_RELEASE);
   return kIOReturnSuccess;
 }
 
@@ -823,13 +795,18 @@ public:
     __atomic_fetch_add(&e5_display_cap213_calls, 1U, __ATOMIC_RELAXED);
     IOReturn status = kIOReturnBadArgument;
     if (count && key && transport) {
-      *count = 1;
-      *transport = 1; // r164: v18/r125-era answer (cached at +0x3c8)
+      unsigned frameInfo = 1;
+      PE_parse_boot_argn("e5-frameinfo", &frameInfo, sizeof(frameInfo));
+      *count = frameInfo == 1 ? 1 : 0;
+      *transport = 0; // Native Mach transport; shared FrameInfo queues are not implemented.
       bzero(key, 64); // r166: v18 left the key buffer UNTOUCHED (caller
                       // zeros); a non-empty unknown transport key may make
                       // the client disable the async path. Empty key = the
                       // exact last-known-good (r125/r126) behavior.
-      status = kIOReturnSuccess;
+      // This CPU presenter returns no completion reports in slot337.
+      // The control trial declines that optional capability so the client
+      // uses its timer instead of waiting for unsupported frame reports.
+      status = frameInfo == 1 ? kIOReturnSuccess : kIOReturnUnsupported;
     }
     __atomic_store_n(&e5_display_cap213_status, (unsigned)status, __ATOMIC_RELAXED);
     return status;
@@ -878,7 +855,6 @@ public:
     if (status == kIOReturnSuccess && kind < 6 && node) {
       __atomic_fetch_or(&e5_display_async_kinds, 1u << kind, __ATOMIC_RELAXED);
       if (kind == 3) {
-        sAsyncNode = node; // r153: deliver through the node the client handed us
         __atomic_store_n(&sAsyncDiagnosticValid, 0U, __ATOMIC_RELEASE);
         bzero(sAsyncRegSnapshot, sizeof(sAsyncRegSnapshot));
         if (registration) memcpy(sAsyncRegSnapshot, registration, sizeof(sAsyncRegSnapshot));
@@ -895,8 +871,9 @@ public:
     __atomic_fetch_or(&e5_display_swap_mask, 1u << 8, __ATOMIC_RELAXED);
     return IOMobileFramebufferLegacy::opaque210(kind, node, on);
   }
-  // r148: opaque336 override REMOVED (r147 regression bisect). Original
-  // default true stood in every healthy round through r144/r128.
+  // Native kind-3 registration initializes node+0x18 only on the Mach
+  // fallback. The original true leaf selects an unsupported shared queue.
+  bool opaque336() override { return false; }
   // The real enable_event entry is slot 344, not the unrelated 260/261
   // Legacy stubs. Retain the native argument, 32-bit enable word, timer
   // arming and native return status; report calls without forcing readiness.

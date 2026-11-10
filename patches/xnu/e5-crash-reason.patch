@@ -44,8 +44,8 @@
 +		arm_saved_state_t *e5ss = find_user_regs(thread);
 +		if (e5ss != NULL && is_saved_state64(e5ss)) {
 +			arm_saved_state64_t *e5s = saved_state64(e5ss);
-+			printf("E5EXC pid %d (%s) exc %d code %llu sub %llu lr %llx fp %llx x16 %llx x17 %llx",
-+			    proc_pid(p), p->p_comm, exception, code, subcode,
++			printf("E5EXC pid %d (%s) exc %d code %llu sub %llu pc %llx esr %x lr %llx fp %llx x16 %llx x17 %llx",
++			    proc_pid(p), p->p_comm, exception, code, subcode, e5s->pc, e5s->esr,
 +			    e5s->lr, e5s->fp, e5s->x[16], e5s->x[17]);
 +			/* E5: walk the user frame-pointer chain for up to 6
 +			 * return addresses - independent code anchors that pin
