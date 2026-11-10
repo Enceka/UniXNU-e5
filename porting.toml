@@ -739,7 +739,7 @@ result = "First swaps occur between uptime 499345 and 531424ms, within ten minut
 
 [[area.evidence]]
 kind = "device"
-revision = "e8a69b5c65a5dbd313f6496bbc82644f28045cac"
+revision = "3bfb9fe5a0023a15951dd03091453a9b3c9050fc"
 reference = "docs/logs/gpu-r390-evidence.json"
 command = "R390 e5-frameinfo=1 restore round; same kernel/ICD/Data bytes as r388/r389; 1200s authorized watchdog; full closeout"
 result = "Desktop composited (79k px), complete Settings navigation with zero failures, Home to real desktop and Settings reopened; PNG frames in docs/logs/ui-r390/. Queue/compile latency measured for the first time in a working session; FPS still low (35 presents in 77 reported seconds)."
@@ -852,7 +852,7 @@ result = "Identical failure signature to r388 (fi=0, no desktop, no automation, 
 
 [[area.evidence]]
 kind = "device"
-revision = "e8a69b5c65a5dbd313f6496bbc82644f28045cac"
+revision = "3bfb9fe5a0023a15951dd03091453a9b3c9050fc"
 reference = "docs/logs/gpu-r390-evidence.json"
 command = "R390 e5-frameinfo=1 restore; byte-identical kernel/ICD/Data; 1200s authorized watchdog; full closeout"
 result = "Functional PASS: desktop, full Settings navigation, Home and reopen all rendered and captured; first instrumented working-session latency measurements (19.4s compile; 0.6-2.3s queue submits)."
