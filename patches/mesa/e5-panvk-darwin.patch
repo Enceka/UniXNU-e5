@@ -1,0 +1,2592 @@
+diff --git a/meson.build b/meson.build
+index 622970f..c3d7009 100644
+--- a/meson.build
++++ b/meson.build
+@@ -16,10 +16,9 @@ project(
+     'build.rust_std=2021',
+   ],
+ )
+-add_project_link_arguments(
+-  '-llog',
+-  language : ['c', 'cpp'],
+-)
++if host_machine.system() == 'android'
++  add_project_link_arguments('-llog', language : ['c', 'cpp'])
++endif
+ project_version = meson.project_version()
+ 
+ if host_machine.system() == 'darwin'
+@@ -355,6 +354,12 @@ endif
+ if panfrost_kmds.contains('kbase')
+   pre_args += '-DHAVE_PAN_KMOD_KBASE'
+ endif
++if panfrost_kmds.contains('e5')
++  if host_machine.system() != 'darwin' or panfrost_kmds.length() != 1
++    error('The E5 IOKit backend requires Darwin and an exclusive KMD selection.')
++  endif
++  pre_args += ['-DHAVE_PAN_KMOD_E5', '-DHAVE_PAN_KMOD_KBASE']
++endif
+ 
+ # This has to be below the freedreno_kmds check since that can change system_has_kms_drm
+ with_gallium_kmsro = with_gallium_drm or (system_has_kms_drm and with_gallium_zink)
+@@ -1943,6 +1948,10 @@ if system_has_kms_drm
+       'amdgpu' : _libdrm_checks['amdgpu']['enabled'].to_string('enabled', 'disabled'),
+     },
+   )
++elif panfrost_kmds.contains('e5')
++  # ABI declarations and explicit ENOTSUP for DRM-only operations. E5 GPU
++  # submission and synchronization go through the native IOKit backend.
++  dep_libdrm = dependency('e5-drmuapi', required : true)
+ else
+   # We should prevent libdrm from being available when the target doesn't have it to avoid transitive
+   # dependencies (such as vk-runtime) linking to it
+diff --git a/meson.options b/meson.options
+index 36e090c..2003c8f 100644
+--- a/meson.options
++++ b/meson.options
+@@ -231,7 +231,7 @@ option(
+   'panfrost-kmds',
+   type : 'array',
+   value : ['panfrost', 'panthor'],
+-  choices : ['panfrost', 'panthor', 'kbase'],
++  choices : ['panfrost', 'panthor', 'kbase', 'e5'],
+   description : 'List of kernel-mode drivers to enable for panfrost ' +
+                 'gallium and vulkan driver',
+ )
+diff --git a/src/panfrost/compiler/bifrost/bi_ra.c b/src/panfrost/compiler/bifrost/bi_ra.c
+index bf1dcc5..74f8520 100644
+--- a/src/panfrost/compiler/bifrost/bi_ra.c
++++ b/src/panfrost/compiler/bifrost/bi_ra.c
+@@ -219,8 +219,13 @@ liveness_block_update(bi_block *blk, unsigned temp_count)
+ 
+    /* live_out[s] = sum { p in succ[s] } ( live_in[p] ) */
+    bi_foreach_successor(blk, succ) {
++      /* Each block owns separate live_in/live_out allocations, even for a
++       * self edge. Keep byte writes from aliasing the block's pointer fields
++       * and expose the disjoint arrays to the vectorizer. */
++      uint8_t *restrict live_out = blk->live_out;
++      const uint8_t *restrict live_in = succ->live_in;
+       for (unsigned i = 0; i < temp_count; ++i)
+-         blk->live_out[i] |= succ->live_in[i];
++         live_out[i] |= live_in[i];
+    }
+ 
+    uint8_t *live = ralloc_array(blk, uint8_t, temp_count);
+@@ -325,6 +330,14 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+                      bool split_file, unsigned arch)
+ {
+    bool aligned_sr = arch >= 9;
++   /* Most SSA values are dead at a given instruction. Track nonzero live
++    * masks so interference construction skips them without changing node
++    * order or the component masks used for coalescing. */
++   BITSET_WORD *live_nodes = BITSET_CALLOC(node_count);
++   for (unsigned i = 0; i < node_count; ++i) {
++      if (live[i])
++         BITSET_SET(live_nodes, i);
++   }
+    bi_foreach_instr_in_block_rev(block, ins) {
+       /* Mark all registers live after the instruction as
+        * interfering with the destination */
+@@ -348,7 +361,8 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+ 
+          l->affinity[node] &= affinity;
+ 
+-         for (unsigned i = 0; i < node_count; ++i) {
++         unsigned i;
++         BITSET_FOREACH_SET(i, live_nodes, node_count) {
+             uint8_t r = live[i];
+ 
+             /* Nodes only interfere if they occupy
+@@ -393,7 +407,8 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+             BITFIELD64_MASK(16) |
+             BITFIELD64_BIT(bi_preload_reg(BI_PRELOAD_BLEND_LINK, arch));
+ 
+-         for (unsigned i = 0; i < node_count; ++i) {
++         unsigned i;
++         BITSET_FOREACH_SET(i, live_nodes, node_count) {
+             if (live[i])
+                l->affinity[i] &= ~clobber;
+          }
+@@ -402,8 +417,23 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+       /* Update live_in */
+       preload_live = bi_postra_liveness_ins(preload_live, ins);
+       bi_liveness_ins_update_ra(live, ins);
++      bi_foreach_dest(ins, d) {
++         unsigned node = ins->dest[d].value;
++         if (live[node])
++            BITSET_SET(live_nodes, node);
++         else
++            BITSET_CLEAR(live_nodes, node);
++      }
++      bi_foreach_ssa_src(ins, s) {
++         unsigned node = ins->src[s].value;
++         if (live[node])
++            BITSET_SET(live_nodes, node);
++         else
++            BITSET_CLEAR(live_nodes, node);
++      }
+    }
+ 
++   free(live_nodes);
+    block->reg_live_in = preload_live;
+ }
+ 
+diff --git a/src/panfrost/compiler/bifrost/test/meson.build b/src/panfrost/compiler/bifrost/test/meson.build
+index b29936a..9b3c67c 100644
+--- a/src/panfrost/compiler/bifrost/test/meson.build
++++ b/src/panfrost/compiler/bifrost/test/meson.build
+@@ -24,3 +24,17 @@ test(
+   suite : ['panfrost'],
+   protocol : 'gtest',
+ )
++
++
++test(
++  'bifrost_interference',
++  executable(
++    'bifrost_interference',
++    'test-interference.c',
++    include_directories : [inc_include, inc_src, inc_valhall],
++    dependencies: [idep_nir, idep_bi_opcodes_h, idep_bi_builder_h, idep_valhall_enums_h],
++    link_with : [libpanfrost_compiler],
++    link_language : 'cpp',
++  ),
++  suite : ['panfrost'],
++)
+diff --git a/src/panfrost/compiler/bifrost/test/test-interference.c b/src/panfrost/compiler/bifrost/test/test-interference.c
+new file mode 100644
+index 0000000..4cf0a5d
+--- /dev/null
++++ b/src/panfrost/compiler/bifrost/test/test-interference.c
+@@ -0,0 +1,317 @@
++/* SPDX-License-Identifier: MIT
++ * Differential interference and liveness tests with the original dense passes. */
++#include <time.h>
++#include "../bi_ra.c"
++static void
++reference_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
++                       uint64_t preload_live, unsigned node_count,
++                       bool is_blend, bool split_file, unsigned arch)
++{
++   bool aligned_sr = arch >= 9;
++   bi_foreach_instr_in_block_rev(block, ins) {
++      /* Mark all registers live after the instruction as
++       * interfering with the destination */
++
++      bi_foreach_dest(ins, d) {
++         unsigned node = ins->dest[d].value;
++
++         /* Don't allocate to anything that's read later as a
++          * preloaded register. The affinity is the intersection
++          * of affinity masks for each write. Since writes have
++          * offsets, but the affinity is for the whole node, we
++          * need to offset the affinity opposite the write
++          * offset, so we shift right. */
++         unsigned count = bi_count_write_registers(ins, d);
++         unsigned offset = ins->dest[d].offset;
++         uint64_t affinity =
++            bi_make_affinity(preload_live, count, split_file) >> offset;
++         /* Valhall needs >= 64-bit staging writes to be pair-aligned */
++         if (aligned_sr && (count >= 2 || offset))
++            affinity &= EVEN_BITS_MASK;
++
++         l->affinity[node] &= affinity;
++
++         for (unsigned i = 0; i < node_count; ++i) {
++            uint8_t r = live[i];
++
++            /* Nodes only interfere if they occupy
++             * /different values/ at the same time
++             * (Boissinot). In particular, sources of
++             * moves do not interfere with their
++             * destinations. This enables a limited form of
++             * coalescing.
++             */
++            if (ins->op == BI_OPCODE_MOV_I32 && bi_is_ssa(ins->src[0]) &&
++                i == ins->src[0].value) {
++
++               r &= ~BITFIELD_BIT(ins->src[0].offset);
++            }
++
++            if (r) {
++               lcra_add_node_interference(l, node, bi_writemask(ins, d), i, r);
++            }
++         }
++
++         unsigned node_first = ins->dest[0].value;
++         if (d == 1) {
++            lcra_add_node_interference(l, node, bi_writemask(ins, 1),
++                                       node_first, bi_writemask(ins, 0));
++         }
++      }
++
++      /* Valhall needs >= 64-bit reads to be pair-aligned */
++      if (aligned_sr) {
++         bi_foreach_ssa_src(ins, s) {
++            if (bi_count_read_registers(ins, s) >= 2)
++               l->affinity[ins->src[s].value] &= EVEN_BITS_MASK;
++            else if (s < valhall_opcodes[ins->op].nr_srcs &&
++                     va_src_info(ins->op, s).size > VA_SIZE_32)
++               l->affinity[ins->src[s].value] &= EVEN_BITS_MASK;
++         }
++      }
++
++      if (!is_blend && ins->op == BI_OPCODE_BLEND) {
++         /* Blend shaders might clobber r0-r15, blend link reg. */
++         uint64_t clobber =
++            BITFIELD64_MASK(16) |
++            BITFIELD64_BIT(bi_preload_reg(BI_PRELOAD_BLEND_LINK, arch));
++
++         for (unsigned i = 0; i < node_count; ++i) {
++            if (live[i])
++               l->affinity[i] &= ~clobber;
++         }
++      }
++
++      /* Update live_in */
++      preload_live = bi_postra_liveness_ins(preload_live, ins);
++      bi_liveness_ins_update_ra(live, ins);
++   }
++
++   block->reg_live_in = preload_live;
++}
++
++static bool
++reference_block_update(bi_block *blk, unsigned temp_count)
++{
++   bool progress = false;
++
++   /* live_out[s] = sum { p in succ[s] } ( live_in[p] ) */
++   bi_foreach_successor(blk, succ) {
++      for (unsigned i = 0; i < temp_count; ++i)
++         blk->live_out[i] |= succ->live_in[i];
++   }
++
++   uint8_t *live = ralloc_array(blk, uint8_t, temp_count);
++   memcpy(live, blk->live_out, temp_count);
++
++   bi_foreach_instr_in_block_rev(blk, ins)
++      bi_liveness_ins_update_ra(live, ins);
++
++   /* To figure out progress, diff live_in */
++
++   for (unsigned i = 0; (i < temp_count) && !progress; ++i)
++      progress |= (blk->live_in[i] != live[i]);
++
++   ralloc_free(blk->live_in);
++   blk->live_in = live;
++
++   return progress;
++}
++
++/* Globally, liveness analysis uses a fixed-point algorithm based on a
++ * worklist. We initialize a work list with the exit block. We iterate the work
++ * list to compute live_in from live_out for each block on the work list,
++ * adding the predecessors of the block to the work list if we made progress.
++ */
++
++static void
++reference_liveness(bi_context *ctx)
++{
++   u_worklist worklist;
++   bi_worklist_init(ctx, &worklist);
++
++   bi_foreach_block(ctx, block) {
++      ralloc_free(block->live_in);
++      ralloc_free(block->live_out);
++
++      block->live_in = rzalloc_array(block, uint8_t, ctx->ssa_alloc);
++      block->live_out = rzalloc_array(block, uint8_t, ctx->ssa_alloc);
++
++      bi_worklist_push_tail(&worklist, block);
++   }
++
++   while (!u_worklist_is_empty(&worklist)) {
++      /* Pop off in reverse order since liveness is backwards */
++      bi_block *blk = bi_worklist_pop_tail(&worklist);
++
++      /* Update liveness information. If we made progress, we need to
++       * reprocess the predecessors
++       */
++      if (reference_block_update(blk, ctx->ssa_alloc)) {
++         bi_foreach_predecessor(blk, pred)
++            bi_worklist_push_head(&worklist, *pred);
++      }
++   }
++
++   u_worklist_fini(&worklist);
++}
++
++#define CHECK(x)                                                               \
++   do {                                                                        \
++      if (!(x)) {                                                              \
++         fprintf(stderr, "FAIL %d: %s\n", __LINE__, #x);                       \
++         abort();                                                              \
++      }                                                                        \
++   } while (0)
++static double
++now(void)
++{
++   struct timespec t;
++   clock_gettime(CLOCK_MONOTONIC, &t);
++   return t.tv_sec + t.tv_nsec * 1e-9;
++}
++
++static void
++test_cfg(void)
++{
++   for (unsigned variant = 0; variant < 3; ++variant) {
++      unsigned blocks = variant ? 256 : 32, count = variant ? 24576 : 259;
++      bi_context *ctx = rzalloc(NULL, bi_context);
++      ctx->arch = 9;
++      ctx->ssa_alloc = count;
++      ctx->num_blocks = blocks;
++      list_inithead(&ctx->blocks);
++      bi_block **bb = calloc(blocks, sizeof(*bb));
++      for (unsigned j = 0; j < blocks; ++j) {
++         bb[j] = rzalloc(ctx, bi_block);
++         bb[j]->index = j;
++         list_inithead(&bb[j]->instructions);
++         list_addtail(&bb[j]->link, &ctx->blocks);
++         util_dynarray_init(&bb[j]->predecessors, bb[j]);
++         bi_builder b = bi_init_builder(ctx, bi_after_block(bb[j]));
++         for (unsigned k = 0; k < 10; ++k) {
++            unsigned n = (j * 83 + k) % count;
++            bi_index dest = bi_get_index(n),
++                     src = bi_get_index((n + count - 1) % count);
++            dest.offset = k % 4;
++            src.offset = (k + 1) % 4;
++            bi_mov_i32_to(&b, dest, src);
++         }
++      }
++      for (unsigned j = 0; j < blocks; ++j) {
++         if (j + 1 < blocks) {
++            bb[j]->successors[0] = bb[j + 1];
++            util_dynarray_append(&bb[j + 1]->predecessors, bb[j]);
++         }
++         if (variant && j % 17 == 0) {
++            bb[j]->successors[1] = bb[j];
++            util_dynarray_append(&bb[j]->predecessors, bb[j]);
++         }
++         if (variant == 2 && j == blocks - 1) {
++            bb[j]->successors[0] = bb[blocks / 2];
++            util_dynarray_append(&bb[blocks / 2]->predecessors, bb[j]);
++         }
++      }
++      double t = now();
++      reference_liveness(ctx);
++      double before = now() - t;
++      uint8_t *expected = malloc((size_t)blocks * count * 2);
++      for (unsigned j = 0; j < blocks; ++j) {
++         memcpy(expected + (size_t)j * count * 2, bb[j]->live_in, count);
++         memcpy(expected + ((size_t)j * 2 + 1) * count, bb[j]->live_out, count);
++      }
++      t = now();
++      bi_compute_liveness_ra(ctx);
++      double after = now() - t;
++      for (unsigned j = 0; j < blocks; ++j) {
++         CHECK(memcmp(expected + (size_t)j * count * 2, bb[j]->live_in,
++                      count) == 0);
++         CHECK(memcmp(expected + ((size_t)j * 2 + 1) * count, bb[j]->live_out,
++                      count) == 0);
++      }
++      printf(
++         "PASS liveness nodes=%u blocks=%u cfg=%u old=%.6f new=%.6f speedup=%.2f all fixed-point component masks exact\n",
++         count, blocks, variant, before, after, before / after);
++      free(expected);
++      free(bb);
++      ralloc_free(ctx);
++   }
++}
++int
++main(void)
++{
++   unsigned sizes[] = {257, 4096, 24000};
++   for (unsigned c = 0; c < 3; ++c) {
++      unsigned count = sizes[c];
++      bi_context *ctx = rzalloc(NULL, bi_context);
++      ctx->arch = 9;
++      ctx->ssa_alloc = count;
++      list_inithead(&ctx->blocks);
++      bi_block *block = rzalloc(ctx, bi_block);
++      list_inithead(&block->instructions);
++      list_addtail(&block->link, &ctx->blocks);
++      bi_builder b = bi_init_builder(ctx, bi_after_block(block));
++      for (unsigned i = 0; i < count; ++i) {
++         bi_index dst = bi_get_index(i),
++                  src = i ? bi_get_index(i - 1) : bi_imm_u32(0);
++         if (c == 0) {
++            dst.offset = i % 4;
++            if (i)
++               src.offset = (i - 1) % 4;
++         }
++         if (c == 0 && i >= 16 && i % 17 == 0)
++            bi_blend_to(&b, dst, src, bi_imm_u32(0), bi_imm_u32(0),
++                        bi_imm_u32(0), bi_get_index(i - 16),
++                        BI_REGISTER_FORMAT_F32, 1, 1);
++         else if (c == 0 && i >= 16 && i % 19 == 0)
++            bi_texc_dual_to(&b, dst, bi_get_index(i - 2), src, bi_imm_u32(0),
++                            bi_imm_u32(0), bi_imm_u32(0), false, 1, 1);
++         else if (i % 3 == 0)
++            bi_mov_i32_to(&b, dst, src);
++         else
++            bi_iadd_u32_to(&b, dst, src,
++                           i >= 16 ? bi_get_index(i - 16) : bi_imm_u32(1),
++                           false);
++      }
++      for (unsigned variant = 0; variant < 4; ++variant) {
++         uint8_t *live0 = calloc(count, 1), *live1 = calloc(count, 1);
++         live0[count - 1] = live1[count - 1] = 15;
++         struct lcra_state *a = lcra_alloc_equations(count),
++                           *z = lcra_alloc_equations(count);
++         for (unsigned i = 0; i < count; ++i)
++            a->affinity[i] = z->affinity[i] = ~0ull;
++         double t = now();
++         reference_interference(block, a, live0, 5, count, variant & 1,
++                                variant & 2, variant & 1 ? 7 : 9);
++         double before = now() - t;
++         uint64_t preload = block->reg_live_in;
++         t = now();
++         bi_mark_interference(block, z, live1, 5, count, variant & 1,
++                              variant & 2, variant & 1 ? 7 : 9);
++         double after = now() - t;
++         CHECK(block->reg_live_in == preload);
++         CHECK(memcmp(live0, live1, count) == 0);
++         CHECK(memcmp(a->affinity, z->affinity, count * sizeof(uint64_t)) == 0);
++         for (unsigned i = 0; i < count; ++i) {
++            nodearray *x = &a->linear[i], *y = &z->linear[i];
++            CHECK(x->size == y->size);
++            CHECK(x->sparse_capacity == y->sparse_capacity);
++            if (x->size)
++               CHECK(memcmp(x->sparse, y->sparse,
++                            x->size * (nodearray_is_sparse(x)
++                                          ? sizeof(nodearray_sparse)
++                                          : sizeof(nodearray_value))) == 0);
++         }
++         printf(
++            "PASS nodes=%u variant=%u old=%.6f new=%.6f speedup=%.2f constraints/affinity/live exact\n",
++            count, variant, before, after, before / after);
++         lcra_free(a);
++         lcra_free(z);
++         free(live0);
++         free(live1);
++      }
++      ralloc_free(ctx);
++   }
++   test_cfg();
++   return 0;
++}
+diff --git a/src/panfrost/compiler/pan_nir_lower_fs_inputs.c b/src/panfrost/compiler/pan_nir_lower_fs_inputs.c
+index 8ed30b3..f07e220 100644
+--- a/src/panfrost/compiler/pan_nir_lower_fs_inputs.c
++++ b/src/panfrost/compiler/pan_nir_lower_fs_inputs.c
+@@ -58,6 +58,12 @@ lower_fs_input_load(struct nir_builder *b,
+       slot = pan_varying_layout_find_slot(ctx->varying_layout, sem.location);
+       assert(slot);
+       use_ld_var_buf = slot->offset < pan_ld_var_buf_off_size(ctx->arch);
++#ifdef HAVE_PAN_KMOD_E5
++      /* Use the v9 Gallium descriptor path on E5. It explicitly addresses
++       * the varying area of the vertex packet and preserves integer types;
++       * direct buffer loads did not recover the verified GPU-written data. */
++      use_ld_var_buf &= ctx->arch != 9;
++#endif
+    }
+ 
+    nir_def *res;
+diff --git a/src/panfrost/lib/kmod/e5_kmod.c b/src/panfrost/lib/kmod/e5_kmod.c
+new file mode 100644
+index 0000000..f6f0483
+--- /dev/null
++++ b/src/panfrost/lib/kmod/e5_kmod.c
+@@ -0,0 +1,484 @@
++/* Copyright 2026 E5 contributors. SPDX-License-Identifier: MIT
++ * Darwin implementation of the JM kmod contract. GPU operations go through
++ * the E5MaliG1 UserClient; the kbase-named entry points are the existing JM
++ * queue interface, not Linux ioctl emulation. Submission is synchronous until
++ * a separate completion transport is qualified. No failed job becomes Done.
++ */
++#include <IOKit/IOKitLib.h>
++#include <mach/mach.h>
++#include <errno.h>
++#include <pthread.h>
++#include "pan_kmod_backend.h"
++#include "kbase_kmod.h"
++#include "E5MaliG1Abi.h"
++#include "E5MaliG1Ext.h"
++
++struct e5_bo {
++   struct pan_kmod_bo base;
++   uint64_t gpu;
++   mach_vm_address_t cpu;
++   mach_vm_size_t cpu_size;
++   bool borrowed_cpu;
++   bool owned_cpu;
++};
++struct e5_dev {
++   struct pan_kmod_dev base;
++   io_connect_t connection;
++   E5MaliGpuProperties hw;
++   pthread_mutex_t lock;
++   bool lost;
++   bool vm_live;
++   bool user_memory;
++   bool read_only_imports;
++   bool submit_wait;
++   size_t submit_bytes;
++   uint64_t completed;
++   uint64_t job_count;
++   struct e5_bo *live[E5_MALI_MAX_BO_HANDLES];
++};
++const struct pan_kmod_ops kbase_kmod_ops;
++bool e5_kmod_supports_user_memory(const struct pan_kmod_dev *dev);
++static struct e5_dev *edev(const struct pan_kmod_dev *d) { return container_of(d, struct e5_dev, base); }
++static struct e5_bo *ebo(struct pan_kmod_bo *b) { return container_of(b, struct e5_bo, base); }
++static kern_return_t call(struct e5_dev *d, uint32_t sel, const void *in, size_t ni, void *out, size_t no)
++{
++   size_t size = no;
++   kern_return_t rc = IOConnectCallStructMethod(d->connection, sel, in, ni, out, out ? &size : NULL);
++   if (!rc && out && size != no) rc = kIOReturnUnderrun;
++   if (rc) {
++      static unsigned reports;
++      if (p_atomic_inc_return(&reports) <= 16)
++         dprintf(229, "E5PANVK API_FAIL pid=%d selector=%u rc=%x in=%zu out=%zu\n",
++                 getpid(), sel, rc, ni, no);
++      mesa_loge("E5Mali selector %u failed: 0x%x", sel, rc);
++   }
++   return rc;
++}
++static void report_stats(struct e5_dev *d, const char *phase)
++{
++   E5MaliStats stats = {0};
++   if (call(d, kSelStats, NULL, 0, &stats, sizeof(stats))) return;
++   char text[252];
++   int n = snprintf(text, sizeof(text),
++      "E5PANVK %s sub=%llu comp=%llu fault=%llu tmo=%llu reset=%llu mmu=%llu active=%u mapped=%u bo=%u pid=%d\n",
++      phase, (unsigned long long)stats.submitted, (unsigned long long)stats.completed,
++      (unsigned long long)stats.faults, (unsigned long long)stats.timedOut,
++      (unsigned long long)stats.resets, (unsigned long long)stats.mmuFaults,
++      stats.activeAtoms, stats.mappedBytes, stats.liveBoBytes, getpid());
++   if (n > 0 && n < (int)sizeof(text)) {
++      if (write(229, text, n) != n) (void)write(2, text, n);
++   }
++}
++static struct pan_kmod_dev *create(int fd, uint32_t flags, const struct pan_kmod_driver *drv,
++                                  const struct pan_kmod_allocator *allocator)
++{
++   io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("E5MaliG1"));
++   if (!service) { errno = ENODEV; return NULL; }
++   struct e5_dev *d = pan_kmod_alloc(allocator, sizeof(*d));
++   if (!d) { IOObjectRelease(service); return NULL; }
++   kern_return_t rc = IOServiceOpen(service, mach_task_self(), 0, &d->connection);
++   IOObjectRelease(service);
++   if (rc) { pan_kmod_free(allocator, d); return NULL; }
++   E5MaliInfo info = {0};
++   if (call(d, kSelGetVersion, NULL, 0, &info, sizeof(info)) || info.abiMajor != 1 || info.abiMinor < 1 ||
++       call(d, kSelGpuProperties, NULL, 0, &d->hw, sizeof(d->hw)) || d->hw.gpuId != 0x90910010 ||
++       !d->hw.vaBytes || !d->hw.maxBoHandles ||
++       d->hw.maxBoHandles > E5_MALI_MAX_BO_HANDLES ||
++       d->hw.maxSubmitBos < d->hw.maxBoHandles ||
++       d->hw.maxSubmitBos > E5_MALI_MAX_SUBMIT_BOS ||
++       (info.abiMinor < 6 && d->hw.maxBoHandles > 64)) {
++      IOServiceClose(d->connection); pan_kmod_free(allocator, d); errno = ENODEV; return NULL;
++   }
++   pan_kmod_dev_init(&d->base, -1,
++                    (flags & ~PAN_KMOD_DEV_FLAG_OWNS_FD) |
++                       PAN_KMOD_DEV_FLAG_MMAP_SYNC_THROUGH_KERNEL,
++                    drv, &kbase_kmod_ops, allocator);
++   d->user_memory = info.abiMinor >= 3;
++   d->read_only_imports = info.abiMinor >= 4;
++   const char *separate_wait = getenv("PANVK_E5_SEPARATE_WAIT");
++   d->submit_wait = info.abiMinor >= 7 && !(separate_wait && separate_wait[0] == '1');
++   d->submit_bytes = info.abiMinor >= 6 ? sizeof(E5MaliSubmitMany) : E5_MALI_LEGACY_SUBMIT_MANY_BYTES;
++   pthread_mutex_init(&d->lock, NULL);
++   struct pan_kmod_dev_props *p = &d->base.props;
++   p->gpu_id = d->hw.gpuId;
++   p->shader_present = d->hw.shaderPresent;
++   p->tiler_features = d->hw.tilerFeatures;
++   p->mem_features = d->hw.memFeatures;
++   p->mmu_features = d->hw.mmuFeatures;
++   p->l2_features = d->hw.l2Features;
++   memcpy(p->texture_features, d->hw.textureFeatures, sizeof(p->texture_features));
++   /* Zero-valued thread limits use the vendor's documented defaults. */
++   p->max_threads_per_core = d->hw.threadMaxThreads ? d->hw.threadMaxThreads : 256;
++   p->max_threads_per_wg = d->hw.threadMaxWorkgroup ? d->hw.threadMaxWorkgroup : 256;
++   p->max_tasks_per_core = MAX2(d->hw.threadFeatures >> 24, 1);
++   p->num_registers_per_core = d->hw.threadFeatures & 0xffff;
++   if (!p->num_registers_per_core) p->num_registers_per_core = p->max_threads_per_core * 32;
++   p->max_tls_instance_per_core = d->hw.threadTlsAlloc ? d->hw.threadTlsAlloc : p->max_threads_per_core;
++   p->pgsize_bitmap = PAN_PGSIZE_4K;
++   p->is_io_coherent = false;
++   /* ABI 1.1 CacheRange uses 64-byte lines on E5's A55/A76 CPUs. Darwin
++    * denies CTR_EL0 in this process; do not query it from userspace.
++    */
++   p->cache_sync_granularity = 64;
++   p->gpu_can_query_timestamp = false;
++   p->timestamp_cycles_to_ns_factor = 1.0; /* unused: timestamp support is disabled */
++   p->supported_bo_flags = PAN_KMOD_BO_FLAG_EXECUTABLE |
++                          PAN_KMOD_BO_FLAG_NO_MMAP | PAN_KMOD_BO_FLAG_WB_MMAP;
++   p->allowed_group_priorities_mask = PAN_KMOD_GROUP_ALLOW_PRIORITY_MEDIUM;
++   report_stats(d, "OPEN");
++   return &d->base;
++}
++static struct pan_kmod_va_range va_range(const struct pan_kmod_dev *dev)
++{
++   const struct e5_dev *d = edev(dev);
++   return (struct pan_kmod_va_range){ .start = d->hw.vaBase, .size = d->hw.vaBytes };
++}
++static void destroy(struct pan_kmod_dev *dev)
++{
++   struct e5_dev *d = edev(dev);
++   for (unsigned i = 0; i < d->hw.maxBoHandles; ++i)
++      if (d->live[i] && d->live[i]->cpu && !d->live[i]->borrowed_cpu)
++         IOConnectUnmapMemory64(d->connection, i + 1, mach_task_self(), d->live[i]->cpu);
++   report_stats(d, "CLOSE");
++   IOServiceClose(d->connection); /* kernel quiesces any failed context before freeing BOs */
++   for (unsigned i = 0; i < d->hw.maxBoHandles; ++i) {
++      if (!d->live[i]) continue;
++      /* Connection close restores the cache policy and unpins user pages
++       * before the owning anonymous mapping is released. */
++      if (d->live[i]->owned_cpu)
++         munmap((void *)(uintptr_t)d->live[i]->cpu, d->live[i]->cpu_size);
++      pan_kmod_dev_free(dev, d->live[i]);
++   }
++   pthread_mutex_destroy(&d->lock);
++   pan_kmod_dev_cleanup(dev);
++   pan_kmod_free(dev->allocator, d);
++}
++static void allocation_failure(struct e5_dev *d, const char *phase, uint64_t size, uint32_t flags)
++{
++   int saved = errno;
++   static unsigned reports;
++   if (p_atomic_inc_return(&reports) <= 16) {
++      dprintf(229, "E5PANVK ALLOC_FAIL pid=%d phase=%s bytes=%llu flags=%x errno=%d\n",
++              getpid(), phase, (unsigned long long)size, flags, saved);
++      report_stats(d, "ALLOC_STATE");
++   }
++   errno = saved;
++}
++static struct pan_kmod_bo *bo_alloc(struct pan_kmod_dev *dev, struct pan_kmod_vm *vm,
++                                    uint64_t size, uint32_t flags)
++{
++   struct e5_dev *d = edev(dev);
++   if (!size || size > (256ull << 20) || flags & ~dev->props.supported_bo_flags) {
++      errno = EINVAL; allocation_failure(d, "arguments", size, flags); return NULL;
++   }
++   /* Without WB_MMAP, pan_kmod promises an uncached CPU mapping on a
++    * non-snooping GPU. IOBufferMemoryDescriptor's default mapping is cached,
++    * so it cannot back Vulkan HOST_COHERENT memory. Own a separate anonymous
++    * mapping and use ABI 1.3's per-page write-combining import instead. */
++   if (!(flags & (PAN_KMOD_BO_FLAG_WB_MMAP | PAN_KMOD_BO_FLAG_NO_MMAP))) {
++      if (!d->user_memory || (flags & PAN_KMOD_BO_FLAG_EXECUTABLE)) {
++         errno = ENOTSUP;
++         allocation_failure(d, "coherent-exec-or-abi", size, flags);
++         return NULL;
++      }
++      size = ALIGN_POT(size, 4096);
++      void *cpu = mmap(NULL, size, PROT_READ | PROT_WRITE,
++                       MAP_PRIVATE | MAP_ANON, -1, 0);
++      if (cpu == MAP_FAILED) { allocation_failure(d, "mmap", size, flags); return NULL; }
++      struct pan_kmod_bo *bo = kbase_kmod_bo_import_host(dev, cpu, size);
++      if (!bo) { allocation_failure(d, "import", size, flags); munmap(cpu, size); return NULL; }
++      ebo(bo)->owned_cpu = true;
++      bo->exclusive_vm = vm;
++      static unsigned reports;
++      if (p_atomic_inc_return(&reports) <= 8) {
++         char line[128];
++         int n = snprintf(line, sizeof(line), "E5PANVK COHERENT pid=%d bytes=%llu handle=%u\n",
++                          getpid(), (unsigned long long)size, bo->handle);
++         if (n > 0 && n < (int)sizeof(line)) (void)write(229, line, n);
++      }
++      return bo;
++   }
++   struct e5_bo *b = pan_kmod_dev_alloc(dev, sizeof(*b));
++   if (!b) return NULL;
++   E5MaliCreateBo in = { .size = size, .flags = flags & PAN_KMOD_BO_FLAG_EXECUTABLE ? 0 : 1 };
++   E5MaliCreateBoOut made = {0};
++   const char *phase = "create-bo";
++   pthread_mutex_lock(&d->lock);
++   if (d->lost || call(d, kSelCreateBo, &in, sizeof(in), &made, sizeof(made)) ||
++       made.status || !made.handle || made.handle > d->hw.maxBoHandles) goto fail;
++   E5MaliMapBo map = { .handle = made.handle, .flags = flags & PAN_KMOD_BO_FLAG_EXECUTABLE ? 0 : 2 };
++   phase = "gpu-map";
++   E5MaliMapBoOut mapped = {0};
++   if (call(d, kSelMapBo, &map, sizeof(map), &mapped, sizeof(mapped)) || mapped.status) goto fail;
++   b->gpu = mapped.va;
++   phase = "cpu-map";
++   if (!(flags & PAN_KMOD_BO_FLAG_NO_MMAP) &&
++       IOConnectMapMemory64(d->connection, made.handle, mach_task_self(), &b->cpu, &b->cpu_size, kIOMapAnywhere)) goto fail;
++   pan_kmod_bo_init(&b->base, dev, vm, made.size, flags, made.handle);
++   d->live[made.handle - 1] = b;
++   pthread_mutex_unlock(&d->lock);
++   return &b->base;
++fail:
++   allocation_failure(d, phase, size, flags);
++   if (b->cpu) IOConnectUnmapMemory64(d->connection, made.handle, mach_task_self(), b->cpu);
++   if (made.handle) { E5MaliDestroyBo drop = { .handle = made.handle }; call(d, kSelDestroyBo, &drop, sizeof(drop), NULL, 0); }
++   pthread_mutex_unlock(&d->lock); pan_kmod_dev_free(dev, b); return NULL;
++}
++static void bo_free(struct pan_kmod_bo *bo)
++{
++   struct e5_dev *d = edev(bo->dev); struct e5_bo *b = ebo(bo);
++   pan_kmod_bo_cleanup(bo);
++   pthread_mutex_lock(&d->lock);
++   if (b->cpu && !b->borrowed_cpu) {
++      if (IOConnectUnmapMemory64(d->connection, bo->handle, mach_task_self(), b->cpu)) {
++         d->lost = true;
++         pthread_mutex_unlock(&d->lock);
++         return;
++      }
++      b->cpu = 0;
++   }
++   E5MaliDestroyBo drop = { .handle = bo->handle };
++   if (call(d, kSelDestroyBo, &drop, sizeof(drop), NULL, 0)) {
++      d->lost = true; /* retain in live[] until connection close; never release active DMA pages */
++      pthread_mutex_unlock(&d->lock); return;
++   }
++   d->live[bo->handle - 1] = NULL;
++   pthread_mutex_unlock(&d->lock);
++   if (b->owned_cpu)
++      munmap((void *)(uintptr_t)b->cpu, b->cpu_size);
++   pan_kmod_dev_free(bo->dev, b);
++}
++static struct pan_kmod_bo *bo_import(struct pan_kmod_dev *d, uint32_t h, uint64_t n)
++{ (void)d; (void)h; (void)n; errno = ENOTSUP; return NULL; }
++bool e5_kmod_supports_user_memory(const struct pan_kmod_dev *dev)
++{
++   return edev(dev)->user_memory;
++}
++struct pan_kmod_bo *kbase_kmod_bo_import_host(struct pan_kmod_dev *dev, void *ptr, uint64_t size)
++{
++   struct e5_dev *d = edev(dev);
++   if (!d->user_memory) { errno = ENOTSUP; return NULL; }
++   if (!ptr || !size || size > (256ull << 20) || ((uintptr_t)ptr & 4095) || (size & 4095)) {
++      errno = EINVAL; return NULL;
++   }
++   struct e5_bo *b = pan_kmod_dev_alloc(dev, sizeof(*b));
++   if (!b) return NULL;
++   E5MaliImportUser request = { .address = (uintptr_t)ptr, .length = size };
++   E5MaliCreateBoOut made = {0};
++   E5MaliMapBoOut mapped = {0};
++   pthread_mutex_lock(&d->lock);
++   kern_return_t imported = d->lost ? kIOReturnNotReady :
++      call(d, kSelImportUser, &request, sizeof(request), &made, sizeof(made));
++   if (imported == KERN_PROTECTION_FAILURE && d->read_only_imports) {
++      request.flags = E5_MALI_IMPORT_READ_ONLY;
++      imported = call(d, kSelImportUser, &request, sizeof(request), &made, sizeof(made));
++      if (!imported && !made.status) {
++         static unsigned reports;
++         if (p_atomic_inc_return(&reports) <= 8)
++            dprintf(229, "E5PANVK IMPORT_RO pid=%d bytes=%llu handle=%u\n",
++                    getpid(), (unsigned long long)size, made.handle);
++      }
++   }
++   if (imported ||
++       made.status || !made.handle || made.handle > d->hw.maxBoHandles) goto fail;
++   E5MaliMapBo map = { .handle = made.handle, .flags = 2 };
++   if (call(d, kSelMapBo, &map, sizeof(map), &mapped, sizeof(mapped)) || mapped.status) goto fail;
++   b->gpu = mapped.va;
++   b->cpu = (uintptr_t)ptr; b->cpu_size = size; b->borrowed_cpu = true;
++   pan_kmod_bo_init(&b->base, dev, NULL, made.size, 0, made.handle);
++   d->live[made.handle - 1] = b;
++   pthread_mutex_unlock(&d->lock);
++   return &b->base;
++fail:
++   if (made.handle) {
++      E5MaliDestroyBo drop = { .handle = made.handle };
++      call(d, kSelDestroyBo, &drop, sizeof(drop), NULL, 0);
++   }
++   pthread_mutex_unlock(&d->lock);
++   pan_kmod_dev_free(dev, b);
++   return NULL;
++}
++static off_t bo_offset(struct pan_kmod_bo *b) { (void)b; errno = ENOTSUP; return -1; }
++static void *bo_mmap(struct pan_kmod_bo *bo, int prot, int flags, void *address)
++{
++   (void)flags; struct e5_bo *b = ebo(bo);
++   if (!b->cpu || (prot & PROT_EXEC) || (address && address != (void *)(uintptr_t)b->cpu)) { errno = EINVAL; return MAP_FAILED; }
++   return (void *)(uintptr_t)b->cpu;
++}
++static int bo_munmap(struct pan_kmod_bo *bo, void *address, size_t bytes)
++{
++   struct e5_bo *b = ebo(bo);
++   return address == (void *)(uintptr_t)b->cpu && bytes <= bo->size ? 0 : -1;
++}
++static int flush_maps(struct pan_kmod_dev *dev)
++{
++   struct e5_dev *d = edev(dev); int result = 0;
++   pthread_mutex_lock(&d->lock);
++   util_dynarray_foreach(&dev->pending_bo_syncs.array, struct pan_kmod_deferred_bo_sync, sync) {
++      if (sync->start > sync->bo->size || sync->size > sync->bo->size - sync->start) {
++         errno = EINVAL;
++         d->lost = true;
++         result = -1;
++         break;
++      }
++      uint64_t start = sync->start & ~63ull;
++      uint64_t end = MIN2(ALIGN_POT(sync->start + sync->size, 64), sync->bo->size);
++      if (end <= start) continue;
++      E5MaliCacheRange request = { .handle = sync->bo->handle, .offset = start, .length = end - start,
++         .operation = sync->type == PAN_KMOD_BO_SYNC_CPU_CACHE_FLUSH ? E5_MALI_CACHE_CLEAN : E5_MALI_CACHE_INVALIDATE };
++      if (call(d, kSelCacheRange, &request, sizeof(request), NULL, 0)) { d->lost = true; result = -1; break; }
++   }
++   pthread_mutex_unlock(&d->lock); return result;
++}
++static bool bo_wait(struct pan_kmod_bo *bo, int64_t timeout, bool read_only)
++{
++   (void)timeout; (void)read_only; struct e5_dev *d = edev(bo->dev);
++   pthread_mutex_lock(&d->lock); bool ready = !d->lost; pthread_mutex_unlock(&d->lock);
++   return ready; /* all submissions have completed before releasing lock */
++}
++static struct pan_kmod_vm *vm_create(struct pan_kmod_dev *dev, uint32_t flags, uint64_t start, uint64_t size)
++{
++   struct e5_dev *d = edev(dev);
++   if (d->vm_live || (size && (start < d->hw.vaBase || size > d->hw.vaBytes || start - d->hw.vaBase > d->hw.vaBytes - size))) return NULL;
++   struct pan_kmod_vm *vm = pan_kmod_dev_alloc(dev, sizeof(*vm));
++   if (!vm) return NULL;
++   pan_kmod_vm_init(vm, dev, 0, flags); d->vm_live = true; return vm;
++}
++static void vm_destroy(struct pan_kmod_vm *vm)
++{
++   struct pan_kmod_dev *dev = vm->dev; edev(dev)->vm_live = false;
++   pan_kmod_vm_cleanup(vm); pan_kmod_dev_free(dev, vm);
++}
++static int vm_bind(struct pan_kmod_vm *vm, enum pan_kmod_vm_op_mode mode, struct pan_kmod_vm_op *ops, uint32_t count)
++{
++   if (mode == PAN_KMOD_VM_OP_MODE_ASYNC || edev(vm->dev)->lost) return -1;
++   for (uint32_t i = 0; i < count; ++i) {
++      struct pan_kmod_vm_op *op = &ops[i];
++      if (op->wait.count || op->signal.count || op->flags) return -1;
++      if (op->type == PAN_KMOD_VM_OP_TYPE_MAP) {
++         if (!op->map.bo || op->map.bo_offset < 0 || (uint64_t)op->map.bo_offset > op->map.bo->size ||
++             !op->va.size || op->va.size > op->map.bo->size - op->map.bo_offset) return -1;
++         uint64_t address = ebo(op->map.bo)->gpu + op->map.bo_offset;
++         if (op->va.start != PAN_KMOD_VM_MAP_AUTO_VA && op->va.start != address) return -1;
++         op->va.start = address;
++      } else if (op->type != PAN_KMOD_VM_OP_TYPE_UNMAP && op->type != PAN_KMOD_VM_OP_TYPE_SYNC_ONLY) return -1;
++      /* The one kernel mapping belongs to the BO, like kbase SAME_VA. */
++   }
++   return 0;
++}
++static enum pan_kmod_vm_state vm_state(struct pan_kmod_vm *vm)
++{
++   struct e5_dev *d = edev(vm->dev);
++   pthread_mutex_lock(&d->lock);
++   enum pan_kmod_vm_state state = d->lost ? PAN_KMOD_VM_FAULTY : PAN_KMOD_VM_USABLE;
++   pthread_mutex_unlock(&d->lock);
++   return state;
++}
++static uint64_t timestamp(const struct pan_kmod_dev *dev) { (void)dev; errno = ENOTSUP; return 0; }
++
++uint64_t kbase_kmod_job_submit(struct pan_kmod_dev *dev, uint64_t jc, uint32_t request,
++                               struct pan_kmod_bo **bos, uint32_t count,
++                               struct base_external_resource *external, uint32_t nexternal)
++{
++   (void)external; struct e5_dev *d = edev(dev);
++   if (!count || count > d->hw.maxSubmitBos || nexternal) return 0;
++   E5MaliSubmitMany submit = { .jc = jc, .slot = request & BASE_JD_REQ_FS ? 0u : 1u };
++   for (uint32_t i = 0; i < count; ++i) {
++      if (!bos[i] || bos[i]->dev != dev) return 0;
++   }
++   E5MaliSubmitOut out = {0}; E5MaliWaitAtomOut done = {0};
++   pthread_mutex_lock(&d->lock);
++   /* Include immutable shaders and device-private buffers as well as the
++    * batch's explicit list. The lock prevents BO changes through real wait. */
++   for (unsigned i = 0; i < d->hw.maxBoHandles; ++i)
++      if (d->live[i]) submit.handles[submit.handleCount++] = i + 1;
++   if (d->lost) goto fail;
++   if (d->submit_wait) {
++      E5MaliSubmitWaitOut completed = {0};
++      if (call(d, kSelSubmitWaitMany, &submit, d->submit_bytes, &completed, sizeof(completed)) ||
++          completed.status || !completed.atomId || completed.state != kAtomDone || completed.hwStatus != 1) goto fail;
++      out.atomId = completed.atomId;
++   } else {
++      if (call(d, kSelSubmitMany, &submit, d->submit_bytes, &out, sizeof(out)) || out.status || !out.atomId) goto fail;
++      E5MaliWaitAtom wait = { .atomId = out.atomId, .timeoutMs = 500 };
++      if (call(d, kSelWaitAtom, &wait, sizeof(wait), &done, sizeof(done)) || done.status || done.state != kAtomDone || done.hwStatus != 1) goto fail;
++   }
++   d->completed = out.atomId;
++   uint64_t number = ++d->job_count;
++   if (number <= 8 || !(number & (number - 1))) {
++      char line[192];
++      int n = snprintf(line, sizeof(line), "E5PANVK DONE pid=%d job=%llu atom=%llu slot=%u hw=1 jc=%llx\n",
++                       getpid(), (unsigned long long)number, (unsigned long long)out.atomId,
++                       submit.slot, (unsigned long long)jc);
++      if (n > 0 && n < (int)sizeof(line)) (void)write(229, line, n);
++   }
++   pthread_mutex_unlock(&d->lock); return out.atomId;
++fail:
++   d->lost = true; pthread_mutex_unlock(&d->lock); return 0;
++}
++bool kbase_kmod_wait_atom(struct pan_kmod_dev *dev, uint64_t atom, int64_t timeout)
++{
++   (void)timeout; struct e5_dev *d = edev(dev); pthread_mutex_lock(&d->lock);
++   bool complete = atom && atom <= d->completed;
++   pthread_mutex_unlock(&d->lock); return complete;
++}
++uint64_t kbase_kmod_job_submit_dep(struct pan_kmod_dev *d, uint64_t jc, uint32_t req, struct pan_kmod_bo **bos, uint32_t n,
++                                  uint64_t dep0, uint8_t type0, uint64_t dep1, uint8_t type1, bool no_waiter)
++{
++   (void)type0; (void)type1; (void)no_waiter;
++   if ((dep0 && !kbase_kmod_wait_atom(d, dep0, -1)) || (dep1 && !kbase_kmod_wait_atom(d, dep1, -1))) return 0;
++   return kbase_kmod_job_submit(d, jc, req, bos, n, NULL, 0);
++}
++bool kbase_kmod_job_submit_retry(struct pan_kmod_dev *d, uint64_t jc, uint32_t req, struct pan_kmod_bo **bos, uint32_t n,
++                                struct base_external_resource *ext, uint32_t ne, int attempts)
++{ (void)attempts; return kbase_kmod_job_submit(d, jc, req, bos, n, ext, ne) != 0; }
++void kbase_kmod_atom_release(struct pan_kmod_dev *d, uint64_t atom) { (void)d; (void)atom; /* already retired after real wait */ }
++bool kbase_kmod_supports_dmabuf(const struct pan_kmod_dev *d) { (void)d; return false; }
++const struct drm_panthor_csif_info *kbase_kmod_get_csif_props(const struct pan_kmod_dev *d) { (void)d; return NULL; }
++uint32_t kbase_kmod_get_flush_id(const struct pan_kmod_dev *d) { (void)d; return 0; }
++const struct pan_kmod_ops kbase_kmod_ops = {
++   .dev_create = create, .dev_destroy = destroy, .dev_query_user_va_range = va_range,
++   .bo_alloc = bo_alloc, .bo_free = bo_free, .bo_import = bo_import,
++   .bo_get_mmap_offset = bo_offset, .bo_mmap = bo_mmap, .bo_munmap = bo_munmap,
++   .flush_bo_map_syncs = flush_maps, .bo_wait = bo_wait,
++   .vm_create = vm_create, .vm_destroy = vm_destroy, .vm_bind = vm_bind,
++   .vm_query_state = vm_state, .query_timestamp = timestamp,
++};
++
++/* E5 is a JM device. CSF and alias operations are unavailable and are
++ * never exposed as capabilities. Keep explicit failures for shared callers. */
++int kbase_kmod_csf_group_create(struct pan_kmod_dev *dev, uint32_t cs_queue_count, uint32_t *group_handle)
++{ (void)dev; (void)cs_queue_count; (void)group_handle; errno = ENOTSUP; return -1; }
++
++void kbase_kmod_csf_group_destroy(struct pan_kmod_dev *dev, uint32_t group_handle)
++{ (void)dev; (void)group_handle; errno = ENOTSUP; }
++
++void * kbase_kmod_csf_queue_bind(struct pan_kmod_dev *dev, uint32_t group_handle, uint32_t csi_index, uint64_t ringbuf_va, uint32_t ringbuf_size)
++{ (void)dev; (void)group_handle; (void)csi_index; (void)ringbuf_va; (void)ringbuf_size; errno = ENOTSUP; return NULL; }
++
++void kbase_kmod_csf_queue_term(struct pan_kmod_dev *dev, uint64_t ringbuf_va, void *user_io)
++{ (void)dev; (void)ringbuf_va; (void)user_io; errno = ENOTSUP; }
++
++int kbase_kmod_csf_queue_kick(struct pan_kmod_dev *dev, uint64_t ringbuf_va)
++{ (void)dev; (void)ringbuf_va; errno = ENOTSUP; return -1; }
++
++int kbase_kmod_csf_wait_event(struct pan_kmod_dev *dev, int64_t timeout_ns)
++{ (void)dev; (void)timeout_ns; errno = ENOTSUP; return -1; }
++
++int kbase_kmod_csf_wait_cqs64(struct pan_kmod_dev *dev, uint64_t addr, uint64_t target_minus_one, int64_t timeout_ns)
++{ (void)dev; (void)addr; (void)target_minus_one; (void)timeout_ns; errno = ENOTSUP; return -1; }
++
++bool kbase_kmod_csf_has_error(const struct pan_kmod_dev *dev)
++{ (void)dev; errno = ENOTSUP; return true; }
++
++int kbase_kmod_csf_tiler_heap_create(struct pan_kmod_dev *dev, uint32_t chunk_size, uint32_t initial_chunks, uint32_t max_chunks, uint32_t target_in_flight, uint32_t mem_group_id, uint64_t *heap_ctx_va, uint64_t *first_chunk_va)
++{ (void)dev; (void)chunk_size; (void)initial_chunks; (void)max_chunks; (void)target_in_flight; (void)mem_group_id; (void)heap_ctx_va; (void)first_chunk_va; errno = ENOTSUP; return -1; }
++
++void kbase_kmod_csf_tiler_heap_destroy(struct pan_kmod_dev *dev, uint64_t heap_ctx_va)
++{ (void)dev; (void)heap_ctx_va; errno = ENOTSUP; }
++
++uint64_t kbase_kmod_alias_create(struct pan_kmod_dev *dev, uint64_t bo_va, uint64_t size, uint32_t nents)
++{ (void)dev; (void)bo_va; (void)size; (void)nents; errno = ENOTSUP; return 0; }
++
++void kbase_kmod_alias_destroy(struct pan_kmod_dev *dev, uint64_t va, uint64_t size, uint32_t nents)
++{ (void)dev; (void)va; (void)size; (void)nents; errno = ENOTSUP; }
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.h b/src/panfrost/lib/kmod/kbase_kmod.h
+index 1fea940..1d8ac88 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.h
++++ b/src/panfrost/lib/kmod/kbase_kmod.h
+@@ -21,6 +21,8 @@ struct pan_kmod_dev;
+  * ---------------------------------------------------------------------- */
+ 
+ struct pan_kmod_bo;
++struct pan_kmod_bo *kbase_kmod_bo_import_host(struct pan_kmod_dev *dev,
++                                             void *host_ptr, uint64_t size);
+ 
+ struct base_external_resource {
+    uint64_t ext_resource; /* gpu_va | access (bit 0: 0=non-exclusive, 1=exclusive) */
+@@ -148,3 +150,7 @@ void kbase_kmod_alias_destroy(struct pan_kmod_dev *dev, uint64_t va,
+ #if defined(__cplusplus)
+ } // extern "C"
+ #endif
++
++#ifdef HAVE_PAN_KMOD_E5
++bool e5_kmod_supports_user_memory(const struct pan_kmod_dev *dev);
++#endif
+diff --git a/src/panfrost/lib/kmod/meson.build b/src/panfrost/lib/kmod/meson.build
+index 97a7316..d3da141 100644
+--- a/src/panfrost/lib/kmod/meson.build
++++ b/src/panfrost/lib/kmod/meson.build
+@@ -16,6 +16,9 @@ endif
+ if panfrost_kmds.contains('kbase')
+   libpankmod_lib_files += files('kbase_kmod.c')
+ endif
++if panfrost_kmds.contains('e5')
++  libpankmod_lib_files += files('e5_kmod.c')
++endif
+ 
+ libpankmod_lib = static_library(
+   'pankmod_lib',
+diff --git a/src/panfrost/lib/kmod/pan_kmod.c b/src/panfrost/lib/kmod/pan_kmod.c
+index 1e6ca23..0214208 100644
+--- a/src/panfrost/lib/kmod/pan_kmod.c
++++ b/src/panfrost/lib/kmod/pan_kmod.c
+@@ -5,7 +5,9 @@
+ 
+ #include <errno.h>
+ #include <string.h>
++#if MESA_SYSTEM_HAS_KMS_DRM
+ #include <xf86drm.h>
++#endif
+ 
+ #include "util/cache_ops.h"
+ #include "util/u_memory.h"
+@@ -41,7 +43,11 @@ static const struct {
+ #endif
+ #if defined(HAVE_PAN_KMOD_KBASE)
+    {
++#if defined(HAVE_PAN_KMOD_E5)
++      "e5",
++#else
+       "kbase",
++#endif
+       &kbase_kmod_ops,
+    },
+ #endif
+@@ -104,6 +110,7 @@ struct pan_kmod_dev *
+ pan_kmod_dev_create(int fd, uint32_t flags,
+                     const struct pan_kmod_allocator *allocator)
+ {
++#if MESA_SYSTEM_HAS_KMS_DRM
+    drmVersionPtr version = drmGetVersion(fd);
+ 
+    if (!version)
+@@ -122,6 +129,10 @@ pan_kmod_dev_create(int fd, uint32_t flags,
+ 
+    drmFreeVersion(version);
+    return dev;
++#else
++   errno = ENOTSUP;
++   return NULL;
++#endif
+ }
+ 
+ void
+@@ -221,6 +232,7 @@ pan_kmod_bo_import(struct pan_kmod_dev *dev, int fd)
+       goto out_unlock;
+    }
+ 
++#if MESA_SYSTEM_HAS_KMS_DRM
+    uint32_t handle;
+    int ret = drmPrimeFDToHandle(dev->fd, fd, &handle);
+    if (ret)
+@@ -249,14 +261,20 @@ pan_kmod_bo_import(struct pan_kmod_dev *dev, int fd)
+    }
+ 
+    assert(p_atomic_read(&bo->refcnt) > 0);
++#else
++   errno = ENOTSUP;
++   goto err_unlock;
++#endif
+ 
+ out_unlock:
+    simple_mtx_unlock(&dev->handle_to_bo.lock);
+ 
+    return bo;
+ 
++#if MESA_SYSTEM_HAS_KMS_DRM
+ err_close_handle:
+    drmCloseBufferHandle(dev->fd, handle);
++#endif
+ 
+ err_unlock:
+    simple_mtx_unlock(&dev->handle_to_bo.lock);
+@@ -351,8 +369,9 @@ pan_kmod_queue_bo_map_sync(struct pan_kmod_bo *bo, uint64_t bo_offset,
+        MAX_PENDING_SYNC_OPS)
+       pan_kmod_flush_bo_map_syncs_locked(dev);
+ 
+-   uint64_t start = bo_offset & ~((uint64_t)util_cache_granularity() - 1);
+-   uint64_t end = ALIGN_POT(bo_offset + range, util_cache_granularity());
++   size_t granularity = pan_kmod_cache_granularity(dev);
++   uint64_t start = bo_offset & ~((uint64_t)granularity - 1);
++   uint64_t end = ALIGN_POT(bo_offset + range, granularity);
+ 
+    /* A command buffer often dirties several neighboring slices of the same
+     * mapped BO before the next submit.  Coalesce those slices here so a
+diff --git a/src/panfrost/lib/kmod/pan_kmod.h b/src/panfrost/lib/kmod/pan_kmod.h
+index cdcaba9..fb3d7cf 100644
+--- a/src/panfrost/lib/kmod/pan_kmod.h
++++ b/src/panfrost/lib/kmod/pan_kmod.h
+@@ -22,7 +22,9 @@
+ #include <fcntl.h>
+ #include <inttypes.h>
+ #include <unistd.h>
++#if MESA_SYSTEM_HAS_KMS_DRM
+ #include <xf86drm.h>
++#endif
+ 
+ #include "drm-uapi/drm.h"
+ 
+@@ -275,6 +277,12 @@ struct pan_kmod_dev_props {
+     */
+    bool is_io_coherent;
+ 
++   /* Cache-maintenance granularity supplied by the kernel ABI. Zero selects
++    * the userspace CPU query; a backend whose OS traps that query must set
++    * this to its cache-sync contract's power-of-two granularity.
++    */
++   uint32_t cache_sync_granularity;
++
+    /* Bitmask encoding the available GPU page sizes */
+    uint64_t pgsize_bitmap;
+ };
+@@ -757,11 +765,16 @@ pan_kmod_bo_export(struct pan_kmod_bo *bo)
+       if (fd < 0)
+          return -1;
+    } else {
++#if MESA_SYSTEM_HAS_KMS_DRM
+       if (drmPrimeHandleToFD(bo->dev->fd, bo->handle,
+                              DRM_CLOEXEC | DRM_RDWR, &fd)) {
+          mesa_loge("drmPrimeHandleToFD() failed (err=%d)", errno);
+          return -1;
+       }
++#else
++      errno = ENOTSUP;
++      return -1;
++#endif
+    }
+ 
+    if (bo->dev->ops->bo_export && bo->dev->ops->bo_export(bo, fd)) {
+@@ -851,6 +864,15 @@ pan_kmod_can_sync_bo_map_from_userland(struct pan_kmod_dev *dev)
+           !(dev->flags & PAN_KMOD_DEV_FLAG_MMAP_SYNC_THROUGH_KERNEL);
+ }
+ 
++static inline size_t
++pan_kmod_cache_granularity(const struct pan_kmod_dev *dev)
++{
++   if (dev->props.cache_sync_granularity)
++      return dev->props.cache_sync_granularity;
++
++   return util_has_cache_ops() ? util_cache_granularity() : 64;
++}
++
+ void pan_kmod_queue_bo_map_sync(struct pan_kmod_bo *bo, uint64_t bo_offset,
+                                 void *cpu_ptr, uint64_t range,
+                                 enum pan_kmod_bo_sync_type type);
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
+index 9230e5d..32fe230 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
+@@ -501,10 +501,23 @@ panvk_create_cmdbuf(struct vk_command_pool *vk_pool, VkCommandBufferLevel level,
+ 
+    struct panvk_pool_properties desc_pool_props = {
+       .create_flags =
+-         panvk_device_adjust_bo_flags(device, PAN_KMOD_BO_FLAG_WB_MMAP),
++         panvk_device_adjust_bo_flags(device, PAN_KMOD_BO_FLAG_WB_MMAP
++#ifdef HAVE_PAN_KMOD_E5
++                                      /* G1 validates the job-chain mapping as executable. */
++                                      | PAN_KMOD_BO_FLAG_EXECUTABLE
++#endif
++                                      ),
+       .slab_size = 64 * 1024,
+       .label = "Command buffer descriptor pool",
++#ifdef HAVE_PAN_KMOD_E5
++      /* Secondary command buffers are recorded in a CPU queue and replayed
++       * into the primary. Eager GPU backing for every idle/secondary buffer
++       * consumes E5's finite BO handles before the first draw is replayed.
++       * The pool already allocates backing on its first real use. */
++      .prealloc = false,
++#else
+       .prealloc = true,
++#endif
+       .owns_bos = true,
+       .needs_locking = false,
+    };
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index 9e34a8e..59a8e5a 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -458,6 +458,23 @@ panvk_draw_prepare_varyings(struct panvk_cmd_buffer *cmdbuf,
+       ia->primitive_topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    uint64_t psiz_buf = 0;
+ 
++#ifdef HAVE_PAN_KMOD_E5
++   if (is_indirect_draw(draw)) {
++      /* Preserve the full indirect-draw capacity, allocating its 144 MB
++       * backing only when a command actually needs it. */
++      simple_mtx_lock(&dev->indirect_varying_lock);
++      VkResult result = VK_SUCCESS;
++      if (!dev->indirect_varying_buffer)
++         result = panvk_priv_bo_create(
++            dev, PANVK_JM_MAX_VERTICES_INDIRECT * PANVK_JM_MAX_PER_VTX_ATTRIBUTES_INDIRECT_SIZE,
++            PAN_KMOD_BO_FLAG_NO_MMAP, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE,
++            &dev->indirect_varying_buffer);
++      simple_mtx_unlock(&dev->indirect_varying_lock);
++      if (result != VK_SUCCESS)
++         return result;
++   }
++#endif
++
+    if (is_indirect_draw(draw) &&
+        !cmdbuf->state.gfx.vs.indirect_varying_bufs_infos) {
+       struct pan_ptr bufs_info_storage = panvk_cmd_alloc_dev_mem(
+@@ -2104,6 +2121,56 @@ v9_prepare_tess_compute_driver_set(struct panvk_cmd_buffer *cmdbuf,
+    return VK_SUCCESS;
+ }
+ 
++static void
++v9_emit_varying_descs(const struct panvk_cmd_buffer *cmdbuf,
++                   struct mali_attribute_packed *descs)
++{
++   const struct panvk_shader_variant *vs =
++      panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *fs =
++      panvk_shader_only_variant(cmdbuf->state.gfx.fs.shader);
++
++   const struct pan_varying_layout *vs_layout = &vs->info.varyings.formats;
++   const struct pan_varying_layout *fs_format = &fs->info.varyings.formats;
++   pan_varying_layout_require_layout(vs_layout);
++   pan_varying_layout_require_format(fs_format);
++
++   for (uint32_t i = 0; i < fs_format->count; i++) {
++      const struct pan_varying_slot *fs_slot =
++         pan_varying_layout_slot_at(fs_format, i);
++
++      /* Skip empty slots and special varyings. */
++      if (!fs_slot || fs_slot->section != PAN_VARYING_SECTION_GENERIC)
++         continue;
++
++      unsigned offset = 0;
++      enum pipe_format format = PIPE_FORMAT_NONE;
++
++      const struct pan_varying_slot *vs_slot =
++         pan_varying_layout_find_slot(vs_layout, fs_slot->location);
++      if (vs_slot) {
++         nir_alu_type base_type = nir_alu_type_get_base_type(fs_slot->alu_type);
++         nir_alu_type bit_size = nir_alu_type_get_type_size(vs_slot->alu_type);
++
++         offset = vs_slot->offset;
++         format = pan_varying_format(base_type | bit_size, vs_slot->ncomps);
++      }
++
++      pan_pack(&descs[i], ATTRIBUTE, cfg) {
++         cfg.attribute_type = MALI_ATTRIBUTE_TYPE_VERTEX_PACKET;
++         cfg.offset_enable = false;
++         cfg.format = GENX(pan_format_from_pipe_format)(format)->hw;
++         cfg.table = 61;
++         cfg.frequency = MALI_ATTRIBUTE_FREQUENCY_VERTEX;
++         cfg.offset = 1024 + offset;
++         /* On v12+, the hardware-controlled buffer is at index 1 for varyings */
++         cfg.buffer_index = PAN_ARCH >= 12 ? 1 : 0;
++         cfg.attribute_stride = vs_layout->generic_size_B;
++         cfg.packet_stride = vs_layout->generic_size_B + 16;
++      }
++   }
++}
++
+ static VkResult
+ v9_prepare_fs_driver_set(struct panvk_cmd_buffer *cmdbuf)
+ {
+@@ -2112,18 +2179,22 @@ v9_prepare_fs_driver_set(struct panvk_cmd_buffer *cmdbuf)
+ 
+    const struct panvk_shader_desc_info *info = &cmdbuf->state.gfx.fs.shader->desc_info;
+    struct panvk_shader_desc_state *st = &cmdbuf->state.gfx.fs.desc;
+-   uint32_t desc_count = info->dyn_bufs.count + 1;
++   uint32_t varying_count = info->fs_varying_attr_desc_count;
++   uint32_t desc_count = varying_count + info->dyn_bufs.count + 1;
+    struct pan_ptr driver_set = panvk_cmd_alloc_dev_mem(
+       cmdbuf, desc, desc_count * PANVK_DESCRIPTOR_SIZE, PANVK_DESCRIPTOR_SIZE);
+    if (desc_count && !driver_set.gpu)
+       return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+ 
+    struct panvk_opaque_desc *descs = driver_set.cpu;
+-   pan_cast_and_pack(&descs[0], SAMPLER, cfg) {
++   memset(descs, 0, desc_count * PANVK_DESCRIPTOR_SIZE);
++   if (varying_count)
++      v9_emit_varying_descs(cmdbuf, (struct mali_attribute_packed *)&descs[0]);
++   pan_cast_and_pack(&descs[varying_count], SAMPLER, cfg) {
+       cfg.clamp_integer_array_indices = false;
+    }
+    panvk_per_arch(cmd_fill_dyn_bufs)(&cmdbuf->state.gfx.desc_state, info,
+-      (struct mali_buffer_packed *)(&descs[1]));
++      (struct mali_buffer_packed *)(&descs[varying_count + 1]));
+    st->driver_set.dev_addr = driver_set.gpu;
+    st->driver_set.size = desc_count * PANVK_DESCRIPTOR_SIZE;
+    return VK_SUCCESS;
+@@ -2264,21 +2335,26 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
+    panvk_depth_range(&cmdbuf->state.gfx, &dyns->vp, &z_min, &z_max);
+ 
+    const bool secondary_shader = vs->info.vs.secondary_enable && fs != NULL;
+-   /* Use the real varying count from the linked vs/fs pair instead of a
+-    * vkcube-only hardcoded guess. Position is IDVS-side and not counted here,
+-    * so vs varying count (fs consumes a subset/same set) drives the stride. */
+-   const unsigned vary_slots = MAX2(vs->info.varyings.formats.count, 1);
+-   /* The compiler places varyings by layout offset, not densely by count:
+-    * use the layout's real byte size (as CSF does) so a vertex's varyings
+-    * never spill into the next vertex packet. Never smaller than before. */
+-   const unsigned vary_bytes =
+-      MAX2(vary_slots * 16, ALIGN_POT(vs->info.varyings.formats.generic_size_B, 16));
+-   const unsigned vary_stride = secondary_shader ? vary_bytes : 0;
+-   PANVK_TRACE_PRINTF(
+-           "[V9-VARY] secondary=%d slots=%u packet=%u attr=%u var_spd=%d\n",
+-           (int)secondary_shader, vary_slots,
+-           secondary_shader ? vary_stride + 16 : 16, vary_stride,
+-           (int)panvk_priv_mem_check_alloc(vs->spds.var));
++   /* Match Gallium's v9 packet layout. The varying count also contains
++    * position and point size; only generic_size_B describes the attribute
++    * payload consumed by the secondary shader and fragment interpolator. */
++   const unsigned vary_stride =
++      secondary_shader ? vs->info.varyings.formats.generic_size_B : 0;
++#ifdef HAVE_PAN_KMOD_E5
++   static int varying_reports;
++   if (p_atomic_inc_return(&varying_reports) <= 12) {
++      char line[240];
++      int n = snprintf(line, sizeof(line),
++         "E5PANVK VARY pid=%d secondary=%u slots=%u packet=%u attr=%u spd=%llx offset=%u preload=%llx fau=%u flat=%u\n",
++         getpid(), secondary_shader, vs->info.varyings.formats.count,
++         vary_stride + 16, vary_stride,
++         (unsigned long long)panvk_priv_mem_dev_addr(vs->spds.var),
++         vs->info.vs.secondary_offset,
++         (unsigned long long)vs->info.vs.secondary_preload,
++         vs->fau.total_count, fs ? fs->info.bifrost.uses_flat_shading : 0);
++      if (n > 0 && n < (int)sizeof(line)) (void)write(229, line, n);
++   }
++#endif
+ 
+    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, PRIMITIVE, cfg) {
+       cfg.draw_mode = v9_translate_prim(info->prim);
+@@ -2368,15 +2444,37 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
+          cfg.flags_0.shader_modifies_coverage = !v61a_no_smc() &&
+             (fs->info.fs.can_discard || fs->info.fs.writes_coverage ||
+              dyns->ms.alpha_to_coverage_enable);
+-         /* FPK would discard what lies underneath; only allowed when blending
+-          * doesn't read the destination (and no alpha-to-coverage). */
++         uint8_t rt_mask = cmdbuf->state.gfx.render.bound_attachments &
++                           MESA_VK_RP_ATTACHMENT_ANY_COLOR_BITS;
++         uint8_t rt_written = color_attachment_written_mask(fs, &dyns->cal);
++         uint8_t rt_read = color_attachment_read_mask(fs, &dyns->ial, rt_mask);
++         bool roa_color = dyns->rasterization_order_access & VK_IMAGE_ASPECT_COLOR_BIT;
++         /* Tilebuffer reads must see preceding fragments. Match the CSF and
++          * Gallium rules: neither a read/modify/write fragment nor an ordered
++          * color-access pipeline may kill the fragments it reads. */
+          cfg.flags_0.allow_forward_pixel_to_kill =
+-            fs->info.fs.can_fpk &&
++            fs->info.fs.can_fpk && !(rt_mask & ~rt_written) &&
++            !(rt_read & rt_written) && !roa_color &&
+             !cmdbuf->state.gfx.cb.info.any_dest_read &&
+             !dyns->ms.alpha_to_coverage_enable;
+          cfg.flags_0.allow_forward_pixel_to_be_killed = !fs->info.writes_global;
+-         cfg.flags_1.render_target_mask =
+-            color_attachment_written_mask(fs, &cmdbuf->vk.dynamic_graphics_state.cal);
++         cfg.flags_0.evaluate_per_sample =
++            (fs->info.fs.sample_shading || cmdbuf->state.gfx.cb.info.needs_shader) &&
++            dyns->ms.rasterization_samples > 1;
++         cfg.flags_1.render_target_mask = rt_written;
++#ifdef HAVE_PAN_KMOD_E5
++         if (roa_color) {
++            static int reports;
++            if (p_atomic_inc_return(&reports) <= 8) {
++               char line[160];
++               int n = snprintf(line, sizeof(line), "E5PANVK ROA pid=%d read=%x write=%x fpk=%u samples=%u\n",
++                                getpid(), rt_read, rt_written,
++                                (unsigned)cfg.flags_0.allow_forward_pixel_to_kill,
++                                dyns->ms.rasterization_samples);
++               if (n > 0 && n < (int)sizeof(line)) (void)write(229, line, n);
++            }
++         }
++#endif
+          cfg.shader.resources = cmdbuf->state.gfx.fs.desc.res_table;
+          cfg.shader.shader = panvk_priv_mem_dev_addr(fs->spd);
+          cfg.shader.thread_storage = batch->tls.gpu;
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+index 1796454..1845e85 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+@@ -33,6 +33,7 @@
+ /* ---- P4 trace ---- */
+ #include <stdio.h>
+ #include <unistd.h>
++#include <time.h>
+ 
+ /* ---- PANVK_TRACE gate: debug fprintf(stderr) only when PANVK_TRACE=1 ---- */
+ #include <stdio.h>
+@@ -72,16 +73,74 @@ panvk_overlap_enabled(void)
+    }
+    return on;
+ }
++#if defined(HAVE_PAN_KMOD_E5) && PAN_ARCH == 9
++/* Diagnostic-only readback after genuine vertex/tiler completion. The heap
++ * is mapped only by the standalone PID 1 probe which sets this option. */
++static void
++e5_read_vertex_packets(struct panvk_device *dev, struct panvk_cmd_buffer *cmdbuf,
++                       struct panvk_batch *batch)
++{
++   if (getpid() != 1 || !getenv("PANVK_E5_VARY_READBACK") ||
++       !dev->tiler_heap->addr.host || !batch->frag_jc.first_job)
++      return;
++   static unsigned reports;
++   if (reports++ >= 4)
++      return;
++
++   panvk_pool_invalidate_maps(&cmdbuf->desc_pool);
++   const uint64_t size = pan_kmod_bo_size(dev->tiler_heap->bo);
++   panvk_priv_bo_invalidate(dev->tiler_heap, 0, size);
++   pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
++
++   const uint32_t *heap = dev->tiler_heap->addr.host;
++   unsigned matches = 0;
++   uint64_t first = 0;
++   for (uint64_t i = 0; i < size / 4; i++) {
++      if (heap[i] == 0x12340025u) {
++         if (!matches) first = dev->tiler_heap->addr.dev + i * 4;
++         matches++;
++      }
++   }
++   dprintf(229, "E5PANVK HEAP pass=%u sentinel=%u first=%llx\n",
++           reports, matches, (unsigned long long)first);
++   util_dynarray_foreach(&batch->jobs, void *, job) {
++      pan_unpack((const struct mali_job_header_packed *)*job, JOB_HEADER, header);
++      if (header.type != MALI_JOB_TYPE_MALLOC_VERTEX)
++         continue;
++      pan_unpack(pan_section_ptr(*job, MALLOC_VERTEX_JOB, PRIMITIVE), PRIMITIVE, prim);
++      pan_unpack(pan_section_ptr(*job, MALLOC_VERTEX_JOB, DRAW), DRAW, draw);
++      pan_unpack(pan_section_ptr(*job, MALLOC_VERTEX_JOB, VARYING), SHADER_ENVIRONMENT, vary);
++      const uint64_t addr = draw.vertex_array.pointer;
++      dprintf(229, "E5PANVK PACKET job=%u status=%llx secondary=%u ptr=%llx packet=%u attr=%u spd=%llx fau=%llx/%u\n",
++              header.index, (unsigned long long)header.exception_status, prim.secondary_shader,
++              (unsigned long long)addr, draw.vertex_array.vertex_packet_stride,
++              draw.vertex_array.vertex_attribute_stride,
++              (unsigned long long)vary.shader, (unsigned long long)vary.fau,
++              vary.fau_count);
++      if (addr < dev->tiler_heap->addr.dev ||
++          addr - dev->tiler_heap->addr.dev > size - 128)
++         continue;
++      const uint32_t *data = (const uint32_t *)((const uint8_t *)heap +
++                                               addr - dev->tiler_heap->addr.dev);
++      for (unsigned i = 0; i < 32; i += 8)
++         dprintf(229, "E5PANVK PACKET words=%u %08x %08x %08x %08x %08x %08x %08x %08x\n",
++                 i, data[i], data[i+1], data[i+2], data[i+3], data[i+4],
++                 data[i+5], data[i+6], data[i+7]);
++   }
++}
++#endif
++
+ static uint64_t
+ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+                          struct panvk_cmd_buffer *cmdbuf,
+                          struct panvk_batch *batch, struct pan_kmod_bo **bos,
+-                         unsigned nr_bos, uint64_t *out_frag_atom)
++                         unsigned nr_bos, uint64_t *out_frag_atom, VkResult *status)
+ {
+    struct panvk_device *dev = to_panvk_device(queue->vk.base.device);
+    struct panvk_physical_device *phys_dev =
+       to_panvk_physical_device(dev->vk.physical);
+    uint64_t vtc_atom = 0, frag_atom = 0;
++   *status = VK_SUCCESS;
+    (void)0;
+ 
+    /* Reset the batch if it's already been issued */
+@@ -109,6 +168,44 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+     * make sure things are GPU-visible. */
+    pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
+ 
++#ifdef HAVE_PAN_KMOD_E5
++   if (pan_kmod_vm_query_state(dev->kmod.vm) != PAN_KMOD_VM_USABLE) {
++      *status = vk_queue_set_lost(&queue->vk, "E5 cache synchronization failed");
++      return 0;
++   }
++   if (queue->in_dep && !kbase_kmod_wait_atom(dev->kmod.dev, queue->in_dep, -1)) {
++      *status = vk_queue_set_lost(&queue->vk, "E5 input dependency failed");
++      return 0;
++   }
++   queue->in_dep = 0;
++   if (batch->vtc_jc.first_job) {
++      vtc_atom = kbase_kmod_job_submit(
++         dev->kmod.dev, batch->vtc_jc.first_job,
++         BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V, bos, nr_bos, NULL, 0);
++      if (!vtc_atom) {
++         *status = vk_queue_set_lost(&queue->vk, "E5 vertex/tiler/compute submission failed");
++         return 0;
++      }
++      queue->last_vtc_atom = vtc_atom;
++#if PAN_ARCH == 9
++      e5_read_vertex_packets(dev, cmdbuf, batch);
++#endif
++   }
++   if (batch->frag_jc.first_job) {
++      frag_atom = kbase_kmod_job_submit(dev->kmod.dev, batch->frag_jc.first_job,
++                                       BASE_JD_REQ_FS, bos, nr_bos, NULL, 0);
++      if (!frag_atom) {
++         *status = vk_queue_set_lost(&queue->vk, "E5 fragment submission failed");
++         return 0;
++      }
++      queue->last_frag_atom = frag_atom;
++   }
++   // The E5 backend returns an atom only after real Done/01 completion.
++   batch->issued = true;
++   *out_frag_atom = frag_atom;
++   queue->last_any_atom = frag_atom ? frag_atom : vtc_atom;
++   return queue->last_any_atom;
++#else
+    if (batch->vtc_jc.first_job) {
+          if (unlikely(!queue->warmed_up)) {
+          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
+@@ -224,6 +321,7 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+ 
+    *out_frag_atom = frag_atom;
+    return frag_atom ? frag_atom : vtc_atom;
++#endif
+ }
+ 
+ /* kbase has no kernel wait primitive for VkEvent (see panvk_event.h), so
+@@ -303,6 +401,11 @@ panvk_jm_kbase_wait_atoms(void *data, const uint64_t targets[PANVK_KBASE_SYNC_TA
+ VkResult
+ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_submit *submit)
+ {
++#if defined(HAVE_PAN_KMOD_E5) && PAN_ARCH == 9
++   struct timespec start, end;
++   clock_gettime(CLOCK_MONOTONIC, &start);
++   unsigned batches = 0;
++#endif
+    struct panvk_gpu_queue *queue = container_of(vk_queue, struct panvk_gpu_queue, vk);
+    struct panvk_device *dev = to_panvk_device(queue->vk.base.device);
+    (void)0;
+@@ -327,8 +430,8 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+                   continue;
+                if (n_in < ARRAY_SIZE(in_atoms))
+                   in_atoms[n_in++] = wt[t];
+-               else
+-                  kbase_kmod_wait_atom(dev->kmod.dev, wt[t], -1);
++               else if (!kbase_kmod_wait_atom(dev->kmod.dev, wt[t], -1))
++                  return vk_queue_set_lost(&queue->vk, "input atom failed");
+             }
+             continue;
+          }
+@@ -340,7 +443,8 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+       /* One atom goes to the GPU as a pre-dependency, extra ones are
+        * waited on the CPU (rare). */
+       for (unsigned a = 1; a < n_in; a++)
+-         kbase_kmod_wait_atom(dev->kmod.dev, in_atoms[a], -1);
++         if (!kbase_kmod_wait_atom(dev->kmod.dev, in_atoms[a], -1))
++            return vk_queue_set_lost(&queue->vk, "input atom failed");
+       queue->in_dep = n_in ? in_atoms[0] : 0;
+ 
+       (void)0;
+@@ -354,6 +458,9 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+          container_of(submit->command_buffers[j], struct panvk_cmd_buffer, vk);
+ 
+       list_for_each_entry(struct panvk_batch, batch, &cmdbuf->batches, node) {
++#if defined(HAVE_PAN_KMOD_E5) && PAN_ARCH == 9
++         ++batches;
++#endif
+          /* FIXME: should be done at the batch level */
+          unsigned nr_bos = panvk_pool_num_bos(&cmdbuf->desc_pool) +
+                            panvk_pool_num_bos(&cmdbuf->varying_pool) +
+@@ -401,9 +508,12 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+          panvk_wait_event_ops(batch);
+ 
+          uint64_t frag_atom = 0;
++         VkResult result = VK_SUCCESS;
+          uint64_t last_atom =
+             panvk_queue_submit_batch(queue, cmdbuf, batch, bos, nr_bos,
+-                                     &frag_atom);
++                                     &frag_atom, &result);
++         if (result != VK_SUCCESS)
++            return result;
+ 
+          if (last_atom) {
+             queue->last_submitted_atom = last_atom;
+@@ -431,8 +541,8 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+    if (queue->in_dep) {
+       if (ntargets < PANVK_KBASE_SYNC_TARGET_COUNT)
+          targets[ntargets++] = queue->in_dep;
+-      else
+-         kbase_kmod_wait_atom(dev->kmod.dev, queue->in_dep, -1);
++      else if (!kbase_kmod_wait_atom(dev->kmod.dev, queue->in_dep, -1))
++         return vk_queue_set_lost(&queue->vk, "input atom failed");
+       queue->in_dep = 0;
+    }
+    if (ntargets == 0 && queue->last_submitted_atom)
+@@ -446,6 +556,14 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+                                    panvk_jm_kbase_wait_atoms, targets);
+    }
+ 
++#if defined(HAVE_PAN_KMOD_E5) && PAN_ARCH == 9
++   clock_gettime(CLOCK_MONOTONIC, &end);
++   const int64_t us = (int64_t)(end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
++   static unsigned calls;
++   const unsigned number = __atomic_add_fetch(&calls, 1, __ATOMIC_RELAXED);
++   if (number <= 8 || !(number & (number - 1)) || us >= 500000)
++      dprintf(229, "E5QUEUEPERF pid=%d call=%u buffers=%u batches=%u elapsed_us=%lld\n", getpid(), number, submit->command_buffer_count, batches, (long long)us);
++#endif
+    return VK_SUCCESS;
+ }
+ 
+diff --git a/src/panfrost/vulkan/panvk_device.h b/src/panfrost/vulkan/panvk_device.h
+index a985c33..a192695 100644
+--- a/src/panfrost/vulkan/panvk_device.h
++++ b/src/panfrost/vulkan/panvk_device.h
+@@ -73,6 +73,9 @@ struct panvk_device {
+    struct panvk_priv_bo *tiler_heap;
+    struct panvk_priv_bo *poly_heap;
+    struct panvk_priv_bo *indirect_varying_buffer;
++#ifdef HAVE_PAN_KMOD_E5
++   simple_mtx_t indirect_varying_lock;
++#endif
+    struct panvk_priv_bo *sample_positions;
+ 
+    struct {
+diff --git a/src/panfrost/vulkan/panvk_device_memory.c b/src/panfrost/vulkan/panvk_device_memory.c
+index c443644..6948802 100644
+--- a/src/panfrost/vulkan/panvk_device_memory.c
++++ b/src/panfrost/vulkan/panvk_device_memory.c
+@@ -115,6 +115,13 @@ panvk_AllocateMemory(VkDevice _device,
+       host_info = NULL;
+ 
+    if (host_info) {
++#ifdef HAVE_PAN_KMOD_E5
++      if (host_info->handleType != VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT ||
++          !(type->propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
++         result = panvk_error(device, VK_ERROR_INVALID_EXTERNAL_HANDLE);
++         goto err_destroy_mem;
++      }
++#endif
+       mem->bo = kbase_kmod_bo_import_host(device->kmod.dev,
+                                           (void *)host_info->pHostPointer,
+                                           pAllocateInfo->allocationSize);
+@@ -568,8 +575,15 @@ panvk_GetMemoryHostPointerPropertiesEXT(
+ 
+    uint32_t bits = 0;
+    for (uint32_t i = 0; i < props.memoryProperties.memoryTypeCount; i++) {
+-      if (props.memoryProperties.memoryTypes[i].propertyFlags &
+-          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
++      VkMemoryPropertyFlags flags = props.memoryProperties.memoryTypes[i].propertyFlags;
++#ifdef HAVE_PAN_KMOD_E5
++      /* ABI 1.3 imports hold write-combining per physical page in XNU, so callers
++       * need no cache-management commands. Physical IO coherence stays false. */
++      if ((flags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) ==
++          (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
++#else
++      if (flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
++#endif
+          bits |= 1u << i;
+    }
+    pMemoryHostPointerProperties->memoryTypeBits = bits;
+diff --git a/src/panfrost/vulkan/panvk_image.c b/src/panfrost/vulkan/panvk_image.c
+index 57e5180..a865e74 100644
+--- a/src/panfrost/vulkan/panvk_image.c
++++ b/src/panfrost/vulkan/panvk_image.c
+@@ -32,6 +32,10 @@
+ #include "vk_object.h"
+ #include "vk_util.h"
+ #include <stdlib.h>
++#ifdef HAVE_PAN_KMOD_E5
++#include <stdio.h>
++#include <unistd.h>
++#endif
+ 
+ 
+ /* On JM GPUs (Mali-G57 ...) behind kbase our AFBC path is slower than plain
+@@ -517,6 +521,23 @@ panvk_image_init_layouts(struct panvk_image *image,
+ 
+       pan_img->planes[pan_plane] = &image->planes[plane].plane;
+       if (!pan_image_layout_init(arch, pan_img, pan_plane, &plane_layout)) {
++#ifdef HAVE_PAN_KMOD_E5
++         static unsigned failures;
++         unsigned n = p_atomic_inc_return(&failures);
++         if (n <= 8 || !(n & (n - 1)))
++            dprintf(229, "E5PANVK LAYOUT_FAIL pid=%d n=%u fmt=%u tiling=%u "
++                    "size=%ux%u levels=%u layers=%u samples=%u row=%llu "
++                    "offset=%llu explicit=%u crc=%u\n", getpid(), n,
++                    image->vk.format, image->vk.tiling, image->vk.extent.width,
++                    image->vk.extent.height, image->vk.mip_levels,
++                    image->vk.array_layers, image->vk.samples,
++                    (unsigned long long)plane_layout.wsi_row_pitch_B,
++                    (unsigned long long)plane_layout.offset_B,
++                    explicit_info != NULL, pan_img->props.crc);
++         if (explicit_info)
++            return panvk_error(image->vk.base.device,
++               VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT);
++#endif
+          return panvk_error(image->vk.base.device,
+                             VK_ERROR_INITIALIZATION_FAILED);
+       }
+@@ -1026,10 +1047,25 @@ panvk_GetImageMemoryRequirements2(VkDevice device,
+     * the alignment requirement. It's up to us to satisfy the alignment
+     * requirement when allocating the VA range.
+     */
+-   const uint64_t alignment =
++   uint64_t alignment =
+       image->vk.create_flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT
+          ? panvk_image_get_sparse_binding_granularity(image)
+          : 4096;
++#ifdef HAVE_PAN_KMOD_E5
++   /* A shared bitmap's texels can follow a CPU header in the same page.
++    * The imported allocation remains page-aligned; a linear color image's
++    * address inside it only needs the hardware's 64-byte slice alignment. */
++   if (!(image->vk.create_flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) &&
++       image->vk.external_handle_types ==
++          VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT &&
++       image->vk.drm_format_mod == DRM_FORMAT_MOD_LINEAR &&
++       image->plane_count == 1 && image->vk.image_type == VK_IMAGE_TYPE_2D &&
++       image->vk.mip_levels == 1 && image->vk.array_layers == 1 &&
++       image->vk.samples == VK_SAMPLE_COUNT_1_BIT &&
++       vk_format_is_color(image->vk.format) &&
++       !util_format_is_compressed(vk_format_to_pipe_format(image->vk.format)))
++      alignment = pan_image_slice_align(image->vk.drm_format_mod);
++#endif
+    const VkImagePlaneMemoryRequirementsInfo *plane_info =
+       vk_find_struct_const(pInfo->pNext, IMAGE_PLANE_MEMORY_REQUIREMENTS_INFO);
+    const bool disjoint = is_disjoint(image);
+@@ -1374,6 +1410,23 @@ panvk_image_bind(struct panvk_device *dev,
+    }
+ 
+    assert(mem);
++#ifdef HAVE_PAN_KMOD_E5
++   if (mem->vk.import_handle_type ==
++       VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT) {
++      static unsigned reports;
++      unsigned number = p_atomic_inc_return(&reports);
++      if (number <= 8 || !(number & (number - 1))) {
++         const struct pan_image_layout *layout = &image->planes[0].plane.layout;
++         dprintf(229, "E5PANVK HOST_IMAGE pid=%d n=%u fmt=%u tiling=%u "
++                 "size=%ux%u row=%u offset=%llu bytes=%llu\n",
++                 getpid(), number, image->vk.format, image->vk.tiling,
++                 image->vk.extent.width, image->vk.extent.height,
++                 layout->slices[0].tiled_or_linear.row_stride_B,
++                 (unsigned long long)offset,
++                 (unsigned long long)layout->data_size_B);
++      }
++   }
++#endif
+    if (is_disjoint(image)) {
+       const VkBindImagePlaneMemoryInfo *plane_info =
+          vk_find_struct_const(bind_info->pNext, BIND_IMAGE_PLANE_MEMORY_INFO);
+diff --git a/src/panfrost/vulkan/panvk_instance.c b/src/panfrost/vulkan/panvk_instance.c
+index 882a1d7..d254e89 100644
+--- a/src/panfrost/vulkan/panvk_instance.c
++++ b/src/panfrost/vulkan/panvk_instance.c
+@@ -194,7 +194,11 @@ panvk_enumerate_physical_devices(struct vk_instance *vk_instance)
+    }
+ 
+ #if defined(HAVE_PAN_KMOD_KBASE)
+-   /* Enumerate kbase (Mali) non-DRM nodes. */
++   /* E5 has one IOKit service; kbase uses Linux device nodes. */
++#ifdef HAVE_PAN_KMOD_E5
++   for (int i = 0; i < 1; i++) {
++      const char path[] = "E5MaliG1";
++#else
+    for (int i = 0; i < PAN_KBASE_MAX_NODES; i++) {
+       char path[PATH_MAX];
+       snprintf(path, sizeof(path), "/dev/mali%d", i);
+@@ -204,6 +208,7 @@ panvk_enumerate_physical_devices(struct vk_instance *vk_instance)
+        * permission and uAPI failures remain visible. */
+       if (access(path, F_OK) != 0)
+          continue;
++#endif
+ 
+       struct panvk_physical_device *device =
+          vk_zalloc(&instance->vk.alloc, sizeof(*device), 8,
+@@ -295,7 +300,11 @@ panvk_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
+    }
+ 
+    unsigned build_id_len = build_id_length(note);
++#ifdef __APPLE__
++   if (build_id_len < 16) {
++#else
+    if (build_id_len < BUILD_ID_EXPECTED_HASH_LENGTH) {
++#endif
+       return panvk_errorf(NULL, VK_ERROR_INITIALIZATION_FAILED,
+                           "build-id too short.  It needs to be a SHA");
+    }
+@@ -398,6 +407,18 @@ vk_icdGetInstanceProcAddr(VkInstance instance, const char *pName)
+    return panvk_GetInstanceProcAddr(instance, pName);
+ }
+ 
++#ifdef HAVE_PAN_KMOD_E5
++/* Darwin's Metal bridge opens the native driver directly, without a Vulkan
++ * loader. Expose the standard entry in addition to the loader ICD entry.
++ */
++PUBLIC
++VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
++vkGetInstanceProcAddr(VkInstance instance, const char *pName)
++{
++   return panvk_GetInstanceProcAddr(instance, pName);
++}
++#endif
++
+ /* v54a: defaults for Winlator / DXVK users, so no env vars are needed.
+  * setenv(..., 0) never overrides a value the user set explicitly. */
+ #include <stdlib.h>
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index 7792ea2..e209c3d 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -13,7 +13,6 @@
+ 
+ #include "../lib/pan_trace_gate.h"
+ #include <stdint.h>
+-#include <sys/prctl.h>
+ #include <unistd.h>
+ #include <poll.h>
+ #include <stdio.h>
+@@ -22,7 +21,6 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/stat.h>
+-#include <sys/sysinfo.h>
+ #include <fcntl.h>
+ 
+ #include "util/disk_cache.h"
+@@ -376,34 +374,43 @@ create_kmod_dev_kbase(struct panvk_physical_device *device,
+                       const struct panvk_instance *instance,
+                       const char *path)
+ {
+-   int fd;
+-
++   int fd = -1;
++#ifndef HAVE_PAN_KMOD_E5
+    fd = open(path, O_RDWR | O_CLOEXEC);
+    if (fd < 0) {
+       return panvk_errorf(instance, VK_ERROR_INCOMPATIBLE_DRIVER,
+                           "failed to open kbase device %s", path);
+    }
++#endif
+ 
+    if (PANVK_DEBUG(STARTUP))
+       mesa_logi("Found kbase device '%s'.", path);
+ 
+-   uint32_t flags = PAN_KMOD_DEV_FLAG_OWNS_FD;
++   uint32_t flags = fd >= 0 ? PAN_KMOD_DEV_FLAG_OWNS_FD : 0;
+ 
+    if (PANVK_DEBUG(NO_USER_MMAP_SYNC))
+       flags |= PAN_KMOD_DEV_FLAG_MMAP_SYNC_THROUGH_KERNEL;
+ 
+-   device->kmod.dev = pan_kmod_dev_create_with_driver(fd, flags, "kbase", NULL,
++   device->kmod.dev = pan_kmod_dev_create_with_driver(fd, flags,
++#ifdef HAVE_PAN_KMOD_E5
++                                                      "e5",
++#else
++                                                      "kbase",
++#endif
++                                                      NULL,
+                                                       &instance->kmod.allocator);
+ 
+    if (!device->kmod.dev) {
+-      close(fd);
++      if (fd >= 0) close(fd);
+       return panvk_errorf(instance, VK_ERROR_INCOMPATIBLE_DRIVER,
+                           "failed to create kbase device at %s", path);
+    }
+ 
+    snprintf(device->kbase_node_path, sizeof(device->kbase_node_path), "%s",
+             path);
++#ifndef HAVE_PAN_KMOD_E5
+    configure_kbase_dvfs(path);
++#endif
+ 
+    return VK_SUCCESS;
+ }
+@@ -902,20 +909,7 @@ kbase_cpu_sync_wait_one(struct vk_device *device, struct kbase_cpu_sync *ks,
+                         enum vk_sync_wait_flags wait_flags,
+                         uint64_t abs_timeout_ns)
+ {
+-   if (abs_timeout_ns == 0 || !panvk_trace_on_())
+-      return kbase_cpu_sync_wait_one_impl(device, ks, wait_flags, abs_timeout_ns);
+-   char nm[24] = {0};
+-   prctl(PR_GET_NAME, (unsigned long)nm);
+-   int64_t t0 = (int64_t)os_time_get_nano();
+-   int st = -1;
+-   if (mtx_trylock(&ks->mutex) == thrd_success) {
+-      st = (int)ks->state;
+-      mtx_unlock(&ks->mutex);
+-   }
+-   (void)0;
+-   VkResult r = kbase_cpu_sync_wait_one_impl(device, ks, wait_flags, abs_timeout_ns);
+-   (void)0;
+-   return r;
++   return kbase_cpu_sync_wait_one_impl(device, ks, wait_flags, abs_timeout_ns);
+ }
+ 
+ static VkResult
+@@ -2272,6 +2266,32 @@ panvk_get_external_image_format_properties(
+    VkExternalMemoryHandleTypeFlagBits handleType,
+    VkExternalMemoryProperties *external_properties)
+ {
++#ifdef HAVE_PAN_KMOD_E5
++   if (handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT) {
++      /* E5 pins caller-owned RAM through the same BO path for buffers and
++       * images. Expose only the linear, single-plane layouts whose bytes
++       * the caller can describe; no fd export or dedicated allocation. */
++      bool linear = pImageFormatInfo->tiling == VK_IMAGE_TILING_LINEAR;
++      if (pImageFormatInfo->tiling == VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT) {
++         const VkPhysicalDeviceImageDrmFormatModifierInfoEXT *mod =
++            vk_find_struct_const(pImageFormatInfo->pNext,
++                                 PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT);
++         linear = mod && mod->drmFormatModifier == DRM_FORMAT_MOD_LINEAR;
++      }
++      if (!physical_device->vk.supported_extensions.EXT_external_memory_host ||
++          !linear || pImageFormatInfo->type != VK_IMAGE_TYPE_2D ||
++          vk_format_get_plane_count(pImageFormatInfo->format) != 1 ||
++          vk_format_is_depth_or_stencil(pImageFormatInfo->format))
++         return VK_ERROR_FORMAT_NOT_SUPPORTED;
++
++      *external_properties = (VkExternalMemoryProperties){
++         .externalMemoryFeatures = VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT,
++         .exportFromImportedHandleTypes = 0,
++         .compatibleHandleTypes = handleType,
++      };
++      return VK_SUCCESS;
++   }
++#endif
+    const VkExternalMemoryHandleTypeFlags supported_handle_types =
+       VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT |
+       VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
+diff --git a/src/panfrost/vulkan/panvk_physical_device.h b/src/panfrost/vulkan/panvk_physical_device.h
+index 9e20128..32f72b2 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.h
++++ b/src/panfrost/vulkan/panvk_physical_device.h
+@@ -8,6 +8,7 @@
+ 
+ #include <stdint.h>
+ #include <sys/types.h>
++#include <xf86drm.h>
+ 
+ #include "panvk_instance.h"
+ #include "panvk_macros.h"
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index e0dc58b..b9e837d 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -76,10 +76,17 @@ panvk_kmod_free(const struct pan_kmod_allocator *allocator, void *data)
+ static void
+ panvk_device_init_mempools(struct panvk_device *dev)
+ {
++#ifdef HAVE_PAN_KMOD_E5
++   /* E5 has a finite BO table. Pack persistent shaders and descriptors into
++    * larger slabs rather than spending a handle on every 16 KiB of code. */
++   const size_t persistent_slab = 256 * 1024;
++#else
++   const size_t persistent_slab = 16 * 1024;
++#endif
+    struct panvk_pool_properties rw_pool_props = {
+       .create_flags =
+          panvk_device_adjust_bo_flags(dev, PAN_KMOD_BO_FLAG_WB_MMAP),
+-      .slab_size = 16 * 1024,
++      .slab_size = persistent_slab,
+       .label = "Device RW cached memory pool",
+       .owns_bos = false,
+       .needs_locking = true,
+@@ -91,7 +98,7 @@ panvk_device_init_mempools(struct panvk_device *dev)
+    struct panvk_pool_properties rw_nc_pool_props = {
+       .create_flags =
+          panvk_device_adjust_bo_flags(dev, PAN_KMOD_BO_FLAG_GPU_UNCACHED),
+-      .slab_size = 16 * 1024,
++      .slab_size = persistent_slab,
+       .label = "Device RW uncached memory pool",
+       .owns_bos = false,
+       .needs_locking = true,
+@@ -103,7 +110,7 @@ panvk_device_init_mempools(struct panvk_device *dev)
+    struct panvk_pool_properties exec_pool_props = {
+       .create_flags = panvk_device_adjust_bo_flags(
+          dev, PAN_KMOD_BO_FLAG_EXECUTABLE | PAN_KMOD_BO_FLAG_WB_MMAP),
+-      .slab_size = 16 * 1024,
++      .slab_size = persistent_slab,
+       .label = "Device executable memory pool (shaders)",
+       .owns_bos = false,
+       .needs_locking = true,
+@@ -455,6 +462,9 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+    if (result != VK_SUCCESS)
+       goto err_free_dev;
+ 
++#ifdef HAVE_PAN_KMOD_E5
++   simple_mtx_init(&device->indirect_varying_lock, mtx_plain);
++#endif
+    /* Must be done after vk_device_init() because this function memset(0) the
+     * whole struct.
+     */
+@@ -463,7 +473,9 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+    device->vk.shader_ops = &panvk_per_arch(device_shader_ops);
+    device->vk.check_status = panvk_device_check_status;
+    device->vk.get_timestamp = panvk_device_get_timestamp;
++#ifndef HAVE_PAN_KMOD_E5
+    device->vk.copy_sync_payloads = vk_drm_syncobj_copy_payloads;
++#endif
+ 
+    device->kmod.allocator = (struct pan_kmod_allocator){
+       .zalloc = panvk_kmod_zalloc,
+@@ -473,6 +485,11 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+ 
+ #ifdef HAVE_PAN_KMOD_KBASE
+    if (physical_device->kbase_node_path[0]) {
++#ifdef HAVE_PAN_KMOD_E5
++      device->kmod.dev = pan_kmod_dev_create_with_driver(
++         -1, physical_device->kmod.dev->flags, "e5", NULL,
++         &device->kmod.allocator);
++#else
+       /* dup()ing a kbase fd would share the physical device's kbase
+        * context, whose version handshake can only be done once; open a
+        * fresh context instead.  A separate context also means a separate
+@@ -487,6 +504,7 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+          if (!device->kmod.dev)
+             close(kbase_fd);
+       }
++#endif
+    } else
+ #endif
+    {
+@@ -598,6 +616,15 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+ 
+ #if PAN_ARCH <= 9
+    {
++#ifdef HAVE_PAN_KMOD_E5
++      /* E5 commits backing pages eagerly and has no tiler heap fault growth. */
++      result = panvk_priv_bo_create(device, 8 * 1024 * 1024,
++                                    getenv("PANVK_E5_VARY_READBACK") && getpid() == 1
++                                       ? PAN_KMOD_BO_FLAG_WB_MMAP
++                                       : PAN_KMOD_BO_FLAG_NO_MMAP,
++                                    VK_SYSTEM_ALLOCATION_SCOPE_DEVICE,
++                                    &device->tiler_heap);
++#else
+       uint64_t tiler_heap_mb = 512;
+       const char *e = getenv("PANVK_TILER_HEAP_MB");
+       if (e && atoi(e) >= 16 && atoi(e) <= 2048)
+@@ -609,10 +636,12 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+          device, tiler_heap_mb * 1024 * 1024,
+          PAN_KMOD_BO_FLAG_NO_MMAP | PAN_KMOD_BO_FLAG_ALLOC_ON_FAULT,
+          VK_SYSTEM_ALLOCATION_SCOPE_DEVICE, &device->tiler_heap);
++#endif
+    }
+    if (result != VK_SUCCESS)
+       goto err_free_priv_bos;
+ 
++#ifndef HAVE_PAN_KMOD_E5
+    result = panvk_priv_bo_create(
+       device,
+       PANVK_JM_MAX_VERTICES_INDIRECT * PANVK_JM_MAX_PER_VTX_ATTRIBUTES_INDIRECT_SIZE,
+@@ -620,6 +649,7 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+       VK_SYSTEM_ALLOCATION_SCOPE_DEVICE, &device->indirect_varying_buffer);
+    if (result != VK_SUCCESS)
+       goto err_free_priv_bos;
++#endif
+ #endif
+ 
+    result = panvk_priv_bo_create(
+@@ -776,6 +806,9 @@ err_destroy_kdev:
+    pan_kmod_dev_destroy(device->kmod.dev);
+ 
+ err_finish_dev:
++#ifdef HAVE_PAN_KMOD_E5
++   simple_mtx_destroy(&device->indirect_varying_lock);
++#endif
+    vk_device_finish(&device->vk);
+ 
+ err_free_dev:
+@@ -826,6 +859,9 @@ panvk_per_arch(destroy_device)(struct panvk_device *device,
+       pandecode_destroy_context(device->debug.decode_ctx);
+ 
+    pan_kmod_dev_destroy(device->kmod.dev);
++#ifdef HAVE_PAN_KMOD_E5
++   simple_mtx_destroy(&device->indirect_varying_lock);
++#endif
+    vk_device_finish(&device->vk);
+    vk_free(&device->vk.alloc, device);
+ }
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 0857388..5f82508 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -11,7 +11,9 @@
+ 
+ #include <stdlib.h>
+ #define PANVK_DXVK_COMPAT_ON() (getenv("PANVK_DXVK_COMPAT") != NULL && getenv("PANVK_DXVK_COMPAT")[0] == '1')
++#ifdef __linux__
+ #include <sys/sysmacros.h>
++#endif
+ 
+ #include "git_sha1.h"
+ #include <stdio.h>
+@@ -30,8 +32,19 @@
+ #include "panvk_cmd_draw.h"
+ #include "panvk_descriptor_set_layout.h"
+ #include "panvk_physical_device.h"
++#ifdef HAVE_PAN_KMOD_E5
++#include "kmod/kbase_kmod.h"
++#endif
+ #include "panvk_wsi.h"
+ 
++/* JM v9 has the same ordered tilebuffer loads used by Panfrost's coherent
++ * framebuffer fetch. The E5 path also programs the required FPK state. */
++#if defined(HAVE_PAN_KMOD_E5) && PAN_ARCH == 9
++#define PANVK_E5_COLOR_ROA true
++#else
++#define PANVK_E5_COLOR_ROA false
++#endif
++
+ #include "pan_format.h"
+ #include "pan_props.h"
+ 
+@@ -198,8 +211,12 @@ panvk_per_arch(get_physical_device_extensions)(
+       .EXT_legacy_dithering = true,
+       .EXT_line_rasterization = true,
+       .EXT_load_store_op_none = true,
++#ifdef HAVE_PAN_KMOD_E5
++      .EXT_external_memory_host = e5_kmod_supports_user_memory(device->kmod.dev),
++#else
+       .EXT_map_memory_placed = true,
+       .EXT_external_memory_host = true,
++#endif
+       .EXT_nested_command_buffer = PAN_ARCH >= 10,
+       .EXT_memory_budget = true,
+       .EXT_non_seamless_cube_map = true,
+@@ -217,7 +234,7 @@ panvk_per_arch(get_physical_device_extensions)(
+       .EXT_primitive_topology_list_restart = true,
+       .EXT_provoking_vertex = true,
+       .EXT_queue_family_foreign = true,
+-      .EXT_rasterization_order_attachment_access = PAN_ARCH >= 10,
++      .EXT_rasterization_order_attachment_access = PAN_ARCH >= 10 || PANVK_E5_COLOR_ROA,
+       .EXT_rgba10x6_formats = PAN_ARCH >= 11,
+       .EXT_robustness2 = PAN_ARCH >= 9,
+       .EXT_sampler_filter_minmax = PAN_ARCH >= 10,
+@@ -262,7 +279,7 @@ panvk_per_arch(get_physical_device_extensions)(
+       .ARM_shader_core_builtins = true,
+       .ARM_shader_core_properties = true,
+       .ARM_scheduling_controls = true,
+-      .ARM_rasterization_order_attachment_access = PAN_ARCH >= 10,
++      .ARM_rasterization_order_attachment_access = PAN_ARCH >= 10 || PANVK_E5_COLOR_ROA,
+    };
+ }
+ 
+@@ -794,7 +811,7 @@ panvk_per_arch(get_physical_device_features)(
+ #endif
+ 
+       /* VK_EXT_rasterization_order_attachment_access */
+-      .rasterizationOrderColorAttachmentAccess = PAN_ARCH >= 10,
++      .rasterizationOrderColorAttachmentAccess = PAN_ARCH >= 10 || PANVK_E5_COLOR_ROA,
+       .rasterizationOrderDepthAttachmentAccess = PAN_ARCH >= 10,
+       .rasterizationOrderStencilAttachmentAccess = PAN_ARCH >= 10,
+    };
+@@ -1041,8 +1058,8 @@ panvk_per_arch(get_physical_device_properties)(
+       .optimalBufferCopyOffsetAlignment = 64,
+       .optimalBufferCopyRowPitchAlignment = 64,
+ 
+-      /* If we can't detect the cacheline size, assume 64 bytes cachelines. */
+-      .nonCoherentAtomSize = util_has_cache_ops() ? util_cache_granularity() : 64,
++      /* The kernel cache-sync ABI may define this without an EL0 CPU query. */
++      .nonCoherentAtomSize = pan_kmod_cache_granularity(device->kmod.dev),
+ 
+       /* Vulkan 1.0 sparse properties */
+       .sparseResidencyNonResidentStrict = false,
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 1ca09fb..de07499 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -11,6 +11,9 @@
+ 
+ #include "../lib/pan_trace_gate.h"
+ #include <inttypes.h>
++#include <time.h>
++#include <unistd.h>
++#include <stdio.h>
+ #include "genxml/gen_macros.h"
+ 
+ #include "panvk_cmd_buffer.h"
+@@ -1075,6 +1078,20 @@ panvk_spill_noopt_enabled(void)
+    return enabled;
+ }
+ 
++#ifdef E5_COMPILER_ONLY
++static void
++e5_offline_varyings(const struct pan_varying_layout *layout)
++{
++   dprintf(2, "E5OFFLINE layout count=%u bytes=%u known=%u\n",
++           layout->count, layout->generic_size_B, layout->known);
++   for (unsigned i = 0; i < layout->count; i++) {
++      const struct pan_varying_slot *s = &layout->slots[i];
++      dprintf(2, "E5OFFLINE slot=%u location=%u type=%u comps=%u section=%u offset=%d\n",
++              i, s->location, s->alu_type, s->ncomps, s->section, s->offset);
++   }
++}
++#endif
++
+ static VkResult
+ panvk_compile_nir(struct panvk_device *dev, nir_shader *nir,
+                   VkShaderCreateFlagsEXT shader_flags,
+@@ -1089,6 +1106,14 @@ panvk_compile_nir(struct panvk_device *dev, nir_shader *nir,
+    /* We're going to modify this so make our own copy to be nicer to callers */
+    struct pan_compile_inputs input = *compile_input;
+ 
++#ifdef E5_COMPILER_ONLY
++   dprintf(2, "E5OFFLINE before stage=%u inputs=%u outputs=%u\n",
++           nir->info.stage, nir->num_inputs, nir->num_outputs);
++   if (input.varying_layout)
++      e5_offline_varyings(input.varying_layout);
++   nir_print_shader(nir, stdout);
++#endif
++
+    if (nir->info.stage == MESA_SHADER_VERTEX)
+       NIR_PASS(_, nir, nir_shader_intrinsics_pass, panvk_lower_load_vs_input,
+                nir_metadata_control_flow, &input.no_idvs);
+@@ -1136,6 +1161,24 @@ panvk_compile_nir(struct panvk_device *dev, nir_shader *nir,
+    }
+    ralloc_free(nir_retry);
+ 
++#ifdef E5_COMPILER_ONLY
++   dprintf(2, "E5OFFLINE after stage=%u secondary=%u offset=%u bytes=%u\n",
++           shader->info.stage, shader->info.vs.secondary_enable,
++           shader->info.vs.secondary_offset, binary.size);
++   if (nir->info.stage == MESA_SHADER_VERTEX || nir->info.stage == MESA_SHADER_FRAGMENT)
++      e5_offline_varyings(&shader->info.varyings.formats);
++   pan_disassemble(stdout, binary.data, binary.size, input.gpu_id, false);
++   if (nir->info.stage == MESA_SHADER_VERTEX && shader->info.vs.secondary_enable) {
++      dprintf(2, "E5OFFLINE secondary preload=%llx pos_preload=%llx ftz32=%u ftz16=%u fau=%u\n",
++              (unsigned long long)shader->info.vs.secondary_preload,
++              (unsigned long long)shader->info.preload,
++              shader->info.ftz_fp32, shader->info.ftz_fp16, shader->info.fau.count);
++      pan_disassemble(stdout, (uint8_t *)binary.data + shader->info.vs.secondary_offset,
++                      binary.size - shader->info.vs.secondary_offset, input.gpu_id, false);
++   }
++   fflush(stdout);
++#endif
++
+    /* Propagate potential additional FAU values into the panvk info struct. */
+    /* FAU consts are pushed as 32bit values, but total_count is for 64bit
+     * ones. */
+@@ -1779,6 +1822,13 @@ panvk_compile_shader(struct panvk_device *dev,
+        */
+       nir_assign_io_var_locations(nir, nir_var_shader_in);
+ 
++#if defined(HAVE_PAN_KMOD_E5) && PAN_ARCH == 9
++      /* Reserve the varying descriptors before descriptor lowering bakes
++       * in the dummy-sampler and dynamic-buffer indices. Keep this prefix
++       * stable even when later optimization removes an input load. */
++      shader->desc_info.fs_varying_attr_desc_count = nir->num_inputs;
++#endif
++
+       /* VS (if known) decides the memory layout */
+       inputs.varying_layout = vs_varying_layout;
+ 
+@@ -1804,7 +1854,7 @@ panvk_compile_shader(struct panvk_device *dev,
+          return result;
+       }
+ 
+-      #if PAN_ARCH >= 9
++      #if PAN_ARCH >= 9 && !(defined(HAVE_PAN_KMOD_E5) && PAN_ARCH == 9)
+       /* LD_VAR_BUF[_IMM] has a fixed-size offset, when shaders overflow
+        * that they fall back to LD_VAR[_IMM] and require descriptors.
+        * TODO: We could only emit descriptors that overflow the offset,
+@@ -2019,6 +2069,10 @@ panvk_compile_shaders(struct vk_device *vk_dev, uint32_t shader_count,
+                       const VkAllocationCallbacks *pAllocator,
+                       struct vk_shader **shaders_out)
+ {
++#if defined(HAVE_PAN_KMOD_E5) && PAN_ARCH == 9
++   struct timespec start, end;
++   clock_gettime(CLOCK_MONOTONIC, &start);
++#endif
+    panvk_per_arch(compiler_lock)();
+ 
+    VkResult result = compile_shaders(vk_dev, shader_count, infos, state,
+@@ -2027,6 +2081,14 @@ panvk_compile_shaders(struct vk_device *vk_dev, uint32_t shader_count,
+ 
+    panvk_per_arch(compiler_unlock)();
+ 
++#if defined(HAVE_PAN_KMOD_E5) && PAN_ARCH == 9
++   clock_gettime(CLOCK_MONOTONIC, &end);
++   const int64_t us = (int64_t)(end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
++   static unsigned calls;
++   const unsigned number = __atomic_add_fetch(&calls, 1, __ATOMIC_RELAXED);
++   if (number <= 8 || !(number & (number - 1)) || us >= 500000)
++      dprintf(229, "E5SHADERPERF pid=%d call=%u shaders=%u elapsed_us=%lld result=%d\n", getpid(), number, shader_count, (long long)us, result);
++#endif
+    return result;
+ }
+ 
+diff --git a/src/vulkan/runtime/vk_android.c b/src/vulkan/runtime/vk_android.c
+index 1b9b98f..e472451 100644
+--- a/src/vulkan/runtime/vk_android.c
++++ b/src/vulkan/runtime/vk_android.c
+@@ -67,11 +67,22 @@ static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const
+ #endif
+ #define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+ /* ---- end gate ---- */
++#ifdef __APPLE__
++#include <pthread.h>
++#include <stdint.h>
++static inline long p2_tid(void)
++{
++   uint64_t tid;
++   return pthread_threadid_np(NULL, &tid) == 0 ? (long)tid : -1;
++}
++#else
++static inline long p2_tid(void) { return (long)gettid(); }
++#endif
+ struct p2s { const char *n; long long t; };
+ static inline long long p2_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000; }
+-static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)gettid(), s->n, p2_ms() - s->t); fflush(stderr); }
++static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)p2_tid(), s->n, p2_ms() - s->t); fflush(stderr); }
+ #ifdef PANVK_TRACE_BUILD
+-#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)gettid(), nm); fflush(stderr)
++#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)p2_tid(), nm); fflush(stderr)
+ #else
+ #define P2_SCOPE(nm) ((void)0)
+ #endif
+diff --git a/src/vulkan/runtime/vk_device.c b/src/vulkan/runtime/vk_device.c
+index 0d83f2f..6df1c86 100644
+--- a/src/vulkan/runtime/vk_device.c
++++ b/src/vulkan/runtime/vk_device.c
+@@ -63,11 +63,22 @@ static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const
+ #endif
+ #define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+ /* ---- end gate ---- */
++#ifdef __APPLE__
++#include <pthread.h>
++#include <stdint.h>
++static inline long p2_tid(void)
++{
++   uint64_t tid;
++   return pthread_threadid_np(NULL, &tid) == 0 ? (long)tid : -1;
++}
++#else
++static inline long p2_tid(void) { return (long)gettid(); }
++#endif
+ struct p2s { const char *n; long long t; };
+ static inline long long p2_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000; }
+-static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)gettid(), s->n, p2_ms() - s->t); fflush(stderr); }
++static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)p2_tid(), s->n, p2_ms() - s->t); fflush(stderr); }
+ #ifdef PANVK_TRACE_BUILD
+-#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)gettid(), nm); fflush(stderr)
++#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)p2_tid(), nm); fflush(stderr)
+ #else
+ #define P2_SCOPE(nm) ((void)0)
+ #endif
+diff --git a/src/vulkan/runtime/vk_fence.c b/src/vulkan/runtime/vk_fence.c
+index 24fb8fa..9cb1d22 100644
+--- a/src/vulkan/runtime/vk_fence.c
++++ b/src/vulkan/runtime/vk_fence.c
+@@ -51,11 +51,22 @@ static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const
+ #endif
+ #define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+ /* ---- end gate ---- */
++#ifdef __APPLE__
++#include <pthread.h>
++#include <stdint.h>
++static inline long p2_tid(void)
++{
++   uint64_t tid;
++   return pthread_threadid_np(NULL, &tid) == 0 ? (long)tid : -1;
++}
++#else
++static inline long p2_tid(void) { return (long)gettid(); }
++#endif
+ struct p2s { const char *n; long long t; };
+ static inline long long p2_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000; }
+-static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)gettid(), s->n, p2_ms() - s->t); fflush(stderr); }
++static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)p2_tid(), s->n, p2_ms() - s->t); fflush(stderr); }
+ #ifdef PANVK_TRACE_BUILD
+-#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)gettid(), nm); fflush(stderr)
++#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)p2_tid(), nm); fflush(stderr)
+ #else
+ #define P2_SCOPE(nm) ((void)0)
+ #endif
+diff --git a/src/vulkan/runtime/vk_image.c b/src/vulkan/runtime/vk_image.c
+index bda7fc7..75078d3 100644
+--- a/src/vulkan/runtime/vk_image.c
++++ b/src/vulkan/runtime/vk_image.c
+@@ -23,7 +23,7 @@
+ 
+ #include "vk_image.h"
+ 
+-#if DETECT_OS_LINUX || DETECT_OS_BSD
++#if DETECT_OS_LINUX || DETECT_OS_BSD || DETECT_OS_APPLE
+ #include <drm-uapi/drm_fourcc.h>
+ #endif
+ 
+@@ -105,7 +105,7 @@ vk_image_init(struct vk_device *device,
+       vk_find_struct_const(pCreateInfo->pNext, WSI_IMAGE_CREATE_INFO_MESA);
+    image->wsi_legacy_scanout = wsi_info && wsi_info->scanout;
+ 
+-#if DETECT_OS_LINUX || DETECT_OS_BSD
++#if DETECT_OS_LINUX || DETECT_OS_BSD || DETECT_OS_APPLE
+    image->drm_format_mod = ((1ULL << 56) - 1) /* DRM_FORMAT_MOD_INVALID */;
+ #endif
+ 
+@@ -185,7 +185,7 @@ vk_image_destroy(struct vk_device *device,
+    vk_object_free(device, alloc, image);
+ }
+ 
+-#if DETECT_OS_LINUX || DETECT_OS_BSD
++#if DETECT_OS_LINUX || DETECT_OS_BSD || DETECT_OS_APPLE
+ VKAPI_ATTR VkResult VKAPI_CALL
+ vk_common_GetImageDrmFormatModifierPropertiesEXT(UNUSED VkDevice device,
+                                                  VkImage _image,
+diff --git a/src/vulkan/runtime/vk_image.h b/src/vulkan/runtime/vk_image.h
+index f560519..90fed58 100644
+--- a/src/vulkan/runtime/vk_image.h
++++ b/src/vulkan/runtime/vk_image.h
+@@ -77,7 +77,7 @@ struct vk_image {
+    /* wsi_image_create_info::scanout */
+    bool wsi_legacy_scanout;
+ 
+-#if DETECT_OS_LINUX || DETECT_OS_BSD
++#if DETECT_OS_LINUX || DETECT_OS_BSD || DETECT_OS_APPLE
+    /* VK_EXT_drm_format_modifier
+     *
+     * Initialized by vk_image_create/init() to DRM_FORMAT_MOD_INVALID.  It's
+diff --git a/src/vulkan/runtime/vk_log.c b/src/vulkan/runtime/vk_log.c
+index 740d0b8..a76e920 100644
+--- a/src/vulkan/runtime/vk_log.c
++++ b/src/vulkan/runtime/vk_log.c
+@@ -24,6 +24,10 @@
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <stdarg.h>
++#ifdef HAVE_PAN_KMOD_E5
++#include <unistd.h>
++#include "util/u_atomic.h"
++#endif
+ #include "vk_log.h"
+ #include "vk_debug_utils.h"
+ #include "vk_debug_report.h"
+@@ -313,6 +317,21 @@ __vk_errorv(const void *_obj, VkResult error,
+             const char *file, int line,
+             const char *format, va_list va)
+ {
++#ifdef HAVE_PAN_KMOD_E5
++   static unsigned reports;
++   if (error != VK_SUCCESS && p_atomic_inc_return(&reports) <= 24) {
++      char detail[160] = "", text[360];
++      if (format) {
++         va_list copy;
++         va_copy(copy, va);
++         vsnprintf(detail, sizeof(detail), format, copy);
++         va_end(copy);
++      }
++      int n = snprintf(text, sizeof(text), "E5PANVK ERROR pid=%d code=%d %s:%d %s\n",
++                       getpid(), error, file ? file : "?", line, detail);
++      if (n > 0 && n < (int)sizeof(text)) (void)write(229, text, n);
++   }
++#endif
+    struct vk_object_base *object = (struct vk_object_base *)_obj;
+    struct vk_instance *instance = vk_object_to_instance(object);
+    object = vk_object_for_error(object, error);
+@@ -388,7 +407,7 @@ __vk_errorf(const void *_obj, VkResult error,
+       va_list _vkerr_va;
+       va_start(_vkerr_va, format);
+       fprintf(stderr, "[VKERR] result=%d %s:%d: ", (int)error, file, line);
+-      vfprintf(stderr, format, _vkerr_va);
++      if (format) vfprintf(stderr, format, _vkerr_va);
+       fprintf(stderr, "\n");
+       va_end(_vkerr_va);
+    }
+diff --git a/src/vulkan/runtime/vk_queue.c b/src/vulkan/runtime/vk_queue.c
+index dabd705..ecfd334 100644
+--- a/src/vulkan/runtime/vk_queue.c
++++ b/src/vulkan/runtime/vk_queue.c
+@@ -57,11 +57,22 @@ static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const
+ #endif
+ #define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+ /* ---- end gate ---- */
++#ifdef __APPLE__
++#include <pthread.h>
++#include <stdint.h>
++static inline long p2_tid(void)
++{
++   uint64_t tid;
++   return pthread_threadid_np(NULL, &tid) == 0 ? (long)tid : -1;
++}
++#else
++static inline long p2_tid(void) { return (long)gettid(); }
++#endif
+ struct p2s { const char *n; long long t; };
+ static inline long long p2_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000; }
+-static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)gettid(), s->n, p2_ms() - s->t); fflush(stderr); }
++static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)p2_tid(), s->n, p2_ms() - s->t); fflush(stderr); }
+ #ifdef PANVK_TRACE_BUILD
+-#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)gettid(), nm); fflush(stderr)
++#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)p2_tid(), nm); fflush(stderr)
+ #else
+ #define P2_SCOPE(nm) ((void)0)
+ #endif
+diff --git a/src/vulkan/runtime/vk_semaphore.c b/src/vulkan/runtime/vk_semaphore.c
+index e533883..804c76a 100644
+--- a/src/vulkan/runtime/vk_semaphore.c
++++ b/src/vulkan/runtime/vk_semaphore.c
+@@ -53,11 +53,22 @@ static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const
+ #endif
+ #define fprintf(f, ...) (((f) == stderr && !panvk_trace_on_()) ? 0 : fprintf(f, __VA_ARGS__))
+ /* ---- end gate ---- */
++#ifdef __APPLE__
++#include <pthread.h>
++#include <stdint.h>
++static inline long p2_tid(void)
++{
++   uint64_t tid;
++   return pthread_threadid_np(NULL, &tid) == 0 ? (long)tid : -1;
++}
++#else
++static inline long p2_tid(void) { return (long)gettid(); }
++#endif
+ struct p2s { const char *n; long long t; };
+ static inline long long p2_ms(void) { struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000; }
+-static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)gettid(), s->n, p2_ms() - s->t); fflush(stderr); }
++static inline void p2_leave(struct p2s *s) { fprintf(stderr, "[P2] %lld tid=%ld < %s dt=%lld\n", p2_ms(), (long)p2_tid(), s->n, p2_ms() - s->t); fflush(stderr); }
+ #ifdef PANVK_TRACE_BUILD
+-#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)gettid(), nm); fflush(stderr)
++#define P2_SCOPE(nm) struct p2s _p2 __attribute__((cleanup(p2_leave))) = { nm, p2_ms() }; fprintf(stderr, "[P2] %lld tid=%ld > %s\n", _p2.t, (long)p2_tid(), nm); fflush(stderr)
+ #else
+ #define P2_SCOPE(nm) ((void)0)
+ #endif
+diff --git a/src/vulkan/wsi/wsi_common.c b/src/vulkan/wsi/wsi_common.c
+index fb8f7b7..c7c25be 100644
+--- a/src/vulkan/wsi/wsi_common.c
++++ b/src/vulkan/wsi/wsi_common.c
+@@ -22,7 +22,11 @@
+  */
+ 
+ #include <stdio.h>
++#if defined(__linux__)
+ #include <sys/prctl.h>
++#elif defined(__APPLE__)
++#include <pthread.h>
++#endif
+ #include <string.h>
+ #include <stdlib.h>
+ #include "wsi_common_private.h"
+@@ -64,6 +68,28 @@ static inline int panvk_trace_on_(void) { static int v = -1; if (v < 0) { const
+ /* ---- end gate ---- */
+ #endif
+ 
++static void
++wsi_trace_thread(const char *operation)
++{
++#ifdef PANVK_TRACE_BUILD
++   char name[64] = {0};
++   long tid = -1;
++#if defined(__APPLE__)
++   uint64_t value;
++   if (pthread_threadid_np(NULL, &value) == 0) tid = (long)value;
++   pthread_getname_np(pthread_self(), name, sizeof(name));
++#elif defined(__linux__)
++   prctl(PR_GET_NAME, (unsigned long)name);
++   tid = (long)gettid();
++#endif
++   fprintf(stderr, "[P1] %lld %s tid=%ld %s\n",
++           (long long)(os_time_get_nano() / 1000000), operation, tid, name);
++   fflush(stderr);
++#else
++   (void)operation;
++#endif
++}
++
+ uint64_t WSI_DEBUG;
+ 
+ static const struct debug_control debug_control[] = {
+@@ -2289,7 +2315,7 @@ wsi_common_acquire_next_image2(const struct wsi_device *wsi,
+                                const VkAcquireNextImageInfoKHR *pAcquireInfo,
+                                uint32_t *pImageIndex)
+ {
+-   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "wsi_common_acquire_next_image2", (long)gettid(), _n); fflush(stderr); }
++   wsi_trace_thread("wsi_common_acquire_next_image2");
+    fprintf(stderr, "[ACQ] enter wsi_common_acquire_next_image2\n");
+    VK_FROM_HANDLE(wsi_swapchain, swapchain, pAcquireInfo->swapchain);
+    VK_FROM_HANDLE(vk_device, device, _device);
+@@ -2461,7 +2487,7 @@ wsi_common_queue_present(const struct wsi_device *wsi,
+                          struct vk_queue *queue,
+                          const VkPresentInfoKHR *pPresentInfo)
+ {
+-   { char _n[16]={0}; prctl(PR_GET_NAME,(unsigned long)_n); fprintf(stderr, "[P1] %lld %s tid=%ld %s\n", (long long)(os_time_get_nano()/1000000), "wsi_common_queue_present", (long)gettid(), _n); fflush(stderr); }
++   wsi_trace_thread("wsi_common_queue_present");
+    struct vk_device *dev = queue->base.device;
+    uint32_t current_frame = p_atomic_fetch_add(&dev->current_frame, 1);
+    VkResult final_result = handle_trace(queue, dev, current_frame);

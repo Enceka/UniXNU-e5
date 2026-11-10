@@ -1,0 +1,138 @@
+{
+  "round": 300,
+  "verdict": "FAIL",
+  "kernel_sha256": "356e718d2eebec8e73668b99d34a154a5e414dac30258934315d9cf880f2de71",
+  "payload_sha256": "2c0e1168730ceb7e70b47e81c440e605b814c53de44c02a0643cfef6658a8be0",
+  "implementation_base_revision": "170f6df5eb980b1d8dc40b36c3ad6dfee54e7008",
+  "implementation_has_worktree_changes": true,
+  "source_sha256": {
+    "input/E5HidDevice.cpp": "f7e6eafea71533a6958cc3523f29e5355e502cf269b05852d548cd3cd830de6e",
+    "input/E5InputProtocol.h": "e96eb142f444f230cf59ea7840b1ee8ae1263e7bc15120d6074d3b54a063f8ae",
+    "input/E5InputCapture.cpp": "b6e1ab25872afa6b29dcdf4b89d8de5c221676dbaf78d99715da60032ff9445d",
+    "input/E5TouchCanvas.cpp": "8157812120c1b4f7caa1e830bda2ddc480787f53a02cb61024b3324dcd107055",
+    "input/E5TouchCanvas.h": "99d613824b0da7e2c0290d9511ab57296bfb23e3370ed89f350007e5037443c2",
+    "touch/E5Tlsc6x.cpp": "205f33966722dc1613a6ccd1a44ec6575a523722e7105f94004fe7885147137d",
+    "touch/E5I2cProtocol.h": "6ed1c864427a0461308401ab3395bc5a1aa2c9b3766b2de8891128673df8e746",
+    "touch/E5Tlsc6xConfig.h": "40a4c97debab2060cd648223ba236fc5b63d9d5d52d63cccdaa35949fa365661",
+    "touch/E5GpioEvents.h": "abc7831f6b5c50feb0dc92161c51dcb8709d51ca5bbe1437ce8861a6928f7903",
+    "touch/E5GpioIrq.h": "be8d6aed5022baa709078191db7622a9b60b3e7ed07d5a4eeb7fcf82a96721f5",
+    "e5_input_build.py": "a68004e19d0b1a9cd064274dd60f16eed6e87f5190e03c9f5f2b1107100fd59b"
+  },
+  "armcpu_base_revision": "9066b53bbc82e92a98ec44a11dd50fd13eaf1a1b",
+  "armcpu_source_sha256": {
+    "ArmCpu.cpp": "30a6d6a89aad7f1366a0100179fb39987e8ab4f3dd7589ba53c02a47793366db",
+    "ArmCpuSpi.h": "0087f0c897632849d3b23165409a2e0c53ccdd63e5d0adb65ddab67c9c2ec25c",
+    "SpiGate.h": "afe87d5e7feab4156f6ef9f7eef393dc591ed7cf57d19c17ccf8669cb656f4c4"
+  },
+  "source": {
+    "path": "/Volumes/Projects/e5-xnu/uefi/build/sb-r300-gic/r300/capture/kernel.log",
+    "sha256": "3daf1a67c9be8d9a19468ab67bc24cfcc58d8df4e802025861dd3fd4743ea73f"
+  },
+  "gic_checks": {
+    "single_sensor_epoch": false,
+    "shared_ownership_checked": true,
+    "parent_attached": true,
+    "parent_enabled": false,
+    "actual_callbacks": false,
+    "actual_deferred_reads": false,
+    "read_accounting": false,
+    "idle_read_suppression": false,
+    "sampled_irq_to_read_timing": false,
+    "lifecycle_cycle": false,
+    "error_free": false,
+    "callbacks_after_reuse": false
+  },
+  "failures": [
+    {
+      "line": 1620,
+      "reason": "parent not masked/level/priority0xa0 or visible group1 absent"
+    },
+    {
+      "line": 1622,
+      "reason": "E5TOUCH irq-start refused=1"
+    }
+  ],
+  "last_periodic": null,
+  "attachments": [
+    {
+      "line": 1620,
+      "state": 40960,
+      "router": 0,
+      "generation": 1,
+      "groups_visible": 1,
+      "control": null
+    }
+  ],
+  "enables": [],
+  "detaches": [
+    {
+      "line": 1621,
+      "result": 0,
+      "masked": 0,
+      "drained": 1,
+      "generation": 1
+    }
+  ],
+  "cycles": [],
+  "timing_samples": 0,
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 947.445049209
+  },
+  "final_hid_state": {
+    "driver": 1,
+    "reports": 0,
+    "failed": 0,
+    "dropped": 0,
+    "held": 0
+  },
+  "markers": {
+    "panic(cpu": 0,
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "E5CPU copy-failed": 0
+  },
+  "android": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "15f538ab-bd2c-432a-a14b-065b807bf7ef",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "scope": "GPIO/GIC callback and transport evidence. Original SpringBoard physical UI remains unverified.",
+  "refusal_before_gpio_enable": true,
+  "group_readback_interpretation": "a000 was rejected by an invalid IGROUPR visibility assumption. R301 uses DS-aware visibility and verifies accessible enable bits.",
+  "data_after_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "ca6ca462fa09e42e90b9151d593c2f1648e87da5bb9e03af8a71e7d548810cce",
+    "local_logical_sha256_verified": true,
+    "path": "/Volumes/Workspace/e5-input-backups/r300-gic-after/data-after.img",
+    "elapsed_seconds": 361.86126383299995,
+    "command": "dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none"
+  }
+}

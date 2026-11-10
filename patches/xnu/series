@@ -24,3 +24,11 @@ e5-display-mode-crash.patch
 e5-display-mode-keep.patch
 e5-display-submit-trace.patch
 e5-usb-console.patch
+e5-gpu-user-probe.patch
+e5-gpu-user-probe-v11.patch
+e5-gpu-user-init.patch
+e5-gpu-staged-probe.patch
+e5-gpu-probe-mmap.patch
+e5-metal-staged-probe.patch
+e5-metal-bundle-overlay.patch
+e5-metal-map-diagnostic.patch

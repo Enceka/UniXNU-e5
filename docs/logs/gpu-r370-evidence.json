@@ -1,0 +1,121 @@
+{
+  "round": 370,
+  "kernel_sha256": "0a4d4eee214923084893b0ebd0b60a6f43311226588f764ea68b0eb042b07545",
+  "icd_sha256": "55f29a5d3e5c45b569ba77d4506ab49a569bb92992e2ef42445e49610dcb3225",
+  "probe": "PASS",
+  "buffer_image": {
+    "offset": 64,
+    "width": 64,
+    "height": 16,
+    "row_bytes": 256,
+    "direct_host_binding": true,
+    "gpu_read_mismatch": 0,
+    "guard_changes": 0,
+    "atomic_count": 20002
+  },
+  "submitted": 5,
+  "completed": 5,
+  "gpu_faults": 0,
+  "mmu_faults": 0,
+  "timeouts": 0,
+  "resets": 0,
+  "final_resources": 0,
+  "cache_pages": 0,
+  "original_launchd_handoff": true,
+  "ui_qualified": false,
+  "recovery": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "7a23ad44-e3eb-4832-b62f-465c37b94fea",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "samples": [
+    "E5UL|E5MTL ATOMIC-SHARED HEADER PASS imported=1 shared_alias=1 purgeable=1",
+    "E5UL|E5MTL ATOMIC-SHARED ROUND 0 PASS mismatch=0 guards=0 count=10001 explicit_flush=0",
+    "E5UL|E5MTL ATOMIC-SHARED ROUND 1 PASS mismatch=0 guards=0 count=20001 explicit_flush=0",
+    "E5UL|E5MTL BUFFER-IMAGE BEGIN offset=64 row=256 size=64x16",
+    "E5UL|E5PANVK HOST_IMAGE pid=1 n=1 fmt=37 tiling=1 size=64x16 row=256 offset=64 bytes=4096",
+    "E5UL|E5MTL BUFFER-IMAGE CREATED PASS",
+    "E5UL|E5MTL BUFFER-IMAGE ENCODED",
+    "E5UL|E5MTL BUFFER-IMAGE PASS mismatch=0 guards=0 count=20002 offset=64",
+    "E5UL|E5MTL ATOMIC-SHARED PASS release=1",
+    "E5UL|E5PANVK HOST_IMAGE pid=1 n=2 fmt=44 tiling=1 size=64x64 row=256 offset=0 bytes=16384",
+    "E5UL|E5MTL IOSURFACE PASS mismatch=0 fnv=d0530839d87ea325",
+    "E5UL|E5PANVK CLOSE sub=5 comp=5 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0 pid=1",
+    "E5UL|E5PANVK CLOSE sub=5 comp=5 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0 pid=1",
+    "E5UL|E5MTL CLOSE PASS",
+    "E5UL|E5MTL CACHE-RELEASE PASS held_pages=0",
+    "E5UL|E5MTL VERDICT PASS",
+    "E5UL|E5MTL HANDOFF launchd status=0"
+  ],
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "51f71b9e02a05f3e276d23843d289344ef4be9ebfe2bc35df19875abaea9782c",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r370-linear-offset-after/data-after.img",
+    "elapsed_seconds": 68.3120120000001,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  },
+  "ui_gpu_submissions": 75,
+  "ui_completion_callbacks": 0,
+  "springboard_crash_observed": false,
+  "frame_hashes": [
+    [
+      "300",
+      "af4276c5"
+    ],
+    [
+      "301",
+      "af4276c5"
+    ],
+    [
+      "302",
+      "af4276c5"
+    ],
+    [
+      "303",
+      "af4276c5"
+    ],
+    [
+      "304",
+      "af4276c5"
+    ],
+    [
+      "305",
+      "af4276c5"
+    ],
+    [
+      "306",
+      "af4276c5"
+    ],
+    [
+      "307",
+      "af4276c5"
+    ],
+    [
+      "308",
+      "af4276c5"
+    ],
+    [
+      "309",
+      "af4276c5"
+    ],
+    [
+      "310",
+      "af4276c5"
+    ],
+    [
+      "311",
+      "af4276c5"
+    ],
+    [
+      "312",
+      "af4276c5"
+    ]
+  ],
+  "ui_wait": "CA MetalContext::flush -> commitAndWaitUntilSubmitted -> nmb_command_buffer_wait_scheduled; pipeline worker threads in SPIR-V/NIR preprocessing, encoder thread idle",
+  "diagnostic_layout_failure": "A8_UNORM_KHR 198x100 row224: not a multiple of the current64B row alignment"
+}

@@ -1,0 +1,39 @@
+{
+  "candidate_round": 387,
+  "kernel": {
+    "returncode": 0,
+    "elapsed_seconds": 26.600369792,
+    "kernel_sha256": "d0aaa019b026a6d8bef677664fdb06c2eb0509e6376bfeaa7c3e25aaac98a365"
+  },
+  "icd": {
+    "source": ".work/e5-gpu-active/mesa-ios/src/panfrost/vulkan/libvulkan_panfrost.dylib",
+    "target": ".work/e5-gpu-active/submit-wait-r387/libvulkan_panfrost.dylib",
+    "libraries": [
+      "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+      "/usr/lib/libSystem.B.dylib",
+      "/usr/lib/libc++.1.dylib"
+    ],
+    "source_sha256": "f4b4f10ca3f580d273ecca7772f4dab7128a14000e387e577bb71b803140257b",
+    "sha256": "65cf1e0427689323fb81b96bc92da4df7409cc61c6ea99f3ef116a3c44d8f6dd",
+    "bindings": 7835,
+    "weak_symbols_to_self": 7640,
+    "ordinal_opcodes_changed": 1,
+    "strong_unresolved": [],
+    "signature_verified": true
+  },
+  "kernel_abi": "1.7",
+  "checks": {
+    "native_async_actual_source_ASan_UBSan": "PASS; old R386 sender fails the same native port/payload contract",
+    "submit_wait_actual_source_ASan_UBSan": "PASS single-call, old fallback, packet bounds, lock release, fault and pending refusal",
+    "imported_cache_actual_source_ASan_UBSan": "PASS contiguous and fragmented segments, unsupported middle pages, physical bounds and cache-line boundaries"
+  },
+  "scope": "Host checks only. Candidate hardware FPS and full Settings validation pending.",
+  "source_sha256": {
+    "scripts/gpu/E5MaliG1.cpp": "2cc8ad313610f2f1854a0d126d526487a425004b78e95889c7e0d7f1fc984a63",
+    "scripts/gpu/E5MaliG1Abi.h": "ddfec6cc621f55a774b667d08c19df6bad0e560f33c039187afb4ae834600240",
+    "scripts/gpu/E5MaliG1Ext.h": "7467cd74c644f761aee9ab5115697218d070c6df2ebe3d8d6c1f58e851d549d6",
+    "scripts/display/E5Display.cpp": "e49692f25ad682a920bb9878103b4e7fd8896173259e02b736446d2f1a053d64",
+    "scripts/input/E5HidDevice.cpp": "ae3efb7f84c6a6c59c2812f1a2acab38a2471c2b5c4fe3beaf0720408b48aad7",
+    "scripts/e5_display_build.py": "b64ff0f1da9e28b338903f7ceec1b6f0969d15967f2bbbcedf059bf37e2f509c"
+  }
+}

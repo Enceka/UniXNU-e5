@@ -23,6 +23,7 @@
   "e5_ufs_stub.py .",
   "e5_emmc_build.py .",
   "e5_display_build.py .",
+  "e5_input_build.py .",
   "build-software-aes-bindings.py",
   "build-mockfs-fixture.py",
   "build-libpthread-kernel.py",
@@ -40,7 +41,7 @@
 ["payload"]
 "title" = "Boot E5"
 "dram_size" = "0x80000000"
-"kernel_args" = ["-v", "serial=3", "e5-usb=1"]
+"kernel_args" = ["-v", "serial=3", "e5-usb=1", "e5-hid=1"]
 
 [payload.adt]
 owned_memory_size = "0x28000000"
@@ -56,3 +57,22 @@ owner-boot-manifest-domain = "45352e4272696e6775702e496d6167655365742e763100"
 # Native scanout pixels per UI point; independent of physical dot-pitch.
 [adt.chosen.u32]
 display-scale = 1
+
+# Frontend identity for the320x480 E5 display; hardware/OS ABI remain pinned.
+[adt.root.string]
+model = "iPhone12,8"
+target-type = "D79"
+compatible = "D79AP"
+
+[adt.product.string]
+product-name = "iPhone SE (2nd generation)"
+product-description = "iPhone SE (2nd generation)"
+artwork-device-idiom = "phone"
+compatible-device-fallback = "iPhone11,8"
+
+[adt.product.u32]
+artwork-device-subtype = 569
+artwork-scale-factor = 1
+
+[adt.product.bytes]
+product-id = "c459fdb0eef455588dbc6f587c20a5372792bbf8"

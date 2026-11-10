@@ -1,0 +1,219 @@
+{
+  "round": 298,
+  "verdict": "FAIL",
+  "transport_verdict": "FAIL",
+  "gpio_event_timing_verdict": "PASS",
+  "implementation_base_revision": "170f6df5eb980b1d8dc40b36c3ad6dfee54e7008",
+  "implementation_has_worktree_changes": true,
+  "source_sha256": {
+    "input/E5HidDevice.cpp": "85eb40cce4e4533e5963081fc4bc8a16ac1449c5fd8f347b61b4b9263170483c",
+    "input/E5InputProtocol.h": "e96eb142f444f230cf59ea7840b1ee8ae1263e7bc15120d6074d3b54a063f8ae",
+    "input/E5InputCapture.cpp": "b6e1ab25872afa6b29dcdf4b89d8de5c221676dbaf78d99715da60032ff9445d",
+    "input/E5TouchCanvas.cpp": "8157812120c1b4f7caa1e830bda2ddc480787f53a02cb61024b3324dcd107055",
+    "input/E5TouchCanvas.h": "99d613824b0da7e2c0290d9511ab57296bfb23e3370ed89f350007e5037443c2",
+    "touch/E5Tlsc6x.cpp": "631e89a1376b7dfb8210ed54a79f8bb92888f3f42d18b7de66643b620cb1c633",
+    "touch/E5I2cProtocol.h": "6ed1c864427a0461308401ab3395bc5a1aa2c9b3766b2de8891128673df8e746",
+    "touch/E5Tlsc6xConfig.h": "40a4c97debab2060cd648223ba236fc5b63d9d5d52d63cccdaa35949fa365661",
+    "touch/E5GpioEvents.h": "abc7831f6b5c50feb0dc92161c51dcb8709d51ca5bbe1437ce8861a6928f7903",
+    "e5_input_build.py": "fe64a9a8180d864d59bde34346606b67ffdb03a340d416e60d569d2e7e5ff5d8"
+  },
+  "kernel_sha256": "41e677be89e40b98017629318ccd2ae9c469abbeb12211cdb5f63bf3589f09ca",
+  "payload_sha256": "1b835c3f2b31f1c6f2091e3830b4ca80ece8c8226d14b7dd25beb507194a5e99",
+  "source": {
+    "path": "uefi/build/sb-r298-gpio-events/r298/capture/kernel.log",
+    "sha256": "3f789875e368c2861f37b8dad842ed2c597a87873465b14bc39385c57f974e7c"
+  },
+  "checks": {
+    "single_strict_epoch": true,
+    "event_summaries": true,
+    "packet_status": true,
+    "idle_read_suppression": true,
+    "event_reads": true,
+    "gpio_read_accounting": true,
+    "ordered_timing": true,
+    "error_free_transport": false
+  },
+  "last_periodic_events": {
+    "polls": 40961,
+    "reads": 343,
+    "edges": 343,
+    "low_no_edge": 0,
+    "skipped": 40618,
+    "ie": 0,
+    "ris": 0,
+    "line": 34033
+  },
+  "last_periodic_transport": {
+    "polls": 343,
+    "good": 341,
+    "bad": 2,
+    "recoveries": 2,
+    "line": 34032
+  },
+  "timing_samples": 67,
+  "observation_to_start_ticks_range": [
+    13,
+    33
+  ],
+  "read_duration_ticks_range": [
+    13586,
+    15348
+  ],
+  "pending_after_timing_samples": 6,
+  "quiet_windows": 18,
+  "quiet_window_polls": 36864,
+  "hardware_frame_count": 276,
+  "max_simultaneous_contacts": 2,
+  "stationary_single_contact_releases": 3,
+  "moving_single_contact_releases": 1,
+  "two_contact_sequences_released": 2,
+  "sequences_without_hardware_all_up": 2,
+  "final_active": 0,
+  "sensor_errors": [
+    {
+      "line": 7648,
+      "message": "E5TOUCH error transfer=0 packet=6 bad=1 raw=000001ffffffffffffffffffffffffff0000 status=31044c irq=1:1"
+    },
+    {
+      "line": 8547,
+      "message": "E5TOUCH error transfer=0 packet=2 bad=2 raw=0000ffffffffffffffffffffffffffff0000 status=31044c irq=1:1"
+    }
+  ],
+  "error_timing_traces": [
+    {
+      "seq": 184,
+      "poll": 2208,
+      "observed": 1953018570,
+      "start": 1953018589,
+      "end": 1953033067,
+      "irq_before": 1,
+      "irq_after": 1,
+      "pending_after": 1,
+      "transfer": 0,
+      "packet": 6,
+      "line": 7647
+    },
+    {
+      "seq": 218,
+      "poll": 2414,
+      "observed": 2055352496,
+      "start": 2055352511,
+      "end": 2055366901,
+      "irq_before": 1,
+      "irq_after": 1,
+      "pending_after": 1,
+      "transfer": 0,
+      "packet": 2,
+      "line": 8546
+    }
+  ],
+  "final_hid_state": {
+    "driver": 1,
+    "reports": 306,
+    "failed": 0,
+    "dropped": 0,
+    "held": 0
+  },
+  "last_canvas_status": "draw=833 seq=293 ready=1 active=0 max=2 down=14 up=11 cancel=2 errors=2 dropped=0 home=0 edges=8 readback_errors=0 age_ms=694394",
+  "verified_canvas_frames": [
+    {
+      "id": 200,
+      "width": 320,
+      "height": 480,
+      "fnv": "fa394485",
+      "file": "frame-00-200.png"
+    },
+    {
+      "id": 201,
+      "width": 320,
+      "height": 480,
+      "fnv": "fa394485",
+      "file": "frame-01-201.png"
+    },
+    {
+      "id": 202,
+      "width": 320,
+      "height": 480,
+      "fnv": "4bb318c5",
+      "file": "frame-02-202.png"
+    },
+    {
+      "id": 203,
+      "width": 320,
+      "height": 480,
+      "fnv": "aabb5c86",
+      "file": "frame-03-203.png"
+    },
+    {
+      "id": 204,
+      "width": 320,
+      "height": 480,
+      "fnv": "9db0f2a7",
+      "file": "frame-04-204.png"
+    }
+  ],
+  "rejected_canvas_frames": [],
+  "frames_recovered_by_original_checksum": 4,
+  "frame_recovery_records": 14,
+  "gpio_census": [
+    "E5TOUCH irq-probe bank=0 ie=0 ris=6000 mis=0 is=ffff ibe=0 iev=ffff (read-only)",
+    "E5TOUCH irq-probe banks=16 other_enabled=0 other_pending=0 parent_intid=72 attached=0"
+  ],
+  "markers": {
+    "panic(cpu": 0,
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "E5CPU copy-failed": 0
+  },
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "android": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "bc4f8f98-77fa-4181-8c86-6651e4fba0f1",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 1053.4820754579996
+  },
+  "data_after_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "e1aa8f9112e329f54c0894e7f65c5d89e2f183026d1113f9f2584e9fa0c8d820",
+    "local_logical_sha256_verified": true,
+    "path": "/Volumes/Workspace/e5-input-backups/r298-gpio-events-after/data-after.img",
+    "elapsed_seconds": 351.611183208,
+    "command": "dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none"
+  },
+  "operator_observations": null,
+  "next_round": {
+    "round": 299,
+    "event_interval_ms": 2,
+    "kernel_sha256": "c66b289989861b038c6176106b46c8c24965ba0e64687f80992dd01c63b8612d"
+  },
+  "scope": "Masked GPIO read accounting, idle suppression and sampled software timing pass. Two malformed packets and two error-terminated contact sequences prevent transport acceptance. Raster checks prove scanout memory, not operator acceptance, UIKit, physical edge latency, lossless events or GIC callbacks. Different physical workloads forbid inferring an error-rate improvement from R297/R298 counts."
+}

@@ -1,0 +1,29 @@
+{
+  "round": 382,
+  "result": "UI test confounded by throttled capture starvation; Settings not qualified. Physical user reported very laggy UI.",
+  "physical_touch_records": 100,
+  "successful_swap_window": {
+    "start_ms": 756977,
+    "end_ms": 853329,
+    "start_count": 9,
+    "end_count": 17,
+    "mean_per_second": 0.08302889405513118,
+    "scope": "Includes pauses/static periods; not continuous-scroll FPS or hardware refresh rate"
+  },
+  "gesture_timings": [
+    "E5HID settings-sequence phase=0 action=open-settings release=1 held_ms=115 failures=0 frames=26 pixels=79113 ink=79113 (synthetic)",
+    "E5HID settings-sequence phase=2 action=open-row release=3 held_ms=100 failures=0 frames=27 pixels=79122 ink=79122 (synthetic)"
+  ],
+  "recovery": "complete-data-verified",
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "d9aa16a1010bd5270d26de0b5d430af6f73be3d476f84cfc5c25535a1c0f1629",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r382-input-timing-after/data-after.img",
+    "elapsed_seconds": 71.31284870800005,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  },
+  "next": "Restore kernel-priority captures with gesture exclusion; reduce logging and report real presentation-counter FPS plus presentation work time."
+}

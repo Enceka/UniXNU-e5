@@ -1,0 +1,222 @@
+{
+  "round": 301,
+  "verdict": "INCOMPLETE",
+  "kernel_sha256": "6b04bb97e0b0312006b4023b048561971cc24a8812806ce40b49324c6ad87b10",
+  "payload_sha256": "9ec454c7eaaee156e32034b8a72b418119d182010060284c7d7a58a5e3159e7e",
+  "implementation_base_revision": "170f6df5eb980b1d8dc40b36c3ad6dfee54e7008",
+  "implementation_has_worktree_changes": true,
+  "source_sha256": {
+    "input/E5HidDevice.cpp": "f7e6eafea71533a6958cc3523f29e5355e502cf269b05852d548cd3cd830de6e",
+    "input/E5InputProtocol.h": "e96eb142f444f230cf59ea7840b1ee8ae1263e7bc15120d6074d3b54a063f8ae",
+    "input/E5InputCapture.cpp": "b6e1ab25872afa6b29dcdf4b89d8de5c221676dbaf78d99715da60032ff9445d",
+    "input/E5TouchCanvas.cpp": "8157812120c1b4f7caa1e830bda2ddc480787f53a02cb61024b3324dcd107055",
+    "input/E5TouchCanvas.h": "99d613824b0da7e2c0290d9511ab57296bfb23e3370ed89f350007e5037443c2",
+    "touch/E5Tlsc6x.cpp": "bbc167bdf5d678d46b28d0a33ea77e71155d6e4643a0ff5a55d7acd9e7e3b466",
+    "touch/E5I2cProtocol.h": "6ed1c864427a0461308401ab3395bc5a1aa2c9b3766b2de8891128673df8e746",
+    "touch/E5Tlsc6xConfig.h": "40a4c97debab2060cd648223ba236fc5b63d9d5d52d63cccdaa35949fa365661",
+    "touch/E5GpioEvents.h": "abc7831f6b5c50feb0dc92161c51dcb8709d51ca5bbe1437ce8861a6928f7903",
+    "touch/E5GpioIrq.h": "be8d6aed5022baa709078191db7622a9b60b3e7ed07d5a4eeb7fcf82a96721f5",
+    "e5_input_build.py": "a68004e19d0b1a9cd064274dd60f16eed6e87f5190e03c9f5f2b1107100fd59b"
+  },
+  "armcpu_base_revision": "9066b53bbc82e92a98ec44a11dd50fd13eaf1a1b",
+  "armcpu_source_sha256": {
+    "ArmCpu.cpp": "51b76f206440d0b5fc0fc084f29e3d81925fe092b96408892c3f6bd0fee02939",
+    "ArmCpuSpi.h": "cef60d8a6fe61b7c5554dc2bf361f36d9024cbf896115356b94f0c00daa2f478",
+    "SpiGate.h": "afe87d5e7feab4156f6ef9f7eef393dc591ed7cf57d19c17ccf8669cb656f4c4"
+  },
+  "source": {
+    "path": "/Volumes/Projects/e5-xnu/uefi/build/sb-r301-gic-ns/r301/capture/kernel.log",
+    "sha256": "4252a87f78c92ddb94f043ba48f0e33cf395a94001fb36147b5c337e2a50e4ec"
+  },
+  "gic_checks": {
+    "single_sensor_epoch": true,
+    "shared_ownership_checked": true,
+    "parent_attached": true,
+    "parent_enabled": true,
+    "actual_callbacks": true,
+    "actual_deferred_reads": true,
+    "read_accounting": true,
+    "idle_read_suppression": true,
+    "sampled_irq_to_read_timing": true,
+    "lifecycle_cycle": true,
+    "error_free": true,
+    "callbacks_after_reuse": false
+  },
+  "failures": [],
+  "last_periodic": {
+    "checks": 34817,
+    "callbacks": 386,
+    "consumed": 386,
+    "reads": 386,
+    "coalesced": 0,
+    "pending": 0,
+    "work_runs": 380,
+    "work_reads": 341,
+    "timer_reads": 45,
+    "notifications": 386,
+    "entries": 386,
+    "spurious": 0,
+    "foreign": 0,
+    "ie": 8192,
+    "gic": 386,
+    "generation": 2,
+    "good": 386,
+    "bad": 0,
+    "recoveries": 0,
+    "line": 35932
+  },
+  "attachments": [
+    {
+      "line": 1628,
+      "state": 40960,
+      "router": 0,
+      "generation": 1,
+      "groups_visible": 0,
+      "control": 18
+    },
+    {
+      "line": 20371,
+      "state": 40960,
+      "router": 0,
+      "generation": 2,
+      "groups_visible": 0,
+      "control": 18
+    }
+  ],
+  "enables": [
+    {
+      "line": 1629,
+      "valid": 1,
+      "result": 0,
+      "generation": 1
+    },
+    {
+      "line": 20372,
+      "valid": 1,
+      "result": 0,
+      "generation": 2
+    }
+  ],
+  "detaches": [
+    {
+      "line": 20369,
+      "result": 0,
+      "masked": 0,
+      "drained": 1,
+      "generation": 1
+    }
+  ],
+  "cycles": [
+    {
+      "line": 20373,
+      "completed": 1,
+      "detached": 1,
+      "generation": 2
+    }
+  ],
+  "timing_samples": 65,
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 948.4025280000001
+  },
+  "final_hid_state": {
+    "driver": 1,
+    "reports": 162,
+    "failed": 0,
+    "dropped": 0,
+    "held": 0
+  },
+  "markers": {
+    "panic(cpu": 0,
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "E5CPU copy-failed": 0
+  },
+  "android": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "a5d1c05d-ae62-4d77-9844-5d53d563b148",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "scope": "386 actual callbacks and valid reads,341 deferred/45timer reads,158 changed frames/two complete dual releases/final0. Registration/mask/drain/reattach succeed but no post-reuse input was observed. Canvas passes; complete reuse/UI acceptance remains incomplete.",
+  "hardware_frame_count": 158,
+  "two_contact_sequences_released": 2,
+  "sequences_without_hardware_all_up": 0,
+  "final_active": 0,
+  "sensor_errors": [],
+  "operator_observations": {
+    "source": "user",
+    "recorded_at": "2026-11-08T17:36:18.190938+08:00",
+    "text": "跟手且全部消失",
+    "drag_tracks_finger": true,
+    "rings_disappear_on_lift": true,
+    "scope": "R301 GPIO/GIC CPU canvas behavior; original SpringBoard acceptance remains separate."
+  },
+  "post_reuse_operator_observation": {
+    "source": "user",
+    "recorded_at": "2026-11-08T17:51:34.286832+08:00",
+    "text": "没注意看",
+    "observed": false,
+    "scope": "Post-reconnection physical input remains unverified; no post-cycle callbacks in R301 capture."
+  },
+  "verified_canvas_frames": [
+    {
+      "id": 200,
+      "width": 320,
+      "height": 480,
+      "fnv": "19495550",
+      "file": "frame-00-200.png"
+    },
+    {
+      "id": 201,
+      "width": 320,
+      "height": 480,
+      "fnv": "19495550",
+      "file": "frame-01-201.png"
+    },
+    {
+      "id": 202,
+      "width": 320,
+      "height": 480,
+      "fnv": "61d1bf4d",
+      "file": "frame-02-202.png"
+    },
+    {
+      "id": 203,
+      "width": 320,
+      "height": 480,
+      "fnv": "686da494",
+      "file": "frame-03-203.png"
+    }
+  ],
+  "rejected_canvas_frames": [],
+  "transmission_verdict": "PASS",
+  "actual_callback_delivery_verdict": "PASS",
+  "reuse_input_verdict": "INCOMPLETE",
+  "actual_control_readback": 12
+}

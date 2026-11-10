@@ -52,7 +52,7 @@ static void e5_display_runtime_census() {
   static const char *const targets[] = {
       "SpringBoard", "backboardd", "runningboardd", "frontboardd",
       "liveactivitiesd", "launchd", "WindowServer", "chronod", "lockdownd",
-      "lsd", "logd", "watchdogd", "amfid", "notifyd", "driverkitd"};
+      "lsd", "logd", "watchdogd", "amfid", "notifyd", "driverkitd", "Preferences", "MobileSlideShow"};
   unsigned seen = 0, total = 0, maxPid = 0;
   for (int pid = 1; pid < 512; ++pid) {
     proc_t process = proc_find(pid);

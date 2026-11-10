@@ -1,0 +1,125 @@
+{
+  "round": 287,
+  "verdict": "FAIL",
+  "implementation_revision": "25b4cbe0dd108d9ec5844e35ee771b4f1a68619e",
+  "kernel_sha256": "57805a0beb7249bc4cf83d803394e1ae3c3caf071361c112afc39876a26fc72d",
+  "payload_sha256": "1757373aa71f26944f0c80865b3696a77f32298fa099da998d57adfc2ab971b8",
+  "source": {
+    "path": "uefi/build/sb-r287/r287/capture/kernel.log",
+    "sha256": "dd3cb0d9052bd247aa99d6bb25701c0b1301e341ef44cf2fd646be05999b1369"
+  },
+  "hid_events": [
+    "E5HID load bundle=com.apple.iokit.IOHIDFamily ret=0",
+    "E5HID load bundle=com.apple.iokit.IOHIDEventDriver ret=0",
+    "E5HID publish=1 init=1 attach=1 parent_bytes=208 owned_bytes=304",
+    "E5HID status driver=1 polls=1 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=2002 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=4199 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=6399 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=8399 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=10603 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=12604 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=14606 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=16606 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=18610 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=20611 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=22612 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=24614 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID snapshot id=100 source=retained-scanout-memory stable_reads=2",
+    "E5HID status driver=1 polls=26621 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID report=1 source=selftest-home id=1 bytes=9 ret=0",
+    "E5HID report=2 source=selftest-home id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=1 driver=1 failures=0",
+    "E5HID report=3 source=selftest-home id=1 bytes=9 ret=0",
+    "E5HID report=4 source=selftest-home id=2 bytes=2 ret=0",
+    "E5HID selftest=home down=0 driver=1 failures=0",
+    "E5HID status driver=1 polls=28624 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID snapshot id=101 source=retained-scanout-memory stable_reads=2",
+    "E5HID status driver=1 polls=30631 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=32633 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=34635 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=36638 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=38639 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=40640 transitions=0 reports=4 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=42642 transitions=0 reports=4 failed=0 dropped=0 held=0"
+  ],
+  "final_hid_state": {
+    "driver": 1,
+    "reports": 4,
+    "failed": 0,
+    "dropped": 0,
+    "held": 0
+  },
+  "automatic_home_press_release_passed": true,
+  "physical_key_actuation_verified": false,
+  "physical_touch_verified": false,
+  "touch_mode": 1,
+  "touch_events": [
+    "E5TOUCH clock gate refused before=0 after=0"
+  ],
+  "touch_resources_observed": false,
+  "firmware_identity_verified": false,
+  "touch_transport_samples": null,
+  "configuration_sha256": null,
+  "markers": {
+    "panic(cpu": 0,
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "E5CPU copy-failed": 0
+  },
+  "completed_frames": 13,
+  "display_summary": [
+    "E5IMSUM vc=1:43849:43849 d=1:0:e00002bc b=13:13:0 e=13:13:0 over=0"
+  ],
+  "captured_frames": [
+    {
+      "id": 1,
+      "width": 320,
+      "height": 480,
+      "fnv": "b6005dc5"
+    },
+    {
+      "id": 100,
+      "width": 320,
+      "height": 480,
+      "fnv": "7ef85513"
+    },
+    {
+      "id": 101,
+      "width": 320,
+      "height": 480,
+      "fnv": "c898e397"
+    }
+  ],
+  "rejected_captures": [],
+  "snapshot_pair_verified": true,
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "android_recovered": true,
+  "scope": "Automated original-HID reports and bounded sensor transport checks; physical actuation and UI meaning are separate evidence.",
+  "resource_refusal_reason": "Legacy gate PA0x20003000 had zero status before/after set. Correct FDT address is0x20000000, set0x20001000; no controller reads on failure.",
+  "ui_observation": "Checksum-valid before/after frames both show a Chinese lock screen. Clock digits clipped at viewport edges; Consumer Menu did not visibly unlock.",
+  "next_action": "R288 corrected gate resources and diagnostic system-key sequence with snapshots; then sensor identification/packet stages."
+}

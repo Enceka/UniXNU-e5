@@ -1,0 +1,587 @@
+{
+  "round": 383,
+  "result": "Settings NOT qualified: physical and automatic input mixed; action captures show App Library/search rather than Settings.",
+  "fps": {
+    "source": "uefi/build/sb-r383-input-isolation/r383/capture/kernel.log",
+    "reported_intervals": {
+      "samples": 77,
+      "seconds": 78.631,
+      "presented": 100,
+      "mean_fps": 1.2717630451094353,
+      "input_reports": 160
+    },
+    "intervals_with_input": {
+      "samples": 17,
+      "seconds": 18.293,
+      "presented": 8,
+      "mean_fps": 0.437325753020281,
+      "input_reports": 160
+    },
+    "rejected_records": 0,
+    "samples": [
+      {
+        "interval_ms": 1050,
+        "presented": 2,
+        "fps": 1.903,
+        "input_reports": 4,
+        "last_present_ms": 179.985
+      },
+      {
+        "interval_ms": 1002,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 31,
+        "last_present_ms": 179.985
+      },
+      {
+        "interval_ms": 1101,
+        "presented": 1,
+        "fps": 0.907,
+        "input_reports": 8,
+        "last_present_ms": 185.229
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 1,
+        "fps": 0.995,
+        "input_reports": 4,
+        "last_present_ms": 179.764
+      },
+      {
+        "interval_ms": 1008,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 8,
+        "last_present_ms": 179.764
+      },
+      {
+        "interval_ms": 1086,
+        "presented": 1,
+        "fps": 0.92,
+        "input_reports": 4,
+        "last_present_ms": 182.304
+      },
+      {
+        "interval_ms": 1105,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 4,
+        "last_present_ms": 182.304
+      },
+      {
+        "interval_ms": 1016,
+        "presented": 1,
+        "fps": 0.983,
+        "input_reports": 0,
+        "last_present_ms": 178.921
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 178.783
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 23,
+        "last_present_ms": 178.783
+      },
+      {
+        "interval_ms": 1168,
+        "presented": 1,
+        "fps": 0.855,
+        "input_reports": 23,
+        "last_present_ms": 181.852
+      },
+      {
+        "interval_ms": 1007,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 17,
+        "last_present_ms": 181.852
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 10,
+        "last_present_ms": 181.548
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 182.216
+      },
+      {
+        "interval_ms": 1063,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 2,
+        "last_present_ms": 182.216
+      },
+      {
+        "interval_ms": 1014,
+        "presented": 1,
+        "fps": 0.986,
+        "input_reports": 0,
+        "last_present_ms": 179.054
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 2,
+        "last_present_ms": 179.054
+      },
+      {
+        "interval_ms": 1009,
+        "presented": 1,
+        "fps": 0.99,
+        "input_reports": 0,
+        "last_present_ms": 178.93
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 1,
+        "fps": 0.999,
+        "input_reports": 0,
+        "last_present_ms": 182.633
+      },
+      {
+        "interval_ms": 1009,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 2,
+        "last_present_ms": 182.633
+      },
+      {
+        "interval_ms": 1007,
+        "presented": 1,
+        "fps": 0.992,
+        "input_reports": 0,
+        "last_present_ms": 181.635
+      },
+      {
+        "interval_ms": 1659,
+        "presented": 1,
+        "fps": 0.602,
+        "input_reports": 12,
+        "last_present_ms": 205.208
+      },
+      {
+        "interval_ms": 1008,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 4,
+        "last_present_ms": 205.208
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 1,
+        "fps": 0.999,
+        "input_reports": 0,
+        "last_present_ms": 181.959
+      },
+      {
+        "interval_ms": 1013,
+        "presented": 1,
+        "fps": 0.986,
+        "input_reports": 0,
+        "last_present_ms": 181.296
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 2,
+        "fps": 1.988,
+        "input_reports": 0,
+        "last_present_ms": 181.046
+      },
+      {
+        "interval_ms": 1009,
+        "presented": 1,
+        "fps": 0.991,
+        "input_reports": 0,
+        "last_present_ms": 178.637
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 181.155
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 2,
+        "fps": 1.989,
+        "input_reports": 0,
+        "last_present_ms": 182.269
+      },
+      {
+        "interval_ms": 1013,
+        "presented": 2,
+        "fps": 1.972,
+        "input_reports": 0,
+        "last_present_ms": 182.298
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 1,
+        "fps": 0.994,
+        "input_reports": 0,
+        "last_present_ms": 186.631
+      },
+      {
+        "interval_ms": 1006,
+        "presented": 2,
+        "fps": 1.987,
+        "input_reports": 0,
+        "last_present_ms": 179.579
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 1,
+        "fps": 0.999,
+        "input_reports": 0,
+        "last_present_ms": 228.842
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 2,
+        "fps": 1.988,
+        "input_reports": 0,
+        "last_present_ms": 182.208
+      },
+      {
+        "interval_ms": 1006,
+        "presented": 2,
+        "fps": 1.987,
+        "input_reports": 0,
+        "last_present_ms": 180.976
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 3,
+        "fps": 2.989,
+        "input_reports": 0,
+        "last_present_ms": 180.595
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 181.021
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 3,
+        "fps": 2.985,
+        "input_reports": 0,
+        "last_present_ms": 177.654
+      },
+      {
+        "interval_ms": 1008,
+        "presented": 2,
+        "fps": 1.984,
+        "input_reports": 0,
+        "last_present_ms": 182.37
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 2,
+        "fps": 1.991,
+        "input_reports": 0,
+        "last_present_ms": 181.037
+      },
+      {
+        "interval_ms": 1001,
+        "presented": 2,
+        "fps": 1.996,
+        "input_reports": 0,
+        "last_present_ms": 177.937
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 3,
+        "fps": 2.99,
+        "input_reports": 0,
+        "last_present_ms": 178.424
+      },
+      {
+        "interval_ms": 1008,
+        "presented": 2,
+        "fps": 1.982,
+        "input_reports": 0,
+        "last_present_ms": 181.854
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 2,
+        "fps": 1.998,
+        "input_reports": 0,
+        "last_present_ms": 181.339
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 3,
+        "fps": 2.987,
+        "input_reports": 0,
+        "last_present_ms": 178.026
+      },
+      {
+        "interval_ms": 1016,
+        "presented": 3,
+        "fps": 2.95,
+        "input_reports": 0,
+        "last_present_ms": 177.803
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 3,
+        "fps": 2.982,
+        "input_reports": 0,
+        "last_present_ms": 181.576
+      },
+      {
+        "interval_ms": 1011,
+        "presented": 0,
+        "fps": 0.0,
+        "input_reports": 2,
+        "last_present_ms": 181.576
+      },
+      {
+        "interval_ms": 1006,
+        "presented": 1,
+        "fps": 0.993,
+        "input_reports": 0,
+        "last_present_ms": 178.548
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 181.041
+      },
+      {
+        "interval_ms": 1006,
+        "presented": 1,
+        "fps": 0.993,
+        "input_reports": 0,
+        "last_present_ms": 178.173
+      },
+      {
+        "interval_ms": 1002,
+        "presented": 1,
+        "fps": 0.997,
+        "input_reports": 0,
+        "last_present_ms": 181.62
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 1,
+        "fps": 0.994,
+        "input_reports": 0,
+        "last_present_ms": 182.095
+      },
+      {
+        "interval_ms": 1007,
+        "presented": 2,
+        "fps": 1.985,
+        "input_reports": 0,
+        "last_present_ms": 181.618
+      },
+      {
+        "interval_ms": 1005,
+        "presented": 2,
+        "fps": 1.989,
+        "input_reports": 0,
+        "last_present_ms": 181.337
+      },
+      {
+        "interval_ms": 1002,
+        "presented": 2,
+        "fps": 1.994,
+        "input_reports": 0,
+        "last_present_ms": 178.212
+      },
+      {
+        "interval_ms": 1011,
+        "presented": 2,
+        "fps": 1.976,
+        "input_reports": 0,
+        "last_present_ms": 178.314
+      },
+      {
+        "interval_ms": 1002,
+        "presented": 3,
+        "fps": 2.991,
+        "input_reports": 0,
+        "last_present_ms": 178.705
+      },
+      {
+        "interval_ms": 1009,
+        "presented": 2,
+        "fps": 1.982,
+        "input_reports": 0,
+        "last_present_ms": 181.639
+      },
+      {
+        "interval_ms": 1004,
+        "presented": 1,
+        "fps": 0.995,
+        "input_reports": 0,
+        "last_present_ms": 181.79
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 2,
+        "fps": 1.992,
+        "input_reports": 0,
+        "last_present_ms": 178.443
+      },
+      {
+        "interval_ms": 1007,
+        "presented": 1,
+        "fps": 0.992,
+        "input_reports": 0,
+        "last_present_ms": 193.346
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 1,
+        "fps": 0.999,
+        "input_reports": 0,
+        "last_present_ms": 186.947
+      },
+      {
+        "interval_ms": 1012,
+        "presented": 1,
+        "fps": 0.987,
+        "input_reports": 0,
+        "last_present_ms": 178.543
+      },
+      {
+        "interval_ms": 1012,
+        "presented": 1,
+        "fps": 0.987,
+        "input_reports": 0,
+        "last_present_ms": 181.484
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 1,
+        "fps": 0.999,
+        "input_reports": 0,
+        "last_present_ms": 182.21
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 1,
+        "fps": 0.999,
+        "input_reports": 0,
+        "last_present_ms": 179.725
+      },
+      {
+        "interval_ms": 1001,
+        "presented": 1,
+        "fps": 0.998,
+        "input_reports": 0,
+        "last_present_ms": 179.431
+      },
+      {
+        "interval_ms": 1015,
+        "presented": 2,
+        "fps": 1.969,
+        "input_reports": 0,
+        "last_present_ms": 182.911
+      },
+      {
+        "interval_ms": 1003,
+        "presented": 1,
+        "fps": 0.996,
+        "input_reports": 0,
+        "last_present_ms": 181.496
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 1,
+        "fps": 0.999,
+        "input_reports": 0,
+        "last_present_ms": 180.783
+      },
+      {
+        "interval_ms": 1006,
+        "presented": 1,
+        "fps": 0.993,
+        "input_reports": 0,
+        "last_present_ms": 205.938
+      },
+      {
+        "interval_ms": 1006,
+        "presented": 1,
+        "fps": 0.993,
+        "input_reports": 0,
+        "last_present_ms": 177.907
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 1,
+        "fps": 0.999,
+        "input_reports": 0,
+        "last_present_ms": 181.923
+      },
+      {
+        "interval_ms": 1000,
+        "presented": 1,
+        "fps": 0.999,
+        "input_reports": 0,
+        "last_present_ms": 180.668
+      },
+      {
+        "interval_ms": 1015,
+        "presented": 1,
+        "fps": 0.984,
+        "input_reports": 0,
+        "last_present_ms": 179.36
+      },
+      {
+        "interval_ms": 1015,
+        "presented": 1,
+        "fps": 0.985,
+        "input_reports": 0,
+        "last_present_ms": 181.782
+      }
+    ],
+    "scope": "Presented-frame updates; reported intervals only. Input may be physical or synthetic. Not hardware vblank."
+  },
+  "present_work_observation": "Most measured presentation work179-185ms including pixel diagnostics; repeatedsource-read removal prepared forR384.",
+  "gestures": [
+    "E5HID settings-sequence phase=0 action=open-settings release=1 held_ms=114 failures=0 frames=10 pixels=118948 ink=118948 (synthetic)",
+    "E5HID settings-sequence phase=2 action=open-row release=3 held_ms=115 failures=0 frames=11 pixels=147920 ink=150697 (synthetic)",
+    "E5HID settings-sequence phase=4 action=back release=5 held_ms=115 failures=0 frames=13 pixels=139016 ink=139016 (synthetic)",
+    "E5HID settings-sequence phase=6 action=scroll release=17 held_ms=706 failures=0 frames=15 pixels=139016 ink=139016 (synthetic)",
+    "E5HID settings-sequence phase=18 action=home-down release=19 held_ms=115 failures=0 frames=15 pixels=139016 ink=139016 (synthetic)",
+    "E5HID settings-sequence phase=20 action=open-settings release=21 held_ms=115 failures=0 frames=62 pixels=153600 ink=151528 (synthetic)",
+    "E5HID settings-sequence complete=1 active=0 home_down=0 failures=0"
+  ],
+  "physical_input_before_automation": true,
+  "visual_observation": "AppLibrary is visible; blurred backgrounds show banding. Hardwarevblank/continuous-scrollFPS not established.",
+  "recovery": "complete-data-verified",
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "10abc52e6042a856aa9e06cae37511e424ce80f1161304462e57b8b2884e40bb",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r383-input-isolation-after/data-after.img",
+    "elapsed_seconds": 71.98758670799998,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  }
+}

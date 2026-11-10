@@ -1,0 +1,28 @@
+--- a/metal-plugin/frontend/NativeBridgeMetalFrontend.mm
++++ b/metal-plugin/frontend/NativeBridgeMetalFrontend.mm
+@@ -1759,6 +1759,7 @@
+ @property(nonatomic) uint32_t drawIndex;   // this encoder's draws so far, for NATIVE_METAL_SKIP_DRAWS   // [pipeline info, depth info, first draw, count] for each run of draws with one state
+ - (void)noteState:(uint32_t)kind key:(uint32_t)key object:(const void *)object value:(uint64_t)value;
+ - (void)noteDraw;
++@property(nonatomic,strong) NBRenderPipeline *errorPipeline;
+ @end
+ // NATIVE_METAL_DUMP_CB=FIRST[:COUNT]: the app's command buffers FIRST..FIRST+COUNT-1 (counted from 1, the plugin's own readbacks left
+ // out) have what they rendered read back after them, by a command buffer of the plugin's own on the same queue: every render pass's
+@@ -2028,7 +2029,7 @@
+  if(++gDSDraws%2000==0)writeDrawStats();
+ }
+ - (bool)check:(bool)ok what:(const char *)what {
+- if(!ok)[_commandBuffer refuse:[NSString stringWithFormat:@"%s: %@",what,lastError()]];
++ if(!ok){NSString *why=lastError();NSString *pipeline=self.errorPipeline?[self.errorPipeline dumpInfo]:nil;[_commandBuffer refuse:pipeline?[NSString stringWithFormat:@"%s: %@ | pipeline %@",what,why,pipeline]:[NSString stringWithFormat:@"%s: %@",what,why]];}
+  return ok;
+ }
+ - (void)endEncoding {
+@@ -2211,7 +2212,7 @@
+  if(dumpRange().first)self.dumpPipeline=state;
+  _skipPipeline=((NBRenderPipeline *)state).skipDraws;
+  if(gDrawStats)[self noteState:kDSPipeline key:0 object:(__bridge const void *)state value:0];
+- ENCODE([self check:nmb_render_set_pipeline(self.handle,[(NBRenderPipeline *)state handle]) what:"setRenderPipelineState"]);
++ ENCODE(self.errorPipeline=(NBRenderPipeline *)state; [self check:nmb_render_set_pipeline(self.handle,[(NBRenderPipeline *)state handle]) what:"setRenderPipelineState"]);
+ }
+ - (void)setVertexBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o atIndex:(NSUInteger)i {[self buffer:b offset:o index:i stage:1];}
+ - (void)setFragmentBuffer:(id<MTLBuffer>)b offset:(NSUInteger)o atIndex:(NSUInteger)i {[self buffer:b offset:o index:i stage:2];}

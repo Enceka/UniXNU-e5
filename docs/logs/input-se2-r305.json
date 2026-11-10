@@ -1,0 +1,520 @@
+{
+  "round": 305,
+  "verdict": "PASS_TOUCH_HOME_LAYOUT",
+  "settings_content_verdict": "FAIL_BLACK_SCREEN",
+  "settings_exit_verdict": "UNTESTED",
+  "ui_identity": "iPhone12,8 / D79AP / phone / 1x",
+  "native_product_id": "c459fdb0eef455588dbc6f587c20a5372792bbf8",
+  "mobilegestalt_type": "0x80bb21e1",
+  "kernel_sha256": "47fad6af6718fb853b9f25cfff3bfddb62da07e7ac48b406c9b7bfe1fad39e57",
+  "payload_sha256": "e48b74bf2e7f4fb2d729f7dc500e90a48fdc0df14e7877e216ed7d7228375822",
+  "adt_sha256": "32d1d2a6fe2aa48db406272e1b6c2d668be7a21bd7d1db8b5aafb3cc92e7717b",
+  "adt_change_proof": {
+    "source": "uefi/build/sb-r304-home-double/payload/before-files/kernel.macho.adt",
+    "native": "/Users/enceka/e5-work/se2-native/DeviceTree.d79ap.bin",
+    "source_sha256": "80abcc840c6990663304d757dca8fe76d87589098e559a2bc77481c9ba6e4582",
+    "native_sha256": "8d94f824606d1c7239d2f296309c6cc98e8046f6c4d47cedd2b3049b42490b84",
+    "after_sha256": "32d1d2a6fe2aa48db406272e1b6c2d668be7a21bd7d1db8b5aafb3cc92e7717b",
+    "before_bytes": 14000,
+    "after_bytes": 13984,
+    "pixels_per_point": 1,
+    "changed": {
+      "/device-tree/model": "6950686f6e6531322c3800",
+      "/device-tree/target-type": "44373900",
+      "/device-tree/compatible": "443739415000726f6e677975652c653500737072642c756d733936323100",
+      "/device-tree/product/product-name": "6950686f6e652053452028326e642067656e65726174696f6e2900",
+      "/device-tree/product/product-description": "6950686f6e652053452028326e642067656e65726174696f6e2900",
+      "/device-tree/product/product-id": "c459fdb0eef455588dbc6f587c20a5372792bbf8",
+      "/device-tree/product/compatible-device-fallback": "6950686f6e6531312c3800",
+      "/device-tree/product/artwork-device-idiom": "70686f6e6500",
+      "/device-tree/product/artwork-device-subtype": "39020000",
+      "/device-tree/product/artwork-scale-factor": "01000000",
+      "/device-tree/chosen/display-scale": "01000000"
+    },
+    "hardware_and_other_properties_preserved": true
+  },
+  "automatic_input": false,
+  "watchdog_seconds": 900,
+  "last_periodic": {
+    "checks": 53249,
+    "callbacks": 601,
+    "consumed": 601,
+    "reads": 599,
+    "coalesced": 2,
+    "pending": 0,
+    "work_runs": 599,
+    "work_reads": 594,
+    "timer_reads": 5,
+    "notifications": 601,
+    "entries": 601,
+    "spurious": 0,
+    "foreign": 0,
+    "ie": 8192,
+    "gic": 601,
+    "generation": 1,
+    "good": 599,
+    "bad": 0,
+    "recoveries": 0,
+    "line": 46637
+  },
+  "gic_checks": {
+    "single_sensor_epoch": true,
+    "shared_ownership_checked": true,
+    "parent_attached": true,
+    "parent_enabled": true,
+    "actual_callbacks": true,
+    "actual_deferred_reads": true,
+    "read_accounting": true,
+    "idle_read_suppression": true,
+    "sampled_irq_to_read_timing": true,
+    "lifecycle_cycle": true,
+    "error_free": true,
+    "callbacks_after_reuse": true
+  },
+  "source": {
+    "path": "uefi/build/sb-r305-se2-ui/r305/capture/kernel.log",
+    "sha256": "435f103907e2d68c5cdd6df9745b7db7635a0f1bd8226063ac21338abc9b5ce7"
+  },
+  "hardware_frame_count": 294,
+  "moving_single_contact_releases": 6,
+  "stationary_single_contact_releases": 23,
+  "two_contact_sequences_released": 2,
+  "unreleased_sequences": 0,
+  "final_active": 0,
+  "sensor_errors": [],
+  "physical_home_edges": [
+    {
+      "line": 33023,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 33024,
+      "down": false
+    },
+    {
+      "line": 33025,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 33030,
+      "down": false
+    },
+    {
+      "line": 33807,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 33808,
+      "down": false
+    },
+    {
+      "line": 33818,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 33821,
+      "down": false
+    },
+    {
+      "line": 33822,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 33823,
+      "down": false
+    },
+    {
+      "line": 33824,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 33825,
+      "down": false
+    },
+    {
+      "line": 34085,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 34086,
+      "down": false
+    },
+    {
+      "line": 34087,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 34088,
+      "down": false
+    },
+    {
+      "line": 34090,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 34091,
+      "down": false
+    },
+    {
+      "line": 34092,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 34094,
+      "down": false
+    },
+    {
+      "line": 34098,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 34099,
+      "down": false
+    },
+    {
+      "line": 34100,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 34101,
+      "down": false
+    },
+    {
+      "line": 34102,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 34103,
+      "down": false
+    },
+    {
+      "line": 34115,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 34117,
+      "down": false
+    },
+    {
+      "line": 34390,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 34392,
+      "down": false
+    },
+    {
+      "line": 35526,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 35527,
+      "down": false
+    },
+    {
+      "line": 35528,
+      "down": true,
+      "command_h_observed": false,
+      "consumer_menu_observed": true
+    },
+    {
+      "line": 35529,
+      "down": false
+    }
+  ],
+  "operator": {
+    "source": "user",
+    "recorded_at": "2026-11-08T19:49:05.388218+08:00",
+    "text": "布局合适，Home、切换器和触控都正常",
+    "layout_fits": true,
+    "physical_home_works": true,
+    "app_switcher_works": true,
+    "touch_responds": true,
+    "automatic_input_enabled": false,
+    "scope": "SE2/Phone/1x original iPadOS-derived UI; operator confirms manual Home, app switcher and touch. Runtime counters/pixels and cycle recovery are checked separately.",
+    "settings_enters_black_screen": true,
+    "home_after_settings_tested": false,
+    "settings_observation": "进入黑屏，home键还没来得及测就到看门狗上线了"
+  },
+  "final_hid_state": {
+    "driver": 1,
+    "reports": 426,
+    "failed": 0,
+    "dropped": 0,
+    "held": 0
+  },
+  "original_event_driver_processed": true,
+  "native_client_consumed_events": true,
+  "completed_display_frames": 2433,
+  "verified_scanout_frames": [
+    {
+      "id": 300,
+      "width": 320,
+      "height": 480,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 301,
+      "width": 320,
+      "height": 480,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 302,
+      "width": 320,
+      "height": 480,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 303,
+      "width": 320,
+      "height": 480,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 304,
+      "width": 320,
+      "height": 480,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 305,
+      "width": 320,
+      "height": 480,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 306,
+      "width": 320,
+      "height": 480,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 307,
+      "width": 320,
+      "height": 480,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 308,
+      "width": 320,
+      "height": 480,
+      "fnv": "af4276c5"
+    },
+    {
+      "id": 1,
+      "width": 320,
+      "height": 480,
+      "fnv": "b6005dc5"
+    },
+    {
+      "id": 309,
+      "width": 320,
+      "height": 480,
+      "fnv": "2273a79c"
+    },
+    {
+      "id": 310,
+      "width": 320,
+      "height": 480,
+      "fnv": "3cc54e0b"
+    },
+    {
+      "id": 100,
+      "width": 320,
+      "height": 480,
+      "fnv": "3cc54e0b"
+    },
+    {
+      "id": 311,
+      "width": 320,
+      "height": 480,
+      "fnv": "0701a7c6"
+    },
+    {
+      "id": 101,
+      "width": 320,
+      "height": 480,
+      "fnv": "0701a7c6"
+    },
+    {
+      "id": 312,
+      "width": 320,
+      "height": 480,
+      "fnv": "0701a7c6"
+    },
+    {
+      "id": 313,
+      "width": 320,
+      "height": 480,
+      "fnv": "f8262831"
+    },
+    {
+      "id": 314,
+      "width": 320,
+      "height": 480,
+      "fnv": "f8262831"
+    },
+    {
+      "id": 315,
+      "width": 320,
+      "height": 480,
+      "fnv": "f1dd841e"
+    },
+    {
+      "id": 316,
+      "width": 320,
+      "height": 480,
+      "fnv": "f1dd841e"
+    },
+    {
+      "id": 317,
+      "width": 320,
+      "height": 480,
+      "fnv": "89f66757"
+    },
+    {
+      "id": 318,
+      "width": 320,
+      "height": 480,
+      "fnv": "5dbdc164"
+    },
+    {
+      "id": 64,
+      "width": 320,
+      "height": 480,
+      "fnv": "3e3964f6"
+    },
+    {
+      "id": 319,
+      "width": 320,
+      "height": 480,
+      "fnv": "49128d4f"
+    },
+    {
+      "id": 320,
+      "width": 320,
+      "height": 480,
+      "fnv": "0711fa01"
+    },
+    {
+      "id": 321,
+      "width": 320,
+      "height": 480,
+      "fnv": "0711fa01"
+    },
+    {
+      "id": 322,
+      "width": 320,
+      "height": 480,
+      "fnv": "0711fa01"
+    },
+    {
+      "id": 323,
+      "width": 320,
+      "height": 480,
+      "fnv": "0711fa01"
+    },
+    {
+      "id": 324,
+      "width": 320,
+      "height": 480,
+      "fnv": "0711fa01"
+    },
+    {
+      "id": 325,
+      "width": 320,
+      "height": 480,
+      "fnv": "0711fa01"
+    }
+  ],
+  "rejected_scanout_frames": [],
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "android": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "62602a2b-22ef-4b9b-8b18-e6da8937b1e5",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 1239.3702417079999
+  },
+  "markers": {
+    "panic(cpu": 0,
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "E5CPU copy-failed": 0
+  },
+  "scope": "Operator-confirmed manual Phone layout, Home, app switcher and original UI touch with no automatic input. Raw/GIC/HID/lifts and all900s cycle checks pass. Settings entersblack; no post-Settings Home test or app-content acceptance is claimed.",
+  "settings_boot_uuid": "B2D258C1-4B16-4C62-8472-73A1959311C2",
+  "historical_settings_evidence_not_current": "610F653D-C7E9-4AE6-93FC-52EE73FC8454 is present in pre-R305 timesync; cannot attribute its Preferences launch to R305.",
+  "settings_launch_verified": false,
+  "settings_cause": "Unresolved. Operator sees black after selecting Settings; current-boot device logs being checked.",
+  "current_ui_log_coverage": "Current boot B2D258C1 has878 retained UI records, onlyearlystartup throughmachTimestamp8324759141; no lateSettings launch path retained.",
+  "data_after_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "4901ed9733c76ec4faf2598f1c5a4deba9fd215f47d29170dc8f1fe1a63cff1d",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r305-se2-ui-after/data-after.img",
+    "elapsed_seconds": 353.36226404200005,
+    "command": "dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none"
+  }
+}

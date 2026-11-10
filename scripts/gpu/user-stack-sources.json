@@ -1,0 +1,87 @@
+{
+ "schema_version": 2,
+ "kernel_abi": "1.7",
+ "repositories": {
+  "mesa": {
+   "url": "https://github.com/FristOneRR-Admin/FristOneRR-Panvk-Source.git",
+   "revision": "efd07bab401b263a9ac114560ecdb9a2934f5d43",
+   "patches": [
+    {
+     "path": "patches/mesa/e5-panvk-darwin.patch",
+     "sha256": "776ad8e2bb9eae3ca47a321561177625e781328e5c1d26ad894cbb5abe18e03b"
+    }
+   ]
+  },
+  "mali_metal": {
+   "url": "https://github.com/Ken-u/MaliMetal.git",
+   "revision": "5fea8f85c564e1656b5f7920290b930ba5bd2848",
+   "patches": [
+    {
+     "path": "patches/metal/native-e5-frontend.patch",
+     "sha256": "11bb82b50671a2d679861d2154d16b90d9934165812feffbe33a64abafa42e1a"
+    },
+    {
+     "path": "patches/metal/e5-encoder-error-context.patch",
+     "sha256": "39fe4bf166478c26e5ad90abc9a6e923b2a59b4919246ae5f85d507f438706b1"
+    },
+    {
+     "path": "patches/metal/e5-compile-concurrency-bridge.patch",
+     "sha256": "c0df241e3bcc8b0001449267b3fe56de78c174884ccce5bdbaed9e3e6ae4d2cb"
+    }
+   ]
+  },
+  "metal2vulkan": {
+   "url": "https://github.com/steelbrain/metal2vulkan.git",
+   "revision": "720ef1ce9ae2a2068999a8675717418b9416283e",
+   "patches": [
+    {
+     "path": "patches/metal2vulkan/e5-runtime.patch",
+     "sha256": "b9e0837397c86249138be16420908d7e927d1c2ace690745ec1243e8e997a8ad"
+    }
+   ]
+  },
+  "armcpu": {
+   "url": "https://github.com/UniXNU/ArmCpu.git",
+   "revision": "9066b53bbc82e92a98ec44a11dd50fd13eaf1a1b",
+   "patches": [
+    {
+     "path": "patches/armcpu/e5-spi-lifetime.patch",
+     "sha256": "b4d33d51b40f0532d9303d86b2a0db22da1514c96cfdb72d1d7f2e2659a924f1"
+    }
+   ]
+  }
+ },
+ "runtime_patch_provenance": {
+  "adreno_metal_revision": "d6ca6557039cf9e0c3a1d1a58c560f2e55e8e9bb",
+  "upstream_patch_count": 37,
+  "local_changes": [
+   "8 MiB allocation blocks",
+   "iOS QoS"
+  ]
+ },
+ "toolchain": {
+  "rust": "1.98.0",
+  "target": "aarch64-apple-ios",
+  "deployment_target": "17.0",
+  "llvm": "23",
+  "meson_options": "scripts/gpu/build-options.json"
+ },
+ "frontend": {
+  "entry": "scripts/gpu/metal/NativeE5MetalPlugin.mm",
+  "defines": [
+   "NATIVE_E5_KERNEL_CACHE_SYNC=1",
+   "NATIVE_E5_UI_TRACE=1"
+  ],
+  "bridge_cargo_lock": "scripts/gpu/metal/Cargo.lock"
+ },
+ "qualified_evidence": [
+  "docs/logs/gpu-r366-evidence.json",
+  "docs/logs/gpu-r369-evidence.json",
+  "docs/logs/display-r375-b3a8-evidence.json",
+  "docs/logs/gpu-r388-evidence.json",
+  "docs/logs/gpu-r389-evidence.json",
+  "docs/logs/gpu-r390-evidence.json"
+ ],
+ "scope": "R387 candidate: combined genuine submit/wait transport and native Mach display notifications. Settings root, Notifications and Back visually verified in R385; sustained FPS and complete navigation await R387.",
+ "mesa_patch_note": "R388 lineage: adds E5SHADERPERF/E5QUEUEPERF timing (panvk_compile_shaders, gpu_queue_submit; first8/powers2/>=500ms sampling) on top of the R387 ABI1.7 submit-wait and cache-segment-reuse patch. Replay verified against base efd07bab401b263a9ac114560ecdb9a2934f5d43: patched tree 365447966ef57131913278ef9afb27649999f52e (.work/e5-gpu-active/r388-mesa-patch-replay.json). ICD sha256 f32d3524516ae4498b483ece78e9479968ab04d208b401ce2fb8d8bde5140326."
+}

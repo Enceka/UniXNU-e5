@@ -1,0 +1,104 @@
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -8150,6 +8150,93 @@
+ int e5_data_mount_state = -999;
+ int e5_diag_stage = -999; /* -999 unreached, 1 file found, 2 exec ok, 3 absent, 1000+errno exec fail */
+ extern void commpage_update_dyld_flags(uint64_t);
++
++/* E5 opt-in launchd probe. Only writes its own plist on the qualified
++ * eMMC Data volume, then mounts a read-only union over the daemon directory.
++ * The original system jobs remain visible. No init replacement or injected
++ * environment is needed; launchd starts the signed probe as a normal job. */
++extern volatile int native_bindfs_boot_mount;
++static void
++e5_gpu_probe_prepare(proc_t p, user_addr_t scratch)
++{
++	unsigned enabled = 0;
++	if (!PE_parse_boot_argn("e5-gpu-user-probe", &enabled, sizeof(enabled)) || enabled != 1) return;
++	if (e5_data_mount_state != 100) {
++		printf("E5GPUUSER FAIL Data not qualified state=%d\n", e5_data_mount_state);
++		return;
++	}
++	vfs_context_t ctx = vfs_context_current();
++	vnode_t vp = NULLVP;
++	int error = vnode_lookup("/private/var/e5mali_harness", VNODE_LOOKUP_NOFOLLOW, &vp, ctx);
++	if (!error) { vnode_put(vp); vp = NULLVP; }
++	if (error) { printf("E5GPUUSER FAIL probe missing errno=%d\n", error); return; }
++	static const char source[] = "/private/var/e5gpu-daemons";
++	static const char point[] = "/System/Library/LaunchDaemons";
++	static const char path[] = "/private/var/e5gpu-daemons/com.e5.gpu-probe.plist";
++	static const char xml[] =
++	"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
++	"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
++	"<plist version=\"1.0\">\n"
++	"<dict>\n"
++	"\t<key>KeepAlive</key>\n"
++	"\t<false/>\n"
++	"\t<key>Label</key>\n"
++	"\t<string>com.e5.gpu-probe</string>\n"
++	"\t<key>ProcessType</key>\n"
++	"\t<string>Background</string>\n"
++	"\t<key>ProgramArguments</key>\n"
++	"\t<array>\n"
++	"\t\t<string>/private/var/e5mali_harness</string>\n"
++	"\t\t<string>all</string>\n"
++	"\t</array>\n"
++	"\t<key>RunAtLoad</key>\n"
++	"\t<true/>\n"
++	"\t<key>StandardErrorPath</key>\n"
++	"\t<string>/dev/console</string>\n"
++	"\t<key>StandardOutPath</key>\n"
++	"\t<string>/dev/console</string>\n"
++	"</dict>\n"
++	"</plist>\n";
++	struct mkdir_args mk = {.path = scratch + 0xc00, .mode = 0755};
++	int32_t result = 0;
++	error = copyout(source, mk.path, sizeof(source));
++	if (!error) error = mkdir(p, &mk, &result);
++	if (error == EEXIST) error = 0;
++	if (!error) {
++		error = vnode_lookup(source, VNODE_LOOKUP_NOFOLLOW, &vp, ctx);
++		if (!error) {
++			if (!vnode_isdir(vp)) error = ENOTDIR;
++			vnode_put(vp); vp = NULLVP;
++		}
++	}
++	if (!error) error = vnode_open(path, O_CREAT | O_TRUNC | FWRITE | O_NOFOLLOW, 0644, 0, &vp, ctx);
++	if (!error) {
++		int resid = 0;
++		error = vn_rdwr(UIO_WRITE, vp, (caddr_t)xml, sizeof(xml)-1, 0, UIO_SYSSPACE,
++		    IO_NOAUTH | IO_UNIT, vfs_context_ucred(ctx), &resid, p);
++		if (!error && resid) error = EIO;
++		if (!error) error = VNOP_FSYNC(vp, MNT_WAIT, ctx);
++		int closed = vnode_close(vp, FWRITE, ctx); vp = NULLVP;
++		if (!error) error = closed;
++	}
++	if (error) { printf("E5GPUUSER FAIL plist errno=%d\n", error); return; }
++	struct mount_args request = {.type = scratch + 0x800, .path = scratch + 0x820,
++	    .flags = MNT_RDONLY | MNT_UNION, .data = scratch + 0x900};
++	error = copyout("bindfs", request.type, 7) || copyout(point, request.path, sizeof(point)) ||
++	    copyout(source, request.data, sizeof(source)) ? EINVAL : 0;
++	if (!error) {
++		int previous = native_bindfs_boot_mount;
++		native_bindfs_boot_mount = 1;
++		error = mount(p, &request, &result);
++		native_bindfs_boot_mount = previous;
++	}
++	if (error) { printf("E5GPUUSER FAIL overlay errno=%d\n", error); return; }
++	int lower = vnode_lookup("/System/Library/LaunchDaemons/com.apple.backboardd.plist", 0, &vp, ctx);
++	if (!lower) { vnode_put(vp); vp = NULLVP; }
++	int own = vnode_lookup("/System/Library/LaunchDaemons/com.e5.gpu-probe.plist", 0, &vp, ctx);
++	if (!own) { vnode_put(vp); vp = NULLVP; }
++	printf("E5GPUUSER OVERLAY %s lower=%d probe=%d\n", !lower && !own ? "PASS" : "FAIL", lower, own);
++}
+ 
+ /* Explicit bring-up mode for the two unchanged IPSW images. This is separate
+  * from native libignition/Preboot provisioning and from owner-root enforcement.
+@@ -8286,6 +8373,7 @@
+ 			printf("E5SystemOS: data volume device absent\n");
+ 		}
+ 	}
++	e5_gpu_probe_prepare(p, scratch);
+ out:
+ 	if (cache) vnode_put(cache);
+ 	vnode_put(mounted_root);

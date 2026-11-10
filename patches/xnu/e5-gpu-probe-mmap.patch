@@ -1,0 +1,70 @@
+--- a/bsd/kern/kern_mman.c
++++ b/bsd/kern/kern_mman.c
+@@ -77,6 +77,7 @@
+  * Mapped file (mmap) interface to VM
+  */
+ 
++#include <pexpert/pexpert.h>
+ #include <sys/param.h>
+ #include <sys/systm.h>
+ #include <sys/filedesc.h>
+@@ -203,6 +204,9 @@
+ 	int error = 0;
+ 	int fd = uap->fd;
+ 	int num_retries = 0;
++#if DEVELOPMENT || DEBUG
++	int e5_gpu_target = 0;
++#endif
+ 
+ 	/*
+ 	 * Note that for UNIX03 conformance, there is additional parameter checking for
+@@ -618,9 +622,38 @@
+ 
+ 			handle = (void *)vp;
+ #if CONFIG_MACF
++#if DEVELOPMENT || DEBUG
++			int e5_before_maxprot = maxprot;
++			unsigned e5_gpu_map = 0;
++			extern int e5_data_mount_state;
++			/* Explicit development grant for the signed staged test ICD only.
++			 * Ordinary descriptor permissions were checked above; VM/code-signing
++			 * validation remains below. No writable executable mapping is allowed. */
++			if (proc_getpid(p) == 1 && strcmp(p->p_comm, "e5vk-probe") == 0 &&
++			    e5_data_mount_state == 100 && (flags & MAP_PRIVATE) &&
++			    (prot & (VM_PROT_WRITE | VM_PROT_EXECUTE)) != (VM_PROT_WRITE | VM_PROT_EXECUTE) &&
++			    PE_parse_boot_argn("e5-gpu-map", &e5_gpu_map, sizeof(e5_gpu_map)) && e5_gpu_map == 1) {
++				char e5_path[192]; int e5_path_size = sizeof(e5_path);
++				if (!vn_getpath(vp, e5_path, &e5_path_size) &&
++				    strcmp(e5_path, "/private/var/mobile/e5gpu-stage/lib/libvulkan_panfrost.dylib") == 0)
++					e5_gpu_target = 1;
++			}
++#endif
+ 			error = mac_file_check_mmap(vfs_context_ucred(ctx),
+ 			    fp->fp_glob, prot, flags, file_pos + pageoff,
+ 			    &maxprot);
++#if DEVELOPMENT || DEBUG
++			if (e5_gpu_target) {
++				printf("E5GPUMAP CHECK err=%d prot=%x max=%x/%x flags=%x off=%llx len=%llx\n",
++				    error, prot, e5_before_maxprot, maxprot, flags,
++				    (unsigned long long)(file_pos + pageoff), (unsigned long long)user_size);
++				if (error == EPERM || error == EACCES || (!error && (prot & ~maxprot))) {
++					printf("E5GPUMAP GRANT staged probe mapping; original err=%d\n", error);
++					error = 0;
++					maxprot = e5_before_maxprot;
++				}
++			}
++#endif
+ 			if (error) {
+ 				(void)vnode_put(vp);
+ 				goto bad;
+@@ -957,6 +990,10 @@
+ 		break;
+ 	}
+ bad:
++#if DEVELOPMENT || DEBUG
++	if (e5_gpu_target) printf("E5GPUMAP RESULT err=%d prot=%x max=%x len=%llx\n",
++	    error, prot, maxprot, (unsigned long long)user_size);
++#endif
+ 	if (pager != MEMORY_OBJECT_NULL) {
+ 		/*
+ 		 * Release the reference on the pager.

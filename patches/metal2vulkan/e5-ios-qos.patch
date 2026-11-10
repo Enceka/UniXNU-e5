@@ -1,0 +1,73 @@
+--- a/crates/metal2vulkan-runtime/src/exit_guard.rs
++++ b/crates/metal2vulkan-runtime/src/exit_guard.rs
+@@ -725,7 +725,7 @@
+ }
+ 
+ /// Start one of the runtime's threads that take a command buffer from its commit to its handlers,
+-/// running `f`, as [`spawn`] does, but at the user-interactive quality of service on macOS, and
++/// running `f`, as [`spawn`] does, but at the user-interactive quality of service on macOS and iOS, and
+ /// with the utilization floor at its top on Linux, from its start ([`run_at_user_interactive`]):
+ /// the scheduler's (`scheduler/`), the completion thread
+ /// and each `VkQueue`'s waiter (`command_buffer/completion.rs`), and every thread of the handler
+@@ -766,7 +766,9 @@
+ /// `device/compiles.rs`). MoltenVK runs each
+ /// compile on a dispatch queue that takes the class of the thread asking, so the class here is the
+ /// compile's class in Metal's compiler service.
+-#[cfg(target_os = "macos")]
++/// On iOS native Vulkan drivers compile on this thread itself; keeping that work
++/// below the waiting UI thread's class can starve the first frame.
++#[cfg(any(target_os = "macos", target_os = "ios"))]
+ pub(crate) fn raise_to_user_initiated() {
+     if !at_least_user_initiated() {
+         // SAFETY: sets the calling thread's own class; no pointer.
+@@ -776,13 +778,13 @@
+     }
+ }
+ 
+-/// Nothing: no quality of service class here ([`raise_to_user_initiated`] on macOS).
+-#[cfg(not(target_os = "macos"))]
++/// Nothing: no quality of service class here ([`raise_to_user_initiated`] on macOS and iOS).
++#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+ pub(crate) fn raise_to_user_initiated() {}
+ 
+ /// Run this thread at the user-interactive quality of service, whatever its class: a thread of
+ /// the runtime's own that takes command buffers to their handlers ([`spawn_user_interactive`]).
+-#[cfg(target_os = "macos")]
++#[cfg(any(target_os = "macos", target_os = "ios"))]
+ fn run_at_user_interactive() {
+     // Metal runs every command buffer's scheduled and completed handlers at the user-interactive
+     // class, whatever the class of the thread that committed it: measured on an M3 Max, macOS
+@@ -903,12 +905,12 @@
+ }
+ 
+ /// Nothing: no such hint here ([`run_at_user_interactive`] on macOS and Linux).
+-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
++#[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "linux")))]
+ fn run_at_user_interactive() {}
+ 
+ /// Whether this thread runs at the user-initiated quality of service or above: its class is
+ /// user-initiated or user-interactive. Always where there is no such class.
+-#[cfg(target_os = "macos")]
++#[cfg(any(target_os = "macos", target_os = "ios"))]
+ pub(crate) fn at_least_user_initiated() -> bool {
+     use libc::qos_class_t as Q;
+     let mut class = Q::QOS_CLASS_UNSPECIFIED;
+@@ -924,7 +926,7 @@
+ }
+ 
+ /// Always: no quality of service class here ([`at_least_user_initiated`] on macOS).
+-#[cfg(not(target_os = "macos"))]
++#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+ pub(crate) fn at_least_user_initiated() -> bool {
+     true
+ }
+--- a/crates/metal2vulkan-runtime/README.md
++++ b/crates/metal2vulkan-runtime/README.md
+@@ -332,3 +332,7 @@
+ [LICENSE](LICENSE) is the notice; [LICENSE-GPL-2.0](LICENSE-GPL-2.0),
+ [LICENSE-LGPL-3.0](LICENSE-LGPL-3.0) and [LICENSE-GPL-3.0](LICENSE-GPL-3.0) (which the LGPL v3
+ incorporates) are the texts.
++
++On macOS and iOS, runtime pipeline makers request user-initiated quality of service,
++and scheduler and completion workers request user-interactive quality of service.
++The operating system still chooses their CPU and effective scheduling priority.

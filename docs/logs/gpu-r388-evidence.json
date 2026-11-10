@@ -1,0 +1,21 @@
+{
+  "round": 388,
+  "device": "Rongyue E5 / UMS9621",
+  "os_profile": "ipados-17.7.11-21H461",
+  "result": "FAIL (expected-risk control): e5-frameinfo=0 (decline FrameInfo: count0/Unsupported) prevented the desktop composite entirely. Kept as the regression datapoint that pins the FrameInfo advertisement as load-bearing.",
+  "evidence": {
+    "boot_identical_to_r387": "Presenter frames 300-317 have byte-identical fnv checksums to r387 up through boot progress.",
+    "desktop_never_rendered": "BGRA UI session stalled at 16 frames, source_rgb stayed ~7-8k px the whole round; r387 jumped to ~79k px at frame 5 (~552s uptime).",
+    "frameinfo_context_absent": "E5CAS main render client fi=0 for the entire round (r387/r390: fi=<nonzero pointer>).",
+    "render_daemon_crashes": "UnityPosterExten and ShortcutsTopHits crashed (reason ns 7 code 3); both absent in r387.",
+    "automation_never_armed": "ui-ready gate (>=20000 px) never satisfied; zero synthetic transitions.",
+    "fps": "22 presents in reported windows, mean 0.56; input-response windows mean 0.10."
+  },
+  "shader_and_queue_timings": "SHADERPERF: call12=15.07s, call14=15.47s, call16=1.87s, call18=9.87s in backboardd at boot. QUEUEPERF: 43 batches=623ms, 13=628ms, 12=868ms/127ms, 23=264ms, 9=110ms, 5=68ms/44ms. First instrumentation round; timings precede the (nonexistent) UI session.",
+  "round_closeout": {
+    "runner_result": "rc0 1543.8s",
+    "postboot": "PASS 37/37",
+    "data_after_backup_sha256": "cbf3c72a75f43702622cda11b8fa49bc416e431d1ff5c2fb00b1593d7046159a"
+  },
+  "scope": "Kernel-log derived; no UI PNGs exist because no UI frame beyond boot progress was ever presented."
+}

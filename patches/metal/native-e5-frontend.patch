@@ -1,0 +1,79 @@
+--- a/metal-plugin/frontend/NativeBridgeMetalFrontend.mm
++++ b/metal-plugin/frontend/NativeBridgeMetalFrontend.mm
+@@ -41,9 +41,12 @@
+ #include <string.h>
+ #include <unistd.h>
+ #include <sys/stat.h>
++#include <libkern/OSCacheControl.h>
+ // The headers here are the iPhoneOS 16.5 SDK's (the upstream frontend is built with a newer one): the two names it uses that this one lacks.
++#if __IPHONE_OS_VERSION_MAX_ALLOWED < 170000
+ typedef MTLArgumentAccess MTLBindingAccess;
+ static const MTLLanguageVersion MTLLanguageVersion3_1 = (MTLLanguageVersion)((3 << 16) | 1);
++#endif
+ #include "bridge/NativeMetalObjects.h"
+ #include "NativeBridgeMetalFrontend.h"
+ 
+@@ -51,6 +54,7 @@
+ // lines: measured on the board, a surface the CPU had written and "flushed" read back stale after the GPU wrote it): clean AND invalidate to the
+ // point of coherency, DC CIVAC by line (EL0 may: SCTLR_EL1.UCI; the line size from CTR_EL0, readable through UCT).
+ // Defined here with libSystem's name: the bridge's own references (its self-test, the surface flushes) resolve to this one in the linked image.
++#ifndef NATIVE_E5_KERNEL_CACHE_SYNC
+ extern "C" void sys_dcache_flush(void *start, size_t length) {
+  uint64_t ctr;
+  __asm__ volatile("mrs %0, ctr_el0" : "=r"(ctr));
+@@ -58,6 +62,7 @@
+  for (uintptr_t p = (uintptr_t)start & ~(uintptr_t)(line - 1); p < (uintptr_t)start + length; p += line) __asm__ volatile("dc civac, %0" : : "r"(p) : "memory");
+  __asm__ volatile("dsb sy" : : : "memory");
+ }
++#endif
+ 
+ static NmbDevice *gDevice;
+ static id gDeviceObject;
+@@ -1141,7 +1146,10 @@
+ // (IOSurfaceGetBaseAddress maps it into the task the first time) and sorting the ranges cost CPU on every commit and completion. The
+ // kernel keeps imports right without it: read-only ones are mapped coherent, GPU-written ones are cleaned and invalidated when mapped and
+ // unmapped, and write-combined surfaces hold no line at all.
+-#if defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 270000
++#if defined(NATIVE_E5_KERNEL_CACHE_SYNC) || (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 270000)
++// E5 ABI1.3 imports hold per-page write-combining through XNU pmap.
++// Kernel cache policy and PanVK's ordinary non-coherent BO synchronization
++// own maintenance; this frontend must not issue EL0 cache instructions.
+ static constexpr bool kSurfaceFlush=false;
+ #else
+ static constexpr bool kSurfaceFlush=true;
+@@ -3003,6 +3011,16 @@
+ static void completed(void *context) {
+  gCompleted++;
+  NBCommandBuffer *commandBuffer=(__bridge_transfer NBCommandBuffer *)context;
++#ifdef NATIVE_E5_UI_TRACE
++ const uint64_t number=gCompleted.load();
++ if(number<=8 || !(number&(number-1))) {
++  char line[192];
++  snprintf(line,sizeof line,"UI completed=%llu local_failed=%u draws=%llu dispatches=%llu blits=%llu",
++           (unsigned long long)number,(unsigned)commandBuffer.failedLocally,
++           (unsigned long long)gDraws.load(),(unsigned long long)gDispatches.load(),(unsigned long long)gBlits.load());
++  forwardConsole(line);
++ }
++#endif
+  {
+   const uint64_t took=nowUs()-commandBuffer.committedUs;
+   // What the GPU itself took (its two timestamps, in the host's clock) and how long after the commit it began: ctc minus these is the queue's delay.
+@@ -4285,6 +4303,18 @@
+  NmbLibrary *handle=gDevice?nmb_library_new(gDevice,bytes,length,true):nullptr;if(!handle)return nil;
+  NBLibrary *library=[NBLibrary new];library.handle=handle;return library;
+ }
++
++// Dedicated pre-launch tests close the process-wide device after all of their
++// Metal objects have left the autorelease pool. Production discovery retains it.
++extern "C" __attribute__((visibility("default"))) bool native_e5_metal_shutdown_for_test() {
++ @synchronized(gInFlight){if(gInFlight.count)return false;}
++ {std::lock_guard<std::mutex> lock(gSurfaceImportLock);if(!gHeldImports.empty())return false;}
++ std::lock_guard<std::mutex> lock(gRuntimeHandleLock);
++ gDeviceObject=nil;gName=nil;
++ NmbDevice *device=gDevice;gDevice=nullptr;
++ if(device)nmb_device_release(device);
++ return true;
++}
+ extern "C" bool native_bridge_metal_shader_cache_stats(NmbShaderCacheStats *out) {
+  return gDevice && nmb_device_shader_cache_stats(gDevice,out);
+ }

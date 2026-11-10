@@ -1,0 +1,57 @@
+{
+  "verdict": "PASS",
+  "dts_sha256": "4ff13c4ea30021ed9e7863f3b7f815dab3b2c22cacca088e58e3f24376e1ff36",
+  "source_sha256": "3882210a4beaea77adc6e20c8d8faaaa0f20d745040354a98dba46df34f31349",
+  "registers": {
+    "I2cAddress": {
+      "node": "i2c@2270000",
+      "reg_address": 36110336,
+      "reg_bytes": 256,
+      "physical": 572981248,
+      "driver_constant": 572981248,
+      "match": true
+    },
+    "GateAddress": {
+      "node": "apahb-gate",
+      "reg_address": 0,
+      "reg_bytes": 12288,
+      "physical": 536870912,
+      "driver_constant": 536870912,
+      "match": true
+    },
+    "ClockAddress": {
+      "node": "clock-controller@20010000",
+      "reg_address": 536936448,
+      "reg_bytes": 12288,
+      "physical": 536936448,
+      "driver_constant": 536936448,
+      "match": true
+    },
+    "AonAddress": {
+      "node": "syscon@64900000",
+      "reg_address": 1687158784,
+      "reg_bytes": 12288,
+      "physical": 1687158784,
+      "driver_constant": 1687158784,
+      "match": true
+    },
+    "GpioAddress": {
+      "node": "gpio@170000",
+      "reg_address": 1507328,
+      "reg_bytes": 65536,
+      "physical": 1679228928,
+      "driver_constant": 1679228928,
+      "match": true
+    }
+  },
+  "keypad": {
+    "node": "keypad@641B0000",
+    "reg_address": 1769472,
+    "reg_bytes": 4096,
+    "physical": 1679491072
+  },
+  "gate_set": "0x20001000",
+  "gate_reset_set": "0x20001004",
+  "gate_reset_clear": "0x20002004",
+  "meaning": "Host derivation from captured FDT; hardware gate/version behavior is a separate trial."
+}

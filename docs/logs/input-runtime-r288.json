@@ -1,0 +1,117 @@
+{
+  "round": 288,
+  "verdict": "FAIL",
+  "implementation_revision": "070b8e29f0e3ad57c1c7df08e8aad391281cc7bb",
+  "kernel_sha256": "3fe96a02f50acbd7cab254b24501435aa1a08c86e3a347c80e1cf8e4ca1ef1c7",
+  "payload_sha256": "b9a4634c73b2550bdf1d5d6ef047789edd4442f37dbbdf3806cdad57a8f41c95",
+  "source": {
+    "path": "uefi/build/sb-r288/r288/capture/kernel.log",
+    "sha256": "d1991b0eb17e65f1be1e853c8b5557d55b3c15dea6916c820b17f0e023ed6a88"
+  },
+  "hid_events": [
+    "E5HID load bundle=com.apple.iokit.IOHIDFamily ret=0",
+    "E5HID load bundle=com.apple.iokit.IOHIDEventDriver ret=0",
+    "E5HID publish=1 init=1 attach=1 parent_bytes=208 owned_bytes=336",
+    "E5HID status driver=1 polls=1 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=2002 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=4200 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=6399 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=8399 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=10596 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=12598 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=14600 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=16600 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=18604 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=20604 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID status driver=1 polls=22604 transitions=0 reports=0 failed=0 dropped=0 held=0",
+    "E5HID report=1 source=matrix id=1 bytes=9 ret=0",
+    "E5HID report=2 source=matrix id=2 bytes=2 ret=0",
+    "E5HID report=3 source=matrix id=1 bytes=9 ret=0",
+    "E5HID report=4 source=matrix id=2 bytes=2 ret=0",
+    "E5HID report=5 source=matrix id=1 bytes=9 ret=0",
+    "E5HID report=6 source=matrix id=2 bytes=2 ret=0",
+    "E5HID report=7 source=matrix id=1 bytes=9 ret=0",
+    "E5HID report=8 source=matrix id=2 bytes=2 ret=0",
+    "E5HID report=9 source=matrix id=1 bytes=9 ret=0",
+    "E5HID report=10 source=matrix id=2 bytes=2 ret=0",
+    "E5HID report=11 source=matrix id=1 bytes=9 ret=0",
+    "E5HID report=12 source=matrix id=2 bytes=2 ret=0",
+    "E5HID report=13 source=matrix id=1 bytes=9 ret=0",
+    "E5HID report=14 source=matrix id=2 bytes=2 ret=0",
+    "E5HID report=15 source=matrix id=1 bytes=9 ret=0",
+    "E5HID report=16 source=matrix id=2 bytes=2 ret=0",
+    "E5HID status driver=1 polls=24604 transitions=18 reports=36 failed=0 dropped=0 held=0"
+  ],
+  "final_hid_state": {
+    "driver": 1,
+    "reports": 36,
+    "failed": 0,
+    "dropped": 0,
+    "held": 0
+  },
+  "automatic_home_press_release_passed": false,
+  "physical_key_actuation_verified": false,
+  "physical_touch_verified": false,
+  "touch_mode": 1,
+  "touch_events": [
+    "E5TOUCH resources pa=22270000 gate=89:2089 clock=0:0 version=900 irq=1 reset=1"
+  ],
+  "touch_resources_observed": true,
+  "firmware_identity_verified": false,
+  "touch_transport_samples": null,
+  "configuration_sha256": null,
+  "markers": {
+    "panic(cpu": 0,
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "E5CPU copy-failed": 0
+  },
+  "completed_frames": 3,
+  "display_summary": [
+    "E5IMSUM vc=1:41708:41708 d=1:0:e00002bc b=3:3:0 e=3:3:0 over=0"
+  ],
+  "captured_frames": [
+    {
+      "id": 1,
+      "width": 320,
+      "height": 480,
+      "fnv": "b6005dc5"
+    }
+  ],
+  "rejected_captures": [],
+  "snapshot_pair_verified": false,
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "android_recovered": true,
+  "scope": "Automated original-HID reports and bounded sensor transport checks; physical actuation and UI meaning are separate evidence.",
+  "user_observation": {
+    "text": "\u6211\u6d4b\u4e86\uff0c\u6309\u952e\u5747\u65e0\u53cd\u5e94\uff0c\u89e6\u63a7\u4e5f\u6ca1\u53cd\u9988",
+    "keys_produced_visible_ui_response": false,
+    "touch_produced_visible_ui_response": false,
+    "touch_mode_in_trial": 1,
+    "scope": "Physical UI response failed; matrix reports are present in kernel log. Touch packet/HID scanning was not enabled in this resource trial."
+  },
+  "issue": "HID workloop stopped reporting after36 accepted matrix reports; scheduled Home sequence and captures absent. Independent stage/options telemetry and asynchronous captures prepared for R289."
+}

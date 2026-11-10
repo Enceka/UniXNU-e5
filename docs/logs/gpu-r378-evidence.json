@@ -1,0 +1,34 @@
+{
+  "round": 378,
+  "result": "NOT QUALIFIED: no new frame after native Home; Settings sequence stopped at phase0.",
+  "inputs": [
+    "E5HID selftest=home down=1 driver=1 failures=0 action=consumer-menu",
+    "E5HID selftest=home down=0 driver=1 failures=0 action=consumer-menu",
+    "E5HID settings-sequence stopped=1 phase=0 reason=no-new-frame"
+  ],
+  "copies": [
+    "E5CPU copied=1 retired=1 failed=0 blank=0",
+    "E5CPU copied=2 retired=2 failed=0 blank=0"
+  ],
+  "ui": [
+    "E5METAL pid=57 UI completed=1 local_failed=0 draws=31 dispatches=0 blits=5",
+    "E5METAL pid=57 UI completed=2 local_failed=0 draws=54 dispatches=0 blits=5"
+  ],
+  "recovery": "complete-data-verified",
+  "windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "b80f931e0e5b2e8cd28ce75bcb7d7b4e520950c6f916fa6630bee8b7dcd0fc2d",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r378-ra-vector-after/data-after.img",
+    "elapsed_seconds": 71.56088866599998,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  },
+  "next": "Use original CAEnableDeepFramebuffer preference before startup to select SDR output for the RGB565 panel;1200s authorized."
+}

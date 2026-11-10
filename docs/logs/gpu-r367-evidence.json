@@ -1,0 +1,128 @@
+{
+  "round": 367,
+  "result": "UI NOT QUALIFIED",
+  "kernel_sha256": "cd28beb092a2dfba06ce20a8e3cd9d4a6c9c9601294697caa988b87ca34c8ffe",
+  "readonly_ui_import": true,
+  "prior_bo_exhaustion_observed": false,
+  "gpu_jobs_observed": {
+    "submitted": 75,
+    "highest_logged_done": 64
+  },
+  "frames": {
+    "source": "uefi/build/sb-r367-original-ui/r367/capture/kernel.log",
+    "frames": [
+      {
+        "id": 300,
+        "width": 320,
+        "height": 480,
+        "fnv": "af4276c5",
+        "file": "frame-00-300.png"
+      },
+      {
+        "id": 301,
+        "width": 320,
+        "height": 480,
+        "fnv": "af4276c5",
+        "file": "frame-01-301.png"
+      },
+      {
+        "id": 302,
+        "width": 320,
+        "height": 480,
+        "fnv": "af4276c5",
+        "file": "frame-02-302.png"
+      },
+      {
+        "id": 303,
+        "width": 320,
+        "height": 480,
+        "fnv": "af4276c5",
+        "file": "frame-03-303.png"
+      },
+      {
+        "id": 304,
+        "width": 320,
+        "height": 480,
+        "fnv": "af4276c5",
+        "file": "frame-04-304.png"
+      },
+      {
+        "id": 305,
+        "width": 320,
+        "height": 480,
+        "fnv": "af4276c5",
+        "file": "frame-05-305.png"
+      },
+      {
+        "id": 306,
+        "width": 320,
+        "height": 480,
+        "fnv": "af4276c5",
+        "file": "frame-06-306.png"
+      },
+      {
+        "id": 307,
+        "width": 320,
+        "height": 480,
+        "fnv": "af4276c5",
+        "file": "frame-07-307.png"
+      }
+    ],
+    "rejected": [],
+    "meaning": "Presenter destination memory; physical panel output needs independent observation.",
+    "recovered_interleaved_records": []
+  },
+  "visual_result": "All eight checksum-valid captures visually black",
+  "new_findings": [
+    "Host-allocation image-format queries rejected despite native memory import support",
+    "SpringBoard KERN_MEMORY_ERROR exception matches the same call-stack offsets seen in R364"
+  ],
+  "recovery": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "2e6206d6-922f-46e5-81f0-5e548c492fbf",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "396c721f316273a43580199c52dbb9d4dbce6301d8851a8eca50b7a3b80ff361",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r367-original-ui-after/data-after.img",
+    "elapsed_seconds": 66.14924995799993,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  },
+  "samples": [
+    "E5UL|E5PANVK DONE pid=57 job=64 atom=64 slot=1 hw=1 jc=129db680",
+    "E5HID selftest=home down=1 driver=1 failures=0 action=consumer-menu",
+    "E5HID selftest=home down=0 driver=1 failures=0 action=consumer-menu",
+    "E5UL|E5PANVK IMPORT_RO pid=57 bytes=16384 handle=33",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5UL|E5PANVK ERROR pid=57 code=-11 ../mesa-e5/src/panfrost/vulkan/panvk_physical_device.c:2276 VkExternalMemoryTypeFlagBits(0x80) unsupported",
+    "E5EXC pid 27 (SpringBoard) exc 1 code 5 sub 4376838144 lr 1a08552ec fp 16ec22570 x16 1f48c3e38 x17 bde01088 fr 1a085523c 1a0869758 1a0869688 1a08693a0 1a07f7f60 1a07f66d0"
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "round": 364,
+  "kernel_sha256": "db268e0f527dd0ab7202ddad7d94bd793e94e845a60bf8ff19ae0380b02992eb",
+  "managed_RT_import": true,
+  "original_UI_qualified": false,
+  "frame_observation": "Checksum-valid captures remain visually black; no physical-panel observation",
+  "shader_BO_exhaustion": {
+    "handles": 64,
+    "allocation_bytes": 16384,
+    "mapped_bytes": 69537792,
+    "completed_jobs": 75
+  },
+  "readonly_import_failure": "KERN_PROTECTION_FAILURE (2)",
+  "samples": {
+    "E5WC ACQUIRE PASS": [
+      "E5WC ACQUIRE PASS pages=4 live=4 rt=0",
+      "E5WC ACQUIRE PASS pages=4 live=8 rt=0",
+      "E5WC ACQUIRE PASS pages=1 live=9 rt=0",
+      "E5WC ACQUIRE PASS pages=1 live=10 rt=0",
+      "E5WC ACQUIRE PASS pages=1 live=11 rt=0",
+      "E5WC ACQUIRE PASS pages=1024 live=1032 rt=0",
+      "E5WC ACQUIRE PASS pages=1024 live=2056 rt=0",
+      "E5WC ACQUIRE PASS pages=1024 live=3080 rt=0"
+    ],
+    "selector=15 rc=2": [
+      "E5UL|E5PANVK API_FAIL pid=57 selector=15 rc=2 in=24 out=16"
+    ],
+    "ALLOC_FAIL phase=create-bo bytes=16384": [],
+    "ALLOC_STATE sub=75 comp=75": [
+      "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=69537792 bo=69537792 pid=57",
+      "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=69537792 bo=69537792 pid=57",
+      "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=69537792 bo=69537792 pid=57",
+      "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=69537792 bo=69537792 pid=57",
+      "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=69537792 bo=69537792 pid=57",
+      "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=69537792 bo=69537792 pid=57",
+      "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=69537792 bo=69537792 pid=57",
+      "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=69537792 bo=69537792 pid=57"
+    ],
+    "E5PANVK DONE pid=57": [
+      "E5UL|E5PANVK DONE pid=57 job=1 atom=1 slot=0 hw=1 jc=1295b200",
+      "E5UL|E5PANVK DONE pid=57 job=2 atom=2 slot=0 hw=1 jc=1295b400",
+      "E5UL|E5PANVK DONE pid=57 job=3 atom=3 slot=0 hw=1 jc=1295b600",
+      "E5UL|E5PANVK DONE pid=57 job=4 atom=4 slot=0 hw=1 jc=1295b800",
+      "E5UL|E5PANVK DONE pid=57 job=5 atom=5 slot=0 hw=1 jc=1295ba00",
+      "E5UL|E5PANVK DONE pid=57 job=6 atom=6 slot=0 hw=1 jc=1295bc00",
+      "E5UL|E5PANVK DONE pid=57 job=7 atom=7 slot=0 hw=1 jc=1295be00",
+      "E5UL|E5PANVK DONE pid=57 job=8 atom=8 slot=0 hw=1 jc=1295c000"
+    ]
+  },
+  "recovery": {
+    "returncode": 0,
+    "elapsed_seconds": 939.205384375
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "7d93e0b5affdcc2d836dfa5abd67a677f4b55b4f3e4f5dfafc53cfca9da9535c",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r364-framebuffer-fetch-after/data-after.img",
+    "elapsed_seconds": 63.90432820800004,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  }
+}

@@ -1,0 +1,233 @@
+{
+  "round": 299,
+  "verdict": "PASS",
+  "checks": {
+    "completed_cycle": true,
+    "protected_windows": true,
+    "gpio_event_timing_and_transport": true,
+    "firmware_identity": true,
+    "no_retained_panic_integrity_markers": true,
+    "complete_physical_contacts": true,
+    "required_canvas_frames": true,
+    "canvas_no_errors_or_drops": true,
+    "hid_no_errors_or_drops": true,
+    "operator_tracking_and_lift": true,
+    "android_return": true
+  },
+  "implementation_base_revision": "170f6df5eb980b1d8dc40b36c3ad6dfee54e7008",
+  "implementation_has_worktree_changes": true,
+  "source_sha256": {
+    "input/E5HidDevice.cpp": "083f48801ba62e902df694a945df3c20f46ccccaaad0304bc9253d7ae9daa78a",
+    "input/E5InputProtocol.h": "e96eb142f444f230cf59ea7840b1ee8ae1263e7bc15120d6074d3b54a063f8ae",
+    "input/E5InputCapture.cpp": "b6e1ab25872afa6b29dcdf4b89d8de5c221676dbaf78d99715da60032ff9445d",
+    "input/E5TouchCanvas.cpp": "8157812120c1b4f7caa1e830bda2ddc480787f53a02cb61024b3324dcd107055",
+    "input/E5TouchCanvas.h": "99d613824b0da7e2c0290d9511ab57296bfb23e3370ed89f350007e5037443c2",
+    "touch/E5Tlsc6x.cpp": "a819d13e57f305fa28d10f186f1a1ea5785e319a7365123c1f4ffe5c862bf94f",
+    "touch/E5I2cProtocol.h": "6ed1c864427a0461308401ab3395bc5a1aa2c9b3766b2de8891128673df8e746",
+    "touch/E5Tlsc6xConfig.h": "40a4c97debab2060cd648223ba236fc5b63d9d5d52d63cccdaa35949fa365661",
+    "touch/E5GpioEvents.h": "abc7831f6b5c50feb0dc92161c51dcb8709d51ca5bbe1437ce8861a6928f7903",
+    "e5_input_build.py": "fe64a9a8180d864d59bde34346606b67ffdb03a340d416e60d569d2e7e5ff5d8"
+  },
+  "kernel_sha256": "c66b289989861b038c6176106b46c8c24965ba0e64687f80992dd01c63b8612d",
+  "payload_sha256": "37490b744acac63bb028f7add7e87d12205157088884180d4a12d94c4adbe1e8",
+  "source": {
+    "path": "uefi/build/sb-r299-gpio-cadence/r299/capture/kernel.log",
+    "sha256": "1fe61b76cb24f01cc56b04bd7a69fd3b1dd52bd5228b71dd3ddae9af9f78a798"
+  },
+  "watchdog_seconds": 600,
+  "selected_interval_ms": 2,
+  "event_checks": {
+    "single_strict_epoch": true,
+    "event_summaries": true,
+    "packet_status": true,
+    "idle_read_suppression": true,
+    "event_reads": true,
+    "gpio_read_accounting": true,
+    "ordered_timing": true,
+    "error_free_transport": true,
+    "expected_cadence": true
+  },
+  "last_periodic_events": {
+    "polls": 274433,
+    "reads": 301,
+    "edges": 301,
+    "low_no_edge": 0,
+    "skipped": 274132,
+    "ie": 0,
+    "ris": 0,
+    "line": 36368
+  },
+  "last_periodic_transport": {
+    "polls": 301,
+    "good": 301,
+    "bad": 0,
+    "recoveries": 0,
+    "line": 36367
+  },
+  "timing_samples": 65,
+  "observation_to_start_ticks_range": [
+    13,
+    33
+  ],
+  "read_duration_ticks_range": [
+    13558,
+    22087
+  ],
+  "pending_after_timing_samples": 0,
+  "quiet_windows": 132,
+  "quiet_window_polls": 270336,
+  "hardware_frame_count": 232,
+  "max_simultaneous_contacts": 2,
+  "stationary_single_contact_releases": 1,
+  "moving_single_contact_releases": 3,
+  "two_contact_sequences_released": 1,
+  "sequences_without_hardware_all_up": 0,
+  "final_active": 0,
+  "sensor_errors": [],
+  "final_hid_state": {
+    "driver": 1,
+    "reports": 244,
+    "failed": 0,
+    "dropped": 0,
+    "held": 0
+  },
+  "last_canvas_status": "draw=641 seq=238 ready=1 active=0 max=2 down=7 up=7 cancel=0 errors=0 dropped=0 home=0 edges=6 readback_errors=0 age_ms=573985",
+  "physical_menu_candidate_edges": [
+    {
+      "line": 18249,
+      "down": true,
+      "command_h_observed": true
+    },
+    {
+      "line": 18253,
+      "down": false
+    },
+    {
+      "line": 18256,
+      "down": true,
+      "command_h_observed": true
+    },
+    {
+      "line": 18259,
+      "down": false
+    }
+  ],
+  "verified_canvas_frames": [
+    {
+      "id": 200,
+      "width": 320,
+      "height": 480,
+      "fnv": "671ecc09",
+      "file": "frame-00-200.png"
+    },
+    {
+      "id": 201,
+      "width": 320,
+      "height": 480,
+      "fnv": "671ecc09",
+      "file": "frame-01-201.png"
+    },
+    {
+      "id": 202,
+      "width": 320,
+      "height": 480,
+      "fnv": "d82607cc",
+      "file": "frame-02-202.png"
+    },
+    {
+      "id": 203,
+      "width": 320,
+      "height": 480,
+      "fnv": "4191c041",
+      "file": "frame-03-203.png"
+    }
+  ],
+  "rejected_canvas_frames": [],
+  "optional_canvas_snapshots": [
+    204
+  ],
+  "frames_recovered_by_original_checksum": 3,
+  "frame_recovery_records": 48,
+  "gpio_census": [
+    "E5TOUCH irq-probe bank=0 ie=0 ris=6000 mis=0 is=ffff ibe=0 iev=ffff (read-only)",
+    "E5TOUCH irq-probe banks=16 other_enabled=0 other_pending=0 parent_intid=72 attached=0"
+  ],
+  "markers": {
+    "panic(cpu": 0,
+    "cafebabe": 0,
+    "obj_checksum_verify": 0,
+    "nx_corruption_detected": 0,
+    "E5CPU copy-failed": 0
+  },
+  "window_verification": {
+    "pre": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postflash": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    },
+    "postboot": {
+      "expected_chunks": 37,
+      "observed_chunks": 37,
+      "matched": 37,
+      "mismatched": 0,
+      "missing": 0
+    }
+  },
+  "android": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "affc29f0-89b5-4cca-a7f7-5a36f8a0dd60",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 936.6560149999999
+  },
+  "data_before_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "e1aa8f9112e329f54c0894e7f65c5d89e2f183026d1113f9f2584e9fa0c8d820",
+    "local_logical_sha256_verified": true,
+    "path": "/Volumes/Workspace/e5-input-backups/r298-gpio-events-after/data-after.img",
+    "elapsed_seconds": 351.611183208,
+    "command": "dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none",
+    "reused_after_live_sha256_match": true,
+    "device_sha256": "e1aa8f9112e329f54c0894e7f65c5d89e2f183026d1113f9f2584e9fa0c8d820"
+  },
+  "operator_observations": {
+    "recorded_at": "2026-11-08T16:16:08.179450+08:00",
+    "source": "user",
+    "text": "圆环跟手，抬起后全部消失",
+    "drag_tracks_finger": true,
+    "rings_disappear_on_lift": true,
+    "scope": "Physical R299 canvas behavior. Does not independently qualify UIKit, GIC callbacks or transport."
+  },
+  "host_checks": {
+    "commands": [
+      "python3 -m unittest discover -s tools/tests -p test_gpio_events_check.py -v",
+      "python3 -m unittest discover -s tools/tests -p test_frame_read.py -v"
+    ],
+    "tests_passed": [
+      6,
+      10
+    ],
+    "checker_source_sha256": "283f135130af67a33513cd0e3320daf601ed7177f92da5d545a8b7c17580f180",
+    "frame_reader_source_sha256": "e7fb2d022899ee6fd543e84b82aea0bae8ef7b2a93f2a4d06917b5d47729f551",
+    "scope": "Negative controls require the expected2ms runtime cadence and valid timestamp/read accounting. Recovery accepts complete sensor-report diagnostics only when the unchanged original frame FNV matches."
+  },
+  "source_kernel_payload_hashes_match": true,
+  "payload_readback_checked_by_runner": true,
+  "gic_callback_attached": false,
+  "springboard_physical_ui_verified": false,
+  "scope": "Isolated GPIO-gated 2ms polling, error-free packets in this workload, complete hardware contact lifecycles and operator-confirmed CPU canvas behavior. Does not qualify physical edge latency, lossless events, GIC callbacks, UIKit or SpringBoard actions. Different R297/R298/R299 workloads do not establish a causal error-rate improvement."
+}

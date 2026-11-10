@@ -1,0 +1,609 @@
+{
+  "round": 386,
+  "device": "Rongyue E5 / UMS9621",
+  "os_profile": "ipados-17.7.11-21H461",
+  "result": "Automatic sequence completed without physical cancellation, but Home/reopen NOT qualified:620 still Settings and622 delayed desktop. Root/Notifications/Back/scroll visibly render.",
+  "visuals": {
+    "settings-root": {
+      "reference": "docs/logs/ui-r386/settings-root.png",
+      "sha256": "08f0c319b7900c1ade7abf0633f78d74425fa7954268b9b4419d27e057d3e554"
+    },
+    "notifications": {
+      "reference": "docs/logs/ui-r386/notifications.png",
+      "sha256": "814cf00c7dee189b5cbda73a23256847a722c98202f4ee433a7bd991cc46cd9f"
+    },
+    "back-to-settings": {
+      "reference": "docs/logs/ui-r386/back-to-settings.png",
+      "sha256": "a676d7ffdd1a2e87de9e20c129aa5c00ba20d356bf7b8972c12b7339c83954d3"
+    },
+    "scroll": {
+      "reference": "docs/logs/ui-r386/scroll.png",
+      "sha256": "1fda4cdf5d71ba5e41dbc0e9c156ade5c489cda8baa13f4cd82c1dec1ce2df16"
+    },
+    "home-not-yet-presented": {
+      "reference": "docs/logs/ui-r386/home-not-yet-presented.png",
+      "sha256": "1fda4cdf5d71ba5e41dbc0e9c156ade5c489cda8baa13f4cd82c1dec1ce2df16"
+    },
+    "late-desktop": {
+      "reference": "docs/logs/ui-r386/late-desktop.png",
+      "sha256": "8cc666e4467bed7fa7e8ca87aee0fdd92bec40b8fa91731947c8258107c030cd"
+    }
+  },
+  "inputs": [
+    "E5HID settings-sequence phase=0 action=open-settings release=1 held_ms=116 failures=0 frames=7 pixels=79133 ink=79133 (synthetic)",
+    "E5HID settings-sequence phase=2 action=open-row release=3 held_ms=100 failures=0 frames=17 pixels=152783 ink=89938 (synthetic)",
+    "E5HID settings-sequence phase=4 action=back release=5 held_ms=114 failures=0 frames=21 pixels=153316 ink=96763 (synthetic)",
+    "E5HID settings-sequence phase=6 action=scroll release=17 held_ms=1798 failures=0 frames=26 pixels=152781 ink=89925 (synthetic)",
+    "E5HID settings-sequence phase=18 action=home-down release=19 held_ms=115 failures=0 frames=30 pixels=153252 ink=136498 (synthetic)",
+    "E5HID settings-sequence phase=20 action=open-settings release=21 held_ms=115 failures=0 frames=31 pixels=153252 ink=136498 (synthetic)",
+    "E5HID settings-sequence complete=1 active=0 home_down=0 failures=0"
+  ],
+  "gpu_perf": {
+    "source": "uefi/build/sb-r386-gpu-timing/r386/capture/kernel.log",
+    "all_sampled_jobs": {
+      "samples": 34,
+      "submit_sync_us": {
+        "median": 4390.5,
+        "max": 40821
+      },
+      "hw_us": {
+        "median": 330.0,
+        "max": 29478
+      },
+      "completion_observation_us": {
+        "median": 2.0,
+        "max": 522303
+      },
+      "retire_sync_us": {
+        "median": 4613.0,
+        "max": 30408
+      }
+    },
+    "after_first_eight_atoms": {
+      "samples": 26,
+      "submit_sync_us": {
+        "median": 4298.5,
+        "max": 5244
+      },
+      "hw_us": {
+        "median": 462.0,
+        "max": 29478
+      },
+      "completion_observation_us": {
+        "median": 1.0,
+        "max": 25
+      },
+      "retire_sync_us": {
+        "median": 4599.0,
+        "max": 5319
+      }
+    },
+    "clients": {
+      "0xfffffff4c0ba4d00": {
+        "samples": 34,
+        "submit_sync_us": {
+          "median": 4390.5,
+          "max": 40821
+        },
+        "hw_us": {
+          "median": 330.0,
+          "max": 29478
+        },
+        "completion_observation_us": {
+          "median": 2.0,
+          "max": 522303
+        },
+        "retire_sync_us": {
+          "median": 4613.0,
+          "max": 30408
+        }
+      }
+    },
+    "rejected_records": 0,
+    "samples": [
+      {
+        "atom": 1,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 18,
+        "imported_bytes": 12861440,
+        "submit_sync_us": 10181,
+        "hw_us": 180,
+        "observe_us": 69004,
+        "retire_sync_us": 30408,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 68824
+      },
+      {
+        "atom": 2,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 18,
+        "imported_bytes": 12861440,
+        "submit_sync_us": 22462,
+        "hw_us": 228,
+        "observe_us": 21370,
+        "retire_sync_us": 22041,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 21142
+      },
+      {
+        "atom": 3,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 18,
+        "imported_bytes": 12861440,
+        "submit_sync_us": 13534,
+        "hw_us": 240,
+        "observe_us": 17293,
+        "retire_sync_us": 24538,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 17053
+      },
+      {
+        "atom": 4,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 18,
+        "imported_bytes": 12861440,
+        "submit_sync_us": 40821,
+        "hw_us": 214,
+        "observe_us": 116166,
+        "retire_sync_us": 9085,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 115952
+      },
+      {
+        "atom": 5,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 18,
+        "imported_bytes": 12861440,
+        "submit_sync_us": 17260,
+        "hw_us": 1187,
+        "observe_us": 15291,
+        "retire_sync_us": 17253,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 14104
+      },
+      {
+        "atom": 6,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 18,
+        "imported_bytes": 12861440,
+        "submit_sync_us": 17880,
+        "hw_us": 217,
+        "observe_us": 354914,
+        "retire_sync_us": 19087,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 354697
+      },
+      {
+        "atom": 7,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 18,
+        "imported_bytes": 12861440,
+        "submit_sync_us": 19233,
+        "hw_us": 211,
+        "observe_us": 6309,
+        "retire_sync_us": 7882,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 6098
+      },
+      {
+        "atom": 8,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 18,
+        "imported_bytes": 12861440,
+        "submit_sync_us": 16837,
+        "hw_us": 217,
+        "observe_us": 522520,
+        "retire_sync_us": 18827,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 522303
+      },
+      {
+        "atom": 64,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 34,
+        "imported_bytes": 13549568,
+        "submit_sync_us": 1806,
+        "hw_us": 29478,
+        "observe_us": 29480,
+        "retire_sync_us": 2097,
+        "polls": 26,
+        "state": 3,
+        "completion_observation_us": 2
+      },
+      {
+        "atom": 128,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 38,
+        "imported_bytes": 14221312,
+        "submit_sync_us": 1897,
+        "hw_us": 3773,
+        "observe_us": 3774,
+        "retire_sync_us": 2016,
+        "polls": 3,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 192,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 61,
+        "imported_bytes": 18747392,
+        "submit_sync_us": 2789,
+        "hw_us": 7413,
+        "observe_us": 7438,
+        "retire_sync_us": 3618,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 25
+      },
+      {
+        "atom": 256,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 79,
+        "imported_bytes": 19443712,
+        "submit_sync_us": 3387,
+        "hw_us": 462,
+        "observe_us": 487,
+        "retire_sync_us": 3179,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 25
+      },
+      {
+        "atom": 320,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 79,
+        "imported_bytes": 19443712,
+        "submit_sync_us": 2966,
+        "hw_us": 6871,
+        "observe_us": 6896,
+        "retire_sync_us": 3332,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 25
+      },
+      {
+        "atom": 384,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 95,
+        "imported_bytes": 19439616,
+        "submit_sync_us": 2893,
+        "hw_us": 462,
+        "observe_us": 463,
+        "retire_sync_us": 2939,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 448,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 110,
+        "imported_bytes": 19521536,
+        "submit_sync_us": 2716,
+        "hw_us": 279,
+        "observe_us": 303,
+        "retire_sync_us": 3000,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 24
+      },
+      {
+        "atom": 512,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 110,
+        "imported_bytes": 19521536,
+        "submit_sync_us": 3009,
+        "hw_us": 708,
+        "observe_us": 710,
+        "retire_sync_us": 3771,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 2
+      },
+      {
+        "atom": 576,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 110,
+        "imported_bytes": 19521536,
+        "submit_sync_us": 2738,
+        "hw_us": 367,
+        "observe_us": 392,
+        "retire_sync_us": 3795,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 25
+      },
+      {
+        "atom": 640,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 112,
+        "imported_bytes": 18931712,
+        "submit_sync_us": 2739,
+        "hw_us": 2817,
+        "observe_us": 2818,
+        "retire_sync_us": 2741,
+        "polls": 2,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 704,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 112,
+        "imported_bytes": 18931712,
+        "submit_sync_us": 2600,
+        "hw_us": 1193,
+        "observe_us": 1194,
+        "retire_sync_us": 2684,
+        "polls": 1,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 768,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 114,
+        "imported_bytes": 18939904,
+        "submit_sync_us": 2625,
+        "hw_us": 301,
+        "observe_us": 302,
+        "retire_sync_us": 3128,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 832,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 115,
+        "imported_bytes": 31547392,
+        "submit_sync_us": 4888,
+        "hw_us": 317,
+        "observe_us": 318,
+        "retire_sync_us": 4689,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 896,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 115,
+        "imported_bytes": 31547392,
+        "submit_sync_us": 4428,
+        "hw_us": 192,
+        "observe_us": 194,
+        "retire_sync_us": 4601,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 2
+      },
+      {
+        "atom": 960,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 129,
+        "imported_bytes": 31612928,
+        "submit_sync_us": 4399,
+        "hw_us": 215,
+        "observe_us": 216,
+        "retire_sync_us": 4597,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 1024,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 135,
+        "imported_bytes": 31653888,
+        "submit_sync_us": 4313,
+        "hw_us": 237,
+        "observe_us": 238,
+        "retire_sync_us": 4614,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 1088,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 135,
+        "imported_bytes": 31653888,
+        "submit_sync_us": 5244,
+        "hw_us": 343,
+        "observe_us": 343,
+        "retire_sync_us": 4610,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 0
+      },
+      {
+        "atom": 1152,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 131,
+        "imported_bytes": 31576064,
+        "submit_sync_us": 4495,
+        "hw_us": 145,
+        "observe_us": 147,
+        "retire_sync_us": 4612,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 2
+      },
+      {
+        "atom": 1216,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 131,
+        "imported_bytes": 31576064,
+        "submit_sync_us": 4309,
+        "hw_us": 1238,
+        "observe_us": 1239,
+        "retire_sync_us": 4717,
+        "polls": 1,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 1280,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 129,
+        "imported_bytes": 31555584,
+        "submit_sync_us": 4616,
+        "hw_us": 1367,
+        "observe_us": 1368,
+        "retire_sync_us": 4662,
+        "polls": 1,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 1344,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 121,
+        "imported_bytes": 31518720,
+        "submit_sync_us": 5069,
+        "hw_us": 12997,
+        "observe_us": 12999,
+        "retire_sync_us": 5319,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 2
+      },
+      {
+        "atom": 1408,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 121,
+        "imported_bytes": 31518720,
+        "submit_sync_us": 4461,
+        "hw_us": 106,
+        "observe_us": 106,
+        "retire_sync_us": 4679,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 0
+      },
+      {
+        "atom": 1472,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 119,
+        "imported_bytes": 31522816,
+        "submit_sync_us": 4494,
+        "hw_us": 112,
+        "observe_us": 114,
+        "retire_sync_us": 4602,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 2
+      },
+      {
+        "atom": 1536,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 118,
+        "imported_bytes": 31518720,
+        "submit_sync_us": 4288,
+        "hw_us": 1136,
+        "observe_us": 1137,
+        "retire_sync_us": 4617,
+        "polls": 1,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 1600,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 1,
+        "bos": 118,
+        "imported_bytes": 31518720,
+        "submit_sync_us": 4382,
+        "hw_us": 110,
+        "observe_us": 111,
+        "retire_sync_us": 4616,
+        "polls": 0,
+        "state": 3,
+        "completion_observation_us": 1
+      },
+      {
+        "atom": 1664,
+        "client": "0xfffffff4c0ba4d00",
+        "slot": 0,
+        "bos": 125,
+        "imported_bytes": 31567872,
+        "submit_sync_us": 4317,
+        "hw_us": 1240,
+        "observe_us": 1241,
+        "retire_sync_us": 4792,
+        "polls": 1,
+        "state": 3,
+        "completion_observation_us": 1
+      }
+    ],
+    "scope": "First eight atoms and every 64th thereafter. hw_us includes IRQ completion latency; this is not a frame-rate measurement."
+  },
+  "kernel": {
+    "returncode": 0,
+    "elapsed_seconds": 28.113259417,
+    "kernel_sha256": "d3ec3692b774a4caaeb0f81c9250c3fb63d6f07462f366cc032f6f11db537229"
+  },
+  "windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  },
+  "recovery": {
+    "round": 386,
+    "stage": "complete-data-verified",
+    "directory": "/Volumes/Projects/e5-xnu/uefi/build/sb-r386-gpu-timing",
+    "at": "2026-11-10T22:58:34.188338+08:00"
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "98419c546c545301cb7694466398dc199d3e5c7db15eb7b1e3103f20314d49c8",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r386-gpu-timing-after/data-after.img",
+    "elapsed_seconds": 73.40186341599997,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  }
+}

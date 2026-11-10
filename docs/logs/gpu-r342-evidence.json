@@ -1,0 +1,238 @@
+{
+  "schema": 1,
+  "round": 342,
+  "directory": "/Users/enceka/e5-work/sb-r342-data-emmc-match",
+  "kernel_sha256": "b46bfd7cd58a7387f1ffe1526aa6bb1ecc658a713a08c48c996a452f805d77f4",
+  "control": {
+    "round": 342,
+    "stage": "complete-data-verified",
+    "directory": "/Users/enceka/e5-work/sb-r342-data-emmc-match",
+    "at": "2026-11-09T18:22:47.220483+08:00",
+    "kernel_sha256": "b46bfd7cd58a7387f1ffe1526aa6bb1ecc658a713a08c48c996a452f805d77f4"
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 1251.314572292
+  },
+  "window_checks": {
+    "pre": {
+      "source": "/Users/enceka/e5-work/sb-r342-data-emmc-match/verify/pre.json",
+      "verdict": "PASS",
+      "counts": {
+        "expected_chunks": 37,
+        "observed_chunks": 37,
+        "matched": 37,
+        "mismatched": 0,
+        "missing": 0
+      },
+      "scan_sha256": "b5adf90819882e6da72e42ea5d46791afa0aa7fd3dbe5502e1879865ee380049",
+      "windows": {
+        "osroot": {
+          "chunks": 23,
+          "matched": 23,
+          "mismatched": 0,
+          "missing": 0,
+          "mismatched_chunks": []
+        },
+        "systemos": {
+          "chunks": 13,
+          "matched": 13,
+          "mismatched": 0,
+          "missing": 0,
+          "mismatched_chunks": []
+        },
+        "data": {
+          "chunks": 1,
+          "matched": 1,
+          "mismatched": 0,
+          "missing": 0,
+          "mismatched_chunks": []
+        }
+      }
+    },
+    "postflash": {
+      "source": "/Users/enceka/e5-work/sb-r342-data-emmc-match/verify/postflash.json",
+      "verdict": "PASS",
+      "counts": {
+        "expected_chunks": 37,
+        "observed_chunks": 37,
+        "matched": 37,
+        "mismatched": 0,
+        "missing": 0
+      },
+      "scan_sha256": "b5adf90819882e6da72e42ea5d46791afa0aa7fd3dbe5502e1879865ee380049",
+      "windows": {
+        "osroot": {
+          "chunks": 23,
+          "matched": 23,
+          "mismatched": 0,
+          "missing": 0,
+          "mismatched_chunks": []
+        },
+        "systemos": {
+          "chunks": 13,
+          "matched": 13,
+          "mismatched": 0,
+          "missing": 0,
+          "mismatched_chunks": []
+        },
+        "data": {
+          "chunks": 1,
+          "matched": 1,
+          "mismatched": 0,
+          "missing": 0,
+          "mismatched_chunks": []
+        }
+      }
+    },
+    "postboot": {
+      "source": "/Users/enceka/e5-work/sb-r342-data-emmc-match/verify/postboot.json",
+      "verdict": "PASS",
+      "counts": {
+        "expected_chunks": 37,
+        "observed_chunks": 37,
+        "matched": 37,
+        "mismatched": 0,
+        "missing": 0
+      },
+      "scan_sha256": "b5adf90819882e6da72e42ea5d46791afa0aa7fd3dbe5502e1879865ee380049",
+      "windows": {
+        "osroot": {
+          "chunks": 23,
+          "matched": 23,
+          "mismatched": 0,
+          "missing": 0,
+          "mismatched_chunks": []
+        },
+        "systemos": {
+          "chunks": 13,
+          "matched": 13,
+          "mismatched": 0,
+          "missing": 0,
+          "mismatched_chunks": []
+        },
+        "data": {
+          "chunks": 1,
+          "matched": 1,
+          "mismatched": 0,
+          "missing": 0,
+          "mismatched_chunks": []
+        }
+      }
+    }
+  },
+  "android_before": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "d91fbbeb-d642-4d77-a35c-625aec54d561",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "android_after": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "6a097e4a-030c-4bfc-b42a-d1a8416ad78d",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "data_before": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "8075a4a57ee6c3511dc9e03ecb9c302d1eacd0d79d4e1545d0a39f30cc76d33a",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r341-gpu-scanout-nx-after/data-after.img",
+    "elapsed_seconds": 352.325929417,
+    "command": "dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none",
+    "reused_after_live_sha256_match": true,
+    "device_sha256": "8075a4a57ee6c3511dc9e03ecb9c302d1eacd0d79d4e1545d0a39f30cc76d33a"
+  },
+  "data_after": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "239ddc6fdb6d21c5e99723e5e23c56fbbd96de4ba744b182ceff0f1c2da8351c",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r342-data-emmc-match-after/data-after.img",
+    "elapsed_seconds": 345.8070685,
+    "command": "dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none"
+  },
+  "persistent_data_changed": true,
+  "data_selection": {
+    "uuid": "30ADC749-351F-4FFF-998A-20E1B683859F",
+    "device": "/dev/disk8s1",
+    "backend": "E5DataDeviceEmmc",
+    "sectors": 8388608,
+    "bytes": 4294967296,
+    "apfs_block_size": 4096,
+    "apfs_blocks": 1048576,
+    "mount_result": 0,
+    "records": [
+      {
+        "line": 292,
+        "text": "NativeEmmc: data media window 8388608 sectors, container 1048576 blocks match"
+      },
+      {
+        "line": 1278,
+        "text": "E5DATA SELECT PASS uuid=30ADC749-351F-4FFF-998A-20E1B683859F device=/dev/disk8s1 backend=E5DataDeviceEmmc sectors=8388608 bytes=4294967296"
+      },
+      {
+        "line": 1418,
+        "text": "handle_mount:817: disk8s1 vol-uuid: 30ADC749-351F-4FFF-998A-20E1B683859F block size: 4096 block count: 1048576 (unencrypted; flags: 0x1; features: 8.0.2)"
+      },
+      {
+        "line": 1425,
+        "text": "apfs_log_op_with_proc:3091: disk8s1 mount-complete volume Data, requested by: init (pid 1); parent: kernel_task (pid 0)"
+      },
+      {
+        "line": 1426,
+        "text": "E5SystemOS: data mount result 0"
+      },
+      {
+        "line": 5423,
+        "text": "E5MALIS TRI4 REUSE PASS batches=16/16 repeats_per_variant=8"
+      },
+      {
+        "line": 5430,
+        "text": "E5MALIS CLEAR4 PASS mismatch=0 untouched=0 fnv=e2c50ed21b7e2325 ref=e2c50ed21b7e2325 state=3 hw=01(slot-done) ds=1 dc=1 df=0 dt=0 dr=0 dm=0"
+      }
+    ]
+  },
+  "saved_kernel_log": {
+    "path": "/Users/enceka/e5-work/sb-r342-data-emmc-match/r342/capture/kernel.log",
+    "sha256": "51908e683d8e78cd961ea6232d6a8bf7744a0f38a55117f713058b4a9c76a26a",
+    "enospc_records": 0,
+    "kernel_panic_cpu_records": 0,
+    "panic_count_rule": "panic(cpu records only; panic-on-crash disabled is a policy log"
+  },
+  "offscreen_controls": {
+    "fullscreen_passes": 8,
+    "triangle_passes": 8,
+    "clear_pass": true
+  },
+  "backup_retention": {
+    "source": "/Users/enceka/e5-work/sb-r342-data-emmc-match/backup-retention-after.json",
+    "keep_per_kind": 3,
+    "retained_rounds": {
+      "data": [
+        340,
+        341,
+        342
+      ],
+      "boot_b": [
+        340,
+        341,
+        342
+      ]
+    },
+    "previously_removed_files": 1,
+    "reexecuted_this_turn": false
+  },
+  "acceptance": {
+    "storage_and_closeout": "PASS: complete-data-verified",
+    "springboard_gpu_presentation": "UNVERIFIED",
+    "settings_content": "UNVERIFIED",
+    "physical_panel": "UNVERIFIED",
+    "850mib_expansion": "UNVERIFIED",
+    "coordinator_ui_observation": "Saved screenshots identical; CPU offer0. UI presentation not accepted."
+  },
+  "verification_provenance": "Archived from existing R342 records/log. No tests or builds rerun, no 4GiB image reread. Recorded commands are evidence only."
+}

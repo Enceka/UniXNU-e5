@@ -1,6 +1,6 @@
 --- a/osfmk/console/serial_general.c
 +++ b/osfmk/console/serial_general.c
-@@ -44,6 +44,175 @@
+@@ -44,6 +44,181 @@
  SECURITY_READ_ONLY_LATE(unsigned int) serialmode;                               /* Serial mode keyboard and console control */
  
  /*
@@ -26,6 +26,7 @@
 +extern void delay(int usec);
 +extern void vcputc(char ch);
 +extern void e5_panic_print(const char *s);
++extern void e5_input_matrix(uint32_t raw, uint32_t status, uint32_t gpio_data);
 +
 +static vm_offset_t e5k_kpd;
 +static vm_offset_t e5k_aon;
@@ -111,6 +112,10 @@
 +m[k] = 0;
 +e5_panic_print(m);
 +}
++/* Own GPIO127 input/mask before sampling volume-down. */
++e5k_put32(e5k_gpio + 0x80u * 7u, 4, e5k_get32(e5k_gpio + 0x80u * 7u, 4) | (1u << 15));
++e5k_put32(e5k_gpio + 0x80u * 7u, 8, e5k_get32(e5k_gpio + 0x80u * 7u, 8) & ~(1u << 15));
++e5k_put32(e5k_gpio + 0x80u * 7u, 0x28, e5k_get32(e5k_gpio + 0x80u * 7u, 0x28) | (1u << 15));
 +e5k_init_done = TRUE;
 +}
 +
@@ -140,6 +145,7 @@
 +}
 +voldn:
 +data = e5k_get32(e5k_gpio + 0x80u * 7u, 0);
++e5_input_matrix(raw, ks, data); /* one scanner owns the latched press/release slots */
 +if ((data & (1u << 15)) == 0) {
 +if (e5k_voldn_level) {
 +e5k_push("\t");
@@ -176,7 +182,7 @@
   *  This routine will start a thread that polls the serial port, listening for
   *  characters that have been typed.
   */
-@@ -89,6 +258,8 @@
+@@ -89,6 +264,8 @@
  		cons_cinput((char)chr); /* Buffer up the character */
  	}
  

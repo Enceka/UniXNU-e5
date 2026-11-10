@@ -1,0 +1,56 @@
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -8156,6 +8156,45 @@
+  * Mode 2 executes the bounded probe before launchd, preserving PID 1 through
+  * the probe's unconditional execve handoff after its tests. */
+ extern volatile int native_bindfs_boot_mount;
++static void
++e5_metal_bundle_prepare(proc_t p, user_addr_t scratch)
++{
++    unsigned enabled = 0;
++    if (!PE_parse_boot_argn("e5-metal", &enabled, sizeof(enabled)) || enabled != 1) return;
++    if (e5_data_mount_state != 100) {
++        printf("E5METALFS FAIL Data state=%d\n", e5_data_mount_state); return;
++    }
++    static const char source[] = "/private/var/mobile/e5gpu-stage/system-extensions";
++    static const char point[] = "/System/Library/Extensions";
++    static const char executable[] = "/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal";
++    vfs_context_t ctx = vfs_context_current();
++    vnode_t vp = NULLVP;
++    int error = vnode_lookup(source, VNODE_LOOKUP_NOFOLLOW, &vp, ctx);
++    if (!error) {
++        if (!vnode_isdir(vp)) error = ENOTDIR;
++        vnode_put(vp); vp = NULLVP;
++    }
++    if (error) { printf("E5METALFS FAIL source=%d\n", error); return; }
++    struct mount_args request = {.type = scratch + 0x800, .path = scratch + 0x820,
++        .flags = MNT_RDONLY | MNT_UNION, .data = scratch + 0x900};
++    error = copyout("bindfs", request.type, 7) || copyout(point, request.path, sizeof(point)) ||
++        copyout(source, request.data, sizeof(source)) ? EINVAL : 0;
++    if (!error) {
++        int32_t result = 0;
++        int previous = native_bindfs_boot_mount;
++        native_bindfs_boot_mount = 1;
++        error = mount(p, &request, &result);
++        native_bindfs_boot_mount = previous;
++    }
++    if (error) { printf("E5METALFS FAIL mount=%d\n", error); return; }
++    error = vnode_lookup(executable, VNODE_LOOKUP_NOFOLLOW, &vp, ctx);
++    if (!error) {
++        if (vnode_vtype(vp) != VREG) error = EINVAL;
++        vnode_put(vp);
++    }
++    printf("E5METALFS OVERLAY %s executable=%d\n", error ? "FAIL" : "PASS", error);
++}
++
+ static const char *e5_gpu_probe_init_path;
+ static void
+ e5_gpu_probe_prepare(proc_t p, user_addr_t scratch)
+@@ -8417,6 +8456,7 @@
+ 			printf("E5SystemOS: data volume device absent\n");
+ 		}
+ 	}
++	e5_metal_bundle_prepare(p, scratch);
+ 	e5_gpu_probe_prepare(p, scratch);
+ out:
+ 	if (cache) vnode_put(cache);

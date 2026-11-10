@@ -1,0 +1,96 @@
+{
+  "round": 345,
+  "kernel_sha256": "644d73cd523a3ff539f62aa9ccf493ba3476285b54a0ea322434a52353b86e16",
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 1241.680054334
+  },
+  "protected_windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  },
+  "probe": {
+    "entry": "normal LC_MAIN, PID 1 before launchd",
+    "clear_passes": 8,
+    "clear_pixels": 153600,
+    "clear_mismatch_each": 0,
+    "clear_fnv": "e2c50ed21b7e2325",
+    "bo_count": 64,
+    "abi": "1.1",
+    "cache_bounds": "PASS",
+    "submit_bounds": "PASS",
+    "stats": {
+      "sub": 8,
+      "comp": 8,
+      "fault": 0,
+      "tmo": 0,
+      "reset": 0,
+      "mmu": 0,
+      "active": 0,
+      "mapped": 0,
+      "bo": 0
+    },
+    "launchd_handoff_status": 0,
+    "signed_image_sha256": "47e8d925d01e56761e8e2ee5bee05471842a8c50f76cdf2a8710e1ff30fe8c2e"
+  },
+  "data_after_sha256": "4837f188ca13910827c75a66130993cfa89f977c6d0b3d41a364878743c52201",
+  "data_bytes": 4294967296,
+  "data_local_sha256_verified": true,
+  "android_after": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "a931258b-9c97-4dcc-b1bb-9b3cedf8001b",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "skip_setup": {
+    "guide": "https://unixnu.com/zh/guide/skip-setup#skip-setup",
+    "image_installed_sha256": "ed29408c92afcc8a218af8a5f6067b4f53aa29c4b369461413bdf64eb5c43cf3",
+    "changed_bytes": 364544,
+    "all_five_preference_domains_persisted": true,
+    "preference_uid": 501,
+    "language": {
+      "AppleLanguages": [
+        "zh-Hans"
+      ],
+      "AppleLocale": "zh_CN"
+    },
+    "directories_postboot": {
+      "Bundle": true,
+      "Data/System": true,
+      "Shared/SystemGroup": true,
+      "Temp": false
+    }
+  },
+  "runtime": {
+    "panic_markers": 0,
+    "setup_census": 0,
+    "springboard_census": 23,
+    "iconservices_crash_markers": 6
+  },
+  "qualification": {
+    "userspace_gpu_clear": true,
+    "panvk_execution": false,
+    "metal_execution": false,
+    "springboard_gpu_rendering": false,
+    "physical_panel_observation": false
+  },
+  "r344_recovery": {
+    "round": 344,
+    "safe_to_continue": true,
+    "automatic_return_passed": false,
+    "original_runner_returncode": 1,
+    "return_kind": "user-assisted USB reconnection and power-on",
+    "protected_windows": "pre/postflash/postboot PASS",
+    "data_after_sha256": "5309186d0fdb2043912ddee7692ce84d921b1f2d67632a13a86077344e0ff611",
+    "android": {
+      "slot": "_a",
+      "boot_completed": "1",
+      "boot_id": "654a38bd-a326-4347-8003-0f595663df21",
+      "sectors": "61079552",
+      "cid": "370100654d4d43202010ae1648804b00"
+    },
+    "at": "2026-11-09T20:21:40.819633+08:00"
+  }
+}

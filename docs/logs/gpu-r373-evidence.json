@@ -1,0 +1,86 @@
+{
+  "round": 373,
+  "result": "UI NOT QUALIFIED",
+  "single_maker_path_executed": true,
+  "compile_budget_errors": 0,
+  "ui_callbacks": [
+    "E5UL|E5METAL pid=57 UI completed=1 local_failed=0 draws=31 dispatches=0 blits=5"
+  ],
+  "allocation_failures": [
+    "E5UL|E5PANVK ALLOC_FAIL pid=57 phase=create-bo bytes=65536 flags=41 errno=316",
+    "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=72298496 bo=72298496 pid=57",
+    "E5UL|E5PANVK ALLOC_FAIL pid=57 phase=create-bo bytes=65536 flags=41 errno=316",
+    "E5UL|E5PANVK ALLOC_STATE sub=75 comp=75 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=72298496 bo=72298496 pid=57"
+  ],
+  "frame_hashes": [
+    [
+      "300",
+      "af4276c5"
+    ],
+    [
+      "301",
+      "af4276c5"
+    ],
+    [
+      "302",
+      "af4276c5"
+    ],
+    [
+      "303",
+      "af4276c5"
+    ],
+    [
+      "304",
+      "af4276c5"
+    ],
+    [
+      "305",
+      "af4276c5"
+    ],
+    [
+      "306",
+      "af4276c5"
+    ],
+    [
+      "307",
+      "af4276c5"
+    ],
+    [
+      "308",
+      "af4276c5"
+    ],
+    [
+      "309",
+      "af4276c5"
+    ],
+    [
+      "310",
+      "af4276c5"
+    ],
+    [
+      "311",
+      "af4276c5"
+    ],
+    [
+      "312",
+      "af4276c5"
+    ]
+  ],
+  "recovery": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "2857240c-42f3-4cf8-948b-03cdf071eb64",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "b310401290c9efddba632b6136fcb4a34438f5df5046c530039c1e4d3fbdd6b1",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r373-one-maker-after/data-after.img",
+    "elapsed_seconds": 70.00556354200012,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  }
+}

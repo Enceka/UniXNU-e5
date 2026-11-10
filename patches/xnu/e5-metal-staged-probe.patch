@@ -1,0 +1,52 @@
+--- a/bsd/kern/kern_exec.c
++++ b/bsd/kern/kern_exec.c
+@@ -8162,17 +8162,19 @@
+ {
+ 	unsigned enabled = 0;
+ 	if (!PE_parse_boot_argn("e5-gpu-user-probe", &enabled, sizeof(enabled)) ||
+-	    (enabled != 1 && enabled != 2 && enabled != 3)) return;
++	    (enabled != 1 && enabled != 2 && enabled != 3 && enabled != 4)) return;
+ 	if (e5_data_mount_state != 100) {
+ 		printf("E5GPUUSER FAIL Data not qualified state=%d\n", e5_data_mount_state);
+ 		return;
+ 	}
+ 	vfs_context_t ctx = vfs_context_current();
+ 	vnode_t vp = NULLVP;
+-	if (enabled == 3) {
++	if (enabled == 3 || enabled == 4) {
+ 		/* The signed Vulkan/Metal libraries live on Data, outside boot_b.
+ 		 * Loading the probe still goes through the ordinary exec path. */
+-		static const char staged[] = "/private/var/mobile/e5gpu-stage/e5vk-probe";
++		const char *staged = enabled == 4 ?
++		    "/private/var/mobile/e5gpu-stage/e5metal-probe" :
++		    "/private/var/mobile/e5gpu-stage/e5vk-probe";
+ 		int error = vnode_lookup(staged, VNODE_LOOKUP_NOFOLLOW, &vp, ctx);
+ 		if (!error) {
+ 			if (vnode_vtype(vp) != VREG) error = EINVAL;
+--- a/bsd/kern/kern_mman.c
++++ b/bsd/kern/kern_mman.c
+@@ -626,16 +626,20 @@
+ 			int e5_before_maxprot = maxprot;
+ 			unsigned e5_gpu_map = 0;
+ 			extern int e5_data_mount_state;
+-			/* Explicit development grant for the signed staged test ICD only.
++			/* Explicit development grant for the signed staged probe libraries.
+ 			 * Ordinary descriptor permissions were checked above; VM/code-signing
+ 			 * validation remains below. No writable executable mapping is allowed. */
+-			if (proc_getpid(p) == 1 && strcmp(p->p_comm, "e5vk-probe") == 0 &&
++			if (proc_getpid(p) == 1 &&
+ 			    e5_data_mount_state == 100 && (flags & MAP_PRIVATE) &&
+ 			    (prot & (VM_PROT_WRITE | VM_PROT_EXECUTE)) != (VM_PROT_WRITE | VM_PROT_EXECUTE) &&
+-			    PE_parse_boot_argn("e5-gpu-map", &e5_gpu_map, sizeof(e5_gpu_map)) && e5_gpu_map == 1) {
++			    PE_parse_boot_argn("e5-gpu-map", &e5_gpu_map, sizeof(e5_gpu_map)) &&
++			    ((e5_gpu_map == 1 && strcmp(p->p_comm, "e5vk-probe") == 0) ||
++			     (e5_gpu_map == 2 && strcmp(p->p_comm, "e5metal-probe") == 0))) {
+ 				char e5_path[192]; int e5_path_size = sizeof(e5_path);
+ 				if (!vn_getpath(vp, e5_path, &e5_path_size) &&
+-				    strcmp(e5_path, "/private/var/mobile/e5gpu-stage/lib/libvulkan_panfrost.dylib") == 0)
++				    (strcmp(e5_path, "/private/var/mobile/e5gpu-stage/lib/libvulkan_panfrost.dylib") == 0 ||
++				     (e5_gpu_map == 2 && strcmp(e5_path,
++				      "/private/var/mobile/e5gpu-stage/NativeE5Metal.bundle/NativeE5Metal") == 0)))
+ 					e5_gpu_target = 1;
+ 			}
+ #endif

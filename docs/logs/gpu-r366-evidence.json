@@ -1,0 +1,70 @@
+{
+  "round": 366,
+  "kernel_sha256": "cd28beb092a2dfba06ce20a8e3cd9d4a6c9c9601294697caa988b87ca34c8ffe",
+  "result": "PASS",
+  "readonly_gpu_reads": {
+    "rounds": 2,
+    "submitted": 2,
+    "completed": 2,
+    "mismatch": 0,
+    "explicit_flush": false,
+    "pointer_identity": true,
+    "faults": 0,
+    "final_resources": 0
+  },
+  "expected_negative_test": {
+    "permission_fault": "0xcb PERM_FAULT_3",
+    "target": "0x10000000",
+    "fault_address": "0x10000000",
+    "changed_bytes": 0,
+    "mmu_faults": 1,
+    "timeouts": 0,
+    "resets": 1,
+    "terminal_atom_state": "kAtomReset",
+    "final_bo_bytes": 0,
+    "final_mapped_bytes": 0,
+    "final_active_atoms": 0
+  },
+  "launchd_handoff": true,
+  "original_ui_qualified": false,
+  "recovery": {
+    "slot": "_a",
+    "boot_completed": "1",
+    "boot_id": "5ed8e417-5591-48a7-9a92-ec486c4c4f38",
+    "sectors": "61079552",
+    "cid": "370100654d4d43202010ae1648804b00"
+  },
+  "samples": [
+    "E5UL|E5MTL READONLY ROUND 0 PASS mismatch=0 identity=1 explicit_flush=0",
+    "E5UL|E5MTL READONLY ROUND 1 PASS mismatch=0 identity=1 explicit_flush=0",
+    "E5UL|E5MTL READONLY COMPUTE PASS release=1",
+    "E5UL|E5PANVK CLOSE sub=2 comp=2 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0 pid=1",
+    "E5UL|E5PANVK CLOSE sub=2 comp=2 fault=0 tmo=0 reset=0 mmu=0 active=0 mapped=0 bo=0 pid=1",
+    "E5UL|E5MTL READONLY POLICY PASS default_reject=2 explicit_import=1 executable_reject=1",
+    "E5MALI1 mmu fault as=0 code=cb(PERM_FAULT_3) access=write source=7c00 addr=10000000 raw=7c0003cb",
+    "E5MALI1 reset #1 (deferred) total=1/32 irqSrc job=2 mmu=1 gpu=0",
+    "E5UL|E5MTL READONLY WRITE-FAULT PASS code=cb state=7 addr=10000000 expected=10000000 changed=0 mmu_delta=1 timeout_delta=0",
+    "E5UL|E5MTL READONLY NEGATIVE PASS cleanup_bo=0 mapped=0 active=0 expected_mmu_faults=1",
+    "E5UL|E5MTL VERDICT PASS",
+    "E5UL|E5MTL HANDOFF launchd status=0"
+  ],
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 640.694765208
+  },
+  "data_backup": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "cd032b10b472ab7600137f5a2a1549861e0b9e0e92a9b7cd74bd08fbc251ea32",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r366-reset-irq-after/data-after.img",
+    "elapsed_seconds": 66.328632459,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  },
+  "windows": {
+    "pre": "PASS",
+    "postflash": "PASS",
+    "postboot": "PASS"
+  }
+}

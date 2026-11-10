@@ -1,0 +1,4275 @@
+diff --git a/crates/metal2vulkan-air/src/canon/const_loads.rs b/crates/metal2vulkan-air/src/canon/const_loads.rs
+index 7b3dfd7b..98976df2 100644
+--- a/crates/metal2vulkan-air/src/canon/const_loads.rs
++++ b/crates/metal2vulkan-air/src/canon/const_loads.rs
+@@ -1,4 +1,4 @@
+-//! Pointers loaded from fields of constant globals.
++//! Values loaded from fields of constant globals.
+ //!
+ //! A constant global whose initializer is known once function constants are bound and the static
+ //! initializers have run may hold pointers: a program-scope `constexpr sampler` taken by value is
+@@ -9,18 +9,28 @@
+ //! constant and threadgroup spaces, so such a module was refused, under the values that made the
+ //! select one global.
+ //!
++//! The same holds for every other first-class field. An uber-shader takes its whole configuration
++//! as one struct of function constants that a static initializer copies into an internal
++//! `constant` global (QuartzCore's `fc_fragment_shader_config`, read field by field after a
++//! function-constant `select` between it and a buffer). SCCP folds that select to the global but
++//! not the field loads, so every branch the configuration decides survived: QuartzCore's
++//! `fixed_frag` became about 46000 SPIR-V instructions where its specialized form is a few
++//! hundred, and the driver compiled each such pipeline for about a second. Metal's compiler
++//! specializes these reads away, so a module that reads them is translated as Metal compiles it.
++//!
+ //! This pass reads such a load as the initializer's constant at the field: a non-volatile,
+-//! non-atomic load of a pointer whose address is a field of a constant global at constant indices
+-//! (a `getelementptr` instruction or constant expression over the global's own value type, its
+-//! first index 0), where the field's type is the load's. A copy LLVM made through an integer (a
+-//! load of the field as an integer of the pointer's size, then `inttoptr` to the field's type)
+-//! reads the same constant at its `inttoptr`. The global is never written (it is `constant`, and
+-//! initialized by no one else), so every run reads that constant: the address of the sampler
+-//! state, which the sampler family reads as the sampler it names. Only pointers are read this
+-//! way: a load of any other type from a constant global is lowered from the global's form (its
+-//! typed private copy, or the constant blob), and reading it here would change those modules
+-//! without changing what they compute. SCCP then runs again over a body this pass changed, so
+-//! what the constants decide (an aggregate of them, a phi of them, a member of either) folds too.
++//! non-atomic load of a scalar, vector or pointer whose address is a field of a constant global at
++//! constant indices (a `getelementptr` instruction or constant expression over the global's own
++//! value type, its first index 0), where the field's type is the load's. A copy LLVM made through
++//! an integer (a load of a pointer field as an integer of the pointer's size, then `inttoptr` to
++//! the field's type) reads the same constant at its `inttoptr`. The global is never written (it
++//! is `constant`, and initialized by no one else), so every run reads that constant: for a
++//! pointer, the address of the sampler state, which the sampler family reads as the sampler it
++//! names. An aggregate load, a load of another type than the field's, and a field the initializer
++//! leaves `undef` (an unsupplied constant's) are left to the global's lowered form. SCCP then runs
++//! again over a body this pass changed, so what the constants decide (a branch, an aggregate of
++//! them, a phi of them, a member of either) folds too, and the two alternate until a round folds
++//! nothing: a decided branch can expose a further select of the global.
+ 
+ use crate::budget::Meter;
+ use crate::error::Error;
+@@ -29,9 +39,9 @@ use crate::ir::{InstId, InstKind, ModuleParts, Type, TypeId, Value};
+ 
+ use super::rewrite::{apply, scoped, BodyEdit};
+ 
+-/// Read every load of a pointer from a field of a constant global in `body`, and every
+-/// `inttoptr` of such a field's integer copy, as the field's constant (module docs), and say
+-/// whether there was one. Returns `body` itself when there is none.
++/// Read every first-class load from a field of a constant global in `body`, and every `inttoptr`
++/// of a pointer field's integer copy, as the field's constant (module docs), and say whether there
++/// was one. Returns `body` itself when there is none.
+ pub(super) fn fold(
+     body: Body,
+     parts: &mut ModuleParts,
+@@ -61,8 +71,8 @@ pub(super) fn fold(
+     }
+ }
+ 
+-/// Each instruction of `body` that reads a pointer field of a constant global (module docs), with
+-/// the field's constant.
++/// Each instruction of `body` that reads a first-class field of a constant global (module docs),
++/// with the field's constant.
+ fn find(
+     body: &Body,
+     parts: &mut ModuleParts,
+@@ -71,24 +81,27 @@ fn find(
+ ) -> Result<(), Error> {
+     for (id, inst) in body.insts.iter() {
+         m.tick(1)?;
+-        let Some(space) = parts.types.ptr_space(inst.ty) else {
+-            continue;
+-        };
+-        if !matches!(parts.types.get(inst.ty), Some(Type::Ptr { .. })) {
+-            continue;
+-        }
++        let first_class = parts
++            .types
++            .get(inst.ty)
++            .is_some_and(|t| t.is_sized() && !t.is_aggregate());
++        let pointer = matches!(parts.types.get(inst.ty), Some(Type::Ptr { .. }));
+         let ptr = match inst.kind {
+             InstKind::Load {
+                 ptr,
+                 volatile: false,
+                 atomic: None,
+                 ..
+-            } => ptr,
++            } if first_class => ptr,
+             // `inttoptr` of an integer load of the pointer's size: a copy through an integer.
+             InstKind::Cast {
+                 op: CastOp::IntToPtr,
+                 v: Value::Inst(l),
+-            } => match body.insts.get(l).map(|l| (&l.kind, l.ty)) {
++            } if pointer => {
++                let Some(space) = parts.types.ptr_space(inst.ty) else {
++                    continue;
++                };
++                match body.insts.get(l).map(|l| (&l.kind, l.ty)) {
+                 Some((
+                     &InstKind::Load {
+                         ptr,
+@@ -104,7 +117,8 @@ fn find(
+                     ptr
+                 }
+                 _ => continue,
+-            },
++                }
++            }
+             _ => continue,
+         };
+         let Some((g, path)) = field_address(body, parts, ptr) else {
+diff --git a/crates/metal2vulkan-air/src/canon/mod.rs b/crates/metal2vulkan-air/src/canon/mod.rs
+index bd05d94a..de7b8e60 100644
+--- a/crates/metal2vulkan-air/src/canon/mod.rs
++++ b/crates/metal2vulkan-air/src/canon/mod.rs
+@@ -484,6 +484,7 @@ pub fn specialize_dynamic(
+     let emap = erase::erase_consts(&mut parts.consts, m)?;
+     erase::erase_globals(parts.globals.values_mut(), &emap);
+     erase_functions(&mut parts, &emap, m)?;
++    prune_entry(&mut parts, func, &fcs, &name, m)?;
+     // The entry block always runs: a value use there of an unsupplied constant is SCCP's first
+     // refusal, known before the inlined body is built.
+     let entry_refusal = |consts: &ConstTable, m: &mut Meter| {
+@@ -567,11 +568,17 @@ pub fn specialize_dynamic(
+     };
+     body.release(m);
+     let body = solved;
+-    // A pointer loaded from a field of a constant global is the field's constant: a `constexpr
+-    // sampler` that SCCP's folded select picked is its sampler state. SCCP runs again over a body
+-    // that changed, to fold what those constants decide.
+-    let (body, folded) = const_loads::fold(body, &mut parts, m)?;
+-    let body = if folded {
++    // A value loaded from a field of a constant global is the field's constant: a `constexpr
++    // sampler` that SCCP's folded select picked is its sampler state, and an uber-shader's
++    // configuration struct of function constants is its members. SCCP runs again over a body that
++    // changed, to fold what those constants decide; the two alternate until a round folds nothing.
++    let mut body = body;
++    loop {
++        let (next, folded) = const_loads::fold(body, &mut parts, m)?;
++        if !folded {
++            body = next;
++            break;
++        }
+         let solved = {
+             let mut cx = sccp::Context {
+                 folder: fold::Folder {
+@@ -583,13 +590,11 @@ pub fn specialize_dynamic(
+                 fcs: &fcs,
+                 name: name.clone(),
+             };
+-            sccp::run(&body, &mut cx, m)?
++            sccp::run(&next, &mut cx, m)?
+         };
+-        body.release(m);
+-        solved
+-    } else {
+-        body
+-    };
++        next.release(m);
++        body = solved;
++    }
+     matmul2d::refuse_left(&body, &parts, &ep.stage, &name, m)?;
+     post_check(&body, &parts, &stubs, &name, &control_points(ep), m)?;
+     // Rasterization-rate maps: each `float2` map call becomes Apple's GPU decoder of the parameter
+@@ -783,6 +788,70 @@ fn erased_entry(
+ }
+ 
+ /// Erase every defined function's body in place, one at a time, each body replaced freed.
++/// The entry's own blocks that its function constants leave unreachable, and its loads from
++/// fields of constant globals (`const_loads`), folded before the entry is inlined, so the inliner
++/// copies no callee only a dead block calls. An uber-shader's entry is most of the module and
++/// branches on the constants into every effect it has: QuartzCore's `fixed_frag` entries inlined
++/// 15,700 instructions of which SCCP kept 300, and building, solving and rebuilding the rest was
++/// most of a specialization.
++///
++/// Its calls are opaque here, so what it proves unreachable is unreachable whatever they return,
++/// and the SCCP after inlining reaches the fixed point it reached over the whole body. It runs
++/// only when every declared constant is supplied: an unsupplied constant's taint refuses a use
++/// that only inlining shows is dead (a call argument the callee never reads). Any other refusal
++/// here (a branch on `undef` that a call's constant result would have made dead) leaves the entry
++/// as it was, for the SCCP after inlining to judge; a budget, cancellation or limit is final.
++fn prune_entry(
++    parts: &mut ModuleParts,
++    func: FuncId,
++    fcs: &HashMap<GlobalId, sccp::FcState>,
++    name: &DiagName,
++    m: &mut Meter,
++) -> Result<(), Error> {
++    if fcs.is_empty() || fcs.values().any(|s| !s.supplied) {
++        return Ok(());
++    }
++    let Some(entry) = parts.funcs.get_mut(func).and_then(|f| f.body.take()) else {
++        return Ok(());
++    };
++    let solve = |body: &Body, parts: &mut ModuleParts, m: &mut Meter| {
++        let mut cx = sccp::Context {
++            folder: fold::Folder {
++                types: &parts.types,
++                consts: &mut parts.consts,
++                held: 0,
++            },
++            globals: &parts.globals,
++            fcs,
++            name: name.clone(),
++        };
++        sccp::run(body, &mut cx, m)
++    };
++    let pruned = solve(&entry, parts, m).and_then(|mut body| loop {
++        let (next, folded) = const_loads::fold(body, parts, m)?;
++        if !folded {
++            return Ok(next);
++        }
++        let solved = solve(&next, parts, m);
++        next.release(m);
++        body = solved?;
++    });
++    let kept = match pruned {
++        Ok(body) => {
++            entry.release(m);
++            body
++        }
++        Err(e @ (Error::Budget(_) | Error::Cancelled | Error::LimitExceeded(_))) => return Err(e),
++        Err(_) => entry,
++    };
++    parts
++        .funcs
++        .get_mut(func)
++        .ok_or_else(|| invariant("entry out of range"))?
++        .body = Some(kept);
++    Ok(())
++}
++
+ fn erase_functions(
+     parts: &mut ModuleParts,
+     emap: &[crate::ir::ConstId],
+diff --git a/crates/metal2vulkan-air/src/canon/sccp.rs b/crates/metal2vulkan-air/src/canon/sccp.rs
+index e47e6833..f89e2fc1 100644
+--- a/crates/metal2vulkan-air/src/canon/sccp.rs
++++ b/crates/metal2vulkan-air/src/canon/sccp.rs
+@@ -995,6 +995,30 @@ impl<'b> Solver<'b> {
+         self.set(i, new, m, held)
+     }
+ 
++    /// Whether `v` is an aggregate built by `insertvalue` chains whose only unsupplied-constant
++    /// taint sits in individual inserted members, so those members alone can become `undef`
++    /// (Metal leaves an unsupplied optional constant's value indeterminate) while the rest of
++    /// the aggregate keeps its computed members.
++    fn leafwise(&self, v: Value) -> bool {
++        let mut cur = v;
++        loop {
++            if !matches!(self.lat(cur), Lat::Fc(_)) {
++                return true;
++            }
++            let Value::Inst(i) = cur else { return false };
++            let Some(inst) = self.body.insts.get(i) else {
++                return false;
++            };
++            let InstKind::InsertValue { agg, val, .. } = &inst.kind else {
++                return false;
++            };
++            if matches!(self.lat(*val), Lat::Fc(_)) && !matches!(val, Value::Inst(_)) {
++                return false;
++            }
++            cur = *agg;
++        }
++    }
++
+     /// After the fixpoint: every reachable non-pure use of an unsupplied constant needs the
+     /// caller's value, and a reachable branch on a literal `undef`/`poison` is refused.
+     fn check(&self, cx: &Context<'_>) -> Result<(), Error> {
+@@ -1031,6 +1055,11 @@ impl<'b> Solver<'b> {
+                         )));
+                     }
+                 }
++                if let InstKind::Ret(Some(v)) = &inst.kind {
++                    if self.leafwise(*v) {
++                        continue;
++                    }
++                }
+                 let mut needs = None;
+                 inst.kind.for_each_value(|v| {
+                     if let Lat::Fc(index) = self.lat(v) {
+@@ -1070,7 +1099,11 @@ impl<'b> Solver<'b> {
+                 let deletable = is_pure(&inst.kind)
+                     || is_normalize(&inst.kind)
+                     || is_defined_arg(&inst.kind, cx.folder.consts, cx.fcs).is_some();
++                let leaf_chain = matches!(inst.kind, InstKind::InsertValue { .. })
++                    && matches!(lat, Lat::Fc(_))
++                    && self.leafwise(Value::Inst(i));
+                 match (&inst.kind, lat) {
++                    _ if leaf_chain => {}
+                     (_, Lat::Const(c)) if deletable => edit.replace(i, Value::Const(c)),
+                     (_, Lat::Fc(_)) if deletable => {
+                         let undef = cx.folder.consts.intern(
+diff --git a/crates/metal2vulkan-air/src/canon/tests.rs b/crates/metal2vulkan-air/src/canon/tests.rs
+index fb0dad5b..93edc0a4 100644
+--- a/crates/metal2vulkan-air/src/canon/tests.rs
++++ b/crates/metal2vulkan-air/src/canon/tests.rs
+@@ -1658,7 +1658,18 @@ fn a_deeply_nested_written_global_is_rebuilt_on_a_small_stack() {
+         static_init(&mut m, "init", |f| store(f, five, gaddr));
+         let fty = m.fn_ty(void, &[dev]);
+         let mut f = m.define("k", fty);
+-        let v = load(&mut f, i32t, gaddr);
++        // A volatile read keeps the global: a plain one now reads the rebuilt initializer's leaf
++        // as its constant, and the unused global is pruned.
++        let v = f.push(
++            i32t,
++            InstKind::Load {
++                ptr: gaddr,
++                align: Align::from_bytes(4),
++                volatile: true,
++                atomic: None,
++                range: None,
++            },
++        );
+         store(&mut f, v, arg(0));
+         f.ret(None);
+         let k = f.finish();
+@@ -2359,9 +2370,12 @@ fn a_pointer_loaded_from_a_constant_globals_field_is_the_fields_constant() {
+             assert!(text.contains(kept) && !text.contains(gone), "{text}");
+         }
+     }
+-    // A field of any other type is left to the memory plan: its load stays.
+-    let text = body_text(&picked_field(Some(1), 1).unwrap());
+-    assert!(text.contains("getelementptr"), "{text}");
++    // A field of any other first-class type reads the same way: the picked struct's own `i64`.
++    for (flag, kept, gone) in [(1, "333", "444"), (0, "444", "333")] {
++        let text = body_text(&picked_field(Some(flag), 1).unwrap());
++        assert!(!text.contains("getelementptr") && !text.contains("load"), "{text}");
++        assert!(text.contains(kept) && !text.contains(gone), "{text}");
++    }
+     // Unsupplied, the select stays undecided, as before.
+     assert_eq!(
+         picked_field(None, 0).unwrap_err(),
+diff --git a/crates/metal2vulkan-air/src/container/mtlb.rs b/crates/metal2vulkan-air/src/container/mtlb.rs
+index d4c8e2bd..f8add976 100644
+--- a/crates/metal2vulkan-air/src/container/mtlb.rs
++++ b/crates/metal2vulkan-air/src/container/mtlb.rs
+@@ -41,6 +41,13 @@ const SUPPORTED_MAJOR: [u16; 2] = [1, 2];
+ const FILE_TYPE_EXECUTABLE: u8 = 0;
+ /// `file_type` of a dynamic library (`MTLLibraryTypeDynamic`).
+ const FILE_TYPE_DYNAMIC: u8 = 2;
++/// `file_type` of a Core Image kernel library (`metal -cikernel`: ci_stdlib.metallib and
++/// ci_filters.metallib of Core Image under iOS 27 and macOS 27): one module whose functions are
++/// listed `TYPE` 5 and carry `!air.ci`. Metal loads it as an executable library that names none
++/// of them (an M1 under macOS 27.0.1: `type` 0, `functionNames` empty, `installName` its file).
++const FILE_TYPE_CI_KERNELS: u8 = 1;
++/// `TYPE` of a Core Image kernel in such a library.
++const TYPE_CI_KERNEL: u8 = 5;
+ 
+ /// A metallib's library type (`MTLLibraryType`), from its header's `file_type`.
+ #[non_exhaustive]
+@@ -248,7 +255,10 @@ pub(super) fn parse(bytes: &[u8]) -> Result<Metallib<'_>, Error> {
+             6,
+         ));
+     }
+-    if header.file_type != FILE_TYPE_EXECUTABLE && header.file_type != FILE_TYPE_DYNAMIC {
++    if header.file_type != FILE_TYPE_EXECUTABLE
++        && header.file_type != FILE_TYPE_DYNAMIC
++        && header.file_type != FILE_TYPE_CI_KERNELS
++    {
+         return Err(InputError::new(
+             InputErrorKind::Unsupported(Feature::LibraryKind(header.file_type)),
+             Location::container(10),
+@@ -318,6 +328,11 @@ pub(super) fn parse(bytes: &[u8]) -> Result<Metallib<'_>, Error> {
+     if at != entries_end {
+         return Err(container_error(ContainerError::BadOffset, 32));
+     }
++    // A Core Image kernel library lists its kernels over one shared module; Metal names none of
++    // them, so neither does the library here.
++    if header.file_type == FILE_TYPE_CI_KERNELS {
++        parsed.retain(|p| p.function.stage != FunctionStage::Other(TYPE_CI_KERNEL));
++    }
+     let (extended, _) = tags::read_list(file, at, file.len())?;
+     let mut linkage = linkage(file, &extended)?;
+     if header.file_type == FILE_TYPE_DYNAMIC {
+diff --git a/crates/metal2vulkan-air/src/container/tests.rs b/crates/metal2vulkan-air/src/container/tests.rs
+index 6a45c918..9a01f2ae 100644
+--- a/crates/metal2vulkan-air/src/container/tests.rs
++++ b/crates/metal2vulkan-air/src/container/tests.rs
+@@ -593,14 +593,25 @@ fn unsupported_versions_and_library_kinds() {
+     b.version = (1, 2);
+     assert!(parse(&b.build()).is_ok());
+     let mut b = sample();
+-    b.file_type = 1;
++    b.file_type = 3;
+     match parse(&b.build()).unwrap_err() {
+         Error::Unsupported(Unsupported {
+-            feature: Feature::LibraryKind(1),
++            feature: Feature::LibraryKind(3),
+             ..
+         }) => {}
+         other => panic!("{other:?}"),
+     }
++    // A Core Image kernel library (`file_type` 1): Metal loads it and names none of its `TYPE` 5
++    // kernels (macOS 27.0.1, ci_stdlib.metallib); a function of another type stays listed.
++    let mut b = sample();
++    b.file_type = 1;
++    for f in &mut b.functions {
++        f.type_code = 5;
++    }
++    match parse(&b.build()).unwrap() {
++        Library::Metallib(m) => assert!(m.functions.is_empty(), "{:?}", m.functions),
++        other => panic!("{other:?}"),
++    }
+ }
+ 
+ #[test]
+diff --git a/crates/metal2vulkan-air/src/intrinsics/llvm.rs b/crates/metal2vulkan-air/src/intrinsics/llvm.rs
+index d784c6c5..b6ca3f98 100644
+--- a/crates/metal2vulkan-air/src/intrinsics/llvm.rs
++++ b/crates/metal2vulkan-air/src/intrinsics/llvm.rs
+@@ -56,6 +56,8 @@ pub enum LlvmIntOp {
+     Bswap,
+     /// `llvm.ctpop`: the number of set bits.
+     Ctpop,
++    /// `llvm.bitreverse`: the bits in reverse order (what `reverse_bits` compiles to).
++    Bitreverse,
+     /// `llvm.uadd.sat`: unsigned saturating addition.
+     UAddSat,
+     /// `llvm.usub.sat`: unsigned saturating subtraction.
+@@ -340,6 +342,7 @@ pub(super) const BASES: &[(&str, Base)] = &[
+     ("fshr", Base::Int(LlvmIntOp::Fshr)),
+     ("bswap", Base::Int(LlvmIntOp::Bswap)),
+     ("ctpop", Base::Int(LlvmIntOp::Ctpop)),
++    ("bitreverse", Base::Int(LlvmIntOp::Bitreverse)),
+     ("uadd.sat", Base::Int(LlvmIntOp::UAddSat)),
+     ("usub.sat", Base::Int(LlvmIntOp::USubSat)),
+     ("sadd.sat", Base::Int(LlvmIntOp::SAddSat)),
+@@ -393,7 +396,7 @@ impl LlvmFloatOp {
+ impl LlvmIntOp {
+     fn arity(self) -> usize {
+         match self {
+-            LlvmIntOp::Bswap | LlvmIntOp::Ctpop => 1,
++            LlvmIntOp::Bswap | LlvmIntOp::Ctpop | LlvmIntOp::Bitreverse => 1,
+             LlvmIntOp::Fshl | LlvmIntOp::Fshr => 3,
+             _ => 2,
+         }
+diff --git a/crates/metal2vulkan-runtime/README.md b/crates/metal2vulkan-runtime/README.md
+index c6dc9f69..8c722ca2 100644
+--- a/crates/metal2vulkan-runtime/README.md
++++ b/crates/metal2vulkan-runtime/README.md
+@@ -139,6 +139,7 @@ Vulkan-side choices Metal has no counterpart for:
+ | `announce_each` | Degradation kinds to announce at every occurrence instead of once. |
+ | `metal_level` | The macOS release whose Metal the device answers as (the host's by default). |
+ | `record_executions` | Keep, per command buffer, which pipeline each dispatch and draw ran (`CommandBuffer::executions`). Off by default. |
++| `refuse_rebinds` | Refuse every `rebind_bytes_no_copy` (`RebindProblem::Refused`), so the encoders log no calls to encode again while no-copy buffers live. Off by default. |
+ 
+ While a handle lives, equal options give the same device for a physical device, as Metal has one
+ `MTLDevice` per GPU. Nothing is read from the environment but the platform's default cache
+@@ -331,3 +332,7 @@ option) any later version, at your choice (`GPL-2.0-or-later OR LGPL-3.0-or-late
+ [LICENSE](LICENSE) is the notice; [LICENSE-GPL-2.0](LICENSE-GPL-2.0),
+ [LICENSE-LGPL-3.0](LICENSE-LGPL-3.0) and [LICENSE-GPL-3.0](LICENSE-GPL-3.0) (which the LGPL v3
+ incorporates) are the texts.
++
++On macOS and iOS, runtime pipeline makers request user-initiated quality of service,
++and scheduler and completion workers request user-interactive quality of service.
++The operating system still chooses their CPU and effective scheduling priority.
+diff --git a/crates/metal2vulkan-runtime/src/binding.rs b/crates/metal2vulkan-runtime/src/binding.rs
+index 000794dc..9d9eeb83 100644
+--- a/crates/metal2vulkan-runtime/src/binding.rs
++++ b/crates/metal2vulkan-runtime/src/binding.rs
+@@ -51,6 +51,7 @@ use super::command_buffer::{NotedTable, State};
+ use super::error::{internal, Error, RuntimeGap};
+ use super::function_table::{self, TableSnapshot, VisibleFunctionTable};
+ use super::heap_sets::{Keeper, TextureTable, HEAP_SET};
++use super::key_hash::KeyMap;
+ use super::render_pass::{PassLayout, Target};
+ use super::render_target;
+ use super::residency::{Residency, Used};
+@@ -69,7 +70,7 @@ use metal2vulkan::bind::{
+ };
+ use metal2vulkan::metal::sampler::OpaqueBlackBorder;
+ use metal2vulkan::pipeline::{HandleClass, SlotClass, SlotRef, Stage, StorageAttachmentView};
+-use std::collections::{BTreeSet, HashMap};
++use std::collections::BTreeSet;
+ use std::ops::Deref;
+ use std::sync::atomic::Ordering;
+ use std::sync::Arc;
+@@ -454,8 +455,17 @@ pub(super) fn bind(
+     tables: &Tables<'_>,
+     mut memo: Option<&mut BindMemo>,
+ ) -> Result<Bound, Error> {
+-    let mut writes = Vec::with_capacity(plan.descriptors.len());
+-    let mut samplers = Vec::new();
++    // The vectors a memo keeps from the last bind, emptied.
++    let (mut writes, mut holes, mut samplers, mut roots) = match memo.as_deref_mut() {
++        Some(memo) => (
++            std::mem::take(&mut memo.writes),
++            std::mem::take(&mut memo.holes),
++            std::mem::take(&mut memo.bound_samplers),
++            std::mem::take(&mut memo.roots),
++        ),
++        None => Default::default(),
++    };
++    writes.reserve(plan.descriptors.len());
+     // The sampler tables, whose regions the command buffer writes again as it commits.
+     let sampler_keys = plan.sampler_tables();
+     let mut sampler_tables = Vec::with_capacity(sampler_keys.len());
+@@ -533,11 +543,11 @@ pub(super) fn bind(
+             held,
+         });
+     }
+-    let mut roots = Vec::with_capacity(command.root_tables.len());
++    roots.clear();
+     for &(stages, table) in &command.root_tables {
+         roots.push((stages, root_table(device, state, table)?));
+     }
+-    let mut holes = Vec::with_capacity(command.push_holes.len());
++    holes.reserve(command.push_holes.len());
+     for hole in command.push_holes {
+         holes.push(match *hole {
+             PushHole::RootTableAddress { stages, offset } => Hole {
+@@ -588,6 +598,9 @@ pub(super) fn bind(
+             },
+         });
+     }
++    if let Some(memo) = memo {
++        memo.roots = roots;
++    }
+     Ok(Bound {
+         writes,
+         holes,
+@@ -757,6 +770,17 @@ pub(super) fn push_writes(
+     Ok(filled)
+ }
+ 
++/// `push_writes`'s writes, given back as the plan's: the next draw's instantiation fills their
++/// vectors again instead of allocating its own.
++pub(super) fn push_room(push: Vec<PushWrite>) -> Vec<PushConstantWrite> {
++    push.into_iter()
++        .map(|(stages, offset, bytes)| {
++            let stages = metal2vulkan::vk::ShaderStageFlags::from_raw(stages.as_raw());
++            PushConstantWrite::new(stages, offset, bytes)
++        })
++        .collect()
++}
++
+ /// The descriptor writes [`write_sets`] hands the driver in one call: their infos sit on the stack.
+ const WRITES_AT_ONCE: usize = 16;
+ 
+@@ -876,8 +900,46 @@ const KEPT_VIEWS: usize = 256;
+ pub(super) struct BindMemo {
+     /// The views epoch the views were kept under.
+     epoch: u64,
+-    views: HashMap<ViewKey, vk::ImageView>,
++    views: KeyMap<ViewKey, vk::ImageView>,
+     samplers: Vec<KeptSampler>,
++    /// The vectors of the last bind's [`Bound`] its consumer gave back ([`BindMemo::give_back`])
++    /// and its root table addresses, emptied: the next bind fills them.
++    writes: Vec<Write>,
++    holes: Vec<Hole>,
++    bound_samplers: Vec<Arc<OwnedSampler>>,
++    roots: Vec<(metal2vulkan::vk::ShaderStageFlags, u64)>,
++}
++
++impl BindMemo {
++    /// The memo with nothing kept but its vectors' room: what an ended encoder hands the next
++    /// (`render::DrawRooms`), holding no texture of its views.
++    pub(super) fn emptied(mut self) -> Self {
++        self.views.clear();
++        self.samplers.clear();
++        self.writes.clear();
++        self.holes.clear();
++        self.bound_samplers.clear();
++        self.roots.clear();
++        self
++    }
++
++    /// Keep the vectors of a [`Bound`] its consumer is done with for the next bind; samplers
++    /// where the consumer did not keep them.
++    pub(super) fn give_back(
++        &mut self,
++        mut writes: Vec<Write>,
++        mut holes: Vec<Hole>,
++        samplers: Option<Vec<Arc<OwnedSampler>>>,
++    ) {
++        writes.clear();
++        holes.clear();
++        self.writes = writes;
++        self.holes = holes;
++        if let Some(mut samplers) = samplers {
++            samplers.clear();
++            self.bound_samplers = samplers;
++        }
++    }
+ }
+ 
+ /// What a view a bind made or found is a function of ([`BindMemo`]): a binding of the texture as
+@@ -1457,7 +1519,24 @@ pub(super) fn command_uses(
+     index: Option<(&Buffer, u64)>,
+     indirect: Option<(&Buffer, u64)>,
+ ) -> Result<CommandUses, Error> {
+-    let mut uses = Vec::new();
++    command_uses_in(Vec::new(), call, plan, command, tables, index, indirect)
++}
++
++/// [`command_uses`], its uses listed in `room` (emptied first): a list an earlier command's
++/// uses were in ([`CommandUses::into_room`]).
++pub(super) fn command_uses_in(
++    mut room: Vec<Use<ResourceKey>>,
++    call: &'static str,
++    plan: &BindingPlan,
++    command: &Command<'_>,
++    tables: &Tables<'_>,
++    index: Option<(&Buffer, u64)>,
++    indirect: Option<(&Buffer, u64)>,
++) -> Result<CommandUses, Error> {
++    // At most one use for each resource use of the plan and the command.
++    room.clear();
++    room.reserve(plan.uses.len() + command.uses.len());
++    let mut uses = room;
+     // The keys of the buffers made resident the command reaches through the resident set, by
+     // address; every other use names its resource (a descriptor, a root table's static, a view).
+     // Those it names are gathered once it reaches one so: until then each use names its key.
+@@ -1625,6 +1704,13 @@ impl CommandUses {
+     pub(super) fn resident(&self) -> &BTreeSet<ResourceKey> {
+         &self.resident
+     }
++
++    /// The list the uses were in, emptied, for a later command's ([`command_uses_in`]).
++    pub(super) fn into_room(self) -> Vec<Use<ResourceKey>> {
++        let mut uses = self.uses;
++        uses.clear();
++        uses
++    }
+ }
+ 
+ impl Deref for CommandUses {
+diff --git a/crates/metal2vulkan-runtime/src/blit.rs b/crates/metal2vulkan-runtime/src/blit.rs
+index 2af641bb..9db0e67e 100644
+--- a/crates/metal2vulkan-runtime/src/blit.rs
++++ b/crates/metal2vulkan-runtime/src/blit.rs
+@@ -160,7 +160,7 @@ impl CommandBuffer {
+             core: EncoderCore::open(self, "blit_command_encoder", true)?,
+             pattern: None,
+             shadows: Vec::new(),
+-            log: self.device().shared().rebinds.any().then(CallLog::new),
++            log: self.device().shared().logs_calls().then(CallLog::new),
+         })
+     }
+ }
+diff --git a/crates/metal2vulkan-runtime/src/blit_texture.rs b/crates/metal2vulkan-runtime/src/blit_texture.rs
+index f280c2a6..aa98987f 100644
+--- a/crates/metal2vulkan-runtime/src/blit_texture.rs
++++ b/crates/metal2vulkan-runtime/src/blit_texture.rs
+@@ -1739,9 +1739,11 @@ impl BlitCommandEncoder {
+         if one_dimensional || !own_format {
+             return Err(gap());
+         }
+-        if !device.mipmaps_accepted(texture)? {
+-            return Err(gap());
+-        }
++        // A format whose blit chain failed the measured-spread check, or whose Metal answer is not
++        // measured, still gets the chain: Metal generates every filterable format's mipmaps with its
++        // box filter, and a refusal leaves the levels unwritten (a texture sampled below level 0
++        // shows garbage). The near-equivalent is announced once per device.
++        let within_spread = device.mipmaps_accepted(texture)?;
+         let (image, aspects) = (texture.raw_image()?, texture_aspects(texture.image_plan()?));
+         device.shared().counts.pool_compiled(
+             crate::work_counts::PoolCompiled::ImageBlit,
+@@ -1777,14 +1779,25 @@ impl BlitCommandEncoder {
+             .collect();
+         self.scrub(texture, written)?;
+         let pixel_format = texture.record().pixel_format;
+-        device.degrade(Degradation::MipmapsWithinSpread, || {
+-            (
+-                format!("generate_mipmaps of a {} texture", pixel_format.name()),
+-                "the device's blit chain gives the format's mipmaps within Metal's measured \
+-                 spread, which the runtime checked at the format's first generate_mipmaps"
+-                    .to_owned(),
+-            )
+-        });
++        if within_spread {
++            device.degrade(Degradation::MipmapsWithinSpread, || {
++                (
++                    format!("generate_mipmaps of a {} texture", pixel_format.name()),
++                    "the device's blit chain gives the format's mipmaps within Metal's measured \
++                     spread, which the runtime checked at the format's first generate_mipmaps"
++                        .to_owned(),
++                )
++            });
++        } else {
++            device.degrade(Degradation::MipmapsBoxFilter, || {
++                (
++                    format!("generate_mipmaps of a {} texture", pixel_format.name()),
++                    "the device's linear blit chain, whose answers for the format lie outside \
++                     Metal's measured spread or were not measured"
++                        .to_owned(),
++                )
++            });
++        }
+         Ok(())
+     }
+ 
+diff --git a/crates/metal2vulkan-runtime/src/buffer_descriptor.rs b/crates/metal2vulkan-runtime/src/buffer_descriptor.rs
+index 902a821c..5d072640 100644
+--- a/crates/metal2vulkan-runtime/src/buffer_descriptor.rs
++++ b/crates/metal2vulkan-runtime/src/buffer_descriptor.rs
+@@ -539,6 +539,10 @@ impl Device {
+         if self.is_lost() {
+             return Err(Error::DeviceLost);
+         }
++        // Its encoders logged nothing to encode again (`DeviceOptions::refuse_rebinds`).
++        if self.shared().refuse_rebinds {
++            return Err(invalid(call, Problem::Rebind(RebindProblem::Refused)));
++        }
+         let key = buffer.identity().key;
+         let encoded = || invalid(call, Problem::Rebind(RebindProblem::EncodedUses));
+         if self.rebind_pending(key) {
+diff --git a/crates/metal2vulkan-runtime/src/command_buffer/completion.rs b/crates/metal2vulkan-runtime/src/command_buffer/completion.rs
+index af866a3f..38bb81bb 100644
+--- a/crates/metal2vulkan-runtime/src/command_buffer/completion.rs
++++ b/crates/metal2vulkan-runtime/src/command_buffer/completion.rs
+@@ -292,6 +292,9 @@ fn run(watch: &Watch) {
+                 buffer.read_stamps();
+                 buffer.place_gpu_times();
+             }
++            // The calibration pair the next commits take, refreshed here when old rather than at
++            // a commit (`Timing::kept_pair`).
++            device.shared().timing.pair();
+         }
+         drop(device);
+         match settled {
+diff --git a/crates/metal2vulkan-runtime/src/command_buffer/mod.rs b/crates/metal2vulkan-runtime/src/command_buffer/mod.rs
+index 8b3a0c25..6e92f2be 100644
+--- a/crates/metal2vulkan-runtime/src/command_buffer/mod.rs
++++ b/crates/metal2vulkan-runtime/src/command_buffer/mod.rs
+@@ -1136,7 +1136,7 @@ impl Drop for CommandBufferShared {
+         // state.
+         let pool = lock(&self.state).pool.take();
+         if let Some(pool) = pool {
+-            self.device.shared().spares.give_command_pool(pool);
++            self.device.shared().spares.give_command_pool(self.device.shared(), pool);
+         }
+     }
+ }
+@@ -2401,7 +2401,7 @@ impl CommandBufferShared {
+             Some(slot) => {
+                 shared.counts.timestamp_slot_taken();
+                 state.times.slot = Some(slot);
+-                state.times.pair = timing.pair();
++                state.times.pair = timing.kept_pair();
+             }
+             None => state.times.stamped = Stamped::NoSlot,
+         }
+@@ -2723,7 +2723,7 @@ impl CommandBufferShared {
+             // buffer that completed gives back its descriptor pools too, one that failed releases
+             // them here.
+             if let Some(pool) = state.pool.take() {
+-                self.device.shared().spares.give_command_pool(pool);
++                self.device.shared().spares.give_command_pool(self.device.shared(), pool);
+             }
+             if state.status == CommandBufferStatus::Completed {
+                 state.descriptors.give_back();
+diff --git a/crates/metal2vulkan-runtime/src/command_buffer/submit.rs b/crates/metal2vulkan-runtime/src/command_buffer/submit.rs
+index d90691f0..8b18e146 100644
+--- a/crates/metal2vulkan-runtime/src/command_buffer/submit.rs
++++ b/crates/metal2vulkan-runtime/src/command_buffer/submit.rs
+@@ -313,22 +313,24 @@ impl CommandBufferShared {
+         let mut lead = Some(Barrier::after_completed());
+         let mut work = Vec::with_capacity(2 * (end - start) + 1);
+         if entry.is_some() {
+-            let globals: Vec<Barrier> = lead.take().into_iter().chain(entry_barrier).collect();
++            let (pair, count) = barrier_pair(lead.take(), entry_barrier);
++            let globals = &pair[..count];
+             let stamps = Stamps {
+                 start: start_stamp.take(),
+                 end: None,
+             };
+-            work.push(self.record_barriers(&mut state, &globals, &entries, stamps)?);
++            work.push(self.record_barriers(&mut state, globals, &entries, stamps)?);
+         }
+         for (offset, barrier) in barriers.iter().enumerate() {
+-            let globals: Vec<Barrier> = lead.take().into_iter().chain(*barrier).collect();
++            let (pair, count) = barrier_pair(lead.take(), *barrier);
++            let globals = &pair[..count];
+             if !globals.is_empty() {
+                 let stamps = Stamps {
+                     start: start_stamp.take(),
+                     end: None,
+                 };
+                 let kept = &mut scheduler.kept;
+-                work.push(self.barrier_buffer(&mut state, kept, at, &globals, &[], stamps)?);
++                work.push(self.barrier_buffer(&mut state, kept, at, globals, &[], stamps)?);
+             }
+             work.extend(&state.recorded[start + offset].raws);
+         }
+@@ -823,3 +825,15 @@ struct Stamps {
+     start: Option<(vk::QueryPool, u32)>,
+     end: Option<(vk::QueryPool, u32)>,
+ }
++
++/// `lead` then `barrier`, those of them there are, as the first `.1` of the array: the globals
++/// of a barrier between a batch's encoders, which takes no allocation.
++fn barrier_pair(lead: Option<Barrier>, barrier: Option<Barrier>) -> ([Barrier; 2], usize) {
++    let mut pair = [Barrier::default(); 2];
++    let mut count = 0;
++    for b in lead.into_iter().chain(barrier) {
++        pair[count] = b;
++        count += 1;
++    }
++    (pair, count)
++}
+diff --git a/crates/metal2vulkan-runtime/src/compute.rs b/crates/metal2vulkan-runtime/src/compute.rs
+index 0863fd54..92894bd1 100644
+--- a/crates/metal2vulkan-runtime/src/compute.rs
++++ b/crates/metal2vulkan-runtime/src/compute.rs
+@@ -226,7 +226,7 @@ impl CommandBuffer {
+             indirect_stage_in: None,
+             residency: self.inherited_residency(false),
+             captures: Captures::default(),
+-            log: self.device().shared().rebinds.any().then(CallLog::new),
++            log: self.device().shared().logs_calls().then(CallLog::new),
+             dispatches: 0,
+         })
+     }
+diff --git a/crates/metal2vulkan-runtime/src/degradation.rs b/crates/metal2vulkan-runtime/src/degradation.rs
+index c969b53a..fc20e579 100644
+--- a/crates/metal2vulkan-runtime/src/degradation.rs
++++ b/crates/metal2vulkan-runtime/src/degradation.rs
+@@ -764,6 +764,13 @@ degradations! {
+             "each level is the device's linear blit of the one above, which on the check's inputs \
+              lay within 1 unit in the last place (2 for 32-bit float) of an Apple M3 Max's or an \
+              Apple M4's answer, not at either's exactly; other inputs are not checked";
++        /// `generate_mipmaps` through the device's blit chain for a pixel format whose chain the
++        /// runtime's check did not accept within Metal's measured spread, or whose Metal answer is
++        /// not measured: Metal generates such a format's mipmaps with its box filter.
++        MipmapsBoxFilter = "mipmaps-box-filter", Precision,
++            "each level is the device's linear blit of the one above, a box filter like Metal's, \
++             whose answers for the format lie outside the spread measured between an Apple M3 \
++             Max and an Apple M4, or were not measured";
+         /// A depth or stencil texture made in a heap on a device whose driver lays depth and
+         /// stencil images apart from the memory they are bound to
+         /// ([`metal2vulkan::device::DriverFact::DepthStencilImagesLieApart`]) that no shadow of the
+diff --git a/crates/metal2vulkan-runtime/src/device/adopt.rs b/crates/metal2vulkan-runtime/src/device/adopt.rs
+index 73f84ba4..4262d65d 100644
+--- a/crates/metal2vulkan-runtime/src/device/adopt.rs
++++ b/crates/metal2vulkan-runtime/src/device/adopt.rs
+@@ -266,6 +266,8 @@ impl Device {
+             gpu_times_from_host: raw.gpu_times_from_host,
+             // An adopted device keeps no execution record: validation makes its own devices.
+             record_executions: false,
++            // An adopted device's rebinds go as a made device's do by default.
++            refuse_rebinds: false,
+             announce_each: raw.announce_each,
+             view_reinterpretation,
+             generated_commands: false,
+diff --git a/crates/metal2vulkan-runtime/src/device/create.rs b/crates/metal2vulkan-runtime/src/device/create.rs
+index 76a0d07e..77ac8af4 100644
+--- a/crates/metal2vulkan-runtime/src/device/create.rs
++++ b/crates/metal2vulkan-runtime/src/device/create.rs
+@@ -169,6 +169,14 @@ pub struct DeviceOptions {
+     /// No Metal counterpart.
+     #[doc(hidden)]
+     pub record_executions: bool,
++    /// Refuse every `rebind_bytes_no_copy`, of a buffer and of a heap (`Invalid`,
++    /// [`RebindProblem::Refused`](crate::RebindProblem::Refused)), for a consumer that never moves
++    /// the host pages of what it made with `new_buffer_with_bytes_no_copy` or
++    /// `new_heap_with_bytes_no_copy`. Off by default. The device's compute, blit and render
++    /// encoders then log no calls (`replay.rs`): a log is read only to encode its encoder again at
++    /// a rebind, so a draw pays nothing for a log no one reads. `detach_backing` is unchanged. No
++    /// Metal counterpart.
++    pub refuse_rebinds: bool,
+ }
+ 
+ /// One setting of an instance layer (`VkLayerSettingEXT`).
+@@ -1248,6 +1256,7 @@ fn create_on(
+         gpu_times_from_host: options.gpu_times_from_host,
+         announce_each: options.announce_each.clone(),
+         record_executions: options.record_executions,
++        refuse_rebinds: options.refuse_rebinds,
+         view_reinterpretation,
+         generated_commands,
+         host_image_copy,
+@@ -1356,6 +1365,7 @@ fn same_options(a: &DeviceOptions, b: &DeviceOptions) -> bool {
+         announce_each,
+         metal_level,
+         record_executions,
++        refuse_rebinds,
+     } = a;
+     *policy == b.policy
+         && *layers == b.layers
+@@ -1374,6 +1384,7 @@ fn same_options(a: &DeviceOptions, b: &DeviceOptions) -> bool {
+         && *announce_each == b.announce_each
+         && *metal_level == b.metal_level
+         && *record_executions == b.record_executions
++        && *refuse_rebinds == b.refuse_rebinds
+ }
+ 
+ /// The group of `made` for `options`: the live one, or a new one on a new instance. Its index.
+diff --git a/crates/metal2vulkan-runtime/src/device/mod.rs b/crates/metal2vulkan-runtime/src/device/mod.rs
+index 990c892f..f7b18e68 100644
+--- a/crates/metal2vulkan-runtime/src/device/mod.rs
++++ b/crates/metal2vulkan-runtime/src/device/mod.rs
+@@ -63,7 +63,7 @@ use super::memory::Memory;
+ use super::mipmap_scratch::MipmapScratch;
+ use super::owned_kernel::OwnedKernels;
+ use super::render_state::{depth_bias_command, DepthBiasCommand};
+-use super::render_target::KeptCompatible;
++use super::render_target::{KeptCompatible, KeptFinal};
+ use super::resource_ids::{ResourceIds, SamplerIdReads};
+ use super::sample_planes::PlanesObjects;
+ use super::sampler::{SamplerCount, SamplerKey, SamplerShared};
+@@ -305,6 +305,8 @@ pub(super) struct DeviceShared {
+     pub(super) attachmentless: Mutex<KeptPasses>,
+     /// The compatible passes it keeps, by shape (`render_target::shared_compatible_pass`).
+     pub(super) compatible_passes: Mutex<KeptCompatible>,
++    /// The final passes it keeps, by what they are made of (`render_target::kept_final_pass`).
++    pub(super) final_passes: Mutex<KeptFinal>,
+     /// The caller's images that move between layouts, and the events' timeline semaphores
+     /// (`interop.rs`).
+     pub(super) interop: Interop,
+@@ -364,13 +366,26 @@ pub(super) struct DeviceShared {
+     /// Its command buffers keep execution records (`DeviceOptions::record_executions`): where
+     /// not, its encoders build none (`EncoderCore::executed`).
+     pub(crate) record_executions: bool,
++    /// It refuses every rebind (`DeviceOptions::refuse_rebinds`): its encoders log no calls
++    /// ([`DeviceShared::logs_calls`]).
++    pub(crate) refuse_rebinds: bool,
+     /// Counts the times an image of the device let its views go, under its views lock (a
+     /// rebind's or a storage form's new `VkImage`, a detach's stand-in, a reattach): a view kept
+     /// by what it was made of (`binding::BindMemo`) is current while this holds.
+     pub(crate) views_epoch: AtomicU64,
++    /// The vectors ended render encoders' draws filled, emptied, for the next encoders' draws
++    /// (`render::DrawRooms`).
++    pub(crate) draw_rooms: Mutex<Vec<crate::render::DrawRooms>>,
+ }
+ 
+ impl DeviceShared {
++    /// Whether an encoder opened now logs its calls (`replay.rs`): where the device has a buffer
++    /// over host pages, unless it refuses every rebind, the only reader of a log
++    /// (`DeviceOptions::refuse_rebinds`).
++    pub(crate) fn logs_calls(&self) -> bool {
++        !self.refuse_rebinds && self.rebinds.any()
++    }
++
+     /// What `create` makes with the `VkPipelineCache` it is handed, its `vkCreate*Pipelines` call:
+     /// a cache of the making's own, seeded from the record `making` names
+     /// (`ShaderCache::make_pipelines`, `shader_cache/driver.rs`). On a pool's thread the exit waits
+@@ -498,6 +513,7 @@ impl Drop for DeviceShared {
+         lock(&self.depth_stencil_resolves).destroy(self.vk());
+         lock(&self.attachmentless).destroy(self.vk());
+         lock(&self.compatible_passes).destroy(self.vk());
++        lock(&self.final_passes).destroy(self.vk());
+         // What released variants left (`pipeline/kept.rs`).
+         lock(&self.kept).destroy(self);
+         // The graphics pipeline libraries, after every pipeline they linked: each linked
+@@ -751,6 +767,8 @@ pub(super) struct Parts {
+     pub(super) announce_each: BTreeSet<Degradation>,
+     /// Its command buffers keep execution records (`DeviceOptions::record_executions`).
+     pub(super) record_executions: bool,
++    /// It refuses every rebind (`DeviceOptions::refuse_rebinds`).
++    pub(super) refuse_rebinds: bool,
+     /// Its views may reinterpret an image's components ([`DeviceShared`]'s field), outside
+     /// `enabled`'s vocabulary.
+     pub(super) view_reinterpretation: bool,
+@@ -818,6 +836,7 @@ impl Device {
+             gpu_times_from_host,
+             announce_each,
+             record_executions,
++            refuse_rebinds,
+             view_reinterpretation,
+             generated_commands,
+             host_image_copy,
+@@ -962,6 +981,21 @@ impl Device {
+         // SAFETY: the device is live, of `physical`, and enables timeline semaphores, and
+         // `bufferDeviceAddress` where `device_address` says so; `queues` holds at least one of
+         // its queues, which nothing uses yet.
++        let priming_has = prime::Has {
++            timestamps: timestamp_bits > 0,
++            device_addresses: device_address,
++            generated_commands: generated_commands.is_some(),
++            sparse_binding: sparse.binds(),
++        };
++        // Raw disk/cache I/O only: starting the ordinary guarded cache or its
++        // worker before priming would change the destructor ordering it protects.
++        let priming_cache = cache.priming(
++            &unsafe { instance.raw.get_physical_device_properties(physical) },
++            compile.profile_fingerprint(),
++            instance.settings,
++            prime::cache_key(priming_has, queue_family),
++            instance.sink().cloned(),
++        );
+         if let Err(error) = unsafe {
+             prime::prime(
+                 &instance.raw,
+@@ -971,13 +1005,9 @@ impl Device {
+                 queue_family,
+                 &queues,
+                 Sharing::new(&queue_families),
+-                prime::Has {
+-                    timestamps: timestamp_bits > 0,
+-                    device_addresses: device_address,
+-                    generated_commands: generated_commands.is_some(),
+-                    sparse_binding: sparse.binds(),
+-                },
++                priming_has,
+                 generated_commands.as_ref(),
++                priming_cache,
+             )
+         } {
+             scheduler.stop();
+@@ -1205,7 +1235,9 @@ impl Device {
+             properties,
+             announced: Announced::new(&announce_each),
+             record_executions,
++            refuse_rebinds,
+             views_epoch: AtomicU64::new(0),
++            draw_rooms: Mutex::new(Vec::new()),
+             device_address,
+             upload_alignment,
+             memory: Mutex::new(memory),
+@@ -1261,6 +1293,7 @@ impl Device {
+             depth_stencil_resolves: Mutex::new(DepthStencilResolveObjects::default()),
+             attachmentless: Mutex::default(),
+             compatible_passes: Mutex::default(),
++            final_passes: Mutex::default(),
+             interop: Interop::default(),
+             heap_keys: Default::default(),
+             rebinds: Default::default(),
+diff --git a/crates/metal2vulkan-runtime/src/device/prime.rs b/crates/metal2vulkan-runtime/src/device/prime.rs
+index 91791baa..8bb81ba3 100644
+--- a/crates/metal2vulkan-runtime/src/device/prime.rs
++++ b/crates/metal2vulkan-runtime/src/device/prime.rs
+@@ -52,9 +52,11 @@ use crate::generated_commands::{
+ use crate::loader_word::LoaderWord;
+ use crate::memory;
+ use crate::release::{self, Generated, Released};
++use crate::shader_cache::PrimingCache;
+ use crate::sharing::Sharing;
+ use crate::tracker::Barrier;
+ use ash::vk;
++use sha2::{Digest, Sha256};
+ use std::time::{Duration, Instant};
+ 
+ use super::QueueSlot;
+@@ -184,7 +186,7 @@ const VERTEX_SHADER: [u32; 29] = [
+ 
+ /// What the device primed has: a queue family that writes timestamps, device addresses,
+ /// `VK_EXT_device_generated_commands`, and sparse binding on its queues.
+-#[derive(Clone, Copy)]
++#[derive(Clone, Copy, Debug)]
+ pub(crate) struct Has {
+     pub(crate) timestamps: bool,
+     pub(crate) device_addresses: bool,
+@@ -192,6 +194,16 @@ pub(crate) struct Has {
+     pub(crate) sparse_binding: bool,
+ }
+ 
++/// Identity includes every byte of the helper implementation, enabled compile
++/// profile (in Records), instance settings, driver identity, and these choices.
++/// No pointer/handle or host path enters the persistent key.
++pub(super) fn cache_key(has: Has, queue_family: u32) -> metal2vulkan::cache::Hash256 {
++    crate::shader_cache::driver::Making::new("entry-point-priming-v1")
++        .digest(&Sha256::digest(include_bytes!("prime.rs")).into())
++        .text(&(has, queue_family))
++        .finish()
++}
++
+ /// Prime `device` of `physical`, made from `instance`, whose queues are `queues`, the first of
+ /// its primary family `queue_family`, its buffers and images shared as `sharing` says, on this
+ /// thread; `has` says what the device has, and `generated` holds the commands of
+@@ -213,6 +225,7 @@ pub(super) unsafe fn prime(
+     sharing: Sharing<'_>,
+     has: Has,
+     generated: Option<&Commands>,
++    mut disk: PrimingCache,
+ ) -> Result<(), Error> {
+     let mut primer = Primer {
+         device,
+@@ -222,6 +235,8 @@ pub(super) unsafe fn prime(
+         memory: unsafe { instance.get_physical_device_memory_properties(physical) },
+         calls: 0,
+         held: Vec::new(),
++        disk: &mut disk,
++        pipeline_cache: vk::PipelineCache::null(),
+     };
+     // SAFETY: the caller's.
+     let primed = unsafe {
+@@ -239,6 +254,10 @@ pub(super) unsafe fn prime(
+     unsafe {
+         let _ = device.device_wait_idle();
+         primer.made(Call::DeviceWaitIdle);
++        if primed.is_ok() && primer.pipeline_cache != vk::PipelineCache::null() {
++            primer.disk.keep(device, loader_word, primer.pipeline_cache);
++            primer.made(Call::GetPipelineCacheData);
++        }
+         while let Some(release) = primer.held.pop() {
+             let call = release(device);
+             primer.made(call);
+@@ -303,6 +322,8 @@ struct Primer<'a> {
+     calls: u128,
+     /// What was made, released last first.
+     held: Vec<Release>,
++    disk: &'a mut PrimingCache,
++    pipeline_cache: vk::PipelineCache,
+ }
+ 
+ impl Primer<'_> {
+@@ -395,6 +416,9 @@ impl Primer<'_> {
+         let pool = unsafe { device.create_command_pool(&pool_info, None) }.map_err(vulkan)?;
+         self.made(Call::CreateCommandPool);
+         self.hold(pool);
++        // SAFETY: the pool was just made, and nothing of it is pending.
++        unsafe { device.reset_command_pool(pool, vk::CommandPoolResetFlags::empty()) }.map_err(vulkan)?;
++        self.made(Call::ResetCommandPool);
+         let allocate = vk::CommandBufferAllocateInfo::default()
+             .command_pool(pool)
+             .level(vk::CommandBufferLevel::PRIMARY)
+@@ -575,7 +599,7 @@ impl Primer<'_> {
+                 .layout(layout)
+                 .push_next(&mut flags);
+             let pipeline = device
+-                .create_compute_pipelines(vk::PipelineCache::null(), &[info], None)
++                .create_compute_pipelines(self.pipeline_cache, &[info], None)
+                 .map_err(|(_, error)| vulkan(error))?[0];
+             self.hold(pipeline);
+             let pipelines = ExecutionSetPipelineInfo::new(pipeline, 1);
+@@ -848,9 +872,8 @@ impl Primer<'_> {
+             let module = device.create_shader_module(&info, None).map_err(vulkan)?;
+             self.made(Call::CreateShaderModule);
+             self.hold(module);
+-            let cache = device
+-                .create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None)
+-                .map_err(vulkan)?;
++            let cache = self.disk.open(device, self.loader_word).map_err(vulkan)?;
++            self.pipeline_cache = cache;
+             self.made(Call::CreatePipelineCache);
+             self.hold(cache);
+             let stage = vk::PipelineShaderStageCreateInfo::default()
+diff --git a/crates/metal2vulkan-runtime/src/exit_guard.rs b/crates/metal2vulkan-runtime/src/exit_guard.rs
+index 9f989439..4ff87fd0 100644
+--- a/crates/metal2vulkan-runtime/src/exit_guard.rs
++++ b/crates/metal2vulkan-runtime/src/exit_guard.rs
+@@ -303,6 +303,8 @@ calls! {
+     // (`Device::drain_queues`).
+     QueueWaitIdle => c"vkQueueWaitIdle",
+     ResetFences => c"vkResetFences",
++    // A command pool given back reset (`spares.rs`), on the completion thread.
++    ResetCommandPool => c"vkResetCommandPool",
+     DestroyCommandPool => c"vkDestroyCommandPool",
+     DestroyFence => c"vkDestroyFence",
+     DestroySemaphore => c"vkDestroySemaphore",
+@@ -470,7 +472,7 @@ pub(crate) const HOST_STEP: &[Call] = &[
+ ];
+ 
+ impl Call {
+-    /// Its bit. The table fills 88 of the word's 128 (widened from 64): when it next outgrows the
++    /// Its bit. The table fills 90 of the word's 128 (widened from 64): when it next outgrows the
+     /// word, widen the word (here, [`CALLED`], `PENDING` and the priming's calls); do not add a
+     /// second table.
+     pub(crate) fn bit(self) -> u128 {
+@@ -723,7 +725,7 @@ where
+ }
+ 
+ /// Start one of the runtime's threads that take a command buffer from its commit to its handlers,
+-/// running `f`, as [`spawn`] does, but at the user-interactive quality of service on macOS, and
++/// running `f`, as [`spawn`] does, but at the user-interactive quality of service on macOS and iOS, and
+ /// with the utilization floor at its top on Linux, from its start ([`run_at_user_interactive`]):
+ /// the scheduler's (`scheduler/`), the completion thread
+ /// and each `VkQueue`'s waiter (`command_buffer/completion.rs`), and every thread of the handler
+@@ -764,7 +766,9 @@ thread_local! {
+ /// `device/compiles.rs`). MoltenVK runs each
+ /// compile on a dispatch queue that takes the class of the thread asking, so the class here is the
+ /// compile's class in Metal's compiler service.
+-#[cfg(target_os = "macos")]
++/// On iOS native Vulkan drivers compile on this thread itself; keeping that work
++/// below the waiting UI thread's class can starve the first frame.
++#[cfg(any(target_os = "macos", target_os = "ios"))]
+ pub(crate) fn raise_to_user_initiated() {
+     if !at_least_user_initiated() {
+         // SAFETY: sets the calling thread's own class; no pointer.
+@@ -774,13 +778,13 @@ pub(crate) fn raise_to_user_initiated() {
+     }
+ }
+ 
+-/// Nothing: no quality of service class here ([`raise_to_user_initiated`] on macOS).
+-#[cfg(not(target_os = "macos"))]
++/// Nothing: no quality of service class here ([`raise_to_user_initiated`] on macOS and iOS).
++#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+ pub(crate) fn raise_to_user_initiated() {}
+ 
+ /// Run this thread at the user-interactive quality of service, whatever its class: a thread of
+ /// the runtime's own that takes command buffers to their handlers ([`spawn_user_interactive`]).
+-#[cfg(target_os = "macos")]
++#[cfg(any(target_os = "macos", target_os = "ios"))]
+ fn run_at_user_interactive() {
+     // Metal runs every command buffer's scheduled and completed handlers at the user-interactive
+     // class, whatever the class of the thread that committed it: measured on an M3 Max, macOS
+@@ -901,12 +905,12 @@ impl SchedAttr {
+ }
+ 
+ /// Nothing: no such hint here ([`run_at_user_interactive`] on macOS and Linux).
+-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
++#[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "linux")))]
+ fn run_at_user_interactive() {}
+ 
+ /// Whether this thread runs at the user-initiated quality of service or above: its class is
+ /// user-initiated or user-interactive. Always where there is no such class.
+-#[cfg(target_os = "macos")]
++#[cfg(any(target_os = "macos", target_os = "ios"))]
+ pub(crate) fn at_least_user_initiated() -> bool {
+     use libc::qos_class_t as Q;
+     let mut class = Q::QOS_CLASS_UNSPECIFIED;
+@@ -922,7 +926,7 @@ pub(crate) fn at_least_user_initiated() -> bool {
+ }
+ 
+ /// Always: no quality of service class here ([`at_least_user_initiated`] on macOS).
+-#[cfg(not(target_os = "macos"))]
++#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+ pub(crate) fn at_least_user_initiated() -> bool {
+     true
+ }
+diff --git a/crates/metal2vulkan-runtime/src/gpu_time.rs b/crates/metal2vulkan-runtime/src/gpu_time.rs
+index f265af01..8b09e6ee 100644
+--- a/crates/metal2vulkan-runtime/src/gpu_time.rs
++++ b/crates/metal2vulkan-runtime/src/gpu_time.rs
+@@ -610,6 +610,18 @@ impl Timing {
+         self.from_host
+     }
+ 
++    /// The device's latest calibration pair, however old, taken now only where there is none: a
++    /// commit's, on the program's thread. A reading is a round trip to the GPU's driver (on
++    /// DroidVM a request to the host, from WindowServer's main thread every 100 ms); the
++    /// completion thread refreshes the pair instead ([`pair`](Self::pair)), so the one a commit
++    /// takes is at most [`REFRESH`] and a command buffer's completion old.
++    pub(crate) fn kept_pair(&self) -> Option<Pair> {
++        if let Some((_, pair)) = *lock(&self.latest) {
++            return Some(pair);
++        }
++        self.pair()
++    }
++
+     /// The device's latest calibration pair, taken now when the last is [`REFRESH`] old or
+     /// there is none; `None` where the device has no calibration or the reading fails.
+     pub(crate) fn pair(&self) -> Option<Pair> {
+diff --git a/crates/metal2vulkan-runtime/src/linear_plan.rs b/crates/metal2vulkan-runtime/src/linear_plan.rs
+index a0a2cbc1..acf8ae7f 100644
+--- a/crates/metal2vulkan-runtime/src/linear_plan.rs
++++ b/crates/metal2vulkan-runtime/src/linear_plan.rs
+@@ -766,6 +766,26 @@ pub(super) fn only_reads(usage: TextureUsage) -> bool {
+     )
+ }
+ 
++/// Whether a render pass that keeps a texture `width` texels wide over `layout`'s texels in tile
++/// memory stores it back within the bytes an image over them may hold, in a buffer of
++/// `buffer_length` bytes: a tile store reaching the texture's right or bottom edge writes whole
++/// 16x4-texel blocks, so up to 15 texels past a row's last and 3 rows past its last row. Every
++/// row's block must end within its pitch, and the last block within the buffer; one slice only.
++pub(super) fn tile_store_fits(layout: &BufferLayout, width: u64, buffer_length: u64) -> bool {
++    const TILE: (u64, u64) = (16, 4);
++    if layout.slices != 1 || width == 0 || !layout.row_bytes.is_multiple_of(width) {
++        return false;
++    }
++    let block_row = width.next_multiple_of(TILE.0) * (layout.row_bytes / width);
++    let last_row = layout.rows.next_multiple_of(TILE.1) - 1;
++    layout.row_pitch >= block_row
++        && layout
++            .offset
++            .saturating_add(layout.row_pitch.saturating_mul(last_row))
++            .saturating_add(block_row)
++            <= buffer_length
++}
++
+ /// What an image over `layout`'s texels may hold beside them, for a texture of Metal `usage` (as
+ /// [`only_reads`] takes it) under `policy`, or why no image may hold them: the texels alone
+ /// where its rows (and slices) lie one after another, or it has one row (one slice); else, where
+@@ -819,7 +839,7 @@ pub(super) fn holding(
+         return Ok(Holds::Texels);
+     };
+     let reads = only_reads(usage);
+-    if reads && policy == PaddedReadsPolicy::Alias {
++    if policy == PaddedReadsPolicy::AliasWrites || (reads && policy == PaddedReadsPolicy::Alias) {
+         return Ok(Holds::Padding);
+     }
+     let writers = if usage.contains(TextureUsage::RENDER_TARGET) {
+diff --git a/crates/metal2vulkan-runtime/src/live_bind.rs b/crates/metal2vulkan-runtime/src/live_bind.rs
+index 86967541..b4f1a7c2 100644
+--- a/crates/metal2vulkan-runtime/src/live_bind.rs
++++ b/crates/metal2vulkan-runtime/src/live_bind.rs
+@@ -66,6 +66,15 @@ impl Reshape {
+         }
+         *field = value;
+     }
++
++    /// [`field`](Self::field) of `value`, cloned only where it changes the field: a draw of the
++    /// same state copies nothing.
++    pub(super) fn field_from<T: PartialEq + Clone>(&mut self, field: &mut T, value: &T) {
++        if field != value {
++            self.0 = true;
++            field.clone_from(value);
++        }
++    }
+ }
+ 
+ /// A render encoder's bind state as its last draw bound it, and its shape while no change may
+diff --git a/crates/metal2vulkan-runtime/src/memory.rs b/crates/metal2vulkan-runtime/src/memory.rs
+index de3df1e2..73626dff 100644
+--- a/crates/metal2vulkan-runtime/src/memory.rs
++++ b/crates/metal2vulkan-runtime/src/memory.rs
+@@ -49,7 +49,14 @@ use std::sync::Arc;
+ use std::sync::Mutex;
+ 
+ /// The size of a pooled block, at most the device's `maxMemoryAllocationSize`.
+-pub(super) const BLOCK_BYTES: u64 = 64 << 20;
++pub(super) const BLOCK_BYTES: u64 = 8 << 20;
++
++/// The first pooled block of a pool: later ones grow with the pool ([`Memory::next_block_bytes`]),
++/// doubling it up to [`BLOCK_BYTES`]. Where device memory is the system's own and every block is
++/// wired as it is made (a guest whose GPU imports its pages), a process with a few small resources
++/// otherwise held a 64 MiB block in each of its pools: 256-640 MiB each, 2 GiB in all at an iPadOS
++/// guest's home screen.
++pub(super) const FIRST_BLOCK_BYTES: u64 = 4 << 20;
+ 
+ /// What memory a resource needs.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+@@ -328,6 +335,14 @@ impl<T> Pool<T> {
+         }
+     }
+ 
++    /// The bytes of its pooled blocks.
++    pub(super) fn pooled_bytes(&self) -> u64 {
++        (self.blocks.iter().flatten())
++            .filter(|block| !block.dedicated)
++            .map(|block| block.ranges.len())
++            .sum()
++    }
++
+     /// Whether a pooled block has room for `size` bytes at the largest alignment asked of the
+     /// pool so far.
+     pub(super) fn has_room(&self, size: u64) -> bool {
+@@ -821,6 +836,17 @@ impl Memory {
+             .add(size, dedicated, block, used)
+     }
+ 
++    /// The size of the next pooled block of `pool` for a placement of `size` bytes: as many bytes
++    /// as its pooled blocks have (the pool doubles), at least [`FIRST_BLOCK_BYTES`] and the
++    /// placement's next power of two, at most [`BLOCK_BYTES`] (or the device's largest
++    /// allocation).
++    fn next_block_bytes(&self, pool: (Holds, u32), size: u64) -> u64 {
++        let have = self.pool_ref(pool.0, pool.1).pooled_bytes();
++        (have.max(FIRST_BLOCK_BYTES).max(size.next_power_of_two()))
++            .min(self.block_bytes)
++            .max(size)
++    }
++
+     /// What making a block takes, copied out so that the block is made with the memory's lock
+     /// released ([`place`], [`keep_room`]).
+     fn maker(&self) -> BlockMaker {
+@@ -1374,10 +1400,10 @@ fn place(
+         return Err(Error::OutOfMemory(MemoryKind::Device));
+     }
+     let dedicated = fit == Fit::Apart || size > maker.block_bytes / 2;
+-    let block_size = if dedicated { size } else { maker.block_bytes };
+     let mut failure = Error::OutOfMemory(MemoryKind::Device);
+     for type_index in candidates {
+         let pool = (holds, type_index);
++        let block_size = if dedicated { size } else { lock(memory).next_block_bytes(pool, size) };
+         if fit == Fit::Pooled {
+             if let Some(placement) =
+                 lock(memory).place_pooled(device, pool, size, align, addressed)?
+@@ -1411,27 +1437,26 @@ pub(super) fn keep_room(memory: &Mutex<Memory>, device: &ash::Device, counts: &C
+         let Ok(kept) = memory.kept(device) else {
+             return;
+         };
+-        let room = memory.block_bytes / 2;
+-        let lacking: Vec<(Holds, u32)> = (kept.into_iter())
+-            .filter(|&(holds, type_index)| !memory.pool_ref(holds, type_index).has_room(room))
++        // Room for half of the pool's next block: a growing pool keeps room for what its blocks
++        // have held, rather than half of the largest block from its first encoding on.
++        let lacking: Vec<((Holds, u32), u64)> = (kept.into_iter())
++            .map(|pool| (pool, memory.next_block_bytes(pool, 1)))
++            .filter(|&((holds, type_index), bytes)| !memory.pool_ref(holds, type_index).has_room(bytes / 2))
+             .collect();
+         (lacking, memory.maker())
+     };
+-    for pool in lacking {
++    for (pool, bytes) in lacking {
+         let addressed = (pool.0 == Holds::Buffers).then_some(counts);
+-        let Ok(block) = maker.make(device, pool.1, maker.block_bytes, addressed) else {
++        let Ok(block) = maker.make(device, pool.1, bytes, addressed) else {
+             continue;
+         };
+         let mut memory = lock(memory);
+-        if memory
+-            .pool_ref(pool.0, pool.1)
+-            .has_room(maker.block_bytes / 2)
+-        {
++        if memory.pool_ref(pool.0, pool.1).has_room(bytes / 2) {
+             drop(memory);
+             // SAFETY: nothing is placed in the block, which no command reads.
+             unsafe { block.release(device) };
+             continue;
+         }
+-        memory.add_block(pool, block, maker.block_bytes, false, 0);
++        memory.add_block(pool, block, bytes, false, 0);
+     }
+ }
+diff --git a/crates/metal2vulkan-runtime/src/neutral.rs b/crates/metal2vulkan-runtime/src/neutral.rs
+index 4cf4a440..def66eed 100644
+--- a/crates/metal2vulkan-runtime/src/neutral.rs
++++ b/crates/metal2vulkan-runtime/src/neutral.rs
+@@ -26,6 +26,7 @@
+ //! work samples, its bind waited for that work on NVIDIA's driver (`memory.rs`'s `Fit`).
+ 
+ use super::device::lock;
++use super::key_hash::KeyMap;
+ use super::error::{vulkan, Error};
+ use super::memory::{Memory, MemoryClass, Placement};
+ use super::resource::ResourceKey;
+@@ -85,9 +86,9 @@ impl Filled for NeutralTexels {
+ /// A device's neutral images, texel buffers and samplers, made at first use.
+ #[derive(Default)]
+ pub(super) struct Neutrals {
+-    images: HashMap<NeutralResource, Arc<NeutralImage>>,
++    images: KeyMap<NeutralResource, Arc<NeutralImage>>,
+     /// By format and whether the view is a storage texel buffer's.
+-    texels: HashMap<(Format, bool), Arc<NeutralTexels>>,
++    texels: KeyMap<(Format, bool), Arc<NeutralTexels>>,
+     /// By whether depth comparison is enabled.
+     samplers: HashMap<bool, vk::Sampler>,
+ }
+diff --git a/crates/metal2vulkan-runtime/src/pipeline/memo.rs b/crates/metal2vulkan-runtime/src/pipeline/memo.rs
+index c2054d9f..76187dfb 100644
+--- a/crates/metal2vulkan-runtime/src/pipeline/memo.rs
++++ b/crates/metal2vulkan-runtime/src/pipeline/memo.rs
+@@ -19,10 +19,11 @@
+ use super::render::RenderVariant;
+ use super::Variant;
+ use crate::device::lock;
++use crate::key_hash::KeyMap;
+ use metal2vulkan::cache::PipelineKey;
+ use metal2vulkan::library::{CompiledFunction, FunctionCompileKey};
+ use metal2vulkan::pipeline::{ComputePipeline, RenderPipeline};
+-use std::collections::{BTreeMap, HashMap};
++use std::collections::BTreeMap;
+ use std::hash::Hash;
+ use std::sync::{Arc, Mutex, Weak};
+ 
+@@ -33,7 +34,7 @@ pub(crate) const MEMO_ENTRIES: usize = 4096;
+ /// entries, removing the least recently used past either. A lookup or an insert is a use.
+ pub(crate) struct Lru<K, V> {
+     /// Each entry's number: the stamp of the insert that kept it.
+-    numbers: HashMap<K, u64>,
++    numbers: KeyMap<K, u64>,
+     /// The entries, by number.
+     entries: BTreeMap<u64, Slot<K, V>>,
+     /// Each entry's number by its last use, oldest first.
+@@ -61,7 +62,7 @@ impl<K: Clone + Eq + Hash, V> Lru<K, V> {
+     /// An empty map bounded by `max_weight` and `max_entries`.
+     pub(crate) fn new(max_weight: u64, max_entries: usize) -> Lru<K, V> {
+         Lru {
+-            numbers: HashMap::new(),
++            numbers: KeyMap::default(),
+             entries: BTreeMap::new(),
+             order: BTreeMap::new(),
+             clock: 0,
+diff --git a/crates/metal2vulkan-runtime/src/range.rs b/crates/metal2vulkan-runtime/src/range.rs
+index 5c32befa..54855d56 100644
+--- a/crates/metal2vulkan-runtime/src/range.rs
++++ b/crates/metal2vulkan-runtime/src/range.rs
+@@ -111,6 +111,11 @@ impl RangeAllocator {
+         self.free.insert(start, size);
+     }
+ 
++    /// The bytes of `[base, end)`.
++    pub(super) fn len(&self) -> u64 {
++        self.end - self.base
++    }
++
+     /// Whether nothing is allocated.
+     pub(super) fn is_empty(&self) -> bool {
+         self.free.len() == 1 && self.free.get(&self.base) == Some(&(self.end - self.base))
+diff --git a/crates/metal2vulkan-runtime/src/rebind.rs b/crates/metal2vulkan-runtime/src/rebind.rs
+index 2bce8e61..e8a8d2c6 100644
+--- a/crates/metal2vulkan-runtime/src/rebind.rs
++++ b/crates/metal2vulkan-runtime/src/rebind.rs
+@@ -77,6 +77,9 @@ pub enum RebindProblem {
+     /// a resource placed in it, or has an encoder open that used one (or one committed whose
+     /// commands the runtime records only once earlier work completed): commit or drop it first.
+     EncodedUses,
++    /// The device refuses every rebind (`DeviceOptions::refuse_rebinds`): its encoders log no
++    /// calls to encode again.
++    Refused,
+ }
+ 
+ /// The device's buffers over host pages, by their hazard-tracking key, with the command buffers
+@@ -721,7 +724,8 @@ impl Buffer {
+     /// (`NotImplemented(RebindTextures)`: the texture's copies, views and aliasing image are
+     /// planned at that offset), or where the device cannot make a texture's aliasing image again
+     /// over the new memory (`NotImplemented(RebindTextures)`, which says when); memory the device
+-    /// cannot import exactly, as `new_buffer_with_bytes_no_copy` refuses it; a lost device.
++    /// cannot import exactly, as `new_buffer_with_bytes_no_copy` refuses it; a lost device; a
++    /// device made with `DeviceOptions::refuse_rebinds` (`Invalid`, [`RebindProblem::Refused`]).
+     ///
+     /// # Safety
+     ///
+@@ -777,7 +781,8 @@ impl Heap {
+     /// [`RebindProblem::EncodedUses`]); memory whose first byte is off the import's unit
+     /// (`Invalid`, `HeapProblem::HostMemoryAlignment`); memory the device cannot import exactly;
+     /// an image the device cannot make again there (as `new_texture_at_offset` refuses it); a
+-    /// lost device.
++    /// lost device; a device made with `DeviceOptions::refuse_rebinds` (`Invalid`,
++    /// [`RebindProblem::Refused`]).
+     ///
+     /// # Safety
+     ///
+diff --git a/crates/metal2vulkan-runtime/src/render.rs b/crates/metal2vulkan-runtime/src/render.rs
+index 870bdb10..0ed9ae7d 100644
+--- a/crates/metal2vulkan-runtime/src/render.rs
++++ b/crates/metal2vulkan-runtime/src/render.rs
+@@ -296,7 +296,7 @@ use super::render_pass::{
+     self, check_memoryless, AspectTarget, Attachment, DepthStencilTarget, PassLayout,
+     RenderPassDescriptor, RenderPassProblem, Target, HIDDEN_DEPTH_FORMAT, MAX_COLOR_ATTACHMENTS,
+ };
+-use super::render_state::{self, DepthBiasRecord, EncoderState, MAX_VIEWPORTS};
++use super::render_state::{self, DepthBiasRecord, EncoderState, PerViewport, MAX_VIEWPORTS};
+ use super::render_state::{Compensation, DepthBiasEffect, WrittenDepthClamp};
+ use super::render_target::{self, covers, PassShape, Position, RenderPassObject};
+ use super::render_values::{LoadAction, ScissorRect, StoreAction, StoreActionOptions, Viewport};
+@@ -325,8 +325,8 @@ pub use late_resolve::ResolveTarget;
+ use metal2vulkan::bind::BindingPlan;
+ use metal2vulkan::bind::VertexAmplification;
+ use metal2vulkan::bind::{
+-    DrawCall, FragmentTests, HeapPlacement, ImageblockSize, IndexBufferRef, IndirectRef,
+-    MeshDispatch, MeshGroups, TessellationFactors, ViewSetup, WriteSource,
++    DrawCall, DrawCommands, FragmentTests, HeapPlacement, ImageblockSize, IndexBufferRef,
++    IndirectRef, MeshDispatch, MeshGroups, TessellationFactors, ViewSetup, WriteSource,
+ };
+ use metal2vulkan::cache::SpecializationKey;
+ use metal2vulkan::device::{DriverFact, FormatUsage, VkFeature};
+@@ -612,8 +612,8 @@ struct DrawSettings {
+ /// (`render_state.rs`).
+ #[derive(Clone)]
+ struct DrawState {
+-    viewports: Vec<vk::Viewport>,
+-    scissors: Vec<vk::Rect2D>,
++    viewports: PerViewport<vk::Viewport>,
++    scissors: PerViewport<vk::Rect2D>,
+     fixed: FixedState,
+     /// The front and back stencil references.
+     stencil_reference: [u32; 2],
+@@ -1121,6 +1121,15 @@ pub struct RenderCommandEncoder {
+     /// The last draw's variant, plan and specialization under which the bound values' notices
+     /// were quiet (`Device::degrade_bound_values`), where it was.
+     quiet_bound_values: Option<QuietBoundValues>,
++    /// The last draw's commands, whose lists the next draw's fill again.
++    draw_commands: Option<DrawCommands>,
++    /// The list the last draw's uses were in, emptied, for the next draw's
++    /// (`binding::command_uses_in`).
++    uses_room: Vec<Use<ResourceKey>>,
++    /// The list the last draw's argument samplers were in, emptied (`Device::argument_samplers_into`).
++    argument_samplers_room: Vec<SamplerState>,
++    /// The list the last draw's vertex buffer binds were in, emptied, for the next draw's.
++    vertex_buffers_room: Vec<(u32, vk::Buffer, u64, u64)>,
+     /// The views and sampler descriptions its draws' binds made or found (`binding::BindMemo`).
+     bind_memo: binding::BindMemo,
+     /// What its last draw retained of its own ([`LastRetained`]).
+@@ -1140,6 +1149,44 @@ struct LastRetained {
+     samplers: Vec<Arc<OwnedSampler>>,
+ }
+ 
++/// The vectors a render encoder's draws fill again draw after draw, emptied: an ended encoder
++/// gives them to its device, whose next encoder takes them, so its first draws allocate them no
++/// more than its later ones.
++#[derive(Default)]
++pub(crate) struct DrawRooms {
++    draw_commands: Option<DrawCommands>,
++    uses: Vec<Use<ResourceKey>>,
++    argument_samplers: Vec<SamplerState>,
++    vertex_buffers: Vec<(u32, vk::Buffer, u64, u64)>,
++    bind_memo: binding::BindMemo,
++    bound: Bound,
++}
++
++/// The most [`DrawRooms`] a device keeps: one per encoder encoding at once.
++const KEPT_DRAW_ROOMS: usize = 4;
++
++impl DrawRooms {
++    /// A kept one of `device`'s, or new ones.
++    fn take(device: &crate::device::Device) -> Self {
++        crate::device::lock(&device.shared().draw_rooms)
++            .pop()
++            .unwrap_or_default()
++    }
++
++    /// Keep them for `device`'s next encoder, emptied.
++    fn keep(mut self, device: &crate::device::Device) {
++        self.uses.clear();
++        self.argument_samplers.clear();
++        self.vertex_buffers.clear();
++        self.bind_memo = self.bind_memo.emptied();
++        self.bound = self.bound.emptied();
++        let mut kept = crate::device::lock(&device.shared().draw_rooms);
++        if kept.len() < KEPT_DRAW_ROOMS {
++            kept.push(self);
++        }
++    }
++}
++
+ impl LastRetained {
+     /// Retain into `core` a draw's pipeline state, variant objects and made `VkPipeline`, each
+     /// unless it is the one the last draw retained.
+@@ -1179,29 +1226,37 @@ impl LastRetained {
+     /// Retain into `core` the samplers a draw's bind named, unless they are the ones the last
+     /// draw's named, in order: each by another reference to it, the last first, so they go in
+     /// their order (`retained.rs`).
+-    fn retain_samplers(&mut self, core: &mut EncoderCore, samplers: Vec<Arc<OwnedSampler>>) {
++    /// Answers the list where it keeps the one it had, which is the same: the next bind fills it.
++    fn retain_samplers(
++        &mut self,
++        core: &mut EncoderCore,
++        samplers: Vec<Arc<OwnedSampler>>,
++    ) -> Option<Vec<Arc<OwnedSampler>>> {
+         let same = samplers.len() == self.samplers.len()
+             && samplers
+                 .iter()
+                 .zip(&self.samplers)
+                 .all(|(a, b)| Arc::ptr_eq(a, b));
+-        if !same {
+-            for sampler in samplers.iter().rev() {
+-                core.retain_shared(sampler.clone());
+-            }
+-            self.samplers = samplers;
++        if same {
++            return Some(samplers);
+         }
++        for sampler in samplers.iter().rev() {
++            core.retain_shared(sampler.clone());
++        }
++        self.samplers = samplers;
++        None
+     }
+ }
+ 
+ /// A variant, plan and specialization under which `Device::degrade_bound_values` was quiet: no
+ /// clause of a note it tested held. Which hold is a function of the three alone, so a draw of
+ /// the same three announces nothing there. The variant and the plan are held, so a pointer seen
+-/// again is the same object.
++/// again is the same object. The specialization is the plan's own where `specialization` is
++/// `None` (every draw but a mesh draw of its own key), so a draw keeps no copy of it.
+ struct QuietBoundValues {
+     variant: Arc<RenderVariant>,
+     plan: Arc<BindingPlan>,
+-    specialization: SpecializationKey,
++    specialization: Option<SpecializationKey>,
+ }
+ 
+ impl QuietBoundValues {
+@@ -1214,7 +1269,11 @@ impl QuietBoundValues {
+     ) -> bool {
+         Arc::ptr_eq(&self.variant, variant)
+             && Arc::ptr_eq(&self.plan, plan)
+-            && self.specialization == *specialization
++            && self
++                .specialization
++                .as_ref()
++                .unwrap_or(&self.plan.specialization)
++                == specialization
+     }
+ }
+ 
+@@ -1261,8 +1320,7 @@ impl CommandBuffer {
+         let log = match again {
+             None => device
+                 .shared()
+-                .rebinds
+-                .any()
++                .logs_calls()
+                 .then(|| RenderLog::new(descriptor)),
+             Some(_) => None,
+         };
+@@ -1298,6 +1356,7 @@ impl CommandBuffer {
+         render_pass::degrade_depth_clear(device, &layout);
+         let extended = ExtendedShadows::of(descriptor, &layout, rate_map.is_some());
+         let rerecord = reroute::keeps_whole(device) || extended.keeps_draws();
++        let rooms = DrawRooms::take(device);
+         Ok(RenderCommandEncoder {
+             core,
+             earlier: Vec::new(),
+@@ -1318,7 +1377,7 @@ impl CommandBuffer {
+                 reformats: Vec::new(),
+                 positioned: None,
+                 rerecord: rerecord.then(Vec::new),
+-                bound: Bound::default(),
++                bound: rooms.bound,
+             },
+             state: EncoderState::metal_defaults(
+                 rate_map
+@@ -1386,7 +1445,11 @@ impl CommandBuffer {
+             live: Arc::default(),
+             log,
+             quiet_bound_values: None,
+-            bind_memo: binding::BindMemo::default(),
++            draw_commands: rooms.draw_commands,
++            uses_room: rooms.uses,
++            argument_samplers_room: rooms.argument_samplers,
++            vertex_buffers_room: rooms.vertex_buffers,
++            bind_memo: rooms.bind_memo,
+             last_retained: LastRetained::default(),
+         })
+     }
+@@ -3019,7 +3082,7 @@ impl RenderCommandEncoder {
+         let RenderCommandEncoder {
+             mut core,
+             mut earlier,
+-            current,
++            mut current,
+             mut layout,
+             passes,
+             mut visibility,
+@@ -3045,8 +3108,22 @@ impl RenderCommandEncoder {
+             extended,
+             reload_at,
+             log,
++            draw_commands,
++            uses_room,
++            argument_samplers_room,
++            vertex_buffers_room,
++            bind_memo,
+             ..
+         } = self;
++        DrawRooms {
++            draw_commands,
++            uses: uses_room,
++            argument_samplers: argument_samplers_room,
++            vertex_buffers: vertex_buffers_room,
++            bind_memo,
++            bound: std::mem::take(&mut current.bound),
++        }
++        .keep(core.device());
+         earlier.push(current);
+         let mut instances = earlier;
+         // A color attachment's store action still `Unknown` stores nothing, as plain Metal's
+@@ -5837,7 +5914,10 @@ impl RenderCommandEncoder {
+         let max = pipeline.base().graphics.max_vertex_amplification_count;
+         // The device's sampler states, less those at IDs no set-1 sampler array of the variant
+         // holds (`heap_sets::fit_samplers`).
+-        let mut argument_samplers = self.core.device().argument_samplers();
++        let mut argument_samplers = std::mem::take(&mut self.argument_samplers_room);
++        self.core
++            .device()
++            .argument_samplers_into(&mut argument_samplers);
+         let function_tables = pipeline.function_tables();
+         let mut unlisted = None;
+         let reads_tile_memory = pipeline.reads_tile_memory();
+@@ -5956,8 +6036,8 @@ impl RenderCommandEncoder {
+                 return Err(Error::NotImplemented(RuntimeGap::ImageblockMasters));
+             }
+         }
+-        let commands = plan
+-            .instantiate_draw(&live.state, &draw)
++        let mut commands = self.draw_commands.take().unwrap_or_else(DrawCommands::empty);
++        plan.instantiate_draw_into(&live.state, &draw, &mut commands)
+             .map_err(Error::Bind)?;
+         self.reaches_unnamed |= !commands.root_tables.is_empty() || reads_handles(&plan);
+         // A mesh draw the binder launches no threadgroup of (as plain Metal draws nothing).
+@@ -6394,7 +6474,8 @@ impl RenderCommandEncoder {
+             mesh: mesh_work.as_ref().map(mesh::MeshWork::regions),
+         };
+         let (index, indirect) = (buffers.index.as_ref(), buffers.indirect.as_ref());
+-        let mut uses = binding::command_uses(
++        let mut uses = binding::command_uses_in(
++            std::mem::take(&mut self.uses_room),
+             call,
+             &plan,
+             &command,
+@@ -6444,7 +6525,8 @@ impl RenderCommandEncoder {
+             self.capture_missed();
+             return Ok(());
+         }
+-        let mut vertex_buffers = Vec::with_capacity(plan.vertex_buffers.len());
++        let mut vertex_buffers = std::mem::take(&mut self.vertex_buffers_room);
++        vertex_buffers.clear();
+         for bind in &plan.vertex_buffers {
+             let table = pass_start.or(Stage::Vertex, &self.vertex);
+             let offset = commands
+@@ -6498,7 +6580,7 @@ impl RenderCommandEncoder {
+         // offsetting bias folded into the compensation (`EncoderState::compensation`).
+         let depth = compensation.and_then(|c| c.depth);
+         let viewports = match depth {
+-            Some(_) => self.state.used_viewports(selects).to_vec(),
++            Some(_) => self.state.used_viewports(selects).iter().copied().collect(),
+             None => self
+                 .state
+                 .draw_viewports(selects, topology, profile, native)?,
+@@ -6553,12 +6635,12 @@ impl RenderCommandEncoder {
+                                 let [min_depth, max_depth] =
+                                     depth.unwrap_or([viewport.min_depth, viewport.max_depth]);
+                                 DrawState {
+-                                    viewports: vec![vk::Viewport {
++                                    viewports: PerViewport::one(vk::Viewport {
+                                         min_depth,
+                                         max_depth,
+                                         ..viewport
+-                                    }],
+-                                    scissors: vec![scissor],
++                                    }),
++                                    scissors: PerViewport::one(scissor),
+                                     ..draw_state.clone()
+                                 }
+                             })
+@@ -6620,7 +6702,7 @@ impl RenderCommandEncoder {
+             self.quiet_bound_values = Some(QuietBoundValues {
+                 variant: Arc::clone(&variant),
+                 plan: Arc::clone(&plan),
+-                specialization: specialization.clone(),
++                specialization: commands.specialization.clone(),
+             });
+         }
+         device.degrade_cross_class(&plan.diagnostics, &formats);
+@@ -6669,7 +6751,7 @@ impl RenderCommandEncoder {
+             binding::bind(call, &device, &mut state, &plan, &command, &tables, memo)?
+         };
+         // The draw's push bytes, filled in place.
+-        let push = binding::push_writes(commands.push_constants, &bound.holes)?;
++        let push = binding::push_writes(std::mem::take(&mut commands.push_constants), &bound.holes)?;
+         // A plan that draws one amplification at a time records the draw once per amplification,
+         // in order, each after that amplification's push writes.
+         let amplified = commands
+@@ -7288,8 +7370,10 @@ impl RenderCommandEncoder {
+         {
+             self.core.retain_shared(buffer.held());
+         }
+-        self.last_retained
++        let unkept = self
++            .last_retained
+             .retain_samplers(&mut self.core, bound.samplers);
++        self.bind_memo.give_back(writes, bound.holes, unkept);
+         if let Some(unlisted) = unlisted {
+             heap_sets::degrade_unlisted(&device, unlisted, "a render pipeline state's draws");
+             // A host step's draw, which no commit lists again, fails its command buffer.
+@@ -7303,7 +7387,16 @@ impl RenderCommandEncoder {
+         }
+         if capture.is_some() {
+             self.capture_uses(uses);
+-        }
++        } else {
++            self.uses_room = uses.into_room();
++        }
++        // The push writes' vectors go back to the commands, which the next draw fills.
++        commands.push_constants = binding::push_room(push);
++        self.draw_commands = Some(commands);
++        // The states go; the list stays for the next draw's.
++        argument_samplers.clear();
++        self.argument_samplers_room = argument_samplers;
++        self.vertex_buffers_room = vertex_buffers;
+         Ok(())
+     }
+ 
+@@ -7599,8 +7692,8 @@ impl RenderCommandEncoder {
+                 &mut state.depth_clamp_range,
+                 settings.written_clamp.map(|w| w.range),
+             );
+-            reshape.field(&mut state.zeroed_colors, settings.zeroed_colors.clone());
+-            reshape.field(&mut state.dropped_colors, settings.dropped_colors.clone());
++            reshape.field_from(&mut state.zeroed_colors, &settings.zeroed_colors);
++            reshape.field_from(&mut state.dropped_colors, &settings.dropped_colors);
+             reshape.field(&mut state.interlocked_colors, interlocked.clone());
+             reshape.field(&mut state.extended_shadows, shadows.clone());
+             let depth_stencil = match &settings.failing_state {
+@@ -7788,6 +7881,11 @@ impl Recording<'_> {
+     /// is live until the command buffer completes, and `bound` is the record of what the draws
+     /// recorded into it bound (each recorded through it).
+     unsafe fn record(&self, bound: &mut Bound) -> u64 {
++        // A draw whose pipeline could not be created (the compile was refused) has a null pipeline; binding it crashes the driver
++        // (int-170: tu_CmdBindPipeline in the render server). The draw is dropped instead, and nothing is recorded for it.
++        if self.pipeline == vk::Pipeline::null() {
++            return 0;
++        }
+         let (raw, cb) = (self.raw, self.command_buffer);
+         let dynamic = |state| self.dynamic.contains(&state);
+         bound.follow(cb);
+diff --git a/crates/metal2vulkan-runtime/src/render/bound.rs b/crates/metal2vulkan-runtime/src/render/bound.rs
+index 0060cfce..3892fed8 100644
+--- a/crates/metal2vulkan-runtime/src/render/bound.rs
++++ b/crates/metal2vulkan-runtime/src/render/bound.rs
+@@ -32,7 +32,7 @@ use ash::vk;
+ use super::{DrawState, IndexBind};
+ use crate::binding::PushWrite;
+ use crate::pipeline::FixedState;
+-use crate::render_state::DepthBiasSetting;
++use crate::render_state::{DepthBiasSetting, PerViewport};
+ 
+ /// The state commands recorded into one secondary command buffer that still hold (the module
+ /// docs).
+@@ -63,8 +63,8 @@ pub(super) struct Bound {
+ /// The values a draw sets its dynamic states to: the encoder's state at the draw and its input
+ /// assembly.
+ pub(super) struct Values {
+-    viewports: Vec<vk::Viewport>,
+-    scissors: Vec<vk::Rect2D>,
++    viewports: PerViewport<vk::Viewport>,
++    scissors: PerViewport<vk::Rect2D>,
+     fixed: FixedState,
+     stencil_reference: [u32; 2],
+     depth_bias: DepthBiasSetting,
+@@ -87,11 +87,37 @@ impl Bound {
+         if self.command_buffer != command_buffer {
+             *self = Bound {
+                 command_buffer,
+-                ..Bound::default()
++                ..std::mem::take(self).emptied()
+             };
+         }
+     }
+ 
++    /// Nothing bound, its vectors' room kept: an ended encoder's for the next encoder's
++    /// (`DrawRooms`).
++    pub(super) fn emptied(self) -> Bound {
++        let Bound {
++            mut sets,
++            mut pushes,
++            mut push_bytes,
++            mut vertex,
++            mut set,
++            ..
++        } = self;
++        sets.clear();
++        pushes.clear();
++        push_bytes.clear();
++        vertex.clear();
++        set.clear();
++        Bound {
++            sets,
++            pushes,
++            push_bytes,
++            vertex,
++            set,
++            ..Bound::default()
++        }
++    }
++
+     /// Whether binding `pipeline`, which holds the dynamic states `dynamic` (the module docs),
+     /// sets anything: noted as bound where it does.
+     pub(super) fn pipeline(
+@@ -226,8 +252,8 @@ impl Values {
+     fn of(now: Now<'_>) -> Values {
+         let s = now.state;
+         Values {
+-            viewports: s.viewports.clone(),
+-            scissors: s.scissors.clone(),
++            viewports: s.viewports,
++            scissors: s.scissors,
+             fixed: s.fixed,
+             stencil_reference: s.stencil_reference,
+             depth_bias: s.depth_bias.setting(),
+@@ -302,14 +328,8 @@ impl Values {
+         let s = now.state;
+         let (ds, now_ds) = (&mut self.fixed.depth_stencil, &s.fixed.depth_stencil);
+         match state {
+-            vk::DynamicState::VIEWPORT => {
+-                self.viewports.clear();
+-                self.viewports.extend_from_slice(&s.viewports);
+-            }
+-            vk::DynamicState::SCISSOR => {
+-                self.scissors.clear();
+-                self.scissors.extend_from_slice(&s.scissors);
+-            }
++            vk::DynamicState::VIEWPORT => self.viewports = s.viewports,
++            vk::DynamicState::SCISSOR => self.scissors = s.scissors,
+             vk::DynamicState::DEPTH_BIAS => self.depth_bias = s.depth_bias.setting(),
+             vk::DynamicState::BLEND_CONSTANTS => self.blend_color = s.blend_color,
+             vk::DynamicState::STENCIL_COMPARE_MASK => {
+diff --git a/crates/metal2vulkan-runtime/src/render/executions.rs b/crates/metal2vulkan-runtime/src/render/executions.rs
+index 458c5717..db52d4f9 100644
+--- a/crates/metal2vulkan-runtime/src/render/executions.rs
++++ b/crates/metal2vulkan-runtime/src/render/executions.rs
+@@ -2094,6 +2094,10 @@ impl RenderExecution {
+             live: Arc::default(),
+             log: None,
+             quiet_bound_values: None,
++            draw_commands: None,
++            uses_room: Vec::new(),
++            argument_samplers_room: Vec::new(),
++            vertex_buffers_room: Vec::new(),
+             bind_memo: crate::binding::BindMemo::default(),
+             last_retained: Default::default(),
+         }
+diff --git a/crates/metal2vulkan-runtime/src/render/pass_start_reads.rs b/crates/metal2vulkan-runtime/src/render/pass_start_reads.rs
+index 04982ae3..40c1471f 100644
+--- a/crates/metal2vulkan-runtime/src/render/pass_start_reads.rs
++++ b/crates/metal2vulkan-runtime/src/render/pass_start_reads.rs
+@@ -54,7 +54,7 @@ use crate::values::{CpuCacheMode, HazardTrackingMode, ResourceOptions, StorageMo
+ use crate::Device;
+ use ash::vk;
+ use metal2vulkan::pipeline::{PipelineInterface, SlotClass, SlotInterface, Stage};
+-use std::collections::HashMap;
++use crate::key_hash::KeyMap;
+ use std::ops::Range;
+ 
+ /// The byte ranges one key holds before they are merged into their hull.
+@@ -74,7 +74,7 @@ const MESH_STAGES: vk::PipelineStageFlags2 = vk::PipelineStageFlags2::from_raw(
+ 
+ /// Byte ranges of buffers, tracked or not, by key.
+ #[derive(Clone, Default)]
+-struct Written(HashMap<ResourceKey, Vec<Range<u64>>>);
++struct Written(KeyMap<ResourceKey, Vec<Range<u64>>>);
+ 
+ impl Written {
+     fn add(&mut self, key: ResourceKey, range: &Range<u64>) {
+@@ -89,7 +89,9 @@ impl Written {
+     }
+ 
+     fn overlaps(&self, key: ResourceKey, range: &Range<u64>) -> bool {
+-        self.0.get(&key).is_some_and(|ranges| {
++        // Most passes' fragment stages write no buffer: no key to hash.
++        !self.0.is_empty()
++            && self.0.get(&key).is_some_and(|ranges| {
+             ranges
+                 .iter()
+                 .any(|r| r.start < range.end && range.start < r.end)
+diff --git a/crates/metal2vulkan-runtime/src/render_state.rs b/crates/metal2vulkan-runtime/src/render_state.rs
+index f6f5ffdb..c7b65210 100644
+--- a/crates/metal2vulkan-runtime/src/render_state.rs
++++ b/crates/metal2vulkan-runtime/src/render_state.rs
+@@ -113,6 +113,70 @@ use metal2vulkan::pipeline::{GraphicsState, ViewportCompensation};
+ /// Metal's most viewports and scissor rectangles.
+ pub(super) const MAX_VIEWPORTS: usize = 16;
+ 
++/// One value per viewport a draw uses, held in place: its viewports and scissors, which every draw
++/// makes, without allocating. A draw uses at most [`MAX_VIEWPORTS`] (the setters refuse more,
++/// `check_count`, and a draw uses the viewports set or the first).
++#[derive(Clone, Copy, Debug)]
++pub(super) struct PerViewport<T> {
++    items: [T; MAX_VIEWPORTS],
++    len: u8,
++}
++
++impl<T: Copy + Default> PerViewport<T> {
++    /// `item` alone.
++    pub(super) fn one(item: T) -> PerViewport<T> {
++        std::iter::once(item).collect()
++    }
++}
++
++impl<T> std::ops::Deref for PerViewport<T> {
++    type Target = [T];
++
++    fn deref(&self) -> &[T] {
++        &self.items[..usize::from(self.len)]
++    }
++}
++
++impl<T> std::ops::DerefMut for PerViewport<T> {
++    fn deref_mut(&mut self) -> &mut [T] {
++        &mut self.items[..usize::from(self.len)]
++    }
++}
++
++impl<T: Copy + Default> FromIterator<T> for PerViewport<T> {
++    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> PerViewport<T> {
++        let mut items = [T::default(); MAX_VIEWPORTS];
++        let mut len = 0;
++        for item in iter {
++            assert!(len < MAX_VIEWPORTS, "a draw of more than {MAX_VIEWPORTS} viewports");
++            items[len] = item;
++            len += 1;
++        }
++        PerViewport {
++            items,
++            len: len as u8,
++        }
++    }
++}
++
++impl<'a, T> IntoIterator for &'a PerViewport<T> {
++    type Item = &'a T;
++    type IntoIter = std::slice::Iter<'a, T>;
++
++    fn into_iter(self) -> Self::IntoIter {
++        self.iter()
++    }
++}
++
++impl<'a, T> IntoIterator for &'a mut PerViewport<T> {
++    type Item = &'a mut T;
++    type IntoIter = std::slice::IterMut<'a, T>;
++
++    fn into_iter(self) -> Self::IntoIter {
++        self.iter_mut()
++    }
++}
++
+ /// What a viewport, scissor rectangle or depth/stencil setter did wrong.
+ #[non_exhaustive]
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+@@ -188,19 +252,18 @@ impl EncoderState {
+         refused: Option<Error>,
+     ) -> Result<(), Error> {
+         check_count(call, viewports.len())?;
+-        // A NaN origin x draws nothing, as plain Metal's: a viewport of no width.
+-        let viewports: Vec<Viewport> = viewports
+-            .iter()
+-            .map(|v| match v.origin_x.is_nan() {
+-                true => Viewport {
+-                    origin_x: 0.0,
+-                    width: 0.0,
+-                    ..*v
+-                },
+-                false => *v,
+-            })
+-            .collect();
+-        for v in &viewports {
++        // A NaN origin x draws nothing, as plain Metal's: a viewport of no width. The vector is
++        // written in place, so a draw's call allocates nothing once the encoder's has its room.
++        self.viewports.clear();
++        self.viewports.extend(viewports.iter().map(|v| match v.origin_x.is_nan() {
++            true => Viewport {
++                origin_x: 0.0,
++                width: 0.0,
++                ..*v
++            },
++            false => *v,
++        }));
++        for v in &self.viewports {
+             let fields = [v.origin_x, v.origin_y, v.width, v.height, v.znear, v.zfar];
+             if fields.iter().any(|f| !f.is_finite()) {
+                 return Err(invalid(
+@@ -209,10 +272,9 @@ impl EncoderState {
+                 ));
+             }
+         }
+-        if let Some(error) = refused.filter(|_| viewports.iter().any(outside_depth)) {
++        if let Some(error) = refused.filter(|_| self.viewports.iter().any(outside_depth)) {
+             return Err(error);
+         }
+-        self.viewports = viewports;
+         Ok(())
+     }
+ 
+@@ -238,14 +300,12 @@ impl EncoderState {
+             let start = origin.min(end);
+             (start, origin.saturating_add(size).min(end) - start)
+         };
+-        self.scissors = scissors
+-            .iter()
+-            .map(|s| {
+-                let (x, width) = clip(s.x, s.width, width);
+-                let (y, height) = clip(s.y, s.height, height);
+-                ScissorRect::new(x, y, width, height)
+-            })
+-            .collect();
++        self.scissors.clear();
++        self.scissors.extend(scissors.iter().map(|s| {
++            let (x, width) = clip(s.x, s.width, width);
++            let (y, height) = clip(s.y, s.height, height);
++            ScissorRect::new(x, y, width, height)
++        }));
+         Ok(())
+     }
+ 
+@@ -335,7 +395,7 @@ impl EncoderState {
+         topology: metal2vulkan::vk::PrimitiveTopology,
+         profile: &DeviceProfile,
+         native: bool,
+-    ) -> Result<Vec<Viewport>, Error> {
++    ) -> Result<PerViewport<Viewport>, Error> {
+         let used = self.used_viewports(selects);
+         let clamps = self.clip_mode == DepthClipMode::Clamp;
+         // In clamp mode a range past `[0, 1]` whose one clamp holds one depth stores that depth
+@@ -766,7 +826,7 @@ impl EncoderState {
+         viewports: &[Viewport],
+         depth: Option<[f32; 2]>,
+         guard: Option<[f64; 2]>,
+-    ) -> Vec<vk::Viewport> {
++    ) -> PerViewport<vk::Viewport> {
+         viewports
+             .iter()
+             .map(|v| {
+@@ -808,7 +868,7 @@ impl EncoderState {
+     /// its index, the one rectangle where the encoder holds one, and an empty one past two or
+     /// more (the module docs), each clipped to the pixels its viewport overlaps, Metal's implicit
+     /// scissor ([`viewport_pixels`]).
+-    pub(super) fn vk_scissors(&self, selects: bool) -> Vec<vk::Rect2D> {
++    pub(super) fn vk_scissors(&self, selects: bool) -> PerViewport<vk::Rect2D> {
+         self.each_vk_scissor(selects).collect()
+     }
+ 
+diff --git a/crates/metal2vulkan-runtime/src/render_target.rs b/crates/metal2vulkan-runtime/src/render_target.rs
+index 0310edd4..5f7b8fae 100644
+--- a/crates/metal2vulkan-runtime/src/render_target.rs
++++ b/crates/metal2vulkan-runtime/src/render_target.rs
+@@ -107,6 +107,7 @@
+ 
+ use super::attachment_stand_in::Cause;
+ use super::attachmentless;
++use super::key_hash::KeyMap;
+ use super::binding_view::VkView;
+ use super::device::lock;
+ use super::error::{internal, Error};
+@@ -124,7 +125,6 @@ use crate::release;
+ use ash::vk;
+ use metal2vulkan::bind::ViewSetup;
+ use metal2vulkan::device::{DeviceProfile, DriverFact};
+-use std::collections::HashMap;
+ use std::sync::Arc;
+ 
+ /// What makes two passes compatible: each color index's format (`None` without a texture), the
+@@ -299,7 +299,7 @@ pub(super) fn later_steps(layout: &PassLayout) -> impl Iterator<Item = &ResolveS
+ }
+ 
+ /// One attachment's operations: of its color or depth aspect, then of its stencil aspect.
+-#[derive(Clone, Copy)]
++#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+ struct Ops {
+     load: vk::AttachmentLoadOp,
+     store: vk::AttachmentStoreOp,
+@@ -652,7 +652,7 @@ const KEPT_SHAPES: usize = 64;
+ 
+ /// The compatible passes a device keeps, by shape ([`shared_compatible_pass`]).
+ #[derive(Default)]
+-pub(super) struct KeptCompatible(HashMap<PassShape, vk::RenderPass>);
++pub(super) struct KeptCompatible(KeyMap<PassShape, vk::RenderPass>);
+ 
+ impl KeptCompatible {
+     /// Destroy every kept pass; the device is idle, and is destroyed next.
+@@ -723,34 +723,186 @@ pub(super) fn final_pass(
+     }
+     let anchor = shape.anchor(device.compile_device().profile());
+     let dont_care = DontCare::of(device);
+-    let colors: Vec<Ops> = layout
+-        .colors
+-        .iter()
+-        .enumerate()
+-        .filter_map(|(index, color)| Some((index, color.as_ref()?)))
+-        .map(|(index, color)| color_ops(color, anchor == Some(index as u32), at, dont_care))
+-        .collect();
++    // The operations go in this thread's kept vectors: a pass found kept copies none of them.
++    let (mut colors, mut resolves) = FINAL_OPS.take();
++    colors.clear();
++    colors.extend(
++        layout
++            .colors
++            .iter()
++            .enumerate()
++            .filter_map(|(index, color)| Some((index, color.as_ref()?)))
++            .map(|(index, color)| color_ops(color, anchor == Some(index as u32), at, dont_care)),
++    );
+     let depth_stencil = layout
+         .depth_stencil
+         .as_ref()
+         .map(|ds| depth_stencil_ops(layout, ds, at, dont_care));
+-    let resolves = vec![
+-        RESOLVED;
++    resolves.clear();
++    resolves.resize(
+         layout
+             .colors
+             .iter()
+             .filter(|c| subpass_resolve(c.as_ref()).is_some())
+-            .count()
+-    ];
+-    create(
++            .count(),
++        RESOLVED,
++    );
++    let pass = kept_final_pass(
+         device,
+-        shape,
+-        &colors,
+-        depth_stencil,
+-        &resolves,
+-        subpass_step(layout).map(step_ops),
+-        at.last,
+-    )
++        FinalKey {
++            shape,
++            colors: &colors,
++            depth_stencil,
++            resolves: &resolves,
++            depth_stencil_resolve: subpass_step(layout).map(step_ops),
++            resolving: at.last,
++        },
++    );
++    FINAL_OPS.set((colors, resolves));
++    pass
++}
++
++thread_local! {
++    /// The vectors [`final_pass`] puts a pass's operations in, emptied by the next.
++    static FINAL_OPS: std::cell::Cell<(Vec<Ops>, Vec<Ops>)> = std::cell::Cell::default();
++}
++
++/// The most final passes a device keeps ([`kept_final_pass`]): a program's passes take a few
++/// shapes, each with a few sets of load and store operations.
++const KEPT_FINALS: usize = 256;
++
++/// What a final pass is made of: [`create`]'s arguments past the device.
++#[derive(Clone, PartialEq, Eq)]
++pub(super) struct FinalMakings {
++    shape: PassShape,
++    colors: Vec<Ops>,
++    depth_stencil: Option<Ops>,
++    resolves: Vec<Ops>,
++    depth_stencil_resolve: Option<Ops>,
++    resolving: bool,
++}
++
++/// [`FinalMakings`] by reference: what a kept pass is looked up by, hashed and compared as the
++/// makings it stands for, so a lookup that finds one copies nothing.
++#[derive(Clone, Copy, PartialEq, Eq, Hash)]
++struct FinalKey<'a> {
++    shape: &'a PassShape,
++    colors: &'a [Ops],
++    depth_stencil: Option<Ops>,
++    resolves: &'a [Ops],
++    depth_stencil_resolve: Option<Ops>,
++    resolving: bool,
++}
++
++impl FinalKey<'_> {
++    fn to_makings(self) -> FinalMakings {
++        FinalMakings {
++            shape: self.shape.clone(),
++            colors: self.colors.to_vec(),
++            depth_stencil: self.depth_stencil,
++            resolves: self.resolves.to_vec(),
++            depth_stencil_resolve: self.depth_stencil_resolve,
++            resolving: self.resolving,
++        }
++    }
++}
++
++/// What has a [`FinalKey`]: the kept makings, and a key looked up by.
++trait FinalKeyed {
++    fn key(&self) -> FinalKey<'_>;
++}
++
++impl FinalKeyed for FinalMakings {
++    fn key(&self) -> FinalKey<'_> {
++        FinalKey {
++            shape: &self.shape,
++            colors: &self.colors,
++            depth_stencil: self.depth_stencil,
++            resolves: &self.resolves,
++            depth_stencil_resolve: self.depth_stencil_resolve,
++            resolving: self.resolving,
++        }
++    }
++}
++
++impl FinalKeyed for FinalKey<'_> {
++    fn key(&self) -> FinalKey<'_> {
++        *self
++    }
++}
++
++impl std::hash::Hash for FinalMakings {
++    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
++        self.key().hash(state);
++    }
++}
++
++impl std::hash::Hash for dyn FinalKeyed + '_ {
++    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
++        self.key().hash(state);
++    }
++}
++
++impl PartialEq for dyn FinalKeyed + '_ {
++    fn eq(&self, other: &Self) -> bool {
++        self.key() == other.key()
++    }
++}
++
++impl Eq for dyn FinalKeyed + '_ {}
++
++impl<'a> std::borrow::Borrow<dyn FinalKeyed + 'a> for FinalMakings {
++    fn borrow(&self) -> &(dyn FinalKeyed + 'a) {
++        self
++    }
++}
++
++/// The final passes a device keeps, by what they are made of ([`kept_final_pass`]).
++#[derive(Default)]
++pub(super) struct KeptFinal(KeyMap<FinalMakings, vk::RenderPass>);
++
++impl KeptFinal {
++    /// Destroy every kept pass; the device is idle, and is destroyed next.
++    pub(super) fn destroy(&self, raw: &ash::Device) {
++        for &pass in self.0.values() {
++            // SAFETY: the device is idle, so no pending command uses the pass, and no framebuffer
++            // made with it is left (each goes with the command buffer that began it).
++            unsafe { release::object(raw, pass) };
++        }
++    }
++}
++
++/// The device's final pass of `makings`, made now where it keeps none. A render pass is immutable,
++/// so one serves every instance made of the same: made and destroyed for every instance, as
++/// before, it cost a `vkCreateRenderPass2` (where Turnip lays out its attachments in GMEM for
++/// every tile layout) and a `vkDestroyRenderPass` each time a pass ended, 19 times a frame of
++/// iOS's compositor. Past [`KEPT_FINALS`] a pass is made for its instance alone, as before.
++fn kept_final_pass(device: &Device, key: FinalKey<'_>) -> Result<RenderPassObject, Error> {
++    let kept = &device.shared().final_passes;
++    if let Some(&raw) = lock(kept).0.get(&key as &dyn FinalKeyed) {
++        return Ok(RenderPassObject::kept(device, raw));
++    }
++    let makings = key.to_makings();
++    let pass = create(
++        device,
++        &makings.shape,
++        &makings.colors,
++        makings.depth_stencil,
++        &makings.resolves,
++        makings.depth_stencil_resolve,
++        makings.resolving,
++    )?;
++    let mut passes = lock(kept);
++    // Another encoder's may have come first: its pass serves, and this one goes unused.
++    if let Some(&raw) = passes.0.get(&makings) {
++        return Ok(RenderPassObject::kept(device, raw));
++    }
++    if pass.owner == Owner::Holders && passes.0.len() < KEPT_FINALS {
++        let raw = pass.into_kept();
++        passes.0.insert(makings, raw);
++        return Ok(RenderPassObject::kept(device, raw));
++    }
++    Ok(pass)
+ }
+ 
+ /// The operations of color attachment `color` in an instance at `at`, the sample planes'
+diff --git a/crates/metal2vulkan-runtime/src/replay.rs b/crates/metal2vulkan-runtime/src/replay.rs
+index f514934c..d39f82d0 100644
+--- a/crates/metal2vulkan-runtime/src/replay.rs
++++ b/crates/metal2vulkan-runtime/src/replay.rs
+@@ -13,7 +13,8 @@
+ //!   over where their buffers lie now. A call refused at its first encoding is refused again,
+ //!   which leaves the encoder as it was encoded first ([`Replay::run`] fails, and the encoder is
+ //!   not encoded again). The log starts at the encoder's open where the device has a buffer over
+-//!   host pages (`Rebinds::any`); else nothing is logged. It costs one push per
++//!   host pages (`Rebinds::any`) and does not refuse every rebind (`DeviceOptions::refuse_rebinds`,
++//!   `DeviceShared::logs_calls`); else nothing is logged. It costs one push per
+ //!   call; a slice of buffers, offsets, textures or bytes goes into one of the log's arenas, so
+ //!   the common calls allocate nothing of their own.
+ //! - **What is kept.** The command buffer keeps an ended encoder's log only where a command of
+diff --git a/crates/metal2vulkan-runtime/src/resource_ids.rs b/crates/metal2vulkan-runtime/src/resource_ids.rs
+index b3dc4806..d5881f3e 100644
+--- a/crates/metal2vulkan-runtime/src/resource_ids.rs
++++ b/crates/metal2vulkan-runtime/src/resource_ids.rs
+@@ -464,6 +464,11 @@ impl ResourceIds {
+ 
+     /// The live holders of sampler IDs, in ID order: the states a sampler table lists.
+     pub(super) fn samplers(&self) -> Vec<Arc<SamplerShared>> {
++        self.live_samplers().collect()
++    }
++
++    /// [`samplers`](Self::samplers), one at a time.
++    pub(super) fn live_samplers(&self) -> impl Iterator<Item = Arc<SamplerShared>> + '_ {
+         self.samplers
+             .slots
+             .values()
+@@ -471,7 +476,6 @@ impl ResourceIds {
+                 Holder::Sampler(state) => state.upgrade(),
+                 _ => None,
+             })
+-            .collect()
+     }
+ }
+ 
+diff --git a/crates/metal2vulkan-runtime/src/sampler.rs b/crates/metal2vulkan-runtime/src/sampler.rs
+index 2498ec24..9116a997 100644
+--- a/crates/metal2vulkan-runtime/src/sampler.rs
++++ b/crates/metal2vulkan-runtime/src/sampler.rs
+@@ -470,6 +470,13 @@ impl Device {
+         let states = lock(&self.shared().resource_ids).samplers();
+         states.into_iter().map(SamplerState).collect()
+     }
++
++    /// [`argument_samplers`](Self::argument_samplers), listed in `out` (emptied first).
++    pub(super) fn argument_samplers_into(&self, out: &mut Vec<SamplerState>) {
++        out.clear();
++        let ids = lock(&self.shared().resource_ids);
++        out.extend(ids.live_samplers().map(SamplerState));
++    }
+ }
+ 
+ impl SamplerState {
+diff --git a/crates/metal2vulkan-runtime/src/shader_cache/mod.rs b/crates/metal2vulkan-runtime/src/shader_cache/mod.rs
+index 88e0fad8..513fe37f 100644
+--- a/crates/metal2vulkan-runtime/src/shader_cache/mod.rs
++++ b/crates/metal2vulkan-runtime/src/shader_cache/mod.rs
+@@ -282,6 +282,106 @@ impl CacheSetup {
+     }
+ }
+ 
++/// Disk access for entry-point priming, before any exit hook is registered.
++/// Deliberately no worker, exit-guard section, or ordinary driver::make call.
++/// Priming keeps its raw call/cleanup ordering and records every entry point.
++pub(super) struct PrimingCache {
++    store: Store,
++    identity: driver::Identity,
++    name: String,
++    loaded: Option<Vec<u8>>,
++}
++
++impl CacheSetup {
++    pub(super) fn priming(
++        &self,
++        properties: &vk::PhysicalDeviceProperties,
++        profile: Hash256,
++        settings: Hash256,
++        key: Hash256,
++        sink: Option<MessageSink>,
++    ) -> PrimingCache {
++        let identity = driver::Identity::of(properties);
++        let name = Records {
++            identity,
++            settings,
++            profile,
++        }
++        .name(Making::new("device-entry-point-priming").digest(&key));
++        PrimingCache {
++            store: Store::new(self.directory.clone(), sink),
++            identity,
++            name,
++            loaded: None,
++        }
++    }
++}
++
++impl PrimingCache {
++    /// The caller owns the raw cache and primes/releases its entry points.
++    /// No exit_guard::called/enter may happen here, before priming is finished.
++    pub(super) unsafe fn open(
++        &mut self,
++        raw: &ash::Device,
++        word: &crate::loader_word::LoaderWord,
++    ) -> Result<vk::PipelineCache, vk::Result> {
++        let seed = match self.store.load_content(&self.name, |bytes| {
++            let data = driver::open(&self.identity, &bytes)?;
++            Some(bytes[data].to_vec())
++        }) {
++            Lookup::Hit(bytes) => Some(bytes),
++            _ => None,
++        };
++        if let Some(bytes) = seed {
++            let info = vk::PipelineCacheCreateInfo::default().initial_data(&bytes);
++            // SAFETY: the caller owns the live device and the info's bytes outlive the call.
++            if let Ok(cache) = unsafe {
++                word.restore();
++                raw.create_pipeline_cache(&info, None)
++            } {
++                self.loaded = Some(bytes);
++                return Ok(cache);
++            }
++        }
++        // Invalid/absent/refused data is never treated as a successful load.
++        // SAFETY: as above; the empty create info outlives the call.
++        unsafe {
++            word.restore();
++            raw.create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None)
++        }
++    }
++
++    /// Called after all priming (including graphics/generated helpers) succeeds,
++    /// before its raw cache is destroyed and before exit-hook registration.
++    pub(super) unsafe fn keep(
++        &self,
++        raw: &ash::Device,
++        word: &crate::loader_word::LoaderWord,
++        cache: vk::PipelineCache,
++    ) {
++        // SAFETY: priming owns the live device/cache and every making has returned.
++        let Ok(data) = (unsafe {
++            word.restore();
++            raw.get_pipeline_cache_data(cache)
++        }) else {
++            return;
++        };
++        if self.loaded.as_deref() == Some(data.as_slice()) {
++            return;
++        }
++        if self.identity.check_vulkan_header(&data).is_err() {
++            return;
++        }
++        if self
++            .store
++            .write_record(&self.name, &driver::seal(&self.identity, &data))
++            .is_err()
++        {
++            self.store.write_failed();
++        }
++    }
++}
++
+ /// One device's shader cache: its memo, its view of the directory, what names its makings'
+ /// records, and the cache thread.
+ pub(super) struct ShaderCache {
+diff --git a/crates/metal2vulkan-runtime/src/shader_cache/store.rs b/crates/metal2vulkan-runtime/src/shader_cache/store.rs
+index 98e82e19..1c7eac77 100644
+--- a/crates/metal2vulkan-runtime/src/shader_cache/store.rs
++++ b/crates/metal2vulkan-runtime/src/shader_cache/store.rs
+@@ -68,6 +68,11 @@ impl Directory {
+     /// Open `root` for `build` with a cap of `capacity` bytes: create it and the build's
+     /// directory (owner-only) and write and remove a probe file there. The error names the
+     /// directory that failed.
++    ///
++    /// With `METAL2VULKAN_SHADER_CACHE_OPTIONAL` in the environment a directory that cannot be
++    /// made or written opens anyway: a process that may write nowhere (a sandboxed one, as
++    /// WebKit's GPU process) still gets its device, and every read and write of the cache is a
++    /// miss, as after any later failure.
+     pub(crate) fn open(root: PathBuf, build: Hash256, capacity: u64) -> Result<Directory, Failed> {
+         let directory = Directory {
+             root,
+@@ -78,14 +83,20 @@ impl Directory {
+             let path = path.to_path_buf();
+             move |error| Failed { path, error }
+         };
+-        create_private_dir_all(&directory.root).map_err(failed(&directory.root))?;
+-        let build_dir = directory.build_dir();
+-        create_private_dir_all(&build_dir).map_err(failed(&build_dir))?;
+-        let probe = build_dir.join(format!(".probe.{}.tmp", unique()));
+-        let written = new_private_file(&probe).and_then(|mut file| file.write_all(b"probe"));
+-        let removed = fs::remove_file(&probe);
+-        written.and(removed).map_err(failed(&directory.root))?;
+-        Ok(directory)
++        let made = (|| {
++            create_private_dir_all(&directory.root).map_err(failed(&directory.root))?;
++            let build_dir = directory.build_dir();
++            create_private_dir_all(&build_dir).map_err(failed(&build_dir))?;
++            let probe = build_dir.join(format!(".probe.{}.tmp", unique()));
++            let written = new_private_file(&probe).and_then(|mut file| file.write_all(b"probe"));
++            let removed = fs::remove_file(&probe);
++            written.and(removed).map_err(failed(&directory.root))
++        })();
++        match made {
++            Err(_) if std::env::var_os("METAL2VULKAN_SHADER_CACHE_OPTIONAL").is_some() => Ok(directory),
++            Err(failed) => Err(failed),
++            Ok(()) => Ok(directory),
++        }
+     }
+ 
+     /// The directory the consumer named or the platform's default.
+diff --git a/crates/metal2vulkan-runtime/src/spares.rs b/crates/metal2vulkan-runtime/src/spares.rs
+index 39ac4d85..6480b4f8 100644
+--- a/crates/metal2vulkan-runtime/src/spares.rs
++++ b/crates/metal2vulkan-runtime/src/spares.rs
+@@ -20,7 +20,12 @@
+ //! - **Descriptor pools are bounded.** At most [`DESCRIPTOR_POOLS`] descriptor pools of at most
+ //!   [`DESCRIPTORS`] descriptors together; a descriptor pool given back past them releases the
+ //!   oldest spares first, so the spares follow the shapes in use.
+-//! - **Reset by the taker**, on the thread that encodes: the program's own, or one running the
++//! - **Reset as given back**, inside a section on the thread that completed the command buffer
++//!   (the completion thread's, or the dropping one's), so the encoding thread takes a pool ready
++//!   to record: turnip's reset of a frame's command buffers cost ~30 us of the program's thread
++//!   per commit on the host (m2vsim), about three times that in the guest. A pool whose reset
++//!   there failed is released; one given back as the process exits stays unreset and is
++//!   **reset by the taker**, on the thread that encodes: the program's own, or one running the
+ //!   program's code (a handler). A section of the exit guard (a host step's recording on the
+ //!   scheduler's thread) calls only the guard's table of entry points, which holds no reset, so a
+ //!   command buffer or command recorded there makes its pools as before; what it made is given back
+@@ -62,6 +67,8 @@ pub(super) struct CommandPool {
+     family: u32,
+     made: [Vec<vk::CommandBuffer>; 2],
+     handed: [usize; 2],
++    /// Reset since a command buffer last recorded into it (as it was given back).
++    reset: bool,
+ }
+ 
+ impl CommandPool {
+@@ -72,6 +79,7 @@ impl CommandPool {
+             family,
+             made: [Vec::new(), Vec::new()],
+             handed: [0, 0],
++            reset: false,
+         }
+     }
+ 
+@@ -127,6 +135,10 @@ impl Spares {
+         let Some(mut pool) = take_command_pool(&mut lock(&self.command_pools), family) else {
+             return Ok(None);
+         };
++        if std::mem::take(&mut pool.reset) {
++            pool.reset_handed();
++            return Ok(Some(pool));
++        }
+         // SAFETY: the pool is the caller's alone now, and nothing of it is pending: a command
+         // buffer that completed gave it back.
+         let reset = unsafe {
+@@ -143,9 +155,25 @@ impl Spares {
+         Ok(Some(pool))
+     }
+ 
+-    /// Keep `pool`, of a command buffer whose work ended or that was never submitted: nothing of
+-    /// it is pending, and nothing else holds it. Never released here (the module docs).
+-    pub(super) fn give_command_pool(&self, pool: CommandPool) {
++    /// Keep `pool` of `device`, of a command buffer whose work ended or that was never
++    /// submitted: nothing of it is pending, and nothing else holds it. Reset here, inside a
++    /// section; released only where that reset failed (the module docs).
++    pub(super) fn give_command_pool(&self, device: &DeviceShared, mut pool: CommandPool) {
++        if let Some(_busy) = exit_guard::enter() {
++            // SAFETY: nothing of the pool is pending, and nothing else holds it.
++            let reset = unsafe {
++                device
++                    .vk()
++                    .reset_command_pool(pool.raw, vk::CommandPoolResetFlags::empty())
++            };
++            exit_guard::called(exit_guard::Call::ResetCommandPool);
++            if reset.is_err() {
++                // SAFETY: as above.
++                unsafe { release::object(device.vk(), pool.raw) };
++                return;
++            }
++            pool.reset = true;
++        }
+         keep_command_pool(&mut lock(&self.command_pools), pool);
+     }
+ 
+diff --git a/crates/metal2vulkan-runtime/src/tests/mod.rs b/crates/metal2vulkan-runtime/src/tests/mod.rs
+index 998d7f87..f579adcd 100644
+--- a/crates/metal2vulkan-runtime/src/tests/mod.rs
++++ b/crates/metal2vulkan-runtime/src/tests/mod.rs
+@@ -97,6 +97,8 @@ mod private_properties;
+ mod queue;
+ mod range;
+ mod rate_map;
++#[cfg(any(m2v_gpu, m2v_cpu_icd))]
++mod refuse_rebinds;
+ mod resource;
+ mod resource_ids;
+ mod rotated;
+diff --git a/crates/metal2vulkan-runtime/src/tests/refuse_rebinds.rs b/crates/metal2vulkan-runtime/src/tests/refuse_rebinds.rs
+new file mode 100644
+index 00000000..07ea7e2d
+--- /dev/null
++++ b/crates/metal2vulkan-runtime/src/tests/refuse_rebinds.rs
+@@ -0,0 +1,147 @@
++//! A device made with `DeviceOptions::refuse_rebinds`: its encoders log no calls while it has a
++//! buffer over host pages (`replay.rs`, `DeviceShared::logs_calls`), and it refuses a rebind
++//! (`Invalid`, `RebindProblem::Refused`), dropping the deallocator unrun; a device made without it
++//! logs while it has one, as before.
++//!
++//! A device test: compiled only under the validation crate's GPU safety cfgs (`m2v_gpu`,
++//! `m2v_cpu_icd`), on the kind of device the cfg selects.
++
++use crate::{
++    Buffer, Deallocator, Device, DeviceKind, DeviceOptions, Error, HostMemory, Invalid, Problem,
++    RebindProblem, ResourceOptions, ShaderCacheOptions,
++};
++use std::alloc::Layout;
++use std::path::{Path, PathBuf};
++use std::ptr::NonNull;
++use std::sync::atomic::{AtomicUsize, Ordering};
++use std::sync::Arc;
++use std::time::{Duration, Instant};
++
++/// The no-copy buffers' bytes and alignment.
++const NO_COPY: usize = 64 << 10;
++const NO_COPY_ALIGN: usize = 64 << 10;
++
++/// The longest a released buffer's deallocator may take to run.
++const WAIT: Duration = Duration::from_secs(10);
++
++/// A scratch directory for the device's shader cache, removed when dropped.
++struct Scratch(PathBuf);
++
++impl Scratch {
++    fn new(name: &str) -> Scratch {
++        let path = std::env::temp_dir().join(format!(
++            "m2v-refuse-rebinds-{name}-{}",
++            std::process::id()
++        ));
++        std::fs::create_dir_all(&path).unwrap();
++        Scratch(path)
++    }
++}
++
++impl Drop for Scratch {
++    fn drop(&mut self) {
++        let _ = std::fs::remove_dir_all(&self.0);
++    }
++}
++
++/// The device the cfg selects, refusing rebinds where `refuse`, its shader cache in `cache`.
++fn device(cache: &Path, refuse: bool) -> Device {
++    let options = DeviceOptions {
++        kinds: match cfg!(m2v_cpu_icd) {
++            true => vec![DeviceKind::Cpu],
++            false => vec![
++                DeviceKind::Discrete,
++                DeviceKind::Integrated,
++                DeviceKind::Virtual,
++            ],
++        },
++        shader_cache: ShaderCacheOptions {
++            directory: Some(cache.to_owned()),
++            ..ShaderCacheOptions::default()
++        },
++        refuse_rebinds: refuse,
++        ..DeviceOptions::default()
++    };
++    Device::system_default_with(&options).unwrap()
++}
++
++/// Memory of the test's, zeroed, and the deallocator that frees it, counting its runs in `runs`.
++fn memory(runs: &Arc<AtomicUsize>) -> (NonNull<u8>, Deallocator) {
++    let layout = Layout::from_size_align(NO_COPY, NO_COPY_ALIGN).unwrap();
++    // SAFETY: the layout's size is not zero.
++    let memory = NonNull::new(unsafe { std::alloc::alloc_zeroed(layout) }).unwrap();
++    let runs = Arc::clone(runs);
++    let deallocator: Deallocator = Box::new(move |pointer, _| {
++        // SAFETY: the pointer is the memory allocated above with `layout`, freed once.
++        unsafe { std::alloc::dealloc(pointer.as_ptr(), layout) };
++        runs.fetch_add(1, Ordering::SeqCst);
++    });
++    (memory, deallocator)
++}
++
++/// A `Shared` buffer over memory of the test's, whose deallocator counts into `runs`, and the
++/// memory.
++fn no_copy(device: &Device, runs: &Arc<AtomicUsize>) -> (Buffer, NonNull<u8>) {
++    let (memory, deallocator) = memory(runs);
++    // SAFETY: the memory is the test's, mapped and writable, aligned to 64 KiB, until the
++    // deallocator frees it once the buffer's last reference goes.
++    let buffer = unsafe {
++        device.new_buffer_with_bytes_no_copy(
++            HostMemory::new(memory),
++            NO_COPY as u64,
++            ResourceOptions::shared(),
++            Some(deallocator),
++        )
++    }
++    .unwrap();
++    (buffer, memory)
++}
++
++/// Wait for `runs` to reach one.
++#[track_caller]
++fn ran_once(runs: &AtomicUsize) {
++    let start = Instant::now();
++    while runs.load(Ordering::SeqCst) == 0 && start.elapsed() < WAIT {
++        std::thread::sleep(Duration::from_millis(5));
++    }
++    assert_eq!(runs.load(Ordering::SeqCst), 1, "the deallocator's runs");
++}
++
++/// Without the option, a device with a no-copy buffer logs its encoders' calls; with it, it logs
++/// none, and refuses the buffer's rebind without running the new memory's deallocator (that
++/// memory leaks), the buffer still over its own memory, which is freed when the buffer goes.
++#[test]
++fn a_device_that_refuses_rebinds_logs_no_calls() {
++    let scratch = Scratch::new("default");
++    let plain = device(&scratch.0, false);
++    assert!(!plain.shared().logs_calls(), "no buffer over host pages yet");
++    let plain_runs = Arc::new(AtomicUsize::new(0));
++    let (kept, _) = no_copy(&plain, &plain_runs);
++    assert!(plain.shared().logs_calls());
++    drop(kept);
++    ran_once(&plain_runs);
++
++    let scratch = Scratch::new("refusing");
++    let refusing = device(&scratch.0, true);
++    let runs = Arc::new(AtomicUsize::new(0));
++    let (buffer, own) = no_copy(&refusing, &runs);
++    assert!(refusing.shared().rebinds.any());
++    assert!(!refusing.shared().logs_calls());
++    let new_runs = Arc::new(AtomicUsize::new(0));
++    let (new, deallocator) = memory(&new_runs);
++    // SAFETY: the new memory holds the buffer's length; the call is refused and keeps nothing.
++    let rebound =
++        unsafe { buffer.rebind_bytes_no_copy(HostMemory::new(new), Some(deallocator), None) };
++    assert_eq!(
++        rebound,
++        Err(Error::Invalid(Invalid::new(
++            "rebind_bytes_no_copy",
++            Problem::Rebind(RebindProblem::Refused)
++        )))
++    );
++    assert_eq!(new_runs.load(Ordering::SeqCst), 0);
++    assert_eq!(buffer.contents(), Some(own));
++    drop(buffer);
++    ran_once(&runs);
++    assert_eq!(new_runs.load(Ordering::SeqCst), 0);
++}
+diff --git a/crates/metal2vulkan-runtime/src/texture.rs b/crates/metal2vulkan-runtime/src/texture.rs
+index e0400495..46097c98 100644
+--- a/crates/metal2vulkan-runtime/src/texture.rs
++++ b/crates/metal2vulkan-runtime/src/texture.rs
+@@ -57,6 +57,7 @@
+ //!   blits of textures over buffers, are refused `NotImplemented`.
+ 
+ use super::address::{ObjectsToken, RangeToken};
++use super::key_hash::KeyMap;
+ use super::address_map::AddressModeMap;
+ use super::attachment_stand_in::KeptBacking;
+ use super::attributes::PurgeableState;
+@@ -83,8 +84,8 @@ use super::image_plan::{
+     ImagePlan, ImageRefusal,
+ };
+ use super::linear_plan::{
+-    aliases, check_linear_limits, holding, linear_lack, BufferLayout, Holds, LinearImage,
+-    LinearLack,
++    aliases, check_linear_limits, holding, linear_lack, tile_store_fits, BufferLayout, Holds,
++    LinearImage, LinearLack,
+ };
+ use super::memory::{MemoryClass, Placement};
+ use super::metal_texture::{self, MetalOver};
+@@ -121,7 +122,7 @@ use first_move::{FirstMove, Fresh, Pattern, Patterned, TexelCopy, PATTERN_BYTES}
+ use heap_tiled::{FreshDepth, FreshPattern};
+ use metal2vulkan::bind::{ImageViewDesc, TextureFacts};
+ use metal2vulkan::device::{
+-    DeviceDescription, DeviceProfile, DriverFact, FormatSupport, VkFeature,
++    DeviceDescription, DeviceProfile, DriverFact, FormatSupport, PaddedReadsPolicy, VkFeature,
+ };
+ use metal2vulkan::error::{
+     Capability, Feature, LinearNeed, RuntimeDriverDefect, SparseNeed, Unsupported,
+@@ -452,7 +453,7 @@ struct Image {
+     identity: Identity,
+     /// The `VkImageView`s bindings of the image's textures needed (`binding_view.rs`), made at
+     /// their first bind. A finite set per image: its view types, formats and level ranges.
+-    views: Mutex<HashMap<VkView, vk::ImageView>>,
++    views: Mutex<KeyMap<VkView, vk::ImageView>>,
+     /// The image's depth twin: a `D32_SFLOAT` image of the same texels, which the views a
+     /// comparison reads present, for an `R32_SFLOAT` image holding a `Depth32Float` texture.
+     twin: Option<Box<Image>>,
+@@ -1642,7 +1643,7 @@ impl Device {
+             options: ResourceOptions::new(StorageMode::Private, cache, hazard),
+             allow_gpu_optimized_contents: allow,
+             identity: Identity::new(hazard, false),
+-            views: Mutex::new(HashMap::new()),
++            views: Mutex::new(KeyMap::default()),
+             twin: None,
+             decoded: None,
+             form: Default::default(),
+@@ -1765,7 +1766,7 @@ impl Device {
+             options: ResourceOptions::new(StorageMode::Private, cache, hazard),
+             allow_gpu_optimized_contents,
+             identity: Identity::new(hazard, false),
+-            views: Mutex::new(HashMap::new()),
++            views: Mutex::new(KeyMap::default()),
+             twin: None,
+             decoded: None,
+             form: Default::default(),
+@@ -1961,7 +1962,14 @@ impl Device {
+         })?;
+         // What an image over the texels may hold beside them: the bytes between padded rows too
+         // where the texture only reads, by the policy (`linear_plan::holding`); else why none may.
+-        let policy = self.compile_device().policy().padded_reads;
++        let mut policy = self.compile_device().policy().padded_reads;
++        // A written texture's tile stores may reach past its rows (`linear_plan::tile_store_fits`):
++        // where they would leave the row gaps or the buffer, only a texture that reads aliases.
++        if policy == PaddedReadsPolicy::AliasWrites
++            && !tile_store_fits(&texels.layout, u64::from(layout.extent[0]), texels.buffer.length())
++        {
++            policy = PaddedReadsPolicy::Alias;
++        }
+         let holds = holding(&texels.layout, usage, policy);
+         // Over bytes detached from their pages (`detach.rs`) no image aliases them: the texture
+         // is their shadow, which presents a stand-in until they lie in pages again.
+@@ -2324,7 +2332,7 @@ impl Device {
+                 tracked: texels.tracked(),
+                 ..texels.buffer.identity()
+             },
+-            views: Mutex::new(HashMap::new()),
++            views: Mutex::new(KeyMap::default()),
+             twin: None,
+             decoded: None,
+             form: Default::default(),
+@@ -2412,7 +2420,7 @@ impl Device {
+                 tracked: texels.tracked(),
+                 ..texels.buffer.identity()
+             },
+-            views: Mutex::new(HashMap::new()),
++            views: Mutex::new(KeyMap::default()),
+             twin: None,
+             decoded: None,
+             form: Default::default(),
+@@ -2548,7 +2556,7 @@ impl Device {
+             options,
+             allow_gpu_optimized_contents,
+             identity,
+-            views: Mutex::new(HashMap::new()),
++            views: Mutex::new(KeyMap::default()),
+             twin: None,
+             decoded: None,
+             form: Default::default(),
+@@ -3282,7 +3290,8 @@ impl Device {
+     /// its storage mode: a heap texture's in memory of its own where its bytes in the heap are no
+     /// layout of its texels (`texture/heap.rs`, `AliasRoute::Lossless`), as a heap's textures hold
+     /// what their bytes held; and the shadow of a texture over a buffer whose copy in writes every
+-    /// texel of every aspect before any command reads it (`storage_over_buffer`).
++    /// texel of every aspect before any command reads it (`storage_over_buffer`, and a two-plane
++    /// texture's over a surface's planes, `texture/surface_two_planes.rs`).
+     fn new_image_as_it_lies(
+         &self,
+         plan: ImagePlan,
+@@ -3375,7 +3384,7 @@ impl Device {
+             options: descriptor.resource_options,
+             allow_gpu_optimized_contents: descriptor.allow_gpu_optimized_contents,
+             identity,
+-            views: Mutex::new(HashMap::new()),
++            views: Mutex::new(KeyMap::default()),
+             twin: None,
+             decoded: None,
+             form: Default::default(),
+diff --git a/crates/metal2vulkan-runtime/src/texture/heap.rs b/crates/metal2vulkan-runtime/src/texture/heap.rs
+index 12104275..eabf79a3 100644
+--- a/crates/metal2vulkan-runtime/src/texture/heap.rs
++++ b/crates/metal2vulkan-runtime/src/texture/heap.rs
+@@ -179,7 +179,6 @@ use metal2vulkan::metal::{PixelFormat, TextureType, TextureUsage};
+ use metal2vulkan::vk::{
+     Format, FormatFeatureFlags2, ImageAspectFlags, ImageUsageFlags, SampleCountFlags,
+ };
+-use std::collections::HashMap;
+ use std::ptr::NonNull;
+ use std::sync::atomic::{AtomicBool, Ordering};
+ use std::sync::{Arc, Mutex};
+@@ -1290,6 +1289,11 @@ impl Device {
+             }
+             size_and_align = metal;
+         }
++        // Metal's size is a multiple of its alignment, so a heap sized as the sum of its textures'
++        // sizes holds them in any order. Where the device's image needs a coarser alignment than
++        // Metal's model (Turnip: 4 KiB against Metal's 128 bytes), the size grows to a multiple of
++        // it too: otherwise each texture placed after one pads past what the heap was sized for.
++        size_and_align.size = size_and_align.size.next_multiple_of(size_and_align.align.max(1));
+         check_heap_base(size_and_align.align)?;
+         // The size answered is the optimized texture's where the driver keeps the layout.
+         self.degrade_optimized_layout(descriptor, &layout);
+@@ -2089,7 +2093,7 @@ impl Device {
+             options: binding.options,
+             allow_gpu_optimized_contents: binding.allow_gpu_optimized_contents,
+             identity: binding.identity,
+-            views: Mutex::new(HashMap::new()),
++            views: Mutex::new(Default::default()),
+             twin: None,
+             decoded: None,
+             form: Default::default(),
+@@ -2125,7 +2129,7 @@ impl Device {
+             options: binding.options,
+             allow_gpu_optimized_contents: binding.allow_gpu_optimized_contents,
+             identity: binding.identity,
+-            views: Mutex::new(HashMap::new()),
++            views: Mutex::new(Default::default()),
+             twin: None,
+             decoded: None,
+             form: Default::default(),
+diff --git a/crates/metal2vulkan-runtime/src/texture/surface_two_planes.rs b/crates/metal2vulkan-runtime/src/texture/surface_two_planes.rs
+index 44931f57..3042919f 100644
+--- a/crates/metal2vulkan-runtime/src/texture/surface_two_planes.rs
++++ b/crates/metal2vulkan-runtime/src/texture/surface_two_planes.rs
+@@ -58,6 +58,7 @@ use crate::degradation::Degradation;
+ use crate::error::{Error, RuntimeGap};
+ use crate::image_plan::plan_image;
+ use crate::linear_plan::{BufferLayout, LINEAR_ALIGNMENT};
++use crate::resource::Identity;
+ use crate::shadow::{ShadowBuffer, ShadowCopies, ShadowSource, ShadowTarget};
+ use crate::texture_descriptor::{texture_usage, TextureDescriptor, TextureLayout};
+ use crate::tracker::UseRange;
+@@ -206,7 +207,14 @@ impl Device {
+             return Err(Error::NotImplemented(RuntimeGap::Textures));
+         }
+         let hazard = texels.options().hazard_tracking_mode()?;
+-        let image = self.new_image(plan, layout, descriptor, hazard)?;
++        // Its copy in writes every texel of its one aspect before any command reads it, or a pass
++        // that clears it whole does (`shadow.rs`, `render/shadows.rs`), so it starts as its memory
++        // lies, as the other shadows of a buffer's bytes do (`storage_over_buffer`): zeros there
++        // would never be read, and the host's zeros copied into a full-screen surface's image
++        // were most of its making on a phone's render server.
++        let identity = Identity::new(hazard, false);
++        let image =
++            self.new_image_as_it_lies(plan, layout, descriptor, identity, Device::runtime_owner)?;
+         let (raw, start) = texels.buffer.at(color.offset);
+         let staging = HeapPlaneCopies::staging(self, &planes, start, hazard)?;
+         let moves = Box::new(HeapPlaneCopies::new(self, &staging, &planes, hazard)?);
+diff --git a/crates/metal2vulkan-runtime/src/texture/wrapped.rs b/crates/metal2vulkan-runtime/src/texture/wrapped.rs
+index fcd1c468..211d0fe7 100644
+--- a/crates/metal2vulkan-runtime/src/texture/wrapped.rs
++++ b/crates/metal2vulkan-runtime/src/texture/wrapped.rs
+@@ -611,7 +611,7 @@ impl Device {
+             options,
+             allow_gpu_optimized_contents: descriptor.allow_gpu_optimized_contents,
+             identity,
+-            views: Mutex::new(HashMap::new()),
++            views: Mutex::new(Default::default()),
+             twin: None,
+             decoded: None,
+             form: Default::default(),
+diff --git a/crates/metal2vulkan-runtime/src/tracker.rs b/crates/metal2vulkan-runtime/src/tracker.rs
+index 0b532a0a..83502429 100644
+--- a/crates/metal2vulkan-runtime/src/tracker.rs
++++ b/crates/metal2vulkan-runtime/src/tracker.rs
+@@ -909,7 +909,7 @@ fn coalesce(entries: &mut Vec<Entry>) {
+ /// The uses one per key and range, sorted by key, without the ones that touch nothing.
+ fn merged<S: Copy + Ord + Hash>(uses: impl IntoIterator<Item = Use<S>>) -> Vec<Use<S>> {
+     let mut merged: Vec<Use<S>> = Vec::new();
+-    let mut index: HashMap<(S, UseRange), usize> = HashMap::new();
++    let mut index: KeyMap<(S, UseRange), usize> = KeyMap::default();
+     for used in uses {
+         if used.is_nothing() {
+             continue;
+@@ -945,7 +945,7 @@ pub(super) struct EncoderUses<K> {
+     /// Whether Metal runs the commands in encoded order (blit encoders, serial compute encoders).
+     ordered: bool,
+     /// The accesses of the current part's commands so far, for that order.
+-    inside: HashMap<Class<K>, Vec<Entry>>,
++    inside: KeyMap<Class<K>, Vec<Entry>>,
+     /// The parts, in order: the last is the current one. Never empty.
+     parts: Vec<Part<K>>,
+     /// The fences waited for: before the encoder's first part.
+@@ -957,14 +957,58 @@ pub(super) struct EncoderUses<K> {
+ /// The uses of one part of an encoder.
+ struct Part<K> {
+     /// The tracked uses so far, one per range, at most [`ENTRIES_PER_KEY`] per resource.
+-    tracked: HashMap<K, Vec<Use<K>>>,
++    tracked: KeyMap<K, KeyUses<K>>,
+     stages: vk::PipelineStageFlags2,
+ }
+ 
++/// One resource's tracked uses in a part, in the order they were first recorded: the first held
++/// in place, as a part mostly uses a resource over one range.
++enum KeyUses<K> {
++    One(Use<K>),
++    Many(Vec<Use<K>>),
++}
++
++impl<K> KeyUses<K> {
++    fn as_slice(&self) -> &[Use<K>] {
++        match self {
++            KeyUses::One(used) => std::slice::from_ref(used),
++            KeyUses::Many(uses) => uses,
++        }
++    }
++
++    fn as_mut_slice(&mut self) -> &mut [Use<K>] {
++        match self {
++            KeyUses::One(used) => std::slice::from_mut(used),
++            KeyUses::Many(uses) => uses,
++        }
++    }
++
++    /// Add `used` after the others.
++    fn push(&mut self, used: Use<K>) {
++        match self {
++            KeyUses::Many(uses) => uses.push(used),
++            KeyUses::One(_) => {
++                let KeyUses::One(first) = std::mem::replace(self, KeyUses::Many(Vec::new())) else {
++                    unreachable!("matched above")
++                };
++                *self = KeyUses::Many(vec![first, used]);
++            }
++        }
++    }
++
++    /// The uses, appended to `out` in order.
++    fn append_to(self, out: &mut Vec<Use<K>>) {
++        match self {
++            KeyUses::One(used) => out.push(used),
++            KeyUses::Many(uses) => out.extend(uses),
++        }
++    }
++}
++
+ impl<K> Part<K> {
+     fn new() -> Part<K> {
+         Part {
+-            tracked: HashMap::new(),
++            tracked: KeyMap::default(),
+             stages: vk::PipelineStageFlags2::NONE,
+         }
+     }
+@@ -975,7 +1019,7 @@ impl<K: Copy + Ord + Hash> EncoderUses<K> {
+     pub(super) fn new(ordered: bool) -> EncoderUses<K> {
+         EncoderUses {
+             ordered,
+-            inside: HashMap::new(),
++            inside: KeyMap::default(),
+             parts: vec![Part::new()],
+             waits: Vec::new(),
+             updates: Vec::new(),
+@@ -1025,16 +1069,28 @@ impl<K: Copy + Ord + Hash> EncoderUses<K> {
+             .iter()
+             .filter(|used| used.tracked && !used.is_nothing())
+         {
+-            let ranges = part.tracked.entry(used.key).or_default();
+-            match ranges.iter_mut().find(|known| known.range == used.range) {
++            let ranges = match part.tracked.entry(used.key) {
++                std::collections::hash_map::Entry::Vacant(vacant) => {
++                    vacant.insert(KeyUses::One(used.clone()));
++                    continue;
++                }
++                std::collections::hash_map::Entry::Occupied(occupied) => occupied.into_mut(),
++            };
++            match ranges
++                .as_mut_slice()
++                .iter_mut()
++                .find(|known| known.range == used.range)
++            {
+                 Some(known) => {
+                     known.read = known.read.union(used.read);
+                     known.write = known.write.union(used.write);
+                 }
+                 None => ranges.push(used.clone()),
+             }
+-            if ranges.len() > ENTRIES_PER_KEY {
+-                coalesce_uses(ranges);
++            if let KeyUses::Many(ranges) = ranges {
++                if ranges.len() > ENTRIES_PER_KEY {
++                    coalesce_uses(ranges);
++                }
+             }
+         }
+     }
+@@ -1050,6 +1106,7 @@ impl<K: Copy + Ord + Hash> EncoderUses<K> {
+                 self.parts.iter().any(|part| {
+                     part.tracked.get(&read.key).is_some_and(|known| {
+                         known
++                            .as_slice()
+                             .iter()
+                             .any(|k| !k.write.is_empty() && k.range.overlaps(&read.range))
+                     })
+@@ -1068,7 +1125,9 @@ impl<K: Copy + Ord + Hash> EncoderUses<K> {
+                 self.parts.iter().any(|part| {
+                     part.tracked
+                         .get(&write.key)
+-                        .is_some_and(|known| known.iter().any(|k| k.range.overlaps(&write.range)))
++                        .is_some_and(|known| {
++                            known.as_slice().iter().any(|k| k.range.overlaps(&write.range))
++                        })
+                 })
+             })
+     }
+@@ -1077,7 +1136,7 @@ impl<K: Copy + Ord + Hash> EncoderUses<K> {
+     pub(super) fn tracked_in(&self, stages: vk::PipelineStageFlags2) -> Vec<Use<K>> {
+         self.parts
+             .iter()
+-            .flat_map(|part| part.tracked.values().flatten())
++            .flat_map(|part| part.tracked.values().flat_map(KeyUses::as_slice))
+             .filter(|known| (known.read.stages | known.write.stages).intersects(stages))
+             .cloned()
+             .collect()
+@@ -1090,7 +1149,7 @@ impl<K: Copy + Ord + Hash> EncoderUses<K> {
+             self.parts.iter().any(|part| {
+                 part.tracked
+                     .get(&used.key)
+-                    .is_some_and(|known| known.iter().any(|k| touches(k, used, stages)))
++                    .is_some_and(|known| known.as_slice().iter().any(|k| touches(k, used, stages)))
+             })
+         })
+     }
+@@ -1149,7 +1208,10 @@ impl<K: Copy + Ord + Hash> EncoderUses<K> {
+         let mut summaries: Vec<Summary<K>> = parts
+             .into_iter()
+             .map(|part| {
+-                let mut uses: Vec<Use<K>> = part.tracked.into_values().flatten().collect();
++                let mut uses: Vec<Use<K>> = Vec::with_capacity(part.tracked.len());
++                for known in part.tracked.into_values() {
++                    known.append_to(&mut uses);
++                }
+                 uses.sort_by_key(|used| used.key);
+                 Summary {
+                     uses,
+@@ -1185,14 +1247,14 @@ impl<K> fmt::Debug for EncoderUses<K> {
+ /// commands after them. One entry per range, at most [`ENTRIES_PER_KEY`] per resource, merged
+ /// as [`EncoderUses`] merges its own, which claims more and stays exact.
+ pub(super) struct UnorderedWrites<K> {
+-    writes: HashMap<K, Vec<Use<K>>>,
++    writes: KeyMap<K, Vec<Use<K>>>,
+ }
+ 
+ impl<K: Copy + Ord + Hash> UnorderedWrites<K> {
+     /// No writes.
+     pub(super) fn new() -> UnorderedWrites<K> {
+         UnorderedWrites {
+-            writes: HashMap::new(),
++            writes: KeyMap::default(),
+         }
+     }
+ 
+diff --git a/crates/metal2vulkan-runtime/src/used_resources.rs b/crates/metal2vulkan-runtime/src/used_resources.rs
+index 7521345e..03001a83 100644
+--- a/crates/metal2vulkan-runtime/src/used_resources.rs
++++ b/crates/metal2vulkan-runtime/src/used_resources.rs
+@@ -58,6 +58,62 @@ pub struct UsedResources {
+     pub heaps: Vec<Heap>,
+ }
+ 
++// Compare host address ranges without touching their bytes. Object identity covers private
++// memory; host ranges additionally cover distinct imports of an IOSurface or overlapping
++// no-copy buffers. Unknown arithmetic is conservative. Rebinding is not performed by this
++// consumer, and callers must not remap these ranges while the resources are in use.
++fn buffers_overlap(a: &Buffer, b: &Buffer) -> bool {
++    if a == b {
++        return true;
++    }
++    let (Some(a_start), Some(b_start)) = (a.contents(), b.contents()) else {
++        return false;
++    };
++    let (Ok(a_len), Ok(b_len)) = (usize::try_from(a.length()), usize::try_from(b.length())) else {
++        return true;
++    };
++    let a_start = a_start.as_ptr() as usize;
++    let b_start = b_start.as_ptr() as usize;
++    let (Some(a_end), Some(b_end)) = (a_start.checked_add(a_len), b_start.checked_add(b_len)) else {
++        return true;
++    };
++    a_start < b_end && b_start < a_end
++}
++
++impl UsedResources {
++    fn references_buffer(&self, buffer: &Buffer) -> bool {
++        if buffer.heap().is_some_and(|heap| self.heaps.contains(heap)) {
++            return true;
++        }
++        self.buffers.iter().any(|other| buffers_overlap(buffer, other))
++            || self.heaps.iter().any(|heap| heap.bytes().is_some_and(|bytes| buffers_overlap(buffer, bytes)))
++    }
++
++    /// Whether this list names a resource's storage, including a view's root, a buffer
++    /// texture's backing buffer, a heap's resources and overlapping imported host ranges.
++    /// A caller may skip waiting only while this is false. This consumer does not rebind
++    /// or remap live backing ranges. Indirect command buffers remain conservative.
++    pub fn references_resource(&self, resource: super::resource::ResourceRef<'_>) -> bool {
++        use super::resource::ResourceRef;
++        match resource {
++            ResourceRef::Buffer(buffer) => self.references_buffer(buffer),
++            ResourceRef::Texture(texture) => match texture.memory() {
++                TextureMemory::Heap(heap) => self.references_heap(heap),
++                TextureMemory::Buffer(buffer) => self.references_buffer(buffer),
++                TextureMemory::Own(root) => self.textures.contains(root),
++            },
++            ResourceRef::IndirectCommandBuffer(_) => true,
++        }
++    }
++
++    /// Heap storage is treated as one dependency, conservatively including its disjoint
++    /// members. Imports over its host range are dependencies too.
++    pub fn references_heap(&self, heap: &Heap) -> bool {
++        self.heaps.contains(heap)
++            || heap.bytes().is_some_and(|bytes| self.references_buffer(bytes))
++    }
++}
++
+ /// The kind of a command encoder ([`EndedEncoder::kind`]), by the Metal protocol it is.
+ #[non_exhaustive]
+ #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+diff --git a/crates/metal2vulkan-runtime/src/ycbcr.rs b/crates/metal2vulkan-runtime/src/ycbcr.rs
+index 368d62e1..7e545d2b 100644
+--- a/crates/metal2vulkan-runtime/src/ycbcr.rs
++++ b/crates/metal2vulkan-runtime/src/ycbcr.rs
+@@ -151,8 +151,10 @@ use std::ops::Range;
+ /// range, and `xf20`, `xf22` and `xf44` the same, full range; `p420`, `p422` and `p444`, and
+ /// `pf20`, `pf22` and `pf44`, the same packed three to a 32-bit word. A format reads a surface
+ /// whose chroma plane holds its own: a 4:2:0 format a 4:2:2 or 4:4:4 surface's, a 4:2:2 format a
+-/// 4:4:4 one's, each at the surface's rows.
+-const SURFACES: [(&[u8; 4], u32, bool, YCbCrRange, ChromaSubsampling); 18] = {
++/// 4:4:4 one's, each at the surface's rows. `_RB4` is the render server's own two-plane RGB surface (green codes in plane 0, the
++/// red and blue pairs in plane 1, 8-bit 4:4:4), which widget snapshots are drawn into as `RGB8_444_2P` (542); the code formats
++/// read no range, so its range is only nominal.
++const SURFACES: [(&[u8; 4], u32, bool, YCbCrRange, ChromaSubsampling); 19] = {
+     use ChromaSubsampling::{Chroma420 as C420, Chroma422 as C422, Chroma444 as C444};
+     [
+         (b"420v", 8, false, YCbCrRange::Video, C420),
+@@ -173,6 +175,7 @@ const SURFACES: [(&[u8; 4], u32, bool, YCbCrRange, ChromaSubsampling); 18] = {
+         (b"pf22", 10, true, YCbCrRange::Full, C422),
+         (b"p444", 10, true, YCbCrRange::Video, C444),
+         (b"pf44", 10, true, YCbCrRange::Full, C444),
++        (b"_RB4", 8, false, YCbCrRange::Full, C444),
+     ]
+ };
+ /// What the planes' offsets and rows are multiples of: Metal's GPU reads a plane from its offset
+diff --git a/crates/metal2vulkan/src/bind/dispatch.rs b/crates/metal2vulkan/src/bind/dispatch.rs
+index f8a62bbf..3536491c 100644
+--- a/crates/metal2vulkan/src/bind/dispatch.rs
++++ b/crates/metal2vulkan/src/bind/dispatch.rs
+@@ -897,7 +897,8 @@ fn instantiate(
+                 stride.to_le_bytes().to_vec()
+             }
+             field => slot_field(field, &bound.residuals, &t.resources, state)
+-                .ok_or_else(|| internal(format!("a compute push field {field:?}")))?,
++                .ok_or_else(|| internal(format!("a compute push field {field:?}")))?
++                .to_vec(),
+         };
+         put(&mut push, push_start, &mut table, f.loc, &bytes)?;
+     }
+diff --git a/crates/metal2vulkan/src/bind/graphics.rs b/crates/metal2vulkan/src/bind/graphics.rs
+index a477faba..ca8bf540 100644
+--- a/crates/metal2vulkan/src/bind/graphics.rs
++++ b/crates/metal2vulkan/src/bind/graphics.rs
+@@ -233,9 +233,9 @@ use std::collections::BTreeMap;
+ 
+ use crate::bind::heap::{planner, HeapPlanner};
+ use crate::bind::instantiate::{
+-    bind_buffers, descriptor_range, put, slot_field, BufferExtent, BufferRange, DescriptorBytes,
+-    DescriptorRange, IndexBufferRef, IndirectRef, PushConstantWrite, PushHole, RangeError,
+-    RootTable,
++    bind_buffers_in, descriptor_range, put, slot_field, BoundBuffers, BufferExtent, BufferRange,
++    DescriptorBytes, DescriptorRange, FieldBytes, IndexBufferRef, IndirectRef, PushConstantWrite,
++    PushHole, RangeError, RootTable,
+ };
+ use crate::bind::neutral::{zero_buffer_bytes, NeutralResource};
+ use crate::bind::plan::compute::{internal, not_implemented, spec_key, tile_memory};
+@@ -2209,6 +2209,21 @@ impl BindingPlan {
+         state: &BindState,
+         draw: &DrawCall,
+     ) -> Result<DrawCommands, BindError> {
++        let mut out = DrawCommands::empty();
++        self.instantiate_draw_into(state, draw, &mut out)?;
++        Ok(out)
++    }
++
++    /// [`instantiate_draw`](Self::instantiate_draw) into `out`, whose vectors this draw's commands
++    /// take (emptied first): a consumer that keeps one `DrawCommands` from draw to draw fills it
++    /// without allocating them again. On a refusal nothing `out` holds is a draw's to record: the
++    /// next call fills it again.
++    pub fn instantiate_draw_into(
++        &self,
++        state: &BindState,
++        draw: &DrawCall,
++        out: &mut DrawCommands,
++    ) -> Result<(), BindError> {
+         let t = self
+             .graphics
+             .as_ref()
+@@ -2230,10 +2245,45 @@ impl BindingPlan {
+                 });
+             }
+         }
+-        instantiate(t, state, draw)
++        instantiate_into(t, state, draw, out)
+     }
+ }
+ 
++impl DrawCommands {
++    /// No draw's commands, every vector empty: what [`BindingPlan::instantiate_draw_into`] fills.
++    pub fn empty() -> DrawCommands {
++        DrawCommands {
++            push_constants: Vec::new(),
++            descriptor_bytes: Vec::new(),
++            buffer_offsets: Vec::new(),
++            draw: vk::DrawCommand::Draw {
++                vertex_count: 0,
++                instance_count: 0,
++                first_vertex: 0,
++                first_instance: 0,
++            },
++            indirect_needs_arguments: false,
++            extents: Vec::new(),
++            push_holes: Vec::new(),
++            descriptor_ranges: Vec::new(),
++            root_tables: Vec::new(),
++            vertex_strides: Vec::new(),
++            uses: Vec::new(),
++            index_overrun: None,
++            index_bounds_pass: false,
++            amplifications: Vec::new(),
++            specialization: None,
++            mesh_dispatch: None,
++        }
++    }
++}
++
++/// `v`, emptied: its room kept for the draw that takes it.
++fn emptied<T>(mut v: Vec<T>) -> Vec<T> {
++    v.clear();
++    v
++}
++
+ /// The Vulkan draw of a Metal draw, and the base vertex and first instance the
+ /// `BaseVertexInstance` field reports (Vulkan's `BaseVertex` and `BaseInstance`). A direct
+ /// indexed draw whose indices run past its index buffer ([`index_overrun`]) draws as `overrun`
+@@ -3272,11 +3322,31 @@ fn capture_draw(
+     }
+ }
+ 
++#[cfg(test)]
+ fn instantiate(
+     t: &GraphicsTemplate,
+     state: &BindState,
+     draw: &DrawCall,
+ ) -> Result<DrawCommands, BindError> {
++    let mut out = DrawCommands::empty();
++    instantiate_into(t, state, draw, &mut out)?;
++    Ok(out)
++}
++
++thread_local! {
++    /// The residual and root entry vectors of this thread's last draw's bound buffers, emptied by
++    /// the next, which fills them: no draw's [`DrawCommands`] holds them.
++    static BOUND_ROOM: std::cell::Cell<BoundBuffers> = std::cell::Cell::new(BoundBuffers::default());
++}
++
++fn instantiate_into(
++    t: &GraphicsTemplate,
++    state: &BindState,
++    draw: &DrawCall,
++    out: &mut DrawCommands,
++) -> Result<(), BindError> {
++    // The vectors `out` held, which this draw's commands take, emptied.
++    let mut kept = std::mem::replace(out, DrawCommands::empty());
+     let overrun = index_overrun(t.robust_index_fetch, draw);
+     let (command, base) = vk_draw(draw, overrun);
+     let capture = match t.capture {
+@@ -3295,7 +3365,16 @@ fn instantiate(
+         }
+     };
+     let command = mesh.as_ref().map_or(command, |m| m.command);
+-    let bound = bind_buffers(&t.buffers, state)?;
++    let room = BOUND_ROOM.take();
++    let bound = bind_buffers_in(
++        &t.buffers,
++        state,
++        BoundBuffers {
++            descriptor_ranges: kept.descriptor_ranges,
++            extents: kept.extents,
++            ..room
++        },
++    )?;
+     let mut descriptor_ranges = bound.descriptor_ranges;
+     descriptor_ranges.extend(crate::bind::instantiate::texel_ranges(&t.resources, state)?);
+     let tables = crate::bind::heap::table_bytes(&t.resources, state)?;
+@@ -3309,24 +3388,40 @@ fn instantiate(
+     };
+     let vertex = state.stages.get(&Stage::Vertex);
+ 
+-    let mut push_constants = Vec::new();
+-    let mut descriptor_bytes = Vec::new();
+-    let mut push_holes = Vec::new();
+-    let mut root_tables = Vec::new();
++    // The last draw's push and table writes, whose byte vectors this draw's stages take (a plan's
++    // stages write the same ranges, so the room is the same): a draw allocates them once.
++    let mut push_constants = std::mem::take(&mut kept.push_constants);
++    let mut descriptor_bytes = std::mem::take(&mut kept.descriptor_bytes);
++    let mut push_holes = emptied(kept.push_holes);
++    let mut root_tables = emptied(kept.root_tables);
+     let mut reads_base = false;
++    // The writes made so far: the stages with push fields, and those with a table.
++    let (mut pushes, mut tables_written) = (0usize, 0usize);
+     for st in &t.stages {
+         let (push_start, push_size) = st.push_range.unwrap_or((0, 0));
+-        let mut push = vec![0u8; push_size as usize];
+-        let mut table = vec![
+-            0u8;
++        // Only a stage that writes them takes a slot's vector: one without would leave the next
++        // stage's slot emptied.
++        let mut push = match push_constants.get_mut(pushes) {
++            Some(write) if push_size > 0 => std::mem::take(&mut write.bytes),
++            _ => Vec::new(),
++        };
++        push.clear();
++        push.resize(push_size as usize, 0);
++        let mut table = match descriptor_bytes.get_mut(tables_written) {
++            Some(write) if st.table.is_some() => std::mem::take(&mut write.bytes),
++            _ => Vec::new(),
++        };
++        table.clear();
++        table.resize(
+             if st.table.is_some() {
+                 st.table_size as usize
+             } else {
+                 0
+-            }
+-        ];
++            },
++            0,
++        );
+         for f in &st.fields {
+-            let bytes: Vec<u8> = match f.field {
++            let bytes: FieldBytes = match f.field {
+                 PushField::RootTableAddress
+                 | PushField::ExecutionStatusAddress
+                 | PushField::CaptureAddress
+@@ -3355,27 +3450,27 @@ fn instantiate(
+                     let Some(shadow) = &t.shadow_stencil else {
+                         return Err(internal("a stencil state without its shader-side stencil"));
+                     };
+-                    shadow_stencil_words(shadow, state)?
++                    shadow_stencil_words(shadow, state)?.into()
+                 }
+                 PushField::ShaderTestsState => {
+                     if t.shader_tests.is_none() {
+                         return Err(internal("a depth state without its in-shader depth test"));
+                     }
+-                    shader_tests_words(state)
++                    shader_tests_words(state).into()
+                 }
+                 PushField::ShaderStencilState => {
+                     if t.shader_tests.is_none() {
+                         return Err(internal("a stencil state without its in-shader tests"));
+                     }
+-                    shader_stencil_words(state)
++                    shader_stencil_words(state).into()
+                 }
+                 PushField::DispatchRegion => match mesh.as_ref().and_then(|m| m.region(st.stage)) {
+-                    Some(region) => region.to_vec(),
++                    Some(region) => FieldBytes::of(&region),
+                     None => return Err(internal("a dispatch region outside a mesh draw")),
+                 },
+-                PushField::ViewportCount => state.viewport_count.to_le_bytes().to_vec(),
++                PushField::ViewportCount => FieldBytes::of(&state.viewport_count.to_le_bytes()),
+                 PushField::RenderTargetArrayLength => {
+-                    state.render_target_array_length.to_le_bytes().to_vec()
++                    FieldBytes::of(&state.render_target_array_length.to_le_bytes())
+                 }
+                 // The identity where the state holds none: a plan states its variant, so
+                 // instantiation under another shape asks for the other one first.
+@@ -3392,11 +3487,12 @@ fn instantiate(
+                     .flat_map(|v| v.to_le_bytes())
+                     .collect(),
+                 // No viewport mirrored where the state holds none.
+-                PushField::ViewportMirrors => state
+-                    .viewport_compensation
+-                    .map_or(0, |c| c.mirrors)
+-                    .to_le_bytes()
+-                    .to_vec(),
++                PushField::ViewportMirrors => FieldBytes::of(
++                    &state
++                        .viewport_compensation
++                        .map_or(0, |c| c.mirrors)
++                        .to_le_bytes(),
++                ),
+                 // No vertex's depth clamped where the state holds none.
+                 PushField::VertexDepthClamp => state
+                     .viewport_compensation
+@@ -3411,11 +3507,11 @@ fn instantiate(
+                     .iter()
+                     .flat_map(|v| v.to_le_bytes())
+                     .collect(),
+-                PushField::StorageKeptChannels => t.storage_kept.to_le_bytes().to_vec(),
++                PushField::StorageKeptChannels => FieldBytes::of(&t.storage_kept.to_le_bytes()),
+                 // The attachment's rule word, as link derived it from the pipeline's attachment.
+                 PushField::ColorWriteRule(color) => {
+                     match t.color_write_rules.iter().find(|(c, _)| *c == color) {
+-                        Some((_, word)) => word.to_le_bytes().to_vec(),
++                        Some((_, word)) => FieldBytes::of(&word.to_le_bytes()),
+                         None => return Err(internal("a color write rule link gave no word")),
+                     }
+                 }
+@@ -3437,16 +3533,12 @@ fn instantiate(
+                 // The first amplification's; `amplifications` writes each before its draw.
+                 PushField::AmplificationId
+                 | PushField::AmplificationLayerOffset
+-                | PushField::AmplificationViewportOffset => {
+-                    amplification_word(f.field, 0, &t.amplifications)?
+-                        .to_le_bytes()
+-                        .to_vec()
+-                }
++                | PushField::AmplificationViewportOffset => FieldBytes::of(
++                    &amplification_word(f.field, 0, &t.amplifications)?.to_le_bytes(),
++                ),
+                 PushField::BaseVertexInstance => {
+                     reads_base = true;
+-                    let mut b = base[0].to_le_bytes().to_vec();
+-                    b.extend_from_slice(&base[1].to_le_bytes());
+-                    b
++                    base.iter().flat_map(|b| b.to_le_bytes()).collect()
+                 }
+                 PushField::VertexBufferStride(layout) => {
+                     let fixed = t.pulled_strides.iter().find(|(l, _)| *l == layout);
+@@ -3471,7 +3563,7 @@ fn instantiate(
+                             )))
+                         }
+                     };
+-                    stride.to_le_bytes().to_vec()
++                    FieldBytes::of(&stride.to_le_bytes())
+                 }
+                 field => slot_field(field, &bound.residuals, &t.resources, state)
+                     .ok_or_else(|| internal(format!("a render push field {field:?}")))?,
+@@ -3488,25 +3580,43 @@ fn instantiate(
+             root_tables.push((st.flags, stage_root_table(&statics, first, resident)));
+         }
+         if push_size > 0 {
+-            push_constants.push(PushConstantWrite {
++            let write = PushConstantWrite {
+                 stages: st.flags,
+                 offset: push_start,
+                 bytes: push,
+-            });
++            };
++            match push_constants.get_mut(pushes) {
++                Some(slot) => *slot = write,
++                None => push_constants.push(write),
++            }
++            pushes += 1;
+         }
+         if let Some((set, binding)) = st.table {
+-            descriptor_bytes.push(DescriptorBytes {
++            let write = DescriptorBytes {
+                 set,
+                 binding,
+                 bytes: table,
+-            });
++            };
++            match descriptor_bytes.get_mut(tables_written) {
++                Some(slot) => *slot = write,
++                None => descriptor_bytes.push(write),
++            }
++            tables_written += 1;
+         }
+     }
++    // The last draw's writes this one has fewer of: their vectors' room is not kept.
++    push_constants.truncate(pushes);
++    descriptor_bytes.truncate(tables_written);
++    BOUND_ROOM.set(BoundBuffers {
++        residuals: bound.residuals,
++        statics: bound.statics,
++        ..BoundBuffers::default()
++    });
+ 
+     // Vertex buffers: offsets, per-bind strides, the address rules, and the bytes the draw's
+     // vertex and instance ranges fetch.
+-    let mut buffer_offsets = Vec::new();
+-    let mut vertex_strides = Vec::new();
++    let mut buffer_offsets = emptied(kept.buffer_offsets);
++    let mut vertex_strides = emptied(kept.vertex_strides);
+     for vb in &t.vertex_buffers {
+         match vertex.and_then(|v| v.buffers.get(&vb.slot.index)) {
+             Some(&BoundBuffer::Buffer {
+@@ -3598,7 +3708,7 @@ fn instantiate(
+         Some(m) => (m.dispatch, Some(m.specialization)),
+         None => (None, None),
+     };
+-    Ok(DrawCommands {
++    *out = DrawCommands {
+         push_constants,
+         descriptor_bytes,
+         buffer_offsets,
+@@ -3613,10 +3723,11 @@ fn instantiate(
+         uses: {
+             // The indexed capture form reads its indices in the vertex stage, by address, and
+             // binds no index buffer.
+-            let mut uses = match capture.as_ref().and_then(|c| c.indices) {
+-                Some(indices) => vec![indices],
+-                None => draw_uses(draw, overrun, t.tessellation.as_ref()),
+-            };
++            let mut uses = emptied(kept.uses);
++            match capture.as_ref().and_then(|c| c.indices) {
++                Some(indices) => uses.push(indices),
++                None => draw_uses_into(draw, overrun, t.tessellation.as_ref(), &mut uses),
++            }
+             // A mesh draw that reads its arguments reads 12 bytes; an emulated one's scan reads
+             // them in the compute stage.
+             if let vk::DrawCommand::DrawMeshTasksIndirect { .. } = command {
+@@ -3640,7 +3751,8 @@ fn instantiate(
+         amplifications,
+         mesh_dispatch,
+         specialization,
+-    })
++    };
++    Ok(())
+ }
+ 
+ /// The `u32` of amplification push field `field` for amplification `a` of a plan drawing
+@@ -3893,12 +4005,25 @@ fn indirect_use(len: u64) -> ResourceUse {
+ /// control-point index offset, and argument offset. A direct draw whose indices run past the buffer
+ /// (`overrun`) reads the bytes from the index offset to [`IndexBufferRef::fetch_end`] when it is
+ /// `Robust`, and only the indices it draws when it is `Clamped` (none, from offset 0, when it draws
+-/// none).
++/// none). [`draw_uses_into`] appends them to a list.
++#[cfg(test)]
+ fn draw_uses(
+     draw: &DrawCall,
+     overrun: Option<IndexOverrun>,
+     factors: Option<&FactorTemplate>,
+ ) -> Vec<ResourceUse> {
++    let mut uses = Vec::new();
++    draw_uses_into(draw, overrun, factors, &mut uses);
++    uses
++}
++
++/// [`draw_uses`], appended to `uses`.
++fn draw_uses_into(
++    draw: &DrawCall,
++    overrun: Option<IndexOverrun>,
++    factors: Option<&FactorTemplate>,
++    uses: &mut Vec<ResourceUse>,
++) {
+     let index = |range| ResourceUse {
+         resource: UseTarget::IndexBuffer,
+         access: AccessSet::READ,
+@@ -3914,7 +4039,6 @@ fn draw_uses(
+         stages: vk::PipelineStageFlags2::TESSELLATION_CONTROL_SHADER,
+         range,
+     };
+-    let mut uses = Vec::new();
+     if let DrawCall::Patches {
+         patch_index: Some(_),
+         ..
+@@ -3961,21 +4085,22 @@ fn draw_uses(
+         };
+         uses.push(control(UseTarget::ControlPointIndices, range));
+     }
+-    uses.extend(match *draw {
++    // At most two, in place: a draw's own uses allocate nothing past `uses`.
++    let own: [Option<ResourceUse>; 2] = match *draw {
+         // A mesh draw's arguments are its pipeline's to decide (`instantiate`).
+         DrawCall::Primitives { .. }
+         | DrawCall::Patches { .. }
+         | DrawCall::MeshThreadgroups { .. }
+         | DrawCall::MeshThreads { .. }
+-        | DrawCall::MeshThreadgroupsIndirect { .. } => Vec::new(),
++        | DrawCall::MeshThreadgroupsIndirect { .. } => [None, None],
+         DrawCall::Indexed {
+             index_type,
+             index_buffer,
+             index_count,
+             index_offset,
+             ..
+-        } => vec![index(index_bytes(index_type).map(|size| {
+-            ByteRange {
++        } => [
++            Some(index(index_bytes(index_type).map(|size| ByteRange {
+                 offset: 0,
+                 len: match overrun {
+                     None => u64::from(index_count) * size,
+@@ -3986,16 +4111,17 @@ fn draw_uses(
+                         u64::from(index_count.saturating_sub(past_end)) * size
+                     }
+                 },
+-            }
+-        }))],
++            }))),
++            None,
++        ],
+         DrawCall::Indirect { indexed: None, .. } | DrawCall::PatchesIndirect { .. } => {
+-            vec![indirect_use(16)]
++            [Some(indirect_use(16)), None]
+         }
+         DrawCall::Indirect {
+             indexed: Some(_), ..
+-        } => vec![index(None), indirect_use(20)],
+-    });
+-    uses
++        } => [Some(index(None)), Some(indirect_use(20))],
++    };
++    uses.extend(own.into_iter().flatten());
+ }
+ 
+ /// Bytes of one index of `ty`, when it is a fixed-size index type.
+diff --git a/crates/metal2vulkan/src/bind/instantiate.rs b/crates/metal2vulkan/src/bind/instantiate.rs
+index 3eb2f846..1acb2d83 100644
+--- a/crates/metal2vulkan/src/bind/instantiate.rs
++++ b/crates/metal2vulkan/src/bind/instantiate.rs
+@@ -25,6 +25,18 @@ pub struct PushConstantWrite {
+     pub bytes: Vec<u8>,
+ }
+ 
++impl PushConstantWrite {
++    /// A write of `bytes` at `offset` for `stages`: a consumer giving back the vectors of the
++    /// writes it took, which the next instantiation fills again.
++    pub fn new(stages: vk::ShaderStageFlags, offset: u32, bytes: Vec<u8>) -> Self {
++        Self {
++            stages,
++            offset,
++            bytes,
++        }
++    }
++}
++
+ /// Bytes the consumer uploads into the buffer behind a plan binding (argument table, handle
+ /// table) before recording the draw or dispatch.
+ #[non_exhaustive]
+@@ -469,6 +481,7 @@ pub(crate) fn bound_buffer(
+ }
+ 
+ /// What a draw or dispatch binds for the plan's buffer slots.
++#[derive(Default)]
+ pub(crate) struct BoundBuffers {
+     /// The range of every descriptor-form slot's buffer or inline bytes.
+     pub descriptor_ranges: Vec<DescriptorRange>,
+@@ -542,14 +555,22 @@ fn check_uniform_aliasing(buffers: &[PlannedBuffer], state: &BindState) -> Resul
+ pub(crate) fn bind_buffers(
+     buffers: &[PlannedBuffer],
+     state: &BindState,
++) -> Result<BoundBuffers, BindError> {
++    bind_buffers_in(buffers, state, BoundBuffers::default())
++}
++
++/// [`bind_buffers`] into `out`'s vectors, emptied first: a draw that keeps them from the last
++/// (`BindingPlan::instantiate_draw_into`) fills them without allocating.
++pub(crate) fn bind_buffers_in(
++    buffers: &[PlannedBuffer],
++    state: &BindState,
++    mut out: BoundBuffers,
+ ) -> Result<BoundBuffers, BindError> {
+     check_uniform_aliasing(buffers, state)?;
+-    let mut out = BoundBuffers {
+-        descriptor_ranges: Vec::new(),
+-        extents: Vec::new(),
+-        residuals: Vec::new(),
+-        statics: Vec::new(),
+-    };
++    out.descriptor_ranges.clear();
++    out.extents.clear();
++    out.residuals.clear();
++    out.statics.clear();
+     for pb in buffers {
+         let bound = bound_buffer(state, pb.slot, pb.bound)?;
+         let (bind_offset, length) = match bound {
+@@ -611,6 +632,67 @@ pub(crate) fn bind_buffers(
+     Ok(out)
+ }
+ 
++/// A push field's bytes as instantiation writes them: up to [`FieldBytes::INLINE`] bytes in place
++/// (every word and vector field, so a draw's fields allocate nothing), more in a vector (a capture
++/// layout, a dispatch region).
++pub(crate) enum FieldBytes {
++    Inline {
++        bytes: [u8; FieldBytes::INLINE],
++        len: u8,
++    },
++    Heap(Vec<u8>),
++}
++
++impl FieldBytes {
++    /// The most bytes held in place.
++    pub(crate) const INLINE: usize = 32;
++
++    /// `bytes`, copied.
++    pub(crate) fn of(bytes: &[u8]) -> FieldBytes {
++        bytes.iter().copied().collect()
++    }
++}
++
++impl std::ops::Deref for FieldBytes {
++    type Target = [u8];
++
++    fn deref(&self) -> &[u8] {
++        match self {
++            FieldBytes::Inline { bytes, len } => &bytes[..usize::from(*len)],
++            FieldBytes::Heap(bytes) => bytes,
++        }
++    }
++}
++
++impl From<Vec<u8>> for FieldBytes {
++    fn from(bytes: Vec<u8>) -> FieldBytes {
++        FieldBytes::Heap(bytes)
++    }
++}
++
++impl FromIterator<u8> for FieldBytes {
++    fn from_iter<I: IntoIterator<Item = u8>>(iter: I) -> FieldBytes {
++        let mut bytes = [0u8; FieldBytes::INLINE];
++        let mut iter = iter.into_iter();
++        for len in 0..=FieldBytes::INLINE {
++            let Some(byte) = iter.next() else {
++                return FieldBytes::Inline {
++                    bytes,
++                    len: len as u8,
++                };
++            };
++            if len == FieldBytes::INLINE {
++                let mut heap = bytes.to_vec();
++                heap.push(byte);
++                heap.extend(iter);
++                return FieldBytes::Heap(heap);
++            }
++            bytes[len] = byte;
++        }
++        unreachable!("the loop returns by its last pass")
++    }
++}
++
+ /// The bytes of a slot push field (`SlotBindOffset`: the residual, 0 unbound; `SlotGuestBase`: the
+ /// slot's `gpu_address + offset`, which is Metal's `nil`; `TextureLevels`: the level count the plan
+ /// bound; `InstanceCount`: the bound structure's instance count; `Specialized`: the value the plan
+@@ -621,7 +703,7 @@ pub(crate) fn slot_field(
+     residuals: &[(SlotRef, u32)],
+     resources: &crate::bind::plan::ResourceTemplate,
+     state: &BindState,
+-) -> Option<Vec<u8>> {
++) -> Option<FieldBytes> {
+     match field {
+         // The bound structure's instance count, 0 for an unbound slot.
+         PushField::InstanceCount(slot) => {
+@@ -630,38 +712,38 @@ pub(crate) fn slot_field(
+                 .get(&slot.stage)
+                 .and_then(|t| t.acceleration_structures.get(&slot.index))
+                 .map_or(0, |s| s.instance_count);
+-            Some(count.to_le_bytes().to_vec())
++            Some(FieldBytes::of(&count.to_le_bytes()))
+         }
+         // The level count the plan bound.
+         PushField::TextureLevels(slot) => resources
+             .texture_levels
+             .iter()
+             .find(|(s, _)| *s == slot)
+-            .map(|(_, levels)| levels.to_le_bytes().to_vec()),
++            .map(|(_, levels)| FieldBytes::of(&levels.to_le_bytes())),
+         // The value the bound resources decide, as the plan recorded it.
+         PushField::Specialized(key) => resources
+             .specialized
+             .iter()
+             .find(|(k, _)| *k == key)
+-            .map(|(_, value)| value.to_le_bytes().to_vec()),
++            .map(|(_, value)| FieldBytes::of(&value.to_le_bytes())),
+         // Whether the texture the plan bound holds 16-bit float channels.
+         PushField::TextureHalfChannels(slot) => resources
+             .texture_half_channels
+             .iter()
+             .find(|(s, _)| *s == slot)
+-            .map(|(_, half)| half.to_le_bytes().to_vec()),
++            .map(|(_, half)| FieldBytes::of(&half.to_le_bytes())),
+         // The integer channel widths of the texture the plan bound.
+         PushField::TextureIntegerChannels(slot) => resources
+             .texture_integer_channels
+             .iter()
+             .find(|(s, _)| *s == slot)
+-            .map(|(_, word)| word.to_le_bytes().to_vec()),
++            .map(|(_, word)| FieldBytes::of(&word.to_le_bytes())),
+         PushField::SlotBindOffset(slot) => {
+             let r = residuals
+                 .iter()
+                 .find(|(s, _)| *s == slot)
+                 .map_or(0, |r| r.1);
+-            Some(r.to_le_bytes().to_vec())
++            Some(FieldBytes::of(&r.to_le_bytes()))
+         }
+         PushField::SlotGuestBase(slot) => {
+             let base = match state
+@@ -676,7 +758,7 @@ pub(crate) fn slot_field(
+                 }) => gpu_address.wrapping_add(offset),
+                 _ => 0,
+             };
+-            Some(base.to_le_bytes().to_vec())
++            Some(FieldBytes::of(&base.to_le_bytes()))
+         }
+         _ => None,
+     }
+diff --git a/crates/metal2vulkan/src/device/policy.rs b/crates/metal2vulkan/src/device/policy.rs
+index 29b06675..7b4fe500 100644
+--- a/crates/metal2vulkan/src/device/policy.rs
++++ b/crates/metal2vulkan/src/device/policy.rs
+@@ -359,6 +359,11 @@ pub enum PaddedReadsPolicy {
+     /// the validation lane checks per driver (docs/FAST-PATHS.md, its known gaps).
+     #[default]
+     Alias,
++    /// [`PaddedReadsPolicy::Alias`] for every texture, a render target and a texture a shader
++    /// writes too: the driver's layout transitions and a render pass's load and store operations
++    /// may then write the bytes between the rows, which a program that keeps nothing there (a
++    /// window server's padded framebuffers) never reads. No copy in or out of a shadow image.
++    AliasWrites,
+     /// The runtime's shadow image of the texels, copied in from the buffer before each use: the
+     /// copies address the texels alone, so no byte between the rows is ever read or written
+     /// through an image.
+diff --git a/crates/metal2vulkan/src/device/profile.rs b/crates/metal2vulkan/src/device/profile.rs
+index 58c79ce4..2684ba6b 100644
+--- a/crates/metal2vulkan/src/device/profile.rs
++++ b/crates/metal2vulkan/src/device/profile.rs
+@@ -342,7 +342,30 @@ impl DeviceProfile {
+     /// The rendering streams into the hash: every compile takes the fingerprint for its key, and a
+     /// materialized rendering of a profile with a format table is tens of kilobytes that no
+     /// input-scaled ledger charge accounts for.
++    ///
++    /// Every compile takes it, and rendering a profile with a format table cost a twentieth of a
++    /// pipeline's translation, so the last few profiles' fingerprints are kept and found again by
++    /// equality of the fields, which is a structural comparison and holds under any mutation.
+     pub fn fingerprint(&self) -> Hash256 {
++        static KEPT: std::sync::Mutex<Vec<(ProfileFields, Hash256)>> =
++            std::sync::Mutex::new(Vec::new());
++        {
++            let kept = KEPT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
++            if let Some((_, h)) = kept.iter().find(|(f, _)| *f == self.fields) {
++                return *h;
++            }
++        }
++        let h = self.render_fingerprint();
++        let mut kept = KEPT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
++        if kept.len() >= 4 {
++            kept.remove(0);
++        }
++        kept.push((self.fields.clone(), h));
++        h
++    }
++
++    /// [`DeviceProfile::fingerprint`], rendered.
++    fn render_fingerprint(&self) -> Hash256 {
+         use sha2::{Digest, Sha256};
+         use std::fmt::Write as _;
+         struct Hashing(Sha256);
+diff --git a/crates/metal2vulkan/src/lower/arith/extended_range/blend.rs b/crates/metal2vulkan/src/lower/arith/extended_range/blend.rs
+index 0b004f25..ead0ad86 100644
+--- a/crates/metal2vulkan/src/lower/arith/extended_range/blend.rs
++++ b/crates/metal2vulkan/src/lower/arith/extended_range/blend.rs
+@@ -765,10 +765,16 @@ fn planned_for(
+     let narrow = narrow(eq);
+     // The rounded model holds for any blend into an `_sRGB` form, a mask of one color channel,
+     // and the color channels' blend color difference.
++    // An `_sRGB` form's blend the fast model does not hold (any but a narrow, unmasked one) takes
++    // the rounded model, Metal's own without fast math, measured for every `_sRGB` form (EV
++    // XRB-xrts-m4) and apart from its fast-math result only in roundings, rather than no pipeline:
++    // NanoUniverse's starfield (the Astronomy wallpaper, `BGRA10_XR_sRGB`) had none.
++    let math = if math == BlendMath::Fast && srgb && (!narrow || masked) {
++        BlendMath::Rounded
++    } else {
++        math
++    };
+     let fast = math == BlendMath::Fast;
+-    if fast && srgb && (!narrow || masked) {
+-        return Err(refused(ExtendedRangeBlend::SrgbForm));
+-    }
+     let opaque_ = !has_alpha;
+     let color = match colors {
+         0 => None,
+@@ -910,6 +916,13 @@ impl Blend {
+     /// Metal's model's: a `half4` one; a `float4` one under a blend whose color lanes take one term
+     /// alone, unmasked, rounded to `half` first; another is the gap it is.
+     pub fn takes(&self, output: Option<FloatFmt>) -> Result<(), Error> {
++        // The rounded model rounds a `float4` output to `half` first, as a `half4` one.
++        if self.math == BlendMath::Rounded {
++            return match output {
++                Some(FloatFmt::Half | FloatFmt::F32) => Ok(()),
++                _ => Err(refused(ExtendedRangeBlend::Output)),
++            };
++        }
+         match output {
+             Some(FloatFmt::Half) => Ok(()),
+             Some(FloatFmt::F32) if self.narrow && self.takes_float && !self.masked => Ok(()),
+diff --git a/crates/metal2vulkan/src/lower/arith/mod.rs b/crates/metal2vulkan/src/lower/arith/mod.rs
+index 54f371d8..57d7eeca 100644
+--- a/crates/metal2vulkan/src/lower/arith/mod.rs
++++ b/crates/metal2vulkan/src/lower/arith/mod.rs
+@@ -2415,6 +2415,7 @@ fn llvm_math(op: &LlvmIntrinsic) -> Result<Fun, Error> {
+             LlvmIntOp::Fshr => IntFn::Fshr,
+             LlvmIntOp::Bswap => IntFn::Bswap,
+             LlvmIntOp::Ctpop => IntFn::Popcount,
++            LlvmIntOp::Bitreverse => IntFn::ReverseBits,
+             LlvmIntOp::UAddSat => IntFn::AddSat(Sign::Unsigned),
+             LlvmIntOp::USubSat => IntFn::SubSat(Sign::Unsigned),
+             LlvmIntOp::SAddSat => IntFn::AddSat(Sign::Signed),
+diff --git a/crates/metal2vulkan/src/pipeline/compile.rs b/crates/metal2vulkan/src/pipeline/compile.rs
+index 6a67add1..c448dca0 100644
+--- a/crates/metal2vulkan/src/pipeline/compile.rs
++++ b/crates/metal2vulkan/src/pipeline/compile.rs
+@@ -1803,8 +1803,7 @@ fn specialize_one(r: &Request<'_>, m: &mut Meter) -> Result<Specialized, Error>
+         let kept = entries.specialized(fd, r.inputs.call_stack_depth(), m)?;
+         return Ok(Specialized::clone(&kept));
+     }
+-    let air_hash = container::sha256(r.bitcode);
+-    let mut decoded = air::decode(r.bitcode, m)?;
++    let (air_hash, mut decoded) = decode_kept(r.bitcode, m)?;
+     if let Some(f) = r.container {
+         decoded.abi.check_container(&decoded.module, f, m)?;
+     }
+@@ -1828,6 +1827,65 @@ fn specialize_one(r: &Request<'_>, m: &mut Meter) -> Result<Specialized, Error>
+     })
+ }
+ 
++/// The smallest module [`decode_kept`] keeps: below it a decode costs less than the copy.
++const KEPT_DECODE_BYTES: usize = 32 << 10;
++/// The modules [`decode_kept`] keeps, the most recently used first. A decoded QuartzCore uber
++/// module is 2.25 MB charged, so four bound the process's cost near 9 MB.
++const KEPT_DECODES: usize = 4;
++
++/// A module [`decode_kept`] decoded: its bytes, their SHA-256, the decode, and the ledger bytes the
++/// decode left charged.
++struct KeptDecode {
++    bytes: Arc<[u8]>,
++    sha: Hash256,
++    decoded: Arc<air::Decoded>,
++    charged: u64,
++}
++
++static KEPT: std::sync::Mutex<VecDeque<KeptDecode>> = std::sync::Mutex::new(VecDeque::new());
++
++/// The SHA-256 of `bitcode` and its decode. A process specializes the same few large modules over
++/// and over (an uber-shader's every variant: QuartzCore's `fixed_frag` modules, 113 KB of bitcode
++/// each, one per pipeline its render server makes), and decoding one was a sixth of a
++/// specialization. A module of at least [`KEPT_DECODE_BYTES`] is decoded once per process and
++/// kept (the last [`KEPT_DECODES`]), found again by its exact bytes; a later request takes a copy
++/// of the decode and charges `m` the bytes the first decode left charged, so the ledger stands as
++/// after a decode of its own. The decode is a pure function of the bytes.
++fn decode_kept(bitcode: &[u8], m: &mut Meter) -> Result<(Hash256, air::Decoded), Error> {
++    if bitcode.len() < KEPT_DECODE_BYTES {
++        return Ok((container::sha256(bitcode), air::decode(bitcode, m)?));
++    }
++    let found = {
++        let mut kept = KEPT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
++        kept.iter()
++            .position(|k| *k.bytes == *bitcode)
++            .and_then(|at| kept.remove(at))
++            .map(|k| {
++                let found = (k.sha, Arc::clone(&k.decoded), k.charged);
++                kept.push_front(k);
++                found
++            })
++    };
++    if let Some((sha, decoded, charged)) = found {
++        m.charge(usize::try_from(charged).unwrap_or(usize::MAX))?;
++        return Ok((sha, air::Decoded::clone(&decoded)));
++    }
++    let before = m.ledger();
++    let decoded = air::decode(bitcode, m)?;
++    let charged = m.ledger().saturating_sub(before);
++    let sha = container::sha256(bitcode);
++    let entry = KeptDecode {
++        bytes: Arc::from(bitcode),
++        sha,
++        decoded: Arc::new(decoded.clone()),
++        charged,
++    };
++    let mut kept = KEPT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
++    kept.push_front(entry);
++    kept.truncate(KEPT_DECODES);
++    Ok((sha, decoded))
++}
++
+ /// [`specialize_one`], then Metal's grouping of multiply chains (`lower::arith::regroup`) and of
+ /// fast-math sums (`lower::arith::reassoc`), and the order Apple's simdgroup lockstep gives
+ /// threadgroup accesses made explicit for `p`: the entry selection reads, whose instruction indices
+diff --git a/crates/metal2vulkan/src/reflection/function.rs b/crates/metal2vulkan/src/reflection/function.rs
+index e62075c5..812f3728 100644
+--- a/crates/metal2vulkan/src/reflection/function.rs
++++ b/crates/metal2vulkan/src/reflection/function.rs
+@@ -224,9 +224,12 @@ pub(crate) fn metallib_properties(
+                 2 => PatchType::Quad,
+                 _ => return Err(unmeasured()),
+             };
++            // A count of 0 is `[[patch(quad, 0)]]`: a patch with no control points, whose function
++            // reads its own data by `patch_id` (GFXBench's Car Chase draws its Bezier car body so).
++            // Metal answers it as stated: the patch type and 0.
+             let count = match byte >> 2 {
+                 63 => None,
+-                n @ 1..=32 => Some(u32::from(n)),
++                n @ 0..=32 => Some(u32::from(n)),
+                 _ => return Err(unmeasured()),
+             };
+             Some((kind, count))
+diff --git a/crates/metal2vulkan/src/tests/engine_arena.rs b/crates/metal2vulkan/src/tests/engine_arena.rs
+index b138b07a..6b1202f6 100644
+--- a/crates/metal2vulkan/src/tests/engine_arena.rs
++++ b/crates/metal2vulkan/src/tests/engine_arena.rs
+@@ -1366,7 +1366,7 @@ fn struct_dag_kernel(depth: u32, constant: bool) -> String {
+     let read = if constant {
+         types +=
+             &format!("@g = internal addrspace(2) constant %e{depth} zeroinitializer, align 4\n");
+-        "  %x = load i32, ptr %a, align 4\n  %y = load i32, ptr addrspace(2) @g, align 4\n  %v0 = add i32 %x, %y"
++        "  %x = load i32, ptr %a, align 4\n  %y = load volatile i32, ptr addrspace(2) @g, align 4\n  %v0 = add i32 %x, %y"
+     } else {
+         "  %v0 = load i32, ptr %a, align 4"
+     };
+@@ -1437,7 +1437,8 @@ fn a_struct_dag_is_planned_in_linear_work() {
+ }
+ 
+ /// A struct DAG within the function's room is typed, and keeps its values: `a`'s two words read
+-/// back what was stored, and `@g` (all zero) adds nothing. At 14 levels `@g` (planned first) takes
++/// back what was stored, and `@g` (all zero, read volatile so it
++/// stays in memory) adds nothing. At 14 levels `@g` (planned first) takes
+ /// the room and `a` has its place in the private arena; at 15 levels neither fits, so `@g` is in
+ /// the constant blob too. Each passes L3, and the values are the same typed (3 levels) and untyped
+ /// (15 levels). The CPU interpreter walks a struct type's every path to lay it out, so it does not
+@@ -1501,6 +1502,7 @@ fn a_struct_dag_keeps_its_values_typed_or_untyped() {
+ /// `%e13`) and `%big`'s `32,767 + extra`: with 17 extra members exactly `alloca::MAX_UNSHARED`
+ /// (65,536), with 18 one more. With `constant`, `%big` is the type of `@g`, a closed constant whose
+ /// DAG halves are zero and whose extra member `i` is `i + 1`, and `v0 = t + @g.2`, `v1 = @g.18`;
++/// (volatile reads, so the constant-load fold leaves `@g` in memory and the layout is what is tested);
+ /// otherwise of the alloca `a`, which stores `t` at byte 0 and 7 in member 2 (byte 65,536) and
+ /// reads them back as `v0` and `v1`.
+ fn room_kernel(extra: u32, constant: bool) -> String {
+@@ -1518,10 +1520,10 @@ fn room_kernel(extra: u32, constant: bool) -> String {
+             "@g = internal addrspace(2) constant %big {{ %e13 zeroinitializer, %e13 zeroinitializer{ints} }}, align 4\n"
+         );
+         r#"  %p2 = getelementptr inbounds %big, ptr addrspace(2) @g, i32 0, i32 2
+-  %g2 = load i32, ptr addrspace(2) %p2, align 4
++  %g2 = load volatile i32, ptr addrspace(2) %p2, align 4
+   %v0 = add i32 %t, %g2
+   %q = getelementptr inbounds %big, ptr addrspace(2) @g, i32 0, i32 18
+-  %v1 = load i32, ptr addrspace(2) %q, align 4"#
++  %v1 = load volatile i32, ptr addrspace(2) %q, align 4"#
+             .to_string()
+     } else {
+         r#"  %a = alloca %big, align 4

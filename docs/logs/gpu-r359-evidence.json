@@ -1,0 +1,94 @@
+{
+  "round": 359,
+  "verdict": "FAIL",
+  "scope": "Original UI deployment failed before native device open",
+  "cause": "Probe-only trust module omitted the existing system frontend hash and did not update the internal system-bundle ICD.",
+  "kernel_sha256": "9a68eab64731b56a226ba9f608e3f0f0e84d8f649d3fa53a0235717365e1eb6d",
+  "inputs": {
+    "files": {
+      "probe.metallib": "c4d6ef9f64c6f8cd34d775514e6e70205ff6c13224baeb21604a3e74afda4389",
+      "e5metal-probe": "f5be75a2d121d66bd2e28b261d105e2e5f38f56e40273b0751e9ed30d38d735b",
+      "lib/libvulkan_panfrost.link-audit.json": "fe5b025891516c8c905801cdf2468ec4c504c3dd660ca5108d793dec00b62004",
+      "lib/libvulkan_panfrost.dylib": "298561c528556b4fd74766ae9a7ad32d7d46bc33766337872c31b7fc13e500af",
+      "NativeE5Metal.bundle/NativeE5Metal": "ba26747603bc001e98e93f1f645bae65855b57ecbd6e81f60254d4ba9dd02903",
+      "NativeE5Metal.bundle/Info.plist": "744030aad04dc531396bbff6c6724024e69c72e64af89b97af6ea7e2327ed0e5",
+      "NativeE5Metal.bundle/_CodeSignature/CodeResources": "7d269767886b69539bf17beee4e59a956bf1a9adfb23cc891fbd7e96512262aa"
+    },
+    "binaries": [
+      {
+        "name": "e5metal-probe",
+        "relative_path": "e5metal-probe",
+        "sha256": "f5be75a2d121d66bd2e28b261d105e2e5f38f56e40273b0751e9ed30d38d735b",
+        "cdhash": "8ee403fc71a2be43206a743026f3ded6c17e23ce",
+        "bytes": 73168
+      },
+      {
+        "name": "libvulkan_panfrost.dylib",
+        "relative_path": "lib/libvulkan_panfrost.dylib",
+        "sha256": "298561c528556b4fd74766ae9a7ad32d7d46bc33766337872c31b7fc13e500af",
+        "cdhash": "52dcc638ab92e606e6abd658406ada66e3d4daf0",
+        "bytes": 16784368
+      },
+      {
+        "name": "NativeE5Metal",
+        "relative_path": "NativeE5Metal.bundle/NativeE5Metal",
+        "sha256": "ba26747603bc001e98e93f1f645bae65855b57ecbd6e81f60254d4ba9dd02903",
+        "cdhash": "5b7d837e178284f75a3017d4ca479f8f8bbebcf4",
+        "bytes": 19354736
+      }
+    ],
+    "host_reference": {
+      "returncode": 0,
+      "elapsed_seconds": 0.354501042,
+      "output": "E5MTL ENTRY pid=42603 reference=1\nE5MTL DEVICE Apple M5\nE5MTL COMPUTE PASS mismatch=0 first=17 last=1046546 fnv=310a459ce171d7db\nE5MTL VARY constant PASS mismatch=0 expected=37 actual=37,37,0,255 primitives=16 draws=2 fnv=3736682f769e0325\nE5MTL VARY vertex-id PASS mismatch=0 expected=15 actual=15,15,0,255 primitives=16 draws=2 fnv=931db5e2a3eba325\nE5MTL FETCH uint PASS mismatch=0 expected=232 actual=232,15,0,255 primitives=16 draws=2 fnv=27913629c1642325\nE5MTL FETCH unorm PASS mismatch=0 expected=120 actual=120,0,0,255 primitives=16 draws=2 fnv=88562405feafa325\nE5MTL VERDICT PASS\n"
+    }
+  },
+  "runner": {
+    "returncode": 0,
+    "elapsed_seconds": 938.445311458
+  },
+  "closeout": {
+    "round": 359,
+    "stage": "complete-data-verified",
+    "directory": "/Users/enceka/e5-work/sb-r359-metal-ui-descriptors",
+    "at": "2026-11-10T05:30:50.557207+08:00"
+  },
+  "data_after": {
+    "bytes": 4294967296,
+    "base_lba": 50339968,
+    "sha256": "49806d704080ace0f285b68053ca7a71e31d951314df6e1d67c2b5b410c22c7e",
+    "local_logical_sha256_verified": true,
+    "path": "/Users/enceka/e5-input-backups/r359-framebuffer-fetch-after/data-after.img",
+    "elapsed_seconds": 61.58111416700001,
+    "command": "set -o pipefail; dd if=/dev/block/mmcblk0 bs=1048576 skip=25774063616 count=4096 iflag=skip_bytes status=none | gzip -1c",
+    "transport": "gzip-crc"
+  },
+  "observations": [
+    "E5METALREG PASS class=AGXAccelerator plugin=NativeE5Metal entry=NativeE5MetalDevice",
+    "E5METALFS OVERLAY PASS executable=0",
+    "E5GPUMAP CHECK pid=57 name=backboardd target=2 err=0 prot=1 max=7/3 flags=40002 off=0 len=1276000",
+    "E5GPUMAP RESULT err=0 prot=1 max=3 len=1276000",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal' is adhoc signed.",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal': unsuitable CT policy 0 for this platform/device, rejecting signature.",
+    "check_signature[pid: 57]: error = 1",
+    "E5GPUMAP CHECK pid=57 name=backboardd target=2 err=0 prot=1 max=7/3 flags=40002 off=0 len=1276000",
+    "E5GPUMAP RESULT err=0 prot=1 max=3 len=1276000",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal' is adhoc signed.",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal': unsuitable CT policy 0 for this platform/device, rejecting signature.",
+    "check_signature[pid: 57]: error = 1",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal' is adhoc signed.",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal': unsuitable CT policy 0 for this platform/device, rejecting signature.",
+    "check_signature[pid: 29]: error = 1",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal' is adhoc signed.",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal': unsuitable CT policy 0 for this platform/device, rejecting signature.",
+    "check_signature[pid: 29]: error = 1",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal' is adhoc signed.",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal': unsuitable CT policy 0 for this platform/device, rejecting signature.",
+    "check_signature[pid: 190]: error = 1",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal' is adhoc signed.",
+    "AMFI: '/System/Library/Extensions/NativeE5Metal.bundle/NativeE5Metal': unsuitable CT policy 0 for this platform/device, rejecting signature.",
+    "check_signature[pid: 190]: error = 1"
+  ],
+  "original_ui_qualified": false,
+  "physical_observation": "deferred"
+}
